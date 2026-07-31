@@ -1,45 +1,70 @@
-# Work
+# Munaxa Work
 
-Reserved product root for **Munaxa Work**, the HCM product. **Nothing is implemented here yet** — this folder exists so the
-repository's shape is settled before development starts, and so the design system has a second
-real consumer to be designed against rather than a hypothetical one.
+**Munaxa Work** is the HCM product. This is its independent repository — it owns its own API,
+apps, database, migrations, infrastructure and CI, and depends on no other product.
+
+> **Nothing is implemented here yet.** The repository was separated out of the AXA monorepo
+> carrying this document and its history, so the shape and the guardrails are settled before
+> development starts — and so the shared design system has a second real consumer to be
+> designed against rather than a hypothetical one.
 
 ## What already exists for you
 
-The shared platform is done and is the single source of truth:
+The shared platform is done and is the single source of truth. Install it, don't rebuild it:
 
-| You need               | Where it comes from                                              |
-| ---------------------- | ---------------------------------------------------------------- |
-| Components             | `@axa/platform`                                              |
-| Design tokens          | `@axa/platform/tokens`                                       |
-| Icons                  | `@axa/platform/icons`                                        |
-| UI hooks               | `@axa/platform/hooks`                                        |
-| Theme registry         | `@axa/platform/themes`                                       |
-| The Work theme         | `@import '@axa/platform/css/themes/work';`                |
+| You need       | Where it comes from                 |
+| -------------- | ----------------------------------- |
+| Components     | `@munaxa/ui`                        |
+| Design tokens  | `@munaxa/tokens`                    |
+| Icons          | `@munaxa/icons`                     |
+| UI hooks       | `@munaxa/ui/hooks`                  |
+| Theme registry | `@munaxa/theme`                     |
+| Typography     | `@munaxa/typography`                |
+| The Work theme | `@import '@munaxa/theme/css/work';` |
 
-The Work palette is already authored — see
-[`platform/themes/work/`](../platform/themes/work). Nothing about starting Work
-requires touching the platform's colours.
+The Work palette is already authored inside
+[munaxa-platform](https://github.com/tam2om/munaxa-platform). Nothing about starting Work
+requires touching a colour.
 
 ## When you start
 
-1. Create the app(s) under `work/` using the same shape School uses
-   (`work/apps/*`, `work/packages/*`).
-2. Add the new paths to the root [`pnpm-workspace.yaml`](../pnpm-workspace.yaml) and, for any
-   package that emits declarations, to the root [`tsconfig.json`](../tsconfig.json) references.
-3. Depend on `"@axa/platform": "workspace:*"`.
+1. Create the app(s) under `apps/` and any product packages under `packages/`, following the
+   shape [munaxa-school](https://github.com/tam2om/munaxa-school) uses.
+2. Add each new package to [`pnpm-workspace.yaml`](pnpm-workspace.yaml) and, for anything that
+   emits declarations, to the `references` in [`tsconfig.json`](tsconfig.json).
+3. Depend on the platform by semantic version, e.g. `"@munaxa/ui": "^1.0.0"`.
 4. In the app's `globals.css`:
 
    ```css
    @import 'tailwindcss';
-   @import '@axa/platform/css/themes/work';
-   @source '../../../../platform/ui';
+   @import '@munaxa/theme/css/work';
+   @source '../../node_modules/@munaxa/platform/dist';
    ```
 
-   (Adjust the `@source` depth to the file's actual location — Tailwind v4 needs to scan the
-   platform's sources to emit the classes its components use.)
+   Tailwind v4 has to scan the design system's shipped sources to emit the classes its
+   components use. Point `@source` at the installed package — never at a path into another
+   repository.
 
-Read [`platform/CONTRIBUTING.md`](../platform/CONTRIBUTING.md) before adding any component —
-it is the mandatory standard for all work in the shared layer. Whether something belongs in the
-platform or in this product is the one decision that determines whether the shared layer stays
-reusable.
+## Setup
+
+Installing needs a GitHub token with `read:packages` on the `tam2om` org:
+
+```bash
+export GITHUB_TOKEN=<PAT with read:packages>
+pnpm install
+
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+All four run today against an empty workspace, so the first app added here is checked from its
+first commit.
+
+## Before you add anything shared
+
+Read [`ARCHITECTURE.md`](ARCHITECTURE.md) and the platform's `CONTRIBUTING.md`. Whether
+something belongs in the platform or in this product is the one decision that determines
+whether the shared layer stays reusable — and a component copied into a product is the exact
+failure this architecture exists to prevent.
