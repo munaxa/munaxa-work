@@ -121,6 +121,28 @@ A handler that fails after commit does not undo the write — it cannot, the tra
 durable. The error surfaces to the caller and the business fact stands, which is the honest
 outcome.
 
+## What the kernel gives you
+
+Never rebuild any of these in a module — that is what the shared kernel is for.
+
+| Need | Use |
+| ---- | --- |
+| Expected failure | `Result`, `ok`, `err` — domain rules return, they do not throw |
+| Violated invariant | `DomainException`, `ConcurrencyException`, `TenantIsolationException` |
+| Identifier | `uuidV7()` — time-ordered, so indexes stay dense |
+| Money | `Money` — integer minor units, currency exponent supplied, rounding stated |
+| Fractional amount | `Quantity` — leave balances accrue exactly |
+| Period | `DateRange` — half-open, so adjacent periods neither overlap nor gap |
+| History | `Timeline` — supersedes, never rewrites; one value per date, enforced |
+| Dates | `toHijri`, `fromHijri`, `serviceBetween` — calendar stated, never assumed |
+| Tenant-aware text | `LocalizedText` — cannot publish with a language missing |
+| Business rule | `evaluateRule`, `versionInForce` — deterministic, versioned, self-explaining |
+| Aggregate | `AggregateRoot` — records events, asserts its version |
+| Command / query | `Dispatcher` — tenancy, then authorization, then validation, then the handler |
+| Read model | `Projection`, `project`, `verifyRebuild` |
+| Approvals / notifications / documents | `ApprovalPort`, `NotificationPort`, `DocumentPort` (ADR-0024) |
+| Tests | `@work/testing` — `InMemoryUnitOfWork`, `RecordingDispatcher`, `permitting`, `anEvent` |
+
 ## Conventions worth knowing before your first commit
 
 **The environment is read once.** `packages/config` validates `process.env` at startup and

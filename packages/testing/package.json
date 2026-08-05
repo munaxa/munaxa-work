@@ -20,7 +20,7 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile node_modules/.cache/tsc-typecheck.tsbuildinfo",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
@@ -32,6 +32,7 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "@work/kernel": "workspace:*"
   }
 }

@@ -17,6 +17,7 @@ is, and the tooling — not review — is the enforcement point:
 | `tooling/typescript/standards.json`    | Compiler strictness                                                                                |
 | `scripts/check-standards.mjs`          | File and folder naming, file budgets, suppression and unfinished-work markers                      |
 | `scripts/check-architecture.mjs`       | Tenant-first schema, audit, versioning, soft delete, identifiers, `snake_case`                      |
+| `scripts/check-localization.mjs`       | Every catalogue complete in every required language                                                |
 | `.github/workflows/ci.yml`             | The quality gates, on every pull request                                                           |
 
 Run the whole set locally with `pnpm verify`.

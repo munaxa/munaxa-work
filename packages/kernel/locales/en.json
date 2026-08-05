@@ -1,0 +1,12 @@
+{
+  "error": {
+    "concurrency": "Someone else changed this while you were working on it. Reload and try again.",
+    "forbidden": "You do not have permission to do that.",
+    "notFound": "That no longer exists.",
+    "tenantIsolation": "That belongs to another organization."
+  },
+  "validation": {
+    "required": "{field} is required.",
+    "outOfRange": "{field} must be between {minimum} and {maximum}."
+  }
+}

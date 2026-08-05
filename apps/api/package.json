@@ -27,7 +27,8 @@
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "@work/kernel": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",

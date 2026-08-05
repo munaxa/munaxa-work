@@ -14,6 +14,7 @@ import {
 
 const tenant = (tenantId: string = uuidV7()): TenantContext => ({
   tenantId,
+  actor: 'user:tester',
   correlationId: uuidV7(),
 });
 
@@ -44,7 +45,10 @@ describe('tenant context', () => {
 
   it('rejects a tenant identifier that is not a valid identifier', () => {
     expect(() =>
-      runInContext({ tenantId: 'a-tenant', correlationId: uuidV7() }, () => null),
+      runInContext(
+        { tenantId: 'a-tenant', actor: 'user:tester', correlationId: uuidV7() },
+        () => null,
+      ),
     ).toThrow(TenantIsolationException);
   });
 

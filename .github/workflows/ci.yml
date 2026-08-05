@@ -17,7 +17,7 @@ env:
 
 jobs:
   standards:
-    name: Engineering standards · Architecture
+    name: Standards · Architecture · Localization
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -28,6 +28,9 @@ jobs:
 
       - name: Architecture
         run: node scripts/check-architecture.mjs
+
+      - name: Localization
+        run: node scripts/check-localization.mjs
 
   node:
     name: Lint · Typecheck · Test · Build

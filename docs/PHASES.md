@@ -16,7 +16,7 @@ ADRs updated.
 | —   | Phase specification template| [`00A_PHASE_SPECIFICATION_TEMPLATE.md`](../work%20prompts/00A_PHASE_SPECIFICATION_TEMPLATE.md)        | Adopted     |
 | —   | Localization & statutory    | [`00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md`](../work%20prompts/00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md) | Adopted |
 | 0   | Repository bootstrap        | [`01_PHASE_0_WORK_BOOTSTRAP.md`](../work%20prompts/01_PHASE_0_WORK_BOOTSTRAP.md)                      | Awaiting approval |
-| 1   | Foundation                  | [`02_PHASE_1_FOUNDATION.md`](../work%20prompts/02_PHASE_1_FOUNDATION.md)                              | In progress |
+| 1   | Foundation                  | [`02_PHASE_1_FOUNDATION.md`](../work%20prompts/02_PHASE_1_FOUNDATION.md)                              | Awaiting approval |
 | 1.1 | Architecture verification   | [`02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md`](../work%20prompts/02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md) | Not started |
 | 2   | Workforce identity          | [`03_PHASE_2_WORKFORCE_IDENTITY.md`](../work%20prompts/03_PHASE_2_WORKFORCE_IDENTITY.md)              | Not started |
 | 3   | Organization                | [`04_PHASE_3_ORGANIZATION.md`](../work%20prompts/04_PHASE_3_ORGANIZATION.md)                          | Not started |

@@ -5,6 +5,7 @@ import { loadProcessEnvironment } from '@work/config';
 import { environmentProvider } from './configuration/environment.provider.js';
 import { HealthModule } from './health/health.module.js';
 import { CorrelationMiddleware } from './observability/correlation.middleware.js';
+import { TenantMiddleware } from './tenancy/tenant.middleware.js';
 import { loggingOptions } from './observability/logging.js';
 
 /**
@@ -18,6 +19,7 @@ import { loggingOptions } from './observability/logging.js';
 })
 export class AppModule implements NestModule {
   public configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CorrelationMiddleware).forRoutes('*splat');
+    // Order matters: correlation first, so the tenant context can carry its identifier.
+    consumer.apply(CorrelationMiddleware, TenantMiddleware).forRoutes('*splat');
   }
 }

@@ -1,0 +1,12 @@
+{
+  "error": {
+    "concurrency": "قام شخص آخر بتغيير هذا أثناء عملك عليه. أعد التحميل وحاول مرة أخرى.",
+    "forbidden": "ليس لديك إذن للقيام بذلك.",
+    "notFound": "لم يعد هذا موجوداً.",
+    "tenantIsolation": "هذا يخص مؤسسة أخرى."
+  },
+  "validation": {
+    "required": "{field} مطلوب.",
+    "outOfRange": "{field} يجب أن يكون بين {minimum} و {maximum}."
+  }
+}

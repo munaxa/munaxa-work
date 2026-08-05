@@ -17,6 +17,9 @@ import { isUuidV7 } from '../identity/uuid-v7.js';
 
 export interface TenantContext {
   readonly tenantId: string;
+  /** Who is acting. Written to every audit column, so it is required rather than optional —
+   *  an audit row whose actor is unknown answers none of the questions audit exists for. */
+  readonly actor: string;
   readonly userId?: string;
   readonly correlationId: string;
 }

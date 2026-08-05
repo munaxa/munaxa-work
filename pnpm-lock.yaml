@@ -101,6 +101,9 @@ importers:
       '@work/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -394,6 +397,9 @@ importers:
 
   packages/testing:
     dependencies:
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       pg:
         specifier: ^8.13.1
         version: 8.22.0
