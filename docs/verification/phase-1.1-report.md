@@ -165,7 +165,19 @@ mothers, and assertions that name what actually happened.
 | Migration validation | Pass — applied to a fresh database |
 | Dependency audit | Pass |
 | Flutter analyze and test | Pass — 3.27.1 / Dart 3.6.0 |
-| Flutter APK build | **Not verified here** — needs the Android SDK; runs in CI |
+| Flutter APK build | **Not verifiable on this machine** — no Android SDK. Verified in CI, where it failed and was fixed (see below) |
+
+### The APK build, and what it caught
+
+This row was the one thing above that could not be run here, and it is the one thing that was
+wrong. On the first CI run the mobile job failed: *"your app is using an unsupported Gradle
+project"*. The application had been committed with its Dart sources and no platform host, so
+`flutter analyze` and `flutter test` passed for an application that could not be built.
+
+The host project is now committed and checked (ADR-0031), and the CI job pins Temurin 17 so the
+Gradle build does not depend on the runner image's default JDK. The lesson is recorded rather
+than smoothed over: a gate that cannot run locally is not a gate that can be assumed to pass, and
+this report was right to refuse to mark it green.
 
 ## 15. Performance verification
 
@@ -218,6 +230,7 @@ Stated plainly, because a register that omits the awkward entries is worse than 
 | `@work/contracts`, `@work/sdk`, `@work/country-packs` are empty | Placeholders | The phases that own them |
 | Cache health is `not-configured` | Redis is declared but unused | Whenever the first cache consumer arrives |
 | No rate limiting | An unauthenticated endpoint could be hammered | Before production exposure, Phase 24 at the latest |
+| The Android release build type signs with the debug keys | A release artefact built from this repository is not distributable | Phase 19.1, the phase that ships the mobile application. Only `--debug` is built in CI (ADR-0031) |
 
 No item above is a shortcut taken to move faster. Each is work a later phase owns.
 

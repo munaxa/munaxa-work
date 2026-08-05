@@ -110,6 +110,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Gradle 8.3, which the Android host project pins, supports Java 17 up to but not
+      # including Java 21. Pinning it here means the build does not depend on whichever JDK
+      # the runner image happens to default to this month.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.27.1

@@ -76,6 +76,20 @@ const SNAKE_CASE_ECOSYSTEMS = [
 ];
 const isSnakeCaseEcosystem = (file) => SNAKE_CASE_ECOSYSTEMS.some((pattern) => pattern.test(file));
 
+/**
+ * The Android host project (ADR-0031). Every name in it is chosen by the Android toolchain,
+ * not by us: resource folders are qualifiers the platform parses (`mipmap-hdpi`,
+ * `values-night`), a Kotlin file must carry the name of the class it declares, and the Gradle
+ * files answer to Gradle. It is checked against those rules rather than left unchecked.
+ */
+const ANDROID_HOST = /^apps\/mobile\/android\//;
+const ANDROID_FOLDER = /^[a-z0-9]+([_-][a-z0-9]+)*$/;
+const ANDROID_FILE = /^[a-z0-9]+([_-][a-z0-9]+)*(\.[a-z0-9]+)*$/;
+/** A Kotlin or Java file is named after its class, which is `PascalCase` by language rule. */
+const ANDROID_CLASS_FILE = /^[A-Z][A-Za-z0-9]*\.(kt|java)$/;
+/** Names the Android build looks up literally. */
+const ANDROID_FIXED_NAMES = new Set(['AndroidManifest.xml']);
+
 /** Dotfiles are named by the tool that reads them, in every ecosystem. */
 const DOTFILE = /^\./;
 /** Ecosystem files whose names are fixed by the tools that read them. */
@@ -113,7 +127,19 @@ const checkMarkers = (file) => {
   return lines.length;
 };
 
+const checkAndroidNaming = (file) => {
+  const segments = file.split('/');
+  const name = segments.pop();
+  for (const folder of segments) {
+    if (!ANDROID_FOLDER.test(folder)) fail(file, `Folder "${folder}" is not an Android name.`);
+  }
+  if (DOTFILE.test(name) || ANDROID_FIXED_NAMES.has(name) || ANDROID_CLASS_FILE.test(name)) return;
+  if (!ANDROID_FILE.test(name)) fail(file, `File "${name}" is not an Android name.`);
+};
+
 const checkNaming = (file) => {
+  if (ANDROID_HOST.test(file)) return checkAndroidNaming(file);
+
   const snake = isSnakeCaseEcosystem(file);
   const [filePattern, folderPattern, convention] = snake
     ? [SNAKE_FILE, SNAKE_FOLDER, 'snake_case']

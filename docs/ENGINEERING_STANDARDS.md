@@ -48,6 +48,7 @@ Inline lint directives are configured inert (`noInlineConfig`), so a committed
 | Constants                   | `UPPER_SNAKE_CASE` |
 | Files, folders (TypeScript) | `kebab-case`       |
 | Files, folders (Dart)       | `snake_case` (ADR-0029) |
+| Files, folders (Android host) | The Android toolchain's own names (ADR-0031) |
 | Database objects            | `snake_case`       |
 
 Wire formats — API payloads, database rows, HTTP headers — keep the names their protocol
