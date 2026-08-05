@@ -131,6 +131,16 @@ A handler that fails after commit does not undo the write — it cannot, the tra
 durable. The error surfaces to the caller and the business fact stands, which is the honest
 outcome.
 
+## Foundation documentation
+
+| Document | Answers |
+| -------- | ------- |
+| [Foundation architecture](foundation/architecture.md) | What Phase 1 built and why each piece is shaped that way |
+| [Dependency diagram](foundation/dependency-diagram.md) | What may depend on what, and the rules that encodes |
+| [Module guide](foundation/module-guide.md) | How to add a business module |
+| [CQRS guide](foundation/cqrs-guide.md) | Commands, queries, the pipeline, failure kinds |
+| [Event guide](foundation/event-guide.md) | The envelope, publication, versioning, naming |
+
 ## What the kernel gives you
 
 Never rebuild any of these in a module — that is what the shared kernel is for.
@@ -151,7 +161,8 @@ Never rebuild any of these in a module — that is what the shared kernel is for
 | Command / query | `Dispatcher` — tenancy, then authorization, then validation, then the handler |
 | Read model | `Projection`, `project`, `verifyRebuild` |
 | Approvals / notifications / documents | `ApprovalPort`, `NotificationPort`, `DocumentPort` (ADR-0024) |
-| Tests | `@work/testing` — `InMemoryUnitOfWork`, `RecordingDispatcher`, `permitting`, `anEvent` |
+| Feature flag | `InMemoryFeatureFlags` — user beats tenant beats default; unknown is off |
+| Tests | `@work/testing` — `InMemoryUnitOfWork`, `FakeRepository`, `permitting`, `assertEventRaised` |
 
 ## Conventions worth knowing before your first commit
 
