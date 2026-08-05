@@ -188,9 +188,38 @@ an intermittent failure for somebody else to find.
 | Production build (12 packages) | Pass |
 | Migration validation | Pass — applied to a fresh database |
 | Prisma schema validation | Pass |
-| Flutter analyze, test, APK build | **Not verifiable here** — no Flutter toolchain on this machine. CI runs it, unchanged by this phase |
+| Flutter analyze, test, APK build | **Not verifiable here** — no Flutter toolchain on this machine. Verified in CI: passed |
 
 `pnpm verify` passes end to end.
+
+### What CI caught that this machine did not
+
+The first CI run failed with `relation "delegation" does not exist`, and the reason is worth
+recording rather than fixing quietly.
+
+The workflow starts a PostgreSQL service and points `TEST_DATABASE_URL` at it, but never applied
+the migrations — and until this phase nothing needed it, because the foundation's isolation test
+creates its own throwaway table and applies the policy procedure to it by hand. Phase 2's suites
+are the first that exercise the *real* schema: its policies, its unique indexes, its check
+constraints. Locally they passed because this machine's database had been migrated by hand hours
+earlier, which is exactly the difference a developer machine hides.
+
+Two changes followed. The workflow now applies migrations between install and test. And the
+fixture refuses up front, naming the cause, rather than letting whichever statement touched a
+missing table first report a symptom:
+
+```
+Workforce Identity's tables are not in this database: delegation, … These suites exercise the
+real schema — its policies, indexes and check constraints — so run `pnpm db:migrate` against
+TEST_DATABASE_URL first.
+```
+
+Both were verified by reproducing the condition: the suites were run against a database carrying
+only the foundation migration (the message above), and then against a fresh database following
+CI's exact sequence — migrate, then test — where all 149 passed.
+
+The lesson is the one Phase 1.1 recorded about the APK build, in a new place: a gate that passes
+locally because of state the checkout does not carry has not really been run.
 
 ### Security
 
