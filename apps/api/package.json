@@ -18,7 +18,6 @@
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
-    "@nestjs/terminus": "^11.0.0",
     "@prisma/client": "^6.2.0",
     "@work/config": "workspace:*",
     "class-transformer": "^0.5.1",

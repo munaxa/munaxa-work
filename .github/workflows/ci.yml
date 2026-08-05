@@ -32,6 +32,9 @@ jobs:
       - name: Localization
         run: node scripts/check-localization.mjs
 
+      - name: Dependencies
+        run: node scripts/check-dependencies.mjs
+
   node:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest

@@ -17,7 +17,7 @@ ADRs updated.
 | —   | Localization & statutory    | [`00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md`](../work%20prompts/00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md) | Adopted |
 | 0   | Repository bootstrap        | [`01_PHASE_0_WORK_BOOTSTRAP.md`](../work%20prompts/01_PHASE_0_WORK_BOOTSTRAP.md)                      | Awaiting approval |
 | 1   | Foundation                  | [`02_PHASE_1_FOUNDATION.md`](../work%20prompts/02_PHASE_1_FOUNDATION.md)                              | Awaiting approval |
-| 1.1 | Architecture verification   | [`02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md`](../work%20prompts/02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md) | Not started |
+| 1.1 | Architecture verification   | [`02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md`](../work%20prompts/02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md) | Awaiting approval |
 | 2   | Workforce identity          | [`03_PHASE_2_WORKFORCE_IDENTITY.md`](../work%20prompts/03_PHASE_2_WORKFORCE_IDENTITY.md)              | Not started |
 | 3   | Organization                | [`04_PHASE_3_ORGANIZATION.md`](../work%20prompts/04_PHASE_3_ORGANIZATION.md)                          | Not started |
 | 4   | People master registry      | [`05_PHASE_4_PEOPLE_MASTER_REGISTRY.md`](../work%20prompts/05_PHASE_4_PEOPLE_MASTER_REGISTRY.md)      | Not started |
@@ -62,6 +62,10 @@ Decimal phases are phases, not options. They close the gaps identified in
 [`ROADMAP_ANALYSIS.md`](ROADMAP_ANALYSIS.md) between the original specification set and the
 capability an enterprise HCM must ship in this market. They run in numeric order alongside the
 whole numbers.
+
+**Verification** — Phase 1.1 passed on 2026-08-05. The report, the technical debt register and
+the production-readiness assessment are in
+[`verification/phase-1.1-report.md`](verification/phase-1.1-report.md).
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
