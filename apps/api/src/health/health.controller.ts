@@ -1,8 +1,17 @@
-import { Controller, Get, Inject, VERSION_NEUTRAL } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  ServiceUnavailableException,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Environment } from '@work/config';
+import { checkDatabase } from '@work/persistence';
+import type { Pool } from 'pg';
 
 import { ENVIRONMENT } from '../configuration/environment.provider.js';
+import { DATABASE_POOL } from '../persistence/database.module.js';
 
 /**
  * Liveness, readiness and health, as three distinct questions:
@@ -30,7 +39,10 @@ export interface HealthResponse {
 @ApiTags('health')
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
-  public constructor(@Inject(ENVIRONMENT) private readonly environment: Environment) {}
+  public constructor(
+    @Inject(ENVIRONMENT) private readonly environment: Environment,
+    @Inject(DATABASE_POOL) private readonly pool: Pool,
+  ) {}
 
   @Get('live')
   @ApiOperation({ summary: 'Liveness probe' })
@@ -39,27 +51,37 @@ export class HealthController {
     return { status: 'ok' };
   }
 
+  /**
+   * Readiness depends on the database, because an application that cannot reach it can accept
+   * a request but cannot answer one. Reporting ready regardless is how an orchestrator routes
+   * traffic into a process that will only return errors.
+   */
   @Get('ready')
   @ApiOperation({ summary: 'Readiness probe' })
   @ApiOkResponse({ description: 'The application can serve traffic.' })
-  public ready(): LivenessResponse {
-    // Phase 1 adds the database and cache checks that make this meaningful. Until a dependency
-    // exists, readiness and liveness are the same question honestly answered.
+  public async ready(): Promise<LivenessResponse> {
+    const database = await checkDatabase(this.pool);
+
+    if (database.status === 'down') {
+      throw new ServiceUnavailableException('Not ready: the database is unreachable.');
+    }
     return { status: 'ok' };
   }
 
   @Get()
   @ApiOperation({ summary: 'Application health and build information' })
   @ApiOkResponse({ description: 'Health, version and dependency status.' })
-  public health(): HealthResponse {
+  public async health(): Promise<HealthResponse> {
+    const database = await checkDatabase(this.pool);
+
     return {
-      status: 'ok',
+      status: database.status === 'up' ? 'ok' : 'degraded',
       service: this.environment.APP_NAME,
       version: this.environment.APP_VERSION,
       build: this.environment.BUILD_SHA,
       uptimeSeconds: Math.floor(process.uptime()),
       dependencies: {
-        database: 'not-configured',
+        database: database.status,
         cache: this.environment.REDIS_URL === undefined ? 'not-configured' : 'up',
       },
     };

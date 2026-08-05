@@ -22,7 +22,9 @@ const TENANT_A = '01920000-0000-7000-8000-0000000000aa';
 const TENANT_B = '01920000-0000-7000-8000-0000000000bb';
 
 const policySql = readFileSync(
-  fileURLToPath(new URL('../../../prisma/sql/row-level-security.sql', import.meta.url)),
+  fileURLToPath(
+    new URL('../../../prisma/migrations/00000000000000_foundation/migration.sql', import.meta.url),
+  ),
   'utf8',
 );
 

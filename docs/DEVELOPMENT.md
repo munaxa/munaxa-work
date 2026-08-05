@@ -81,7 +81,7 @@ reports it.
 Three mechanisms, layered (ADR-0030), because a cross-tenant disclosure cannot be walked back:
 
 1. Every business table carries `tenant_id`, enforced by `scripts/check-architecture.mjs`.
-2. PostgreSQL row-level security refuses the query — `prisma/sql/row-level-security.sql`.
+2. PostgreSQL row-level security refuses the query — applied by the foundation migration.
 3. The application sets `app.tenant_id` per transaction and repositories filter by tenant.
 
 The application role must not be a superuser and must not hold `BYPASSRLS`. A superuser bypasses
@@ -94,8 +94,18 @@ closed. It skips without a database locally and **refuses to skip in CI**.
 
 ```bash
 pnpm db:up
+pnpm db:migrate     # applies the policies; without it, startup refuses
 TEST_DATABASE_URL=postgresql://work:work@localhost:5432/work pnpm test
 ```
+
+The application **will not start** against a database where isolation is not enforced. Two
+configurations are refused: a connection whose role can bypass row-level security (a superuser,
+or one holding `BYPASSRLS`), and a database where the migration has not been applied. Both are
+single mistakes that would otherwise leave every policy silently inert while the application
+looks healthy.
+
+Migrations run as a privileged role; the application connects as an unprivileged one that owns
+no tables.
 
 ## Writing through the Unit of Work
 

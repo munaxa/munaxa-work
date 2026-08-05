@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { configureApplication } from '../application.setup.js';
 import { ENVIRONMENT } from '../configuration/environment.provider.js';
+import { DATABASE_POOL } from '../persistence/database.module.js';
 import type { ProblemDetails } from '../errors/problem-details.filter.js';
 import { CorrelationMiddleware } from '../observability/correlation.middleware.js';
 
@@ -35,9 +36,18 @@ const testEnvironment: Environment = loadEnvironment({
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/work',
 });
 
+/**
+ * A pool that answers the health round trip without a database. The controller's contract is
+ * what is under test here; the real round trip is covered by the persistence integration tests.
+ */
+const stubPool = { query: () => Promise.resolve({ rows: [{ '?column?': 1 }] }) };
+
 @Module({
   controllers: [HealthController, FailingController],
-  providers: [{ provide: ENVIRONMENT, useValue: testEnvironment }],
+  providers: [
+    { provide: ENVIRONMENT, useValue: testEnvironment },
+    { provide: DATABASE_POOL, useValue: stubPool },
+  ],
 })
 class TestModule {}
 
@@ -78,7 +88,7 @@ describe('health and error contract', () => {
     expect(health.status).toBe('ok');
     expect(health.service).toBe('munaxa-work-test');
     expect(health.version).toBe('0.0.0-test');
-    expect(health.dependencies.database).toEqual(expect.any(String));
+    expect(health.dependencies.database).toBe('up');
     expect(health.uptimeSeconds).toBeGreaterThanOrEqual(0);
   });
 
