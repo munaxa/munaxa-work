@@ -2,7 +2,8 @@
   "extends": ["@munaxa/config-typescript/base.json", "../../tooling/typescript/standards.json"],
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

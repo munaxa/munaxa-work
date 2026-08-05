@@ -75,6 +75,27 @@ A rule is changed by an ADR in [`adr/`](adr/), never by a suppression. There is 
 escape hatch: `noInlineConfig` makes a committed `eslint-disable` inert, and the standards gate
 reports it.
 
+## Tenant isolation
+
+Three mechanisms, layered (ADR-0030), because a cross-tenant disclosure cannot be walked back:
+
+1. Every business table carries `tenant_id`, enforced by `scripts/check-architecture.mjs`.
+2. PostgreSQL row-level security refuses the query — `prisma/sql/row-level-security.sql`.
+3. The application sets `app.tenant_id` per transaction and repositories filter by tenant.
+
+The application role must not be a superuser and must not hold `BYPASSRLS`. A superuser bypasses
+every policy in the file while every test still passes, so `app_isolation_diagnostics()` reports
+it and startup refuses to serve.
+
+`packages/testing/src/tenant-isolation.integration.test.ts` proves the property against a real
+database: reads, inserts, updates and deletes across tenants, and the no-tenant case failing
+closed. It skips without a database locally and **refuses to skip in CI**.
+
+```bash
+pnpm db:up
+TEST_DATABASE_URL=postgresql://work:work@localhost:5432/work pnpm test
+```
+
 ## Conventions worth knowing before your first commit
 
 **The environment is read once.** `packages/config` validates `process.env` at startup and

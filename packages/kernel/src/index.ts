@@ -6,9 +6,9 @@
  * or every module inherits the first leak.
  *
  * Phase 1, in progress. Delivered so far: results and domain exceptions, time-ordered
- * identifiers, calendar-aware dates, money, and service periods. Still to come: Entity and
- * AggregateRoot, domain events and the dispatcher, repositories and Unit of Work, tenant
- * context, the CQRS pipeline, the rule engine, effective dating and timeline projections.
+ * identifiers, calendar-aware dates, money, service periods, and tenant context. Still to come:
+ * Entity and AggregateRoot, domain events and the dispatcher, repositories and Unit of Work,
+ * the CQRS pipeline, the rule engine, effective dating and timeline projections.
  */
 
 export { all, err, flatMap, isErr, isOk, map, ok, unwrap } from './result/result.js';
@@ -21,6 +21,15 @@ export {
 } from './errors/domain-exception.js';
 
 export { isUuidV7, timestampOf, uuidV7 } from './identity/uuid-v7.js';
+
+export {
+  assertBelongsToCurrentTenant,
+  currentContext,
+  currentTenantId,
+  isSystemContext,
+  runInContext,
+} from './tenancy/tenant-context.js';
+export type { ExecutionContext, SystemContext, TenantContext } from './tenancy/tenant-context.js';
 
 export { formatCalendarDate, fromHijri, toGregorian, toHijri, toInstant } from './time/calendar.js';
 export type { CalendarDate, CalendarSystem } from './time/calendar.js';
