@@ -16,6 +16,16 @@ env:
   PNPM_VERSION: '10.33.0'
 
 jobs:
+  standards:
+    name: Engineering standards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # Deliberately runs before (and without) `pnpm install`: the standards gate must not
+      # depend on the package registry being reachable. See docs/ENGINEERING_STANDARDS.md.
+      - name: Engineering standards
+        run: node scripts/check-standards.mjs
+
   node:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest

@@ -53,14 +53,24 @@ Installing needs a GitHub token with `read:packages` on the `tam2om` org:
 export GITHUB_TOKEN=<PAT with read:packages>
 pnpm install
 
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+pnpm verify   # standards · format · lint · typecheck · test · build
 ```
 
-All four run today against an empty workspace, so the first app added here is checked from its
-first commit.
+Every gate runs today against an empty workspace, so the first app added here is checked from
+its first commit. `pnpm standards` on its own needs no install and no registry access.
+
+## The standards are enforced, not advisory
+
+[`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) is mandatory for every module,
+package and phase. Complexity limits, file budgets, naming, layer dependency direction and the
+ban on `any` / `@ts-ignore` / `eslint-disable` are enforced by
+[`tooling/eslint/standards.mjs`](tooling/eslint/standards.mjs),
+[`tooling/typescript/standards.json`](tooling/typescript/standards.json) and
+[`scripts/check-standards.mjs`](scripts/check-standards.mjs), and they fail CI.
+
+Every app and package must spread the standards layer after its Platform config — see
+[Adopting the standards in a package](docs/ENGINEERING_STANDARDS.md#adopting-the-standards-in-a-package).
+A standard is changed by an ADR in [`docs/adr/`](docs/adr/), never by a suppression.
 
 ## Before you add anything shared
 

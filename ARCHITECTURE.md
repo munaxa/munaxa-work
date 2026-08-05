@@ -33,6 +33,20 @@ If something shared is missing, add it to
 component copied into a product is the failure mode this whole architecture exists to
 prevent.
 
+## Layers inside this repository
+
+Business code is layered, and the dependency direction is one-way:
+
+```text
+domain  ◄──  application  ◄──  infrastructure  ◄──  api  ◄──  presentation
+```
+
+`domain` holds business rules and depends on nothing — no framework, no ORM, no transport.
+`application` holds use cases. `infrastructure` holds persistence and external integrations.
+`api` is transport, `presentation` is UI. Violating the direction is a lint error, not a review
+comment: the rules live in [`tooling/eslint/standards.mjs`](tooling/eslint/standards.mjs) and
+the full standard in [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md).
+
 ## Branding
 
 Branding is configuration, not code. The only visual difference between this product and
@@ -65,5 +79,5 @@ munaxa-work/
 
 No application code has been written yet. This repository was separated out of the AXA
 monorepo carrying the product's README and its history; the workspace, task graph, lint and
-TypeScript configuration, registry auth and CI above are real and run today, so the first
-app added here is checked from its first commit.
+TypeScript configuration, engineering standards, registry auth and CI above are real and run
+today, so the first app added here is checked from its first commit.

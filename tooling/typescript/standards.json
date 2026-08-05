@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "//": "Munaxa Work compiler strictness required by docs/ENGINEERING_STANDARDS.md. This is an overlay, not a base: list it after the Platform config so it applies on top of whichever one the package uses. TypeScript 5 resolves an array of `extends` left to right.  \"extends\": [\"@munaxa/config-typescript/nestjs.json\", \"../../tooling/typescript/standards.json\"]",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "forceConsistentCasingInFileNames": true
+  }
+}
