@@ -86,6 +86,15 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # A business module's integration suites exercise the real schema — its row-level security
+      # policies, its unique indexes and its check constraints — so the real migrations have to
+      # be applied first. Before Phase 2 nothing needed this: the foundation's isolation test
+      # creates its own throwaway table and applies the policy procedure to it by hand.
+      - name: Apply migrations
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://work:work@localhost:5432/work
+
       - name: Test
         run: pnpm test
         env:

@@ -33,9 +33,31 @@ If something shared is missing, add it to
 component copied into a product is the failure mode this whole architecture exists to
 prevent.
 
-## Layers inside this repository
+## Modules
 
-Business code is layered, and the dependency direction is one-way:
+Business code is module-first (ADR-0023). A module is the unit that could one day be extracted
+to a service, which is only true if everything it needs is inside it:
+
+```text
+packages/modules/<module>/
+├── domain/           business rules — no framework, no ORM, no transport
+├── application/      use cases: command and query handlers
+├── infrastructure/   repositories and adapters — the only place a driver appears
+├── contracts/        the public surface other modules may depend on
+└── api/              transport: controllers, DTOs, OpenAPI
+```
+
+Exactly three things cross a module boundary: its **application services**, its **public
+contracts**, and its **domain events**. Its repositories, its tables and its Prisma client are
+private, and the lint layer enforces that rather than a review comment.
+
+| Module | Owns | Phase |
+| ------ | ---- | ----- |
+| [`identity`](docs/modules/identity.md) | Workforce identity: tenant membership, invitations, portal access, employment links, delegation | 2 |
+
+## Layers inside a module
+
+Layers live inside a module, never above it, and the dependency direction is one-way:
 
 ```text
 domain  ◄──  application  ◄──  infrastructure  ◄──  api  ◄──  presentation
@@ -46,6 +68,14 @@ domain  ◄──  application  ◄──  infrastructure  ◄──  api  ◄�
 `api` is transport, `presentation` is UI. Violating the direction is a lint error, not a review
 comment: the rules live in [`tooling/eslint/standards.mjs`](tooling/eslint/standards.mjs) and
 the full standard in [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md).
+
+## Tenancy
+
+Every request's tenant comes from a stored `tenant_membership` row, keyed on the principal
+Platform authenticated — never from a header, a path segment or a body (ADR-0032). Underneath
+that, PostgreSQL row-level security refuses the query even if the application were wrong
+(ADR-0030). Authentication and authorization themselves belong to Platform; this repository holds
+the seams they plug into and no implementation of either.
 
 ## Branding
 

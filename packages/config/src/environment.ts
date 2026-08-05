@@ -42,6 +42,25 @@ export const environmentSchema = z.object({
   DEFAULT_LOCALE: z.string().min(2).default('en'),
   DEFAULT_CALENDAR: z.enum(['gregorian', 'hijri']).default('gregorian'),
   DEFAULT_TIME_ZONE: z.string().min(1).default('UTC'),
+  DEFAULT_NUMERALS: z.enum(['western', 'arabic-indic']).default('western'),
+
+  /**
+   * Workforce Identity defaults. They are configuration rather than constants because a tenant
+   * with a slow onboarding process and one that expects same-day acceptance are both ordinary,
+   * and hardcoding either would make the other wrong. Per-tenant overrides arrive with
+   * Organization in Phase 3; until then these are the deployment's answer for every tenant.
+   */
+  INVITATION_VALIDITY_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  DEFAULT_PORTALS: z
+    .string()
+    .default('employee')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((portal) => portal.trim())
+        .filter((portal) => portal !== ''),
+    )
+    .pipe(z.array(z.enum(['employee', 'manager', 'admin'])).min(1)),
 
   OPENAPI_ENABLED: booleanFromEnvironment(true),
 });

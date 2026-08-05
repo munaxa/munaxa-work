@@ -83,8 +83,15 @@ export class Dispatcher {
    * Runs a command through the pipeline: tenancy, then authorization, then validation, then the
    * handler. In that order deliberately — an unauthorized caller learns nothing about whether
    * their payload was well formed.
+   *
+   * Generic over the command type as well as the result. With a bare `Command` parameter,
+   * TypeScript narrows an object literal at the call site to `Command` and rejects every field
+   * the command actually carries, so each caller would have to assert — and an assertion at
+   * every call site is an assertion nobody reads.
    */
-  public async send<TResult>(command: Command): Promise<Result<TResult, HandlerFailure>> {
+  public async send<TResult, TCommand extends Command = Command>(
+    command: TCommand,
+  ): Promise<Result<TResult, HandlerFailure>> {
     const handler = this.registry.commands.get(command.commandName);
 
     if (handler === undefined) {
@@ -102,7 +109,9 @@ export class Dispatcher {
     return (await handler.handle(command)) as Result<TResult, HandlerFailure>;
   }
 
-  public async ask<TResult>(query: Query): Promise<Result<TResult, HandlerFailure>> {
+  public async ask<TResult, TQuery extends Query = Query>(
+    query: TQuery,
+  ): Promise<Result<TResult, HandlerFailure>> {
     const handler = this.registry.queries.get(query.queryName);
 
     if (handler === undefined) {

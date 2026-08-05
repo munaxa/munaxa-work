@@ -1,36 +1,85 @@
-import { Injectable, type NestMiddleware } from '@nestjs/common';
+import { Inject, Injectable, Logger, type NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { isUuidV7, runInContext, type ExecutionContext } from '@work/kernel';
+import { runInContext, type ExecutionContext, type PlatformAuthenticationPort } from '@work/kernel';
+import type { IdentityRequestContext, TenantMembershipDirectory } from '@work/identity';
 
 import type { CorrelatedRequest } from '../observability/correlation.middleware.js';
+import { AUTHENTICATION_PORT, MEMBERSHIP_DIRECTORY } from '../identity/identity.tokens.js';
 
-export const TENANT_HEADER = 'x-tenant-id';
+import { actorFor, resolveForPrincipal } from './tenant-resolution.js';
 
 /**
- * Establishes the tenant context for the request, so everything downstream — handlers,
- * repositories, the Unit of Work, row-level security — is scoped without being told.
+ * The header a caller uses to say *which* of their tenants they mean. It selects; it never
+ * grants. See `tenant-resolution.ts`.
+ */
+export const TENANT_HEADER = 'x-munaxa-tenant';
+const AUTHORIZATION_HEADER = 'authorization';
+
+/**
+ * Establishes who the caller is and which tenant they are acting in, for the rest of the
+ * request.
  *
- * Until Phase 2 wires Platform authentication, the tenant arrives as a header. That is
- * deliberately temporary and deliberately narrow: an absent or unparseable tenant produces no
- * context at all rather than a default, and every tenant-scoped operation then refuses. The
- * request fails; it never quietly runs unscoped.
+ * Two steps, in this order, and neither is optional:
+ *
+ *   1. **Platform authenticates.** Munaxa Work verifies nothing itself; it hands the presented
+ *      credentials to Platform's adapter and receives a principal or nothing (ADR-0001).
+ *   2. **A stored membership chooses the tenant.** Not a header. The header may narrow the set
+ *      of tenants this person is already an active member of, and can do nothing else.
+ *
+ * When either step yields nothing, **no context is established at all**. That is deliberate and
+ * it is the safe direction: the kernel's `currentTenantId()` throws outside a tenant context and
+ * row-level security returns no rows when `app.tenant_id` is unset, so a request that gets this
+ * far unresolved fails closed on both layers rather than running as somebody.
+ *
+ * It remains middleware rather than a guard because the context is async-local and has to wrap
+ * everything downstream, which only `next()` inside `runInContext` achieves.
  */
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
-  public use(request: Request, _response: Response, next: NextFunction): void {
-    const header = request.headers[TENANT_HEADER];
-    const tenantId = Array.isArray(header) ? header[0] : header;
-    const correlated = request as CorrelatedRequest;
+  private readonly logger = new Logger(TenantMiddleware.name);
 
-    if (tenantId === undefined || !isUuidV7(tenantId)) {
+  public constructor(
+    @Inject(AUTHENTICATION_PORT) private readonly authentication: PlatformAuthenticationPort,
+    @Inject(MEMBERSHIP_DIRECTORY) private readonly directory: TenantMembershipDirectory,
+  ) {}
+
+  public async use(request: Request, _response: Response, next: NextFunction): Promise<void> {
+    const correlated = request as CorrelatedRequest;
+    // Typed alias rather than a cast at each assignment, matching the correlation middleware.
+    // Nothing else in the process writes these two fields.
+    const identified = request as Request & IdentityRequestContext;
+    const principal = await this.authentication.authenticate(credentialsFrom(request));
+
+    if (principal === undefined) {
+      next();
+      return;
+    }
+    identified.principal = principal;
+
+    const resolution = await resolveForPrincipal(
+      this.directory,
+      principal,
+      headerValue(request, TENANT_HEADER),
+    );
+
+    if (resolution.kind !== 'resolved') {
+      // Logged at debug because these are ordinary outcomes — a new starter with no membership,
+      // a client that forgot to name a tenant — not incidents. A refused tenant *claim* is
+      // different, and says so.
+      this.logger.debug(
+        `Tenant unresolved (${resolution.kind}) for principal ${principal.platformUserId}.`,
+      );
       next();
       return;
     }
 
+    identified.membership = resolution.membership;
+
     const context: ExecutionContext = {
-      tenantId,
+      tenantId: resolution.membership.tenantId,
       correlationId: correlated.correlationId,
-      actor: 'user:anonymous',
+      actor: actorFor(resolution.membership),
+      userId: resolution.membership.workforceUserId,
     };
 
     runInContext(context, () => {
@@ -38,3 +87,28 @@ export class TenantMiddleware implements NestMiddleware {
     });
   }
 }
+
+const headerValue = (request: Request, header: string): string | undefined => {
+  const value = request.headers[header];
+  return Array.isArray(value) ? value[0] : value;
+};
+
+/**
+ * Splits the Authorization header into a scheme and a value, and does nothing else with it.
+ *
+ * Deliberately not parsed further: a token this repository can decode is a token this repository
+ * would eventually be tempted to trust, and verifying it is Platform's job (AD-001).
+ */
+const credentialsFrom = (
+  request: Request,
+): { readonly scheme: string; readonly value: string } | undefined => {
+  const header = headerValue(request, AUTHORIZATION_HEADER);
+
+  if (header === undefined) return undefined;
+
+  const separator = header.indexOf(' ');
+
+  return separator === -1
+    ? { scheme: 'Bearer', value: header }
+    : { scheme: header.slice(0, separator), value: header.slice(separator + 1) };
+};

@@ -1,9 +1,12 @@
 // Munaxa Work — the product's own schema, shared with no one.
 //
-// No models exist yet: Phase 0 bootstraps, it implements no business functionality. The first
-// model arrives in Phase 2, and scripts/check-architecture.mjs will hold it to the rules that
-// outlive every phase — tenant_id, the audit columns, soft delete, version and snake_case
-// mapping. See docs/MASTER_INSTRUCTIONS.md.
+// Every model here obeys the rules that outlive every phase, enforced by
+// scripts/check-architecture.mjs: tenant_id, the audit columns, soft delete, version, a UUIDv7
+// identifier and snake_case mapping. A model that is genuinely global says so with a
+// `/// @global <reason>` comment, and there is exactly one — see ADR-0033.
+//
+// Row-level security is applied by the migration that creates each table, never afterwards
+// (ADR-0030). See docs/MASTER_INSTRUCTIONS.md.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,4 +15,178 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/// @global one-row-per-Platform-account: a person who works for two tenants is one person (ADR-0033)
+model WorkforceUser {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  platform_user_id String    @unique @db.VarChar(255)
+  status           String    @db.VarChar(32)
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@index([status], map: "workforce_user_status_idx")
+  @@map("workforce_user")
+}
+
+model TenantMembership {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  workforce_user_id String    @db.Uuid
+  status            String    @db.VarChar(32)
+  invited_at        DateTime? @db.Timestamptz(6)
+  joined_at         DateTime? @db.Timestamptz(6)
+  ended_at          DateTime? @db.Timestamptz(6)
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@unique([tenant_id, workforce_user_id], map: "tenant_membership_tenant_user_key")
+  @@index([workforce_user_id, status], map: "tenant_membership_user_status_idx")
+  @@index([tenant_id, status], map: "tenant_membership_tenant_status_idx")
+  @@map("tenant_membership")
+}
+
+model Invitation {
+  id                            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                     String    @db.Uuid
+  email                         String    @db.VarChar(320)
+  portals                       String[]
+  status                        String    @db.VarChar(32)
+  issued_at                     DateTime  @db.Timestamptz(6)
+  expires_at                    DateTime  @db.Timestamptz(6)
+  accepted_at                   DateTime? @db.Timestamptz(6)
+  accepted_by_workforce_user_id String?   @db.Uuid
+  created_at                    DateTime  @db.Timestamptz(6)
+  created_by                    String    @db.VarChar(255)
+  updated_at                    DateTime  @db.Timestamptz(6)
+  updated_by                    String    @db.VarChar(255)
+  deleted_at                    DateTime? @db.Timestamptz(6)
+  deleted_by                    String?   @db.VarChar(255)
+  version                       Int
+
+  @@index([tenant_id, status], map: "invitation_tenant_status_idx")
+  @@index([tenant_id, email], map: "invitation_tenant_email_idx")
+  @@index([status, expires_at], map: "invitation_expiry_sweep_idx")
+  @@map("invitation")
+}
+
+model PortalAssignment {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  membership_id String    @db.Uuid
+  portal        String    @db.VarChar(32)
+  status        String    @db.VarChar(32)
+  granted_at    DateTime  @db.Timestamptz(6)
+  revoked_at    DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@unique([tenant_id, membership_id, portal], map: "portal_assignment_membership_portal_key")
+  @@index([tenant_id, membership_id, status], map: "portal_assignment_membership_status_idx")
+  @@map("portal_assignment")
+}
+
+model EmploymentLink {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  membership_id String    @db.Uuid
+  /// Employment's identifier (Phase 5). Referenced by identity only — deliberately no foreign
+  /// key, because a foreign key here would couple this module's schema to another module's.
+  employment_id String    @db.Uuid
+  is_primary    Boolean
+  status        String    @db.VarChar(32)
+  linked_at     DateTime  @db.Timestamptz(6)
+  unlinked_at   DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@unique([tenant_id, membership_id, employment_id], map: "employment_link_membership_employment_key")
+  @@index([tenant_id, employment_id], map: "employment_link_employment_idx")
+  @@index([tenant_id, membership_id, status], map: "employment_link_membership_status_idx")
+  @@map("employment_link")
+}
+
+model Delegation {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  delegator_membership_id  String    @db.Uuid
+  delegate_membership_id   String    @db.Uuid
+  scope                    String    @db.VarChar(128)
+  effective_from           DateTime  @db.Timestamptz(6)
+  effective_to             DateTime  @db.Timestamptz(6)
+  status                   String    @db.VarChar(32)
+  reason                   String    @db.VarChar(512)
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@index([tenant_id, delegate_membership_id, status], map: "delegation_delegate_status_idx")
+  @@index([tenant_id, delegator_membership_id, status], map: "delegation_delegator_status_idx")
+  @@index([status, effective_to], map: "delegation_expiry_sweep_idx")
+  @@map("delegation")
+}
+
+model BusinessProfile {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  membership_id  String    @db.Uuid
+  /// Language tag to text. Both first-class languages are present before a row is written.
+  display_name   Json
+  job_title      Json?
+  business_email String?   @db.VarChar(320)
+  business_phone String?   @db.VarChar(64)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@unique([tenant_id, membership_id], map: "business_profile_membership_key")
+  @@map("business_profile")
+}
+
+model UserPreference {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  membership_id String    @db.Uuid
+  language      String    @db.VarChar(35)
+  calendar      String    @db.VarChar(16)
+  time_zone     String    @db.VarChar(64)
+  numerals      String    @db.VarChar(16)
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@unique([tenant_id, membership_id], map: "user_preference_membership_key")
+  @@map("user_preference")
 }

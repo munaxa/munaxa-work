@@ -1,0 +1,133 @@
+{
+  "identity": {
+    "rejection": {
+      "workforce_user_not_activatable": "لا يمكن تفعيل هذا الحساب من حالته الراهنة.",
+      "workforce_user_not_suspendable": "لا يمكن إيقاف إلا حساب فعّال.",
+      "workforce_user_not_reinstatable": "لا يمكن إعادة تفعيل إلا حساب موقوف.",
+      "workforce_user_already_deactivated": "سبق تعطيل هذا الحساب.",
+
+      "membership_not_suspendable": "لا يمكن إيقاف إلا عضو فعّال.",
+      "membership_not_reinstatable": "لا يمكن إعادة تفعيل إلا عضو موقوف.",
+      "membership_not_rejoinable": "لم يغادر هذا الشخص، فلا شيء يُستأنف.",
+      "membership_already_ended": "سبق أن غادر هذا الشخص هذه المؤسسة.",
+
+      "invitation_already_pending": "توجد دعوة مفتوحة لهذا العنوان. أعد إرسالها بدل إصدار دعوة أخرى.",
+      "invitation_expiry_not_in_future": "يجب أن تنتهي صلاحية الدعوة في وقت لاحق.",
+      "invitation_not_pending": "سبق الرد على هذه الدعوة أو سحبها.",
+      "invitation_expired": "انتهت صلاحية هذه الدعوة. اطلب دعوة جديدة.",
+      "invitation_not_yet_expired": "لم تنته صلاحية هذه الدعوة بعد.",
+      "invitation_addressed_to_someone_else": "أُرسلت هذه الدعوة إلى عنوان مختلف.",
+
+      "portal_assignment_not_granted": "هذه البوابة غير مفتوحة حالياً لهذا العضو.",
+      "portal_assignment_not_revoked": "هذه البوابة مفتوحة أصلاً لهذا العضو.",
+
+      "employment_link_not_linked": "لم تعد هذه الوظيفة مرتبطة بهذا العضو.",
+      "employment_link_already_primary": "هذه هي الوظيفة الأساسية للعضو أصلاً.",
+
+      "delegation_to_self": "لا يمكن لشخص أن يفوّض نفسه.",
+      "delegation_period_inverted": "يجب أن تنتهي فترة التفويض بعد بدايتها.",
+      "delegation_period_already_elapsed": "انقضت تلك الفترة بالفعل.",
+      "delegation_already_revoked": "سبق سحب هذا التفويض.",
+      "delegation_already_expired": "سبق أن انتهى هذا التفويض.",
+      "delegation_not_expirable": "سبق سحب هذا التفويض أو انتهاؤه.",
+      "delegation_still_in_force": "هذا التفويض ما زال سارياً.",
+      "delegation_not_scheduled": "لا يمكن بدء إلا تفويض مجدول.",
+      "delegation_not_yet_in_force": "لم يبدأ هذا التفويض بعد.",
+      "delegate_not_active": "لا يُمنح التفويض إلا لعضو فعّال.",
+
+      "business_profile_name_required": "الاسم المعروض مطلوب.",
+      "business_profile_name_incomplete": "الاسم المعروض مطلوب بـ{languages} أيضاً.",
+
+      "preference_language_invalid": "\"{language}\" ليست لغة.",
+      "preference_time_zone_unknown": "\"{timeZone}\" ليست منطقة زمنية معروفة.",
+      "preference_numerals_invalid": "\"{numerals}\" ليس نظام أرقام يدعمه هذا المنتج."
+    },
+    "status": {
+      "user": {
+        "provisioned": "مُهيَّأ",
+        "active": "فعّال",
+        "suspended": "موقوف",
+        "deactivated": "معطّل"
+      },
+      "membership": {
+        "active": "فعّال",
+        "suspended": "موقوف",
+        "ended": "غادر"
+      },
+      "invitation": {
+        "pending": "بانتظار الرد",
+        "accepted": "مقبولة",
+        "revoked": "مسحوبة",
+        "expired": "منتهية"
+      },
+      "portal": {
+        "granted": "مفتوحة",
+        "revoked": "مسحوبة"
+      },
+      "employment": {
+        "linked": "مرتبطة",
+        "unlinked": "غير مرتبطة"
+      },
+      "delegation": {
+        "scheduled": "مجدول",
+        "active": "ساري",
+        "revoked": "مسحوب",
+        "expired": "منتهٍ"
+      }
+    },
+    "portal": {
+      "employee": "بوابة الموظف",
+      "manager": "بوابة المدير",
+      "admin": "الإدارة"
+    },
+    "label": {
+      "members": "الأشخاص",
+      "invitations": "الدعوات",
+      "displayName": "الاسم المعروض",
+      "jobTitle": "المسمى الوظيفي",
+      "businessEmail": "البريد الإلكتروني للعمل",
+      "businessPhone": "هاتف العمل",
+      "language": "اللغة",
+      "calendar": "التقويم",
+      "timeZone": "المنطقة الزمنية",
+      "numerals": "الأرقام",
+      "primaryEmployment": "الوظيفة الأساسية",
+      "delegatedTo": "ينوب عنه",
+      "delegatedFrom": "ينوب عن",
+      "effectiveFrom": "من",
+      "effectiveTo": "حتى",
+      "reason": "السبب",
+      "joinedAt": "تاريخ الانضمام",
+      "endedAt": "تاريخ المغادرة"
+    },
+    "calendar": {
+      "gregorian": "ميلادي",
+      "hijri": "هجري"
+    },
+    "numerals": {
+      "western": "غربية (0–9)",
+      "arabic-indic": "عربية هندية (٠–٩)"
+    },
+    "action": {
+      "invite": "دعوة شخص",
+      "resendInvitation": "إعادة الإرسال",
+      "withdrawInvitation": "سحب الدعوة",
+      "suspend": "إيقاف",
+      "reinstate": "إعادة التفعيل",
+      "end": "إنهاء العضوية",
+      "grantPortal": "فتح البوابة",
+      "revokePortal": "سحب البوابة",
+      "linkEmployment": "ربط وظيفة",
+      "unlinkEmployment": "فك ارتباط الوظيفة",
+      "makePrimary": "جعلها الوظيفة الأساسية",
+      "delegate": "ترتيب تفويض",
+      "revokeDelegation": "سحب التفويض"
+    },
+    "empty": {
+      "members": "لم ينضم أحد إلى هذه المؤسسة بعد.",
+      "invitations": "لا توجد دعوات مفتوحة.",
+      "employments": "لا يشغل هذا الشخص أي وظيفة هنا.",
+      "delegations": "لا يوجد تفويض مرتب."
+    }
+  }
+}

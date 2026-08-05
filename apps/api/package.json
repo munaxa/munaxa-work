@@ -2,7 +2,7 @@
   "name": "@work/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Munaxa Work API. Transport only — no business logic.",
+  "description": "Munaxa Work API. Transport only \u2014 no business logic.",
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
@@ -29,7 +29,8 @@
     "rxjs": "^7.8.1",
     "@work/kernel": "workspace:*",
     "@work/persistence": "workspace:*",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "@work/identity": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
@@ -45,6 +46,7 @@
     "supertest": "^7.0.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.0",
-    "@types/pg": "^8.11.10"
+    "@types/pg": "^8.11.10",
+    "@work/testing": "workspace:*"
   }
 }

@@ -183,3 +183,41 @@ colour, and never reach past the API into a domain — the lint layer enforces a
 
 **Tests boot the real composition.** `configureApplication` is shared by `main.ts` and the API
 tests, so routing, prefixes, validation and the error filter are tested as they actually run.
+
+## Running the integration tests without Docker
+
+The suites that prove tenant isolation need a real PostgreSQL, because the property under test
+belongs to the database rather than to our code. `pnpm db:up` starts one with Docker; where
+Docker is unavailable, a local cluster works just as well:
+
+```bash
+export PATH=/usr/lib/postgresql/16/bin:$PATH
+initdb -D /tmp/pgdata -U work --auth=trust
+pg_ctl -D /tmp/pgdata -o '-p 5432 -k /tmp/pgrun -c listen_addresses=127.0.0.1' -l /tmp/pgdata/log start
+psql "postgresql://work@127.0.0.1:5432/postgres" -c "create database work" \
+                                                 -c "alter user work with password 'work'"
+
+DATABASE_URL=postgresql://work:work@127.0.0.1:5432/work pnpm db:migrate
+TEST_DATABASE_URL=postgresql://work:work@127.0.0.1:5432/work pnpm test
+```
+
+The migration user must be privileged; the suites create their own unprivileged roles and
+connect as those, because a test that ran as a superuser would prove nothing about row-level
+security — a superuser bypasses every policy.
+
+## Running the API locally
+
+The API refuses to serve without an authenticated principal, and this repository ships no
+authentication (Platform owns it — ADR-0001). Until Platform's adapter is wired in, every
+business endpoint answers 401 and the health probes answer normally. That is the intended state,
+not a misconfiguration:
+
+```bash
+$ curl -s http://localhost:3000/api/v1/identity/members | jq .title
+"Unauthorized"
+$ curl -s http://localhost:3000/health/live | jq .status
+"ok"
+```
+
+The application must connect as a role that owns no tables and holds no `BYPASSRLS`; it checks at
+startup and exits if it can bypass isolation (ADR-0030).
