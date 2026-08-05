@@ -109,19 +109,31 @@ apps/
 
 packages/
 
-    domain/
+    kernel/            # Shared Kernel — Phase 1
 
-    application/
+    modules/           # one folder per business module
 
-    infrastructure/
+        <module>/
 
-    contracts/
+            domain/
+
+            application/
+
+            infrastructure/
+
+            contracts/
+
+            api/
+
+    contracts/         # cross-module public contract index
 
     sdk/
 
     testing/
 
     config/
+
+    country-packs/     # statutory content — Phase 11.1
 
 prisma/
 
@@ -130,9 +142,17 @@ docs/
 .github/
 
 scripts/
+
+tooling/
 ```
 
 No additional folders unless justified.
+
+The structure is module-first, and this resolves the conflict between the earlier draft of this
+phase — which grouped packages by layer — and `02_PHASE_1_FOUNDATION.md`, which groups by
+module. Module-first is the shape every later phase assumes: module independence, per-module
+registration, and eventual extraction to services. Layers exist inside a module, never above it.
+See ADR-0023.
 
 ---
 
@@ -233,6 +253,11 @@ Connects to API.
 Uses Platform branding.
 
 No business screens.
+
+Bootstrapping only. Mobile functionality is delivered by
+`20A_PHASE_19.1_MOBILE_APPLICATIONS.md`, which is a required phase and not an optional
+companion — for most of an enterprise workforce the mobile application is the only interface
+they will use.
 
 ---
 

@@ -309,6 +309,57 @@ LTR
 
 No assumptions about country.
 
+Arabic and English are both first-class from the first screen.
+
+Gregorian and Hijri are both accepted for input and both available for display. Calendar
+conversion is a Shared Kernel capability implemented once, in Phase 1, and never inside a
+business module.
+
+The binding rules are in `00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md`.
+
+---
+
+# Statutory Ownership
+
+The architecture holds the abstraction. The country pack holds the law.
+
+No business module contains country logic. No country pack contains business logic.
+
+Statutory behaviour — end of service, social insurance, tax, statutory leave, wage protection
+and government reporting — resolves through a versioned country pack, keyed from the Legal
+Entity of the Employment and never from the Tenant.
+
+Statutory rules are financial code: deterministic, versioned with effective dates, traceable to
+their inputs and rule version, and covered by golden-case tests citing the published source.
+
+A tenant may operate several countries at once.
+
+---
+
+# Self Service Is Transactional
+
+Self-service applications never edit master data.
+
+Every employee or manager action is a transaction — a request that carries its own approval,
+validation and audit, and that mutates business data only through the owning domain's
+Application Service after approval.
+
+This applies to leave, attendance corrections, overtime, claims, and personal data changes
+alike. A changed bank account is an approved transaction, not a saved form.
+
+---
+
+# Mobile
+
+Mobile is a first-class client, not a companion.
+
+For most of an enterprise workforce — site staff, shift workers, drivers, field teams — the
+mobile application is the only interface they will ever use.
+
+Mobile consumes the same versioned APIs as the portals, duplicates no business logic, and
+carries no advertising or third-party marketing. An application holding an employee's salary
+and medical claims does not monetize its audience.
+
 ---
 
 # Security
@@ -508,6 +559,15 @@ No future phase may begin before the previous phase satisfies its acceptance cri
 Skipping phases is prohibited.
 
 Changing completed architecture requires an ADR and explicit approval.
+
+Decimal phases (1.1, 4.1, 5.1, 5.2, 5.3, 10.1, 11.1, 11.2, 12.1, 13.1, 19.1) are phases, not
+options. They run in numeric order alongside the whole numbers.
+
+Every phase specification follows `00A_PHASE_SPECIFICATION_TEMPLATE.md`, and every phase
+satisfies the production-readiness criteria stated there. A phase whose feature works but whose
+production-readiness criteria are unmet is not done.
+
+The ledger of phase status is `docs/PHASES.md`.
 
 ---
 

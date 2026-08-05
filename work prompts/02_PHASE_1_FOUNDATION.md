@@ -152,7 +152,102 @@ PagedResult
 
 CursorResult
 
+BusinessDate
+
+Calendar conversion — Gregorian and Hijri (Umm al-Qura), implemented once, here
+
+ServicePeriod — whole-day service duration on a stated calendar
+
+Quantity — fractional day and hour quantities with explicit rounding
+
+Percentage
+
+LocalizedText
+
+ApprovalPort
+
+NotificationPort
+
+DocumentPort
+
+RuleDefinition and RuleEvaluator
+
+EffectiveDatedCollection
+
+TimelineProjection
+
 Domain modules must consume these abstractions.
+
+---
+
+# Ports Required Before Their Engines Exist
+
+Workflow is Phase 16 and Communications is Phase 17, but Attendance, Leave, Compensation,
+Payroll, Recruitment and every other operational domain need approvals and notifications long
+before those phases run.
+
+Phase 1 therefore defines
+
+ApprovalPort
+
+NotificationPort
+
+DocumentPort
+
+with in-process default adapters. Business domains depend on the port from their first commit.
+Phases 16 and 17 supply the real adapters and nothing in a business domain changes.
+
+Retrofitting approvals into five completed domains is prohibited. See ADR-0024.
+
+---
+
+# Rule Engine
+
+Provide one shared rule and formula engine.
+
+It is consumed by
+
+Leave accrual and eligibility
+
+Attendance exception evaluation
+
+Compensation eligibility
+
+Payroll formulas
+
+Benefit eligibility
+
+Loan eligibility
+
+Statutory country packs
+
+Compliance rules
+
+Rules are versioned definitions with effective dates. Evaluation is deterministic, sandboxed,
+side-effect free, and explains its result — which rule, which version, which inputs, which
+intermediate values.
+
+One engine. No module implements its own.
+
+---
+
+# Localization Infrastructure
+
+Provide
+
+Translation catalogue loading and resolution
+
+Locale resolution: tenant default, user override
+
+Direction resolution
+
+Calendar preference resolution
+
+Number, date and currency formatting per locale
+
+Translation completeness verification, enforced in CI
+
+No user-visible string is authored in a business module without a catalogue key.
 
 ---
 
@@ -595,6 +690,16 @@ ADR-0004 Module Boundaries
 ✓ Tenant infrastructure implemented
 
 ✓ Module registration implemented
+
+✓ Calendar conversion implemented and tested against published Umm al-Qura data
+
+✓ Approval, Notification and Document ports defined with in-process adapters
+
+✓ Rule engine implemented, deterministic and self-explaining
+
+✓ Localization infrastructure implemented, completeness enforced in CI
+
+✓ Projection rebuild-from-events implemented as a foundation capability
 
 ✓ Foundation documentation completed
 

@@ -324,6 +324,51 @@ No country logic is hardcoded.
 
 Government integrations are isolated behind provider interfaces.
 
+The content and format of every government submission belongs to the country pack
+(`12A_PHASE_11.1`). This phase owns only connectivity, transmission, acknowledgement and retry.
+
+Required adapters, delivered per country pack priority
+
+Wage protection submission and acknowledgement
+
+Social insurance registration, contribution and settlement
+
+Residency, permit and visa status enquiry and renewal
+
+Labor office contract registration where required
+
+Tax filing where applicable
+
+Each adapter records the submission, the acknowledgement, the reference issued by the authority,
+and any discrepancy between what was submitted and what was accepted. A submission with no
+recorded acknowledgement is an open item, never a success.
+
+---
+
+# Attendance Device Integrations
+
+Support biometric and access-control devices as first-class inbound connectors
+
+Device registration, health and heartbeat
+
+Scheduled and real-time punch collection
+
+Device clock divergence detection and reporting
+
+Backfill after device or network outage, without duplicating events
+
+Employee-to-device enrolment mapping
+
+Devices deliver raw events to Attendance through its Application Service. No device vendor
+appears anywhere in a business module.
+
+---
+
+# Banking Integrations
+
+Support payment file transmission, acknowledgement and return-file reconciliation. The file
+format belongs to the country pack; transmission belongs here.
+
 ---
 
 # Synchronization

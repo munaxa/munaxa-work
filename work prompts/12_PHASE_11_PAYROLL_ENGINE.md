@@ -424,6 +424,69 @@ Payment File
 
 Audit Trail
 
+End of Service Provision — the accrued liability for the period, reported before it is paid
+
+Loan Instalments Confirmed
+
+Authorized Deductions Applied
+
+Statutory Contribution Files
+
+---
+
+# Statutory Behaviour
+
+Payroll performs no statutory calculation of its own.
+
+Every statutory figure — end of service, social insurance, tax, statutory leave payment,
+wage protection formatting — is produced by the country pack defined in
+`12A_PHASE_11.1_STATUTORY_COUNTRY_PACKS.md`, resolved from the Legal Entity of the Employment.
+
+Payroll orchestrates. The pack computes. Neither contains the other's logic.
+
+Every statutory figure on a payslip explains itself: which rule, which pack version, which
+inputs.
+
+---
+
+# Final Settlement
+
+Support final settlement as a first-class payroll type.
+
+A settlement assembles, each from its owning domain
+
+End of service entitlement, from the country pack, driven by the termination reason recorded
+on the Employment
+
+Accrued leave encashment, from Leave
+
+Outstanding loan balance, from Loans
+
+Authorized deductions, from Employee Relations and Assets
+
+Pending approved claims, from Claims
+
+Notice pay or payment in lieu, per the country pack
+
+Final period earnings
+
+Payroll computes none of these. It requests, assembles, applies the configured order of
+recovery, and produces one auditable result.
+
+Offboarding requests the settlement. Payroll owns the calculation of the run.
+
+---
+
+# Recurring Deduction Instructions
+
+Payroll consumes authorized deduction instructions from other domains — loans, disciplinary
+penalties, asset non-return, claim recoveries.
+
+Payroll enforces the configured net-pay protection floor. When a deduction cannot be taken in
+full, Payroll applies the configured priority order, takes what it may, and reports the
+shortfall to the originating domain. Payroll never decides whether a deduction is lawful; it
+decides only whether it fits.
+
 ---
 
 # Retro Payroll

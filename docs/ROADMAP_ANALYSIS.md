@@ -115,6 +115,40 @@ Biometric punches for a large tenant are the highest-volume table in the system 
 magnitude. Partitioning, retention and projection-refresh strategy should be decided when the
 Attendance schema is written, not after.
 
+## Status of this analysis
+
+The gaps identified below were verified against menaitech.com and against a recording of
+**MenaME-Plus+** (app v3.2.30, backend MenaHRMS v7.8.2208.08) running in a live deployment, and
+have since been **closed in the specification set**: eight new phases (4.1, 5.1, 5.2, 5.3, 10.1,
+11.1, 11.2, 12.1, 13.1, 19.1), two cross-cutting frameworks
+([`00A`](../work%20prompts/00A_PHASE_SPECIFICATION_TEMPLATE.md) and
+[`00B`](../work%20prompts/00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md)), and amendments to
+Phases 0, 1, 3, 8, 9, 11, 12, 13, 15, 18 and 22. ADR-0023 through ADR-0028 record the decisions.
+
+The competitor's shipped suite is CURIO® (HR and talent), MenaPAY® (payroll), MenaME® and
+MenaME-Plus+® (self-service web and mobile), MenaTA® (attendance), MenaBI® (analytics),
+Mena360® (feedback), MenaSME®, plus MenaLMS and MenaAI-TA. They claim 19+ countries, ISO/IEC
+27001:2022, and named Saudi government integrations for wage protection, social insurance and
+residency.
+
+What the live application additionally showed, and what each finding changed:
+
+| Observed | Changed |
+| -------- | ------- |
+| Dual Gregorian/Hijri date entry on every request | Calendar conversion moved into the Phase 1 Shared Kernel (ADR-0027) |
+| Fractional balances, and a projected end-of-year balance beside the current one | Phase 9 now specifies fractional accrual and three balance queries |
+| Nationality carried on the transaction | Statutory rules keyed by nationality in the country pack (ADR-0025) |
+| Every action — including a personal data change — submitted as a transaction | Self-service is transactional (ADR-0026), Phase 18 AD-008 |
+| Employee sees the named approval committee and timestamps | Approval visibility required from Phase 9, via the Phase 1 ApprovalPort (ADR-0024) |
+| Loan balance, assets and certificates on the employee's own profile | Phases 10.1 and 5.3 |
+| Geofenced biometric punch as the primary attendance interface | Phase 8 mobile capture, Phase 19.1 |
+| An advertisers list inside the HR app's settings | Explicitly prohibited — Phase 19.1 non-goals, ADR-0028 |
+
+Their weaknesses are worth naming because they are the wedge: raw decimals surfacing in the UI
+("Age 42.752", "Period 1.000"), dense unstyled key-value screens, clipped labels, a 2022-era
+backend build, and advertising shown to employees inside an application that holds their salary
+and medical claims.
+
 ## Competitive gaps against Menaitech
 
 The specifications describe a well-architected global HCM. Menaitech's advantage in its home

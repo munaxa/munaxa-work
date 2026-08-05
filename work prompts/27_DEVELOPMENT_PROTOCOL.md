@@ -31,9 +31,15 @@ Read
 
 00_MASTER_INSTRUCTIONS.md
 
+00_ENGINEERING_STANDARDS.md
+
+00A_PHASE_SPECIFICATION_TEMPLATE.md
+
+00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md
+
 Review all previous completed phases.
 
-Review all ADRs.
+Review all ADRs, in 26_ARCHITECTURE_DECISION_RECORDS.md and in docs/adr/.
 
 Review current repository.
 
@@ -312,12 +318,19 @@ Maintain production build
 A phase is complete only when:
 
 - All acceptance criteria are satisfied.
-- All tests pass.
+- Every artifact required by 00A_PHASE_SPECIFICATION_TEMPLATE.md exists.
+- Every production-readiness criterion in that template is met — correct, safe, operable,
+  supportable, reversible.
+- The localization and statutory acceptance criteria in 00B are met.
+- All tests pass, including tenant isolation, permission, localization and golden-case tests.
 - Production build succeeds.
 - Documentation is updated.
 - Architecture remains compliant.
 - No critical issues remain.
 - Approval has been received to continue.
+
+A phase whose feature works but whose production-readiness criteria are unmet is not complete.
+Deferring them to Phase 24 is prohibited.
 
 ---
 

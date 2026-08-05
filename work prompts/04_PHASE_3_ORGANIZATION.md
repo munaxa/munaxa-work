@@ -392,6 +392,28 @@ Assignments connect Employments to Positions.
 
 ---
 
+# Manpower Planning
+
+Positions carry an approved establishment: the budgeted headcount for a position within an
+organizational unit, effective dated.
+
+Support
+
+Budgeted headcount per position and unit
+
+Approved, filled and vacant counts, as a projection
+
+Establishment changes with approval and history
+
+Recruitment requisitions validated against the establishment
+
+Position criticality, consumed by Career & Succession
+
+Organization owns the establishment. It never counts employees itself — filled counts are a
+projection fed by Employment's assignment events.
+
+---
+
 # Organization Calendar
 
 Support organizational calendars.

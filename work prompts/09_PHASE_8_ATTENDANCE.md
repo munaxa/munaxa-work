@@ -372,6 +372,63 @@ Future integrations
 
 Each event records its source.
 
+Every event additionally records
+
+Device or client identifier
+
+Location, where the tenant enables it for that source
+
+The event time as reported, and the time the server received it, separately
+
+Whether the event was captured offline and synchronized later
+
+Clock divergence between reported and received time, flagged when it exceeds a configured
+tolerance
+
+Attendance never trusts a client clock. Divergence is data, not an error to be discarded.
+
+---
+
+# Mobile Attendance
+
+Mobile is a primary capture source, not a convenience.
+
+Support
+
+Punch from the device, online and offline
+
+Geofencing: permitted locations per employment, site or schedule, with configurable radius
+
+Location capture only where the tenant enables it, only at the punch, and disclosed to the
+employee. Continuous background tracking is prohibited.
+
+Offline queue with idempotent submission and client-generated identifiers
+
+Configurable handling of punches outside a permitted geofence: reject, accept and flag, or
+accept and require approval
+
+Biometric device unlock on the handset, protecting the session and never replacing Platform
+authentication
+
+---
+
+# Attendance Requests
+
+Attendance raises transactions, never direct edits, for
+
+Missing punch correction
+
+Manual attendance entry
+
+Overtime request and approval, before or after the fact per configuration
+
+Shift swap and roster change requests
+
+Remote or off-site work declaration
+
+Each routes through the ApprovalPort from Phase 1, carries a reason, and preserves the original
+record alongside the correction.
+
 ---
 
 # Shift Management

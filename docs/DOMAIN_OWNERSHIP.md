@@ -30,6 +30,15 @@ them afterwards.
 | Approval, workflow definition, task       | `workflow`      | Phase 16      |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
+| Document, permit, expiry                  | `documents`     | Phase 4.1     |
+| Letter template, issued letter            | `letters`       | Phase 5.1     |
+| Violation, disciplinary action, grievance | `relations`     | Phase 5.2     |
+| Asset, custody assignment                 | `assets`        | Phase 5.3     |
+| Loan, advance, repayment schedule         | `loans`         | Phase 10.1    |
+| Statutory rule, country pack, end of service | `statutory`  | Phase 11.1    |
+| Offboarding case, clearance, settlement request | `offboarding` | Phase 11.2 |
+| Claim, adjudication, entitlement balance  | `claims`        | Phase 12.1    |
+| Survey, response, engagement score        | `engagement`    | Phase 13.1    |
 
 The table is the intent recorded by the phase specifications. Rows become real as their phase
 lands, and the owning module is the one that holds the concept's persistence, business rules

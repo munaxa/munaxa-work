@@ -374,7 +374,16 @@ Official Mission
 
 Training Leave
 
-Nothing is hardcoded.
+Hajj Leave
+
+Bereavement by degree of kinship, where the law or policy distinguishes them
+
+Iddah Leave, where applicable
+
+Hourly Leave
+
+Nothing is hardcoded. Statutory entitlements, eligibility and limits for each type are supplied
+by the country pack; the tenant configures the rest.
 
 ---
 
@@ -425,6 +434,74 @@ Carried Forward
 Closing Balance
 
 Balances are projections from leave transactions.
+
+Balances are fractional. Accrual produces fractional days, and the balance is never silently
+rounded — rounding is a configured, explicit rule applied at consumption, not at storage.
+
+Every balance answers three questions, and the projection exposes all three
+
+Balance as of today
+
+Balance projected to the end of the leave year, assuming continued accrual
+
+Balance as of any past date
+
+The projected end-of-year balance is what an employee plans against and what a manager approves
+against. It is a first-class query, not a report.
+
+---
+
+# Hourly Leave
+
+Support leave measured in hours as well as days.
+
+Hourly leave draws from the same entitlement, converted through the employment's configured
+working hours.
+
+Hourly leave has its own policies: daily and monthly limits, minimum and maximum duration,
+notice, and whether it requires approval.
+
+Attendance consumes approved hourly leave when evaluating the working day.
+
+---
+
+# Leave Request Attributes
+
+A leave request carries, and the domain validates
+
+Leave type
+
+From and to dates, enterable and displayable in both Gregorian and Hijri
+
+Duration, in days or hours
+
+Reason
+
+Attachments, where the policy requires them
+
+Contact details during absence
+
+Address during absence, where the policy requires it
+
+Replacement employee, where the policy requires cover
+
+Delegation of the requester's approval authority for the absence period, and whether the
+delegation applies to all transaction types or a subset
+
+Balance at request time, recorded on the request
+
+The replacement and the delegation are distinct: one covers the work, the other covers the
+authority. Delegation is owned by Workforce Identity and referenced here.
+
+---
+
+# Approval Visibility
+
+The requester sees the full approval chain: every approver or approval committee in order,
+their decision, their timestamp and their comment, and where the request currently sits.
+
+This view is required from this phase, not from Phase 16. It consumes the ApprovalPort defined
+in Phase 1.
 
 ---
 
