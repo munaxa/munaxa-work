@@ -19,8 +19,9 @@
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down"
+    "db:up": "docker compose up -d postgres redis mailpit",
+    "db:down": "docker compose down",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",

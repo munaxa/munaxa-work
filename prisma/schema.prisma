@@ -1,0 +1,15 @@
+// Munaxa Work — the product's own schema, shared with no one.
+//
+// No models exist yet: Phase 0 bootstraps, it implements no business functionality. The first
+// model arrives in Phase 2, and scripts/check-architecture.mjs will hold it to the rules that
+// outlive every phase — tenant_id, the audit columns, soft delete, version and snake_case
+// mapping. See docs/MASTER_INSTRUCTIONS.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

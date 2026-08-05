@@ -1,0 +1,9 @@
+{
+  "extends": ["@munaxa/config-typescript/nestjs.json", "../../tooling/typescript/standards.json"],
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@work/testing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared test builders, fixtures, fakes and assertions.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile node_modules/.cache/tsc-typecheck.tsbuildinfo",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@munaxa/config-eslint": "^1.0.0",
+    "@munaxa/config-typescript": "^1.0.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  }
+}
