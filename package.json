@@ -10,7 +10,7 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "standards": "node scripts/check-standards.mjs",
+    "standards": "node scripts/check-standards.mjs && node scripts/check-architecture.mjs",
     "verify": "pnpm standards && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "build": "turbo run build",
     "dev": "turbo run dev",

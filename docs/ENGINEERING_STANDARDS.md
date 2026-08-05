@@ -2,8 +2,9 @@
 
 **Version 1.0 · Mandatory**
 
-These standards apply to every module, package, application and phase of Munaxa Work. No
-implementation may violate them. If an implementation conflicts with this document, **stop**,
+These standards apply to every module, package, application and phase of Munaxa Work. They are
+the code-level law serving the architectural law in
+[`MASTER_INSTRUCTIONS.md`](MASTER_INSTRUCTIONS.md). No implementation may violate them. If an implementation conflicts with this document, **stop**,
 record the conflict, and request approval before continuing — see
 [Changing a standard](#changing-a-standard).
 
@@ -15,9 +16,10 @@ is, and the tooling — not review — is the enforcement point:
 | `tooling/eslint/standards.mjs`         | Complexity, file budgets, naming, forbidden language features, layer dependency direction, UI ownership |
 | `tooling/typescript/standards.json`    | Compiler strictness                                                                                |
 | `scripts/check-standards.mjs`          | File and folder naming, file budgets, suppression and unfinished-work markers                      |
+| `scripts/check-architecture.mjs`       | Tenant-first schema, audit, versioning, soft delete, identifiers, `snake_case`                      |
 | `.github/workflows/ci.yml`             | The quality gates, on every pull request                                                           |
 
-Run the whole set locally with `pnpm standards && pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+Run the whole set locally with `pnpm verify`.
 
 ## General principles
 

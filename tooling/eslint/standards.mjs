@@ -24,14 +24,12 @@ const API = '**/{api,presentation}/**/*.{ts,tsx}';
 /** Anything that would drag a framework, a transport or persistence into a pure layer. */
 const FRAMEWORKS = [
   '@nestjs/*',
-  '@prisma/*',
   'express',
   'fastify',
   'next',
   'next/*',
   'react',
   'react-dom',
-  'prisma',
   '@munaxa/ui',
   '@munaxa/ui/*',
 ];
@@ -59,10 +57,60 @@ const COMPETING_UI = [
   '@radix-ui/*',
 ];
 
-const restrictImports = (patterns, message) => [
-  'error',
-  { patterns: patterns.map((group) => ({ group: [group], message })) },
+/** Infrastructure choices that must never reach business code — the app is deployment agnostic. */
+const INFRA_SDKS = [
+  'aws-sdk',
+  '@aws-sdk/*',
+  '@google-cloud/*',
+  '@azure/*',
+  'firebase',
+  'firebase-admin',
+  'redis',
+  'ioredis',
+  'bullmq',
+  'kafkajs',
+  'amqplib',
+  'nodemailer',
+  '@sendgrid/*',
+  'minio',
 ];
+
+/**
+ * A module's persistence is reachable only from the infrastructure layer that owns it.
+ * Everything else goes through application services, public contracts or domain events.
+ */
+const PERSISTENCE = ['**/*.repository', '**/*.repository.js', '**/repositories/**'];
+const ORM = ['@prisma/*', 'prisma', '.prisma/*'];
+
+/**
+ * One `no-restricted-imports` per file group, each self-contained: flat config merges by
+ * rule name, so the last matching object wins outright rather than adding to the earlier one.
+ * A pattern listed by two groups keeps the first group's message — the rule's schema rejects
+ * duplicates outright, and a config that fails to load enforces nothing.
+ * @param {...{patterns: string[], message: string}} groups
+ */
+const restrictImports = (...groups) => {
+  const seen = new Set();
+  const patterns = [];
+
+  for (const { patterns: group, message } of groups) {
+    for (const pattern of group) {
+      if (seen.has(pattern)) continue;
+      seen.add(pattern);
+      patterns.push({ group: [pattern], message });
+    }
+  }
+  return ['error', { patterns }];
+};
+
+const OUTER_LAYER_MESSAGE =
+  'The dependency direction is domain ◄ application ◄ infrastructure ◄ api ◄ presentation, and it is never violated.';
+const PURITY_MESSAGE =
+  'Domain and application are pure: no framework, ORM, transport or infrastructure SDK. Depend on a port and inject the adapter.';
+const MODULE_MESSAGE =
+  'Modules communicate through application services, public contracts and domain events — never direct repository access.';
+const DEPLOYMENT_MESSAGE =
+  'Infrastructure never affects business logic. Confine this to the infrastructure layer, behind a port.';
 
 const TEST_FILES = ['**/*.{test,spec}.{ts,tsx}', '**/tests/**', '**/__tests__/**', '**/testing/**'];
 
@@ -159,20 +207,41 @@ export default [
     rules: { 'max-lines': ['error', { max: 250, skipBlankLines: true, skipComments: true }] },
   },
 
+  // Configuration is externalized: the environment is read, validated and typed in one place.
+  {
+    name: 'munaxa-work/standards/configuration',
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'process',
+          property: 'env',
+          message:
+            'Read the environment only in the configuration package, which validates it and exposes a typed value.',
+        },
+      ],
+    },
+  },
+
   // Dependency direction: domain ← application ← infrastructure ← api ← presentation.
   {
     name: 'munaxa-work/standards/layers/domain',
     files: [DOMAIN],
     rules: {
       'no-restricted-imports': restrictImports(
-        [
-          '**/application/**',
-          '**/infrastructure/**',
-          '**/api/**',
-          '**/presentation/**',
-          ...FRAMEWORKS,
-        ],
-        'Domain contains business rules only. It may not depend on any outer layer, framework, ORM or transport.',
+        {
+          patterns: [
+            '**/application/**',
+            '**/infrastructure/**',
+            '**/api/**',
+            '**/presentation/**',
+          ],
+          message: OUTER_LAYER_MESSAGE,
+        },
+        { patterns: [...FRAMEWORKS, ...ORM], message: PURITY_MESSAGE },
+        { patterns: INFRA_SDKS, message: DEPLOYMENT_MESSAGE },
+        { patterns: PERSISTENCE, message: MODULE_MESSAGE },
       ),
     },
   },
@@ -181,8 +250,13 @@ export default [
     files: [APPLICATION],
     rules: {
       'no-restricted-imports': restrictImports(
-        ['**/infrastructure/**', '**/api/**', '**/presentation/**', ...FRAMEWORKS],
-        'Application contains use cases. It depends on domain and on ports — never on infrastructure or transport.',
+        {
+          patterns: ['**/infrastructure/**', '**/api/**', '**/presentation/**'],
+          message: OUTER_LAYER_MESSAGE,
+        },
+        { patterns: [...FRAMEWORKS, ...ORM], message: PURITY_MESSAGE },
+        { patterns: INFRA_SDKS, message: DEPLOYMENT_MESSAGE },
+        { patterns: PERSISTENCE, message: MODULE_MESSAGE },
       ),
     },
   },
@@ -190,10 +264,10 @@ export default [
     name: 'munaxa-work/standards/layers/infrastructure',
     files: [INFRASTRUCTURE],
     rules: {
-      'no-restricted-imports': restrictImports(
-        ['**/api/**', '**/presentation/**'],
-        'Infrastructure implements ports. It may not depend on transport or UI.',
-      ),
+      'no-restricted-imports': restrictImports({
+        patterns: ['**/api/**', '**/presentation/**'],
+        message: OUTER_LAYER_MESSAGE,
+      }),
     },
   },
   {
@@ -201,8 +275,9 @@ export default [
     files: [API],
     rules: {
       'no-restricted-imports': restrictImports(
-        ['**/presentation/**'],
-        'API is transport. It may not depend on the presentation layer.',
+        { patterns: ['**/presentation/**'], message: OUTER_LAYER_MESSAGE },
+        { patterns: [...ORM, ...PERSISTENCE], message: MODULE_MESSAGE },
+        { patterns: INFRA_SDKS, message: DEPLOYMENT_MESSAGE },
       ),
     },
   },
@@ -213,8 +288,15 @@ export default [
     files: ['**/*.repository.ts'],
     rules: {
       'no-restricted-imports': restrictImports(
-        HTTP_CLIENTS,
-        'Repositories never call external services. Put the call behind an infrastructure adapter and inject it.',
+        {
+          patterns: ['**/api/**', '**/presentation/**'],
+          message: OUTER_LAYER_MESSAGE,
+        },
+        {
+          patterns: HTTP_CLIENTS,
+          message:
+            'Repositories never call external services. Put the call behind an infrastructure adapter and inject it.',
+        },
       ),
       'no-restricted-globals': [
         'error',
@@ -224,14 +306,30 @@ export default [
     },
   },
 
-  // Presentation: Platform UI only.
+  // Presentation applications: Platform UI, contracts and the SDK. No business logic.
   {
     name: 'munaxa-work/standards/ui',
     files: ['**/apps/**/*.{ts,tsx}', '**/presentation/**/*.{ts,tsx}'],
+    ignores: ['**/apps/api/**'],
     rules: {
       'no-restricted-imports': restrictImports(
-        COMPETING_UI,
-        'Use Platform UI only (@munaxa/ui). A second design system duplicates Platform and is forbidden.',
+        {
+          patterns: COMPETING_UI,
+          message:
+            'Use Platform UI only (@munaxa/ui). A second design system duplicates Platform and is forbidden.',
+        },
+        {
+          patterns: [
+            '**/domain/**',
+            '**/application/**',
+            '**/infrastructure/**',
+            ...ORM,
+            ...PERSISTENCE,
+          ],
+          message:
+            'Presentation applications contain no business logic. Consume the SDK and the public contracts.',
+        },
+        { patterns: INFRA_SDKS, message: DEPLOYMENT_MESSAGE },
       ),
     },
   },
@@ -249,12 +347,20 @@ export default [
     },
   },
 
+  // The configuration package is where the environment is read, validated and typed.
+  {
+    name: 'munaxa-work/standards/configuration/package',
+    files: ['**/packages/config/**/*.ts', '**/config/env/**/*.ts'],
+    rules: { 'no-restricted-properties': 'off' },
+  },
+
   // Local tooling is not production code.
   {
     name: 'munaxa-work/standards/tooling',
     files: ['scripts/**/*.{ts,mjs,js}', 'tooling/**/*.{ts,mjs,js}', '**/*.config.{ts,mjs,js}'],
     rules: {
       'no-console': 'off',
+      'no-restricted-properties': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },

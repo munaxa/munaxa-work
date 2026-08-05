@@ -48,6 +48,9 @@ const FORBIDDEN_MARKERS = [
   [
     /\bconsole\s*\.\s*log\s*\(/,
     'Use the structured logger. console.log is forbidden in production code.',
+    // Local tooling has no logger and its output is the point; the ESLint layer draws the
+    // same line with `no-console: off` for these paths.
+    { productionOnly: true },
   ],
   [/^\s*debugger\s*;?\s*$/, 'Debugger statements never reach main.'],
   [/\bTODO\b/, 'No TODO may be left in production code.'],
@@ -56,6 +59,9 @@ const FORBIDDEN_MARKERS = [
 
 /** This file names the markers it forbids; scanning it would report every one of them. */
 const MARKER_EXEMPT = new Set(['scripts/check-standards.mjs']);
+
+/** Local tooling — the gates themselves, build scripts — is not production code. */
+const TOOLING = /^(scripts|tooling)\//;
 
 /** kebab-case, optionally with dotted role and extension: `leave-request.service.ts`. */
 const KEBAB_FILE = /^[a-z0-9]+(-[a-z0-9]+)*(\.[a-z0-9]+(-[a-z0-9]+)*)*$/;
@@ -85,8 +91,10 @@ const checkMarkers = (file) => {
   const lines = readFileSync(file, 'utf8').split('\n');
   if (MARKER_EXEMPT.has(file)) return lines.length;
 
+  const isTooling = TOOLING.test(file);
   lines.forEach((text, index) => {
-    for (const [marker, message] of FORBIDDEN_MARKERS) {
+    for (const [marker, message, options] of FORBIDDEN_MARKERS) {
+      if (isTooling && options?.productionOnly === true) continue;
       if (marker.test(text)) fail(file, message, index + 1);
     }
   });
