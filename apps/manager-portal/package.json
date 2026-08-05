@@ -1,0 +1,34 @@
+{
+  "name": "@work/manager-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Manager self-service. Presentation only — no business logic.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "next dev --port 3003",
+    "build": "next build",
+    "start": "next start --port 3003",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile node_modules/.cache/tsc-typecheck.tsbuildinfo",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@munaxa/theme": "^1.0.0",
+    "@munaxa/ui": "^1.0.0",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@munaxa/config-eslint": "^1.0.0",
+    "@munaxa/config-typescript": "^1.0.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.17.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  }
+}

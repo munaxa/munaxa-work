@@ -21,7 +21,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "db:up": "docker compose up -d postgres redis mailpit",
     "db:down": "docker compose down",
-    "prisma:generate": "prisma generate --schema prisma/schema.prisma"
+    "prisma:generate": "pnpm --filter @work/api exec prisma generate --schema ../../prisma/schema.prisma",
+    "prisma:validate": "pnpm --filter @work/api exec prisma validate --schema ../../prisma/schema.prisma"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
@@ -39,6 +40,11 @@
       "@nestjs/core",
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "sharp": "^0.35.3",
+      "postcss": "^8.5.25",
+      "js-yaml": "^5.2.3"
+    }
   }
 }

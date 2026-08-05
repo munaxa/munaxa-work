@@ -5,7 +5,19 @@
  * Specification, Result, Money, BusinessDate and calendar conversion, ServicePeriod, the
  * approval, notification and document ports, and the rule engine.
  *
- * Bootstrapped here so that the package, its build and its place in the project references
- * graph are proven before anything depends on them. It deliberately exports nothing yet.
+ * Phase 0 contributes the infrastructure ports below as interfaces only, so that no later phase
+ * is tempted to reach for a provider directly while waiting for an abstraction to exist.
  */
-export {};
+export type {
+  EmailMessage,
+  EmailPort,
+  FeatureContext,
+  FeatureFlagPort,
+  JobPort,
+  JobRequest,
+  SearchDocument,
+  SearchPort,
+  SearchQuery,
+  SearchResult,
+  StoragePort,
+} from './ports/index.js';

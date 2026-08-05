@@ -18,11 +18,20 @@ pnpm db:up            # postgres, redis, mailpit
 pnpm verify           # standards · architecture · format · lint · typecheck · test · build
 ```
 
-## Running the API
+## Running the applications
 
-```bash
-pnpm --filter @work/api dev
-```
+| Application | Command | Port |
+| ----------- | ------- | ---- |
+| API | `pnpm --filter @work/api dev` | 3000 |
+| Admin | `pnpm --filter @work/admin dev` | 3001 |
+| Employee portal | `pnpm --filter @work/employee-portal dev` | 3002 |
+| Manager portal | `pnpm --filter @work/manager-portal dev` | 3003 |
+| Mobile | `cd apps/mobile && flutter run` | — |
+
+The mobile application is not a pnpm workspace member and is not built by turbo: it has its own
+toolchain and its own CI job.
+
+## The API
 
 | Endpoint | Purpose |
 | -------- | ------- |
@@ -38,6 +47,10 @@ change when the API version does. Everything else lives under `/api/v1`.
 
 ```text
 apps/api                     # the product API — transport only
+apps/admin                   # HR administration
+apps/employee-portal         # employee self-service
+apps/manager-portal          # manager self-service
+apps/mobile                  # Flutter application (own toolchain)
 packages/kernel              # Shared Kernel (Phase 1)
 packages/modules/<module>    # business modules, layered inside (ADR-0023)
 packages/config              # the only place the environment is read
@@ -74,6 +87,10 @@ log. Stack traces, SQL and connection strings never reach a response.
 
 **Every request is traceable.** `x-request-id` is ours and always new; `x-correlation-id` is the
 caller's if it sent one. Both are echoed and both appear on every log line.
+
+**Presentation owns no business logic.** The portals consume `@munaxa/ui` and `@munaxa/theme`
+from the registry and the API over `/api/v1`. Never rebuild a component here, never hardcode a
+colour, and never reach past the API into a domain — the lint layer enforces all three.
 
 **Tests boot the real composition.** `configureApplication` is shared by `main.ts` and the API
 tests, so routing, prefixes, validation and the error filter are tested as they actually run.

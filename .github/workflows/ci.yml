@@ -70,6 +70,43 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # `prisma validate` resolves env() at parse time, so the variable must exist. Its value
+      # is irrelevant here — nothing connects.
+      - name: Validate the Prisma schema
+        run: pnpm --filter @work/api exec prisma validate --schema ../../prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://validate:validate@localhost:5432/validate
+
+      - name: Dependency audit
+        run: pnpm audit --audit-level high
+
+  mobile:
+    name: Mobile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # The mobile application has its own toolchain and is not a workspace member.
+      - name: Resolve dependencies
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: apps/mobile
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/mobile
+        run: flutter test
+
+      - name: Build
+        working-directory: apps/mobile
+        run: flutter build apk --debug
+
   boundaries:
     name: Product isolation
     runs-on: ubuntu-latest
