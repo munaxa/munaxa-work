@@ -42,3 +42,16 @@ checking anything there.
   eventually live.
 - **Disable the Dart `file_names` lint instead.** Rejected: it makes our repository hostile to
   every Flutter developer who joins, and the convention is not ours to overrule.
+
+## Addendum — 2026-08-05
+
+Applying the decision surfaced two more ecosystems with the same property, and both are covered
+by the principle already recorded here rather than by a new decision:
+
+- **Prisma migrations.** `prisma/migrations/<timestamp>_<name>/migration.sql` and
+  `migration_lock.toml` are read by name by the migration engine. Checked as `snake_case`.
+- **Dotfiles.** `.gitignore`, `.metadata`, `.npmrc` and their kind are named by the tool that
+  reads them, in every ecosystem. Exempt from the convention check, since there is no
+  convention of ours for them to follow.
+
+The rule remains: each ecosystem's convention, enforced — never an unchecked directory.

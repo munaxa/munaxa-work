@@ -69,8 +69,15 @@ const KEBAB_FOLDER = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 /** snake_case, the Dart convention its own analyzer enforces (ADR-0029). */
 const SNAKE_FILE = /^[a-z0-9]+(_[a-z0-9]+)*(\.[a-z0-9]+)*$/;
 const SNAKE_FOLDER = /^[a-z0-9]+(_[a-z0-9]+)*$/;
-/** The Dart ecosystem. Its naming convention is snake_case and its tools mandate filenames. */
-const DART = /^apps\/mobile\//;
+/** Ecosystems whose own tools mandate snake_case names (ADR-0029). */
+const SNAKE_CASE_ECOSYSTEMS = [
+  /^apps\/mobile\//, // Dart: the analyzer's file_names rule, pubspec.yaml, analysis_options.yaml
+  /^prisma\/migrations\//, // Prisma: <timestamp>_<name>/migration.sql, migration_lock.toml
+];
+const isSnakeCaseEcosystem = (file) => SNAKE_CASE_ECOSYSTEMS.some((pattern) => pattern.test(file));
+
+/** Dotfiles are named by the tool that reads them, in every ecosystem. */
+const DOTFILE = /^\./;
 /** Ecosystem files whose names are fixed by the tools that read them. */
 const NAME_EXEMPT = /^(README|LICENSE|CHANGELOG|CONTRIBUTING|Dockerfile|Makefile)/;
 
@@ -107,21 +114,20 @@ const checkMarkers = (file) => {
 };
 
 const checkNaming = (file) => {
-  const dart = DART.test(file);
-  const [filePattern, folderPattern, convention] = dart
+  const snake = isSnakeCaseEcosystem(file);
+  const [filePattern, folderPattern, convention] = snake
     ? [SNAKE_FILE, SNAKE_FOLDER, 'snake_case']
     : [KEBAB_FILE, KEBAB_FOLDER, 'kebab-case'];
 
   const segments = file.split('/');
   const name = segments.pop();
   for (const folder of segments) {
-    // The mobile application lives under kebab-case folders that predate its own convention.
-    const pattern = dart && !folder.includes('_') ? KEBAB_FOLDER : folderPattern;
+    // These ecosystems sit under kebab-case folders that predate their own convention.
+    const pattern = snake && !folder.includes('_') ? KEBAB_FOLDER : folderPattern;
     if (!pattern.test(folder)) fail(file, `Folder "${folder}" is not ${convention}.`);
   }
-  if (!NAME_EXEMPT.test(name) && !filePattern.test(name)) {
-    fail(file, `File "${name}" is not ${convention}.`);
-  }
+  if (DOTFILE.test(name) || NAME_EXEMPT.test(name)) return;
+  if (!filePattern.test(name)) fail(file, `File "${name}" is not ${convention}.`);
 };
 
 for (const doc of REQUIRED_DOCS) {
