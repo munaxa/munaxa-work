@@ -64,9 +64,41 @@ export interface IdentityFixture {
   close(): Promise<void>;
 }
 
-export const openIdentityFixture = async (role: string): Promise<IdentityFixture> => {
-  const admin = new Pool({ connectionString: CONNECTION });
+/**
+ * Fails with the cause rather than a symptom.
+ *
+ * Without this, a database that has not been migrated produces `relation "delegation" does not
+ * exist` from whichever statement happened to touch it first — which sends the reader looking at
+ * the fixture rather than at the missing migration step. This suite tests the real schema, so
+ * the real schema has to be there.
+ */
+const assertSchemaApplied = async (admin: Pool): Promise<void> => {
+  const present = await admin.query<{ table_name: string }>(
+    `select table_name from information_schema.tables
+      where table_schema = 'public' and table_name = any($1::text[])`,
+    [IDENTITY_TABLES],
+  );
+  const missing = IDENTITY_TABLES.filter(
+    (table) => !present.rows.some((row) => row.table_name === table),
+  );
 
+  if (missing.length > 0) {
+    throw new Error(
+      `Workforce Identity's tables are not in this database: ${missing.join(', ')}. ` +
+        'These suites exercise the real schema — its policies, indexes and check constraints — ' +
+        'so run `pnpm db:migrate` against TEST_DATABASE_URL first.',
+    );
+  }
+};
+
+/**
+ * Creates the unprivileged role the suite connects as, and grants it the module's tables.
+ *
+ * It owns nothing and holds no `BYPASSRLS`, which is the only configuration under which an
+ * isolation assertion means anything: a superuser bypasses every policy, so a suite run as one
+ * would pass whether or not isolation worked.
+ */
+const ensureApplicationRole = async (admin: Pool, role: string): Promise<string> => {
   await admin.query(
     `do $$ begin
        if not exists (select 1 from pg_roles where rolname = '${role}') then
@@ -81,8 +113,15 @@ export const openIdentityFixture = async (role: string): Promise<IdentityFixture
   const url = new URL(CONNECTION ?? '');
   url.username = role;
   url.password = 'fixture';
+  return url.toString();
+};
 
-  const application = new Pool({ connectionString: url.toString() });
+export const openIdentityFixture = async (role: string): Promise<IdentityFixture> => {
+  const admin = new Pool({ connectionString: CONNECTION });
+
+  await assertSchemaApplied(admin);
+
+  const application = new Pool({ connectionString: await ensureApplicationRole(admin, role) });
   const unitOfWork = new PostgresUnitOfWork(application, new InProcessEventDispatcher());
   const stores = postgresIdentityStores();
 
