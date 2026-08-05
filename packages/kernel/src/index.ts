@@ -137,6 +137,12 @@ export type {
   NotificationRequest,
 } from './ports/notification.js';
 export type { DocumentAttachment, DocumentPort, DocumentReference } from './ports/document.js';
+export { UnauthenticatedPort } from './ports/authentication.js';
+export type {
+  PlatformAuthenticationPort,
+  PlatformPrincipal,
+  PresentedCredentials,
+} from './ports/authentication.js';
 export { AutoApprovingPort, RecordingNotificationPort } from './adapters/in-process-ports.js';
 export { InMemoryFeatureFlags } from './adapters/in-memory-feature-flags.js';
 export type { FeatureFlagDefinition } from './adapters/in-memory-feature-flags.js';

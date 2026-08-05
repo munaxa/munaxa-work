@@ -11,6 +11,7 @@ import { checkDatabase } from '@work/persistence';
 import type { Pool } from 'pg';
 
 import { ENVIRONMENT } from '../configuration/environment.provider.js';
+import { PublicRoute } from '../tenancy/public-route.decorator.js';
 import { DATABASE_POOL } from '../persistence/database.module.js';
 
 /**
@@ -37,6 +38,8 @@ export interface HealthResponse {
 }
 
 @ApiTags('health')
+// An orchestrator calls these with no credentials, by design.
+@PublicRoute()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   public constructor(

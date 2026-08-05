@@ -14,7 +14,10 @@ them afterwards.
 | Concept                                   | Owning module   | Introduced in |
 | ----------------------------------------- | --------------- | ------------- |
 | Person, identity, personal data           | `people`        | Phase 4       |
-| Workforce identity                        | `identity`      | Phase 2       |
+| Workforce user, tenant membership          | `identity`      | Phase 2 ✅    |
+| Invitation, portal access                  | `identity`      | Phase 2 ✅    |
+| Employment link, delegation                | `identity`      | Phase 2 ✅    |
+| Business profile, user preference          | `identity`      | Phase 2 ✅    |
 | Legal entity, org unit, position, job     | `organization`  | Phase 3       |
 | Employment, contract, assignment          | `employment`    | Phase 5       |
 | Requisition, candidate, application       | `recruitment`   | Phase 6       |
@@ -41,8 +44,14 @@ them afterwards.
 | Survey, response, engagement score        | `engagement`    | Phase 13.1    |
 
 The table is the intent recorded by the phase specifications. Rows become real as their phase
-lands, and the owning module is the one that holds the concept's persistence, business rules
-and domain events.
+lands — marked ✅ — and the owning module is the one that holds the concept's persistence,
+business rules and domain events.
+
+`identity` owns the *business* identity of a person: which Platform account they are, which
+tenants have admitted them, and how each of those tenants presents them. It does not own the
+person. Legal name, date of birth, nationality and identity documents belong to `people` in
+Phase 4, and this module will not acquire them: two modules that both held a legal name would
+produce two answers on a contract.
 
 ## Rules
 

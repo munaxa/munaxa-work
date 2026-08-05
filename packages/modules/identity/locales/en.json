@@ -1,0 +1,133 @@
+{
+  "identity": {
+    "rejection": {
+      "workforce_user_not_activatable": "This account cannot be activated from its current state.",
+      "workforce_user_not_suspendable": "Only an active account can be suspended.",
+      "workforce_user_not_reinstatable": "Only a suspended account can be reinstated.",
+      "workforce_user_already_deactivated": "This account has already been deactivated.",
+
+      "membership_not_suspendable": "Only an active member can be suspended.",
+      "membership_not_reinstatable": "Only a suspended member can be reinstated.",
+      "membership_not_rejoinable": "This person has not left, so there is nothing to rejoin.",
+      "membership_already_ended": "This person has already left this organization.",
+
+      "invitation_already_pending": "An invitation to this address is already open. Resend it instead of issuing another.",
+      "invitation_expiry_not_in_future": "An invitation must lapse at some point in the future.",
+      "invitation_not_pending": "This invitation has already been answered or withdrawn.",
+      "invitation_expired": "This invitation has lapsed. Ask for a new one.",
+      "invitation_not_yet_expired": "This invitation has not lapsed yet.",
+      "invitation_addressed_to_someone_else": "This invitation was sent to a different address.",
+
+      "portal_assignment_not_granted": "This portal is not currently open to this member.",
+      "portal_assignment_not_revoked": "This portal is already open to this member.",
+
+      "employment_link_not_linked": "This job is no longer attached to this member.",
+      "employment_link_already_primary": "This is already the member's main job.",
+
+      "delegation_to_self": "A person cannot delegate to themselves.",
+      "delegation_period_inverted": "The cover must end after it starts.",
+      "delegation_period_already_elapsed": "That period has already passed.",
+      "delegation_already_revoked": "This delegation has already been withdrawn.",
+      "delegation_already_expired": "This delegation has already ended.",
+      "delegation_not_expirable": "This delegation has already been withdrawn or ended.",
+      "delegation_still_in_force": "This delegation is still in force.",
+      "delegation_not_scheduled": "Only a scheduled delegation can be started.",
+      "delegation_not_yet_in_force": "This delegation has not started yet.",
+      "delegate_not_active": "Cover can only be given to an active member.",
+
+      "business_profile_name_required": "A display name is required.",
+      "business_profile_name_incomplete": "A display name is required in {languages} as well.",
+
+      "preference_language_invalid": "\"{language}\" is not a language.",
+      "preference_time_zone_unknown": "\"{timeZone}\" is not a known time zone.",
+      "preference_numerals_invalid": "\"{numerals}\" is not a numeral system this product supports."
+    },
+    "status": {
+      "user": {
+        "provisioned": "Provisioned",
+        "active": "Active",
+        "suspended": "Suspended",
+        "deactivated": "Deactivated"
+      },
+      "membership": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "ended": "Left"
+      },
+      "invitation": {
+        "pending": "Awaiting a reply",
+        "accepted": "Accepted",
+        "revoked": "Withdrawn",
+        "expired": "Lapsed"
+      },
+      "portal": {
+        "granted": "Open",
+        "revoked": "Withdrawn"
+      },
+      "employment": {
+        "linked": "Attached",
+        "unlinked": "Detached"
+      },
+      "delegation": {
+        "scheduled": "Scheduled",
+        "active": "In force",
+        "revoked": "Withdrawn",
+        "expired": "Ended"
+      }
+    },
+    "portal": {
+      "employee": "Employee portal",
+      "manager": "Manager portal",
+      "admin": "Administration"
+    },
+    "label": {
+      "members": "People",
+      "invitations": "Invitations",
+      "displayName": "Display name",
+      "jobTitle": "Job title",
+      "businessEmail": "Work email",
+      "businessPhone": "Work telephone",
+      "language": "Language",
+      "calendar": "Calendar",
+      "timeZone": "Time zone",
+      "numerals": "Numerals",
+      "primaryEmployment": "Main job",
+      "delegatedTo": "Covered by",
+      "delegatedFrom": "Covering for",
+      "effectiveFrom": "From",
+      "effectiveTo": "Until",
+      "reason": "Reason",
+      "joinedAt": "Joined",
+      "endedAt": "Left"
+    },
+    "calendar": {
+      "gregorian": "Gregorian",
+      "hijri": "Hijri"
+    },
+    "numerals": {
+      "western": "Western (0–9)",
+      "arabic-indic": "Arabic-Indic (٠–٩)"
+    },
+    "action": {
+      "invite": "Invite someone",
+      "resendInvitation": "Resend",
+      "withdrawInvitation": "Withdraw invitation",
+      "suspend": "Suspend",
+      "reinstate": "Reinstate",
+      "end": "End membership",
+      "grantPortal": "Open portal",
+      "revokePortal": "Withdraw portal",
+      "linkEmployment": "Attach a job",
+      "unlinkEmployment": "Detach job",
+      "makePrimary": "Make main job",
+      "delegate": "Arrange cover",
+      "revokeDelegation": "Withdraw cover"
+    },
+    "empty": {
+      "members": "Nobody has joined this organization yet.",
+      "invitations": "No invitations are open.",
+      "employments": "This person holds no job here.",
+      "delegations": "No cover is arranged."
+    }
+  }
+}
