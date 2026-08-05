@@ -404,6 +404,15 @@ Assessments
 
 Target Dates
 
+Individual Development Plans are jointly owned by the employee and the manager: both contribute,
+both see progress, and the plan is versioned per cycle.
+
+Support a configurable development-mix model — experience, exposure and education, weighted
+70-20-10 by default and adjustable by the tenant — so a plan can be validated for balance rather
+than becoming a list of courses.
+
+Development activities reference Learning. Learning remains the owner of training.
+
 ---
 
 # Internal Mobility

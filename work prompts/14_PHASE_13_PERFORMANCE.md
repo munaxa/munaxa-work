@@ -448,6 +448,19 @@ Tenant configurable.
 
 ---
 
+# Talent Classification
+
+Support a configurable performance-and-potential matrix — a nine-box grid by default, with the
+dimensions, axis labels, box count and box definitions all tenant configurable.
+
+Placement is derived from performance and potential ratings, may be overridden in calibration
+with a recorded reason, and is versioned per cycle.
+
+The matrix is published to Career & Succession as a recommendation. It never modifies
+Employment and never triggers a promotion.
+
+---
+
 # Continuous Feedback
 
 Support

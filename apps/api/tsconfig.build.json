@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Non-incremental deliberately. `nest build` deletes dist, and a surviving .tsbuildinfo then
+    // convinces tsc that files it never re-emitted are current — producing a dist that is
+    // missing modules and an application that fails at require time. A full emit every time
+    // costs a second and removes the entire class of problem.
+    "composite": false,
+    "incremental": false
+  },
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+}

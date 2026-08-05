@@ -1,0 +1,8 @@
+# Flutter build output and tool state. The lockfile IS committed — a mobile build must be
+# reproducible, and an application (unlike a library) pins its dependency graph.
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/

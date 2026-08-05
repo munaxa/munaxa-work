@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import '@munaxa/theme/css/work';
+
+/* Tailwind v4 must scan the design system's shipped sources to emit the classes its components
+   use. This points at the installed package — never at a path into another repository. */
+@source '../../../../node_modules/@munaxa/ui';

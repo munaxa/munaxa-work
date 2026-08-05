@@ -10,6 +10,8 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
+    "standards": "node scripts/check-standards.mjs && node scripts/check-architecture.mjs && node scripts/check-localization.mjs && node scripts/check-dependencies.mjs",
+    "verify": "pnpm standards && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
@@ -17,8 +19,12 @@
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down"
+    "db:up": "docker compose up -d postgres redis mailpit",
+    "db:down": "docker compose down",
+    "prisma:generate": "pnpm --filter @work/api exec prisma generate --schema ../../prisma/schema.prisma",
+    "prisma:validate": "pnpm --filter @work/api exec prisma validate --schema ../../prisma/schema.prisma",
+    "db:migrate": "pnpm --filter @work/api exec prisma migrate deploy --schema ../../prisma/schema.prisma",
+    "db:reset": "pnpm --filter @work/api exec prisma migrate reset --schema ../../prisma/schema.prisma"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
@@ -36,6 +42,11 @@
       "@nestjs/core",
       "sharp",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "sharp": "^0.35.3",
+      "postcss": "^8.5.25",
+      "js-yaml": "^5.2.3"
+    }
   }
 }

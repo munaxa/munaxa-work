@@ -2,7 +2,14 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
   "globalDependencies": [".env", "tsconfig.json"],
-  "globalEnv": ["NODE_ENV", "SENTRY_DSN", "NEXT_PUBLIC_POSTHOG_KEY"],
+  "globalEnv": [
+    "CI",
+    "DATABASE_URL",
+    "NEXT_PUBLIC_POSTHOG_KEY",
+    "NODE_ENV",
+    "SENTRY_DSN",
+    "TEST_DATABASE_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

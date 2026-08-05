@@ -162,6 +162,69 @@ Synchronization must resolve conflicts safely.
 
 ---
 
+## AD-008
+
+Self-service never edits master data.
+
+Every employee action is a transaction: a request carrying its own validation, approval and
+audit, which mutates business data only through the owning domain's Application Service after
+approval.
+
+A changed bank account, address or emergency contact is an approved transaction, not a saved
+form. Which fields require approval is tenant configuration; that the change is a transaction is
+not.
+
+---
+
+## AD-009
+
+The employee sees the full approval chain of anything they submit: every approver in order,
+their decision, their timestamp and where the request currently sits.
+
+---
+
+## AD-010
+
+Every date is displayed and entered in the user's chosen calendar, Gregorian or Hijri, and both
+are shown together wherever the business document requires it.
+
+---
+
+# Request Types
+
+Self-service exposes, subject to permission and configuration
+
+Leave request and cancellation
+
+Hourly leave request
+
+Overtime request
+
+Missing punch and attendance correction request
+
+Shift swap request
+
+Financial claim
+
+Medical claim
+
+Loan and advance application
+
+Letter request
+
+Personal data change request
+
+Document upload and renewal
+
+Asset custody acknowledgement
+
+General or miscellaneous request, tenant defined
+
+Each is a transaction. Each routes through Workflow. Each appears in a single unified
+"My Requests" history with its live approval state.
+
+---
+
 # Dashboard
 
 Display configurable widgets.

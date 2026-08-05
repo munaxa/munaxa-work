@@ -1,0 +1,8 @@
+-- Moved.
+--
+-- The row-level security functions are now applied by a migration, at
+-- prisma/migrations/00000000000000_foundation/migration.sql, so that every database that runs
+-- migrations has them. A second copy here would drift from the applied one silently, and the
+-- copy that matters is the one the database actually ran.
+--
+-- See ADR-0030 and docs/DEVELOPMENT.md.

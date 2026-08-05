@@ -53,14 +53,33 @@ Installing needs a GitHub token with `read:packages` on the `tam2om` org:
 export GITHUB_TOKEN=<PAT with read:packages>
 pnpm install
 
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+pnpm verify   # standards · format · lint · typecheck · test · build
 ```
 
-All four run today against an empty workspace, so the first app added here is checked from its
-first commit.
+Every gate runs today against an empty workspace, so the first app added here is checked from
+its first commit. `pnpm standards` on its own needs no install and no registry access.
+
+## The rules are enforced, not advisory
+
+Two documents govern this repository, and both are mandatory for every module, package and
+phase:
+
+- [`docs/MASTER_INSTRUCTIONS.md`](docs/MASTER_INSTRUCTIONS.md) — the architectural law:
+  Platform ownership, layer direction, module independence, multi-tenancy, deployment
+  agnosticism, externalized configuration. Supporting registries:
+  [domain ownership](docs/DOMAIN_OWNERSHIP.md) and the [implementation ledger](docs/PHASES.md).
+- [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) — the code-level law:
+  complexity limits, file budgets, naming, and the ban on `any` / `@ts-ignore` /
+  `eslint-disable`.
+
+They are enforced by [`tooling/eslint/standards.mjs`](tooling/eslint/standards.mjs),
+[`tooling/typescript/standards.json`](tooling/typescript/standards.json),
+[`scripts/check-standards.mjs`](scripts/check-standards.mjs) and
+[`scripts/check-architecture.mjs`](scripts/check-architecture.mjs) — and they fail CI.
+
+Every app and package must spread the standards layer after its Platform config — see
+[Adopting the standards in a package](docs/ENGINEERING_STANDARDS.md#adopting-the-standards-in-a-package).
+A rule is changed by an ADR in [`docs/adr/`](docs/adr/), never by a suppression.
 
 ## Before you add anything shared
 

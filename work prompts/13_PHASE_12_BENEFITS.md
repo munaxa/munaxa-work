@@ -362,9 +362,19 @@ Meal Benefit
 
 Education Assistance
 
+Schooling Assistance for dependants
+
+Air Ticket and Repatriation Entitlement
+
+Provident Fund and Savings Schemes
+
 Flexible Benefits
 
 Nothing is hardcoded.
+
+Claims and reimbursement against these plans belong to
+`13A_PHASE_12.1_MEDICAL_CLAIMS.md`. Benefits decides who is covered and for how much; Claims
+records what was claimed and Payroll pays it.
 
 ---
 

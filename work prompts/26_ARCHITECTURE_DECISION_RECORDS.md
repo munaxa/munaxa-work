@@ -393,6 +393,156 @@ Large exports execute in background jobs.
 
 ---
 
+# ADR-0021 and ADR-0022
+
+Reserved.
+
+Recorded in `docs/adr/` — engineering standards enforcement, and master instructions
+enforcement. They are repository decisions rather than product architecture, and they live with
+the tooling that enforces them.
+
+---
+
+# ADR-0023
+
+Title
+
+Module-First Repository Structure
+
+Decision
+
+Business code is organized module-first: `packages/modules/<module>/{domain, application,
+infrastructure, contracts, api}`. Layers exist inside a module, never above it.
+
+Reason
+
+Module independence, per-module registration and eventual extraction to services all assume the
+module is the unit. An earlier draft of Phase 0 grouped packages by layer, which contradicted
+Phase 1 and would have made every module boundary a convention rather than a structure.
+
+Status
+
+Accepted
+
+---
+
+# ADR-0024
+
+Title
+
+Ports Precede Their Engines
+
+Decision
+
+The Shared Kernel defines ApprovalPort, NotificationPort and DocumentPort in Phase 1, with
+in-process default adapters. Business domains depend on the port from their first commit.
+Workflow (Phase 16) and Communications (Phase 17) supply the real adapters without changing any
+business domain.
+
+Reason
+
+Five operational domains need approvals and notifications years before those engines exist in
+the sequence. The alternative is retrofitting approvals into completed domains, which is
+prohibited.
+
+Status
+
+Accepted
+
+---
+
+# ADR-0025
+
+Title
+
+Country Packs Own the Law
+
+Decision
+
+Statutory behaviour lives in versioned country packs, resolved from the Legal Entity of an
+Employment. No business module contains country logic; no country pack contains business logic.
+Packs are effective-dated, never edited in place, and every statutory figure is traceable to its
+rule, version and inputs.
+
+Reason
+
+The product is sold into markets that select on statutory correctness. The abstraction alone is
+not a product, and country logic inside business modules makes every new market a code change.
+
+Status
+
+Accepted
+
+---
+
+# ADR-0026
+
+Title
+
+Self Service Is Transactional
+
+Decision
+
+Self-service applications never edit master data. Every employee and manager action is a
+transaction carrying its own validation, approval and audit, mutating business data only through
+the owning domain's Application Service after approval.
+
+Reason
+
+Direct edits from a portal bypass approval, produce no audit narrative, and make it impossible
+to answer who changed a bank account and who authorized it.
+
+Status
+
+Accepted
+
+---
+
+# ADR-0027
+
+Title
+
+Bilingual and Bi-Calendar Foundation
+
+Decision
+
+Arabic and English are both first-class, and Gregorian and Hijri are both accepted for input and
+available for display. Calendar conversion is a Shared Kernel capability implemented once in
+Phase 1. Storage is always UTC; calendar is an input and presentation concern.
+
+Reason
+
+Retrofitting a second calendar into date handling after Leave, Attendance, Payroll and Documents
+are built means touching every one of them. It is a foundation concern or it is a rewrite.
+
+Status
+
+Accepted
+
+---
+
+# ADR-0028
+
+Title
+
+Mobile Is a First-Class Client
+
+Decision
+
+The mobile application is a required phase (19.1) consuming the same versioned APIs as the
+portals, duplicating no business logic, and carrying no advertising or third-party marketing.
+
+Reason
+
+For most of an enterprise workforce the mobile application is the only interface they will use.
+An application holding an employee's salary and medical claims does not monetize its audience.
+
+Status
+
+Accepted
+
+---
+
 # Future ADRs
 
 Every architectural decision made after implementation begins must be recorded here.
