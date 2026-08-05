@@ -66,6 +66,11 @@ const TOOLING = /^(scripts|tooling)\//;
 /** kebab-case, optionally with dotted role and extension: `leave-request.service.ts`. */
 const KEBAB_FILE = /^[a-z0-9]+(-[a-z0-9]+)*(\.[a-z0-9]+(-[a-z0-9]+)*)*$/;
 const KEBAB_FOLDER = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+/** snake_case, the Dart convention its own analyzer enforces (ADR-0029). */
+const SNAKE_FILE = /^[a-z0-9]+(_[a-z0-9]+)*(\.[a-z0-9]+)*$/;
+const SNAKE_FOLDER = /^[a-z0-9]+(_[a-z0-9]+)*$/;
+/** The Dart ecosystem. Its naming convention is snake_case and its tools mandate filenames. */
+const DART = /^apps\/mobile\//;
 /** Ecosystem files whose names are fixed by the tools that read them. */
 const NAME_EXEMPT = /^(README|LICENSE|CHANGELOG|CONTRIBUTING|Dockerfile|Makefile)/;
 
@@ -102,13 +107,20 @@ const checkMarkers = (file) => {
 };
 
 const checkNaming = (file) => {
+  const dart = DART.test(file);
+  const [filePattern, folderPattern, convention] = dart
+    ? [SNAKE_FILE, SNAKE_FOLDER, 'snake_case']
+    : [KEBAB_FILE, KEBAB_FOLDER, 'kebab-case'];
+
   const segments = file.split('/');
   const name = segments.pop();
   for (const folder of segments) {
-    if (!KEBAB_FOLDER.test(folder)) fail(file, `Folder "${folder}" is not kebab-case.`);
+    // The mobile application lives under kebab-case folders that predate its own convention.
+    const pattern = dart && !folder.includes('_') ? KEBAB_FOLDER : folderPattern;
+    if (!pattern.test(folder)) fail(file, `Folder "${folder}" is not ${convention}.`);
   }
-  if (!NAME_EXEMPT.test(name) && !KEBAB_FILE.test(name)) {
-    fail(file, `File "${name}" is not kebab-case.`);
+  if (!NAME_EXEMPT.test(name) && !filePattern.test(name)) {
+    fail(file, `File "${name}" is not ${convention}.`);
   }
 };
 

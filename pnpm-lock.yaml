@@ -330,6 +330,9 @@ importers:
       '@munaxa/config-typescript':
         specifier: ^1.0.0
         version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
       eslint:
         specifier: ^9.17.0
         version: 9.39.5(jiti@2.7.0)

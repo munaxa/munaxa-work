@@ -44,7 +44,8 @@ Inline lint directives are configured inert (`noInlineConfig`), so a committed
 | Classes, interfaces, types, enums | `PascalCase`  |
 | Functions, variables        | `camelCase`        |
 | Constants                   | `UPPER_SNAKE_CASE` |
-| Files, folders              | `kebab-case`       |
+| Files, folders (TypeScript) | `kebab-case`       |
+| Files, folders (Dart)       | `snake_case` (ADR-0029) |
 | Database objects            | `snake_case`       |
 
 Wire formats — API payloads, database rows, HTTP headers — keep the names their protocol
