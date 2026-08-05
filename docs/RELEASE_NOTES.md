@@ -85,7 +85,7 @@ Stated here as well as in the report, because a release note that omits them is 
 
 ### Tests
 
-377, up from 208, including tenant isolation proven per entity against a real PostgreSQL.
+379, up from 208, including tenant isolation proven per entity against a real PostgreSQL.
 
 ---
 

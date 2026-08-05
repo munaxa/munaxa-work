@@ -158,11 +158,11 @@ caller who already knows the primary key still cannot read the row".
 
 ### Tests
 
-**377 tests**, up from 208.
+**379 tests**, up from 208.
 
 | Suite | Tests |
 | ----- | ----- |
-| `@work/identity` | 149 (10 files) |
+| `@work/identity` | 151 (11 files) |
 | `@work/kernel` | 139 |
 | `@work/api` | 30 |
 | `@work/testing` | 23 |
@@ -174,6 +174,12 @@ machines; every command and query through the real pipeline; repositories includ
 scoping; every endpoint including authorization failures; every permission granted and denied;
 tenant isolation per entity; concurrency; and localization in both languages.
 
+The module's event handler is registered on the test harness exactly as the composition root
+registers it — a harness that skipped it would leave the reaction to a departure (portals
+closing, cover withdrawn) untested while the documentation described it as automatic. Both of its
+properties are asserted: that it happens, and that redelivering the event revokes nothing a
+second time, because an event handler that is not idempotent is one a retry corrupts.
+
 The integration suites refuse to skip in CI, and run serially against one database because each
 truncates this module's tables between tests — stated in `vitest.config.ts` rather than left as
 an intermittent failure for somebody else to find.
@@ -184,7 +190,7 @@ an intermittent failure for somebody else to find.
 | ---- | ------ |
 | Standards, architecture, localization, dependencies | Pass |
 | Format, lint, typecheck | Pass |
-| Tests (377) | Pass |
+| Tests (379) | Pass |
 | Production build (12 packages) | Pass |
 | Migration validation | Pass — applied to a fresh database |
 | Prisma schema validation | Pass |
@@ -216,7 +222,7 @@ TEST_DATABASE_URL first.
 
 Both were verified by reproducing the condition: the suites were run against a database carrying
 only the foundation migration (the message above), and then against a fresh database following
-CI's exact sequence — migrate, then test — where all 149 passed.
+CI's exact sequence — migrate, then test — where all of the module's suites passed.
 
 The lesson is the one Phase 1.1 recorded about the APK build, in a new place: a gate that passes
 locally because of state the checkout does not carry has not really been run.
@@ -387,7 +393,7 @@ roll back should roll back the whole phase rather than that file.
 ✓ Every table tenant-first, audited, versioned, soft-deleted, UUIDv7, snake_case
 ✓ Row-level security on every new table, applied by the migration that creates it
 ✓ Arabic and English complete; both directions; both calendars accepted
-✓ 377 tests including tenant isolation per entity, permissions, concurrency and localization
+✓ 379 tests including tenant isolation per entity, permissions, concurrency and localization
 ✓ Production build passing, `pnpm verify` green
 ✓ Documentation, ER diagram, ADRs and the debt register updated
 

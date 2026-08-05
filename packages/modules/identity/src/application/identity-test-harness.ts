@@ -79,6 +79,12 @@ export const harnessFor = (tenantId: string, granted: readonly string[] = ALL): 
   for (const handler of module.queries ?? []) {
     dispatcher.registerQuery(handler);
   }
+  // The module's event handlers are registered too, exactly as the composition root does. A
+  // harness that skipped them would leave the reaction to a departure — portals closing, cover
+  // withdrawn — untested while the docs describe it as automatic.
+  for (const handler of module.eventHandlers ?? []) {
+    work.events.register(handler);
+  }
   return { stores, work, dispatcher };
 };
 
@@ -152,6 +158,9 @@ export function harnessWithStores(tenantId: string, stores: IdentityStores): Har
   }
   for (const handler of module.queries ?? []) {
     dispatcher.registerQuery(handler);
+  }
+  for (const handler of module.eventHandlers ?? []) {
+    work.events.register(handler);
   }
   return { stores, work, dispatcher };
 }
