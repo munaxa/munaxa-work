@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
 import {
-  ConfiguredTenantSettings,
   IdentityDispatcher,
   InvitationsController,
   DelegationController,
@@ -15,6 +14,7 @@ import {
   systemClock,
   type TenantMembershipDirectory,
 } from '@work/identity';
+import { StoredTenantSettings } from '@work/organization';
 import {
   Dispatcher,
   ModuleRegistry,
@@ -35,7 +35,13 @@ import {
 } from '../persistence/database.module.js';
 
 import {
+  DeferredCommandSender,
+  organizationModuleFor,
+} from '../organization/organization.composition.js';
+
+import {
   AUTHENTICATION_PORT,
+  COMMAND_SENDER,
   DISPATCHER,
   MEMBERSHIP_DIRECTORY,
   MODULE_REGISTRY,
@@ -75,19 +81,35 @@ import { PlatformPermissionChecker } from './permission-checker.js';
       useFactory: (pool: Pool): TenantMembershipDirectory => new PostgresMembershipDirectory(pool),
     },
     {
+      // Built once and handed the dispatcher below, which is the only way to give bulk import a
+      // dispatcher assembled from a list that includes bulk import.
+      provide: COMMAND_SENDER,
+      useFactory: (): DeferredCommandSender => new DeferredCommandSender(),
+    },
+    {
       provide: MODULE_REGISTRY,
-      inject: [UNIT_OF_WORK, ENVIRONMENT],
-      useFactory: (unitOfWork: UnitOfWork, environment: Environment): ModuleRegistry => {
+      inject: [UNIT_OF_WORK, DATABASE_POOL, ENVIRONMENT, COMMAND_SENDER],
+      useFactory: (
+        unitOfWork: UnitOfWork,
+        pool: Pool,
+        environment: Environment,
+        sender: DeferredCommandSender,
+      ): ModuleRegistry => {
         const registry = new ModuleRegistry();
 
-        registry.register(identityModuleFor(unitOfWork, environment));
+        registry.register(identityModuleFor(unitOfWork, pool, environment));
+        registry.register(organizationModuleFor(unitOfWork, sender));
         return registry;
       },
     },
     {
       provide: DISPATCHER,
-      inject: [MODULE_REGISTRY, EVENT_DISPATCHER],
-      useFactory: (registry: ModuleRegistry, events: EventDispatcher): Dispatcher => {
+      inject: [MODULE_REGISTRY, EVENT_DISPATCHER, COMMAND_SENDER],
+      useFactory: (
+        registry: ModuleRegistry,
+        events: EventDispatcher,
+        sender: DeferredCommandSender,
+      ): Dispatcher => {
         const dispatcher = new Dispatcher(new PlatformPermissionChecker());
 
         for (const module of registry.registered) {
@@ -99,6 +121,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
           }
           for (const handler of module.eventHandlers ?? []) events.register(handler);
         }
+        sender.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -114,15 +137,24 @@ import { PlatformPermissionChecker } from './permission-checker.js';
 export class IdentityModule {}
 
 /**
- * The tenant's identity defaults come from validated configuration, so a deployment for a
- * customer in Riyadh and one in Amman differ by environment rather than by code. Nothing about a
- * country, a calendar or a language is written here (00B).
+ * The tenant's identity defaults now come from *that tenant*, falling back to the deployment's
+ * validated configuration for a tenant that has configured none.
+ *
+ * This one substitution is the outward shape of the Phase 2 debt being closed. `StoredTenantSettings`
+ * is Organization's adapter for the port Identity already asked through, so Identity's use cases
+ * did not change — which is the evidence the port was drawn in the right place (ADR-0036).
+ *
+ * Nothing about a country, a calendar or a language is written here (00B).
  */
-const identityModuleFor = (unitOfWork: UnitOfWork, environment: Environment): WorkModule =>
+const identityModuleFor = (
+  unitOfWork: UnitOfWork,
+  pool: Pool,
+  environment: Environment,
+): WorkModule =>
   identityModule({
     unitOfWork,
     stores: postgresIdentityStores(),
-    settings: new ConfiguredTenantSettings({
+    settings: new StoredTenantSettings(pool, {
       language: environment.DEFAULT_LOCALE,
       calendar: environment.DEFAULT_CALENDAR,
       timeZone: environment.DEFAULT_TIME_ZONE,

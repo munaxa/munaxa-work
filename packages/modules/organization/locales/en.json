@@ -1,0 +1,193 @@
+{
+  "organization": {
+    "rejection": {
+      "name_requires_both_languages": "A name is required in both Arabic and English. The missing one is {missing}.",
+      "code_malformed": "\"{code}\" is not a valid code. Use letters, digits, dots, dashes or underscores.",
+      "metadata_entry_too_long": "The metadata entry \"{key}\" is too long.",
+
+      "unit_type_already_retired": "This level has already been retired.",
+      "unit_already_in_status": "This unit is already {status}.",
+      "unit_closed": "This unit has been closed and can no longer be changed.",
+      "unit_closed_before_it_existed": "A unit cannot close before it came into existence.",
+
+      "placement_already_closed": "That placement period has already ended.",
+      "placement_closed_before_it_opened": "A placement cannot end before it began.",
+      "placement_would_create_cycle": "\"{unit}\" cannot sit beneath itself. That would put the organization in a loop.",
+      "placement_not_permitted_by_type": "A {type} cannot sit under a {parent} in this organization.",
+      "parent_not_accepting_structure": "The parent unit is {status} and cannot take new structure.",
+
+      "country_code_malformed": "\"{country}\" is not a two-letter country code.",
+      "currency_code_malformed": "\"{currency}\" is not a three-letter currency code.",
+      "registration_number_malformed": "A registration number is required.",
+      "legal_entity_closed": "This registration has been closed.",
+      "legal_entity_closed_before_it_existed": "A registration cannot close before it was made.",
+      "unit_type_carries_no_legal_entity": "Units of type {type} do not carry a legal registration.",
+
+      "center_closed": "This {kind} centre has been closed.",
+      "center_closed_before_it_existed": "A centre cannot close before it opened.",
+
+      "position_retired": "This position has been retired.",
+      "position_retired_before_it_existed": "A position cannot be retired before it was defined.",
+      "position_criticality_unknown": "\"{criticality}\" is not a criticality this product recognises.",
+
+      "headcount_not_a_whole_number": "Budgeted headcount must be a whole number, zero or greater.",
+      "headcount_implausible": "Budgeted headcount cannot exceed {limit}.",
+      "establishment_not_draft": "Only a draft establishment can be approved. This one is {status}.",
+      "establishment_already_closed": "That establishment period has already ended.",
+      "establishment_closed_before_it_opened": "An establishment period cannot end before it began.",
+
+      "calendar_closed": "This calendar has been closed.",
+      "calendar_date_malformed": "\"{date}\" is not a date. Use the form YYYY-MM-DD.",
+      "calendar_day_kind_unknown": "\"{kind}\" is not something a calendar day can be.",
+      "time_zone_unknown": "\"{timeZone}\" is not a known time zone.",
+      "weekday_out_of_range": "\"{weekday}\" is not a day of the week. Monday is 1 and Sunday is 7.",
+      "working_week_empty": "A calendar must have at least one working day.",
+
+      "language_tag_malformed": "\"{language}\" is not a language tag.",
+      "calendar_system_unknown": "\"{calendar}\" is not a calendar this product supports.",
+      "numeral_system_unknown": "\"{numerals}\" is not a numeral system this product supports.",
+      "invitation_validity_out_of_range": "An invitation must stay open for between one and {limit} days."
+    },
+    "conflict": {
+      "unit_type_code_taken": "Another level already uses that code.",
+      "unit_code_taken": "Another unit already uses that code.",
+      "center_code_taken": "Another centre of this kind already uses that code.",
+      "position_code_taken": "Another position already uses that code.",
+      "calendar_code_taken": "Another calendar already uses that code.",
+      "unit_already_registered": "This unit already carries a legal registration."
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "closed": "Closed"
+    },
+    "establishment": {
+      "status": {
+        "draft": "Draft",
+        "approved": "Approved",
+        "withdrawn": "Withdrawn"
+      },
+      "approved": "Approved",
+      "filled": "Filled",
+      "vacant": "Vacant",
+      "budgetedHeadcount": "Budgeted headcount",
+      "filledFromEmployment": "Filled positions are counted by Employment, not here."
+    },
+    "criticality": {
+      "standard": "Standard",
+      "important": "Important",
+      "critical": "Critical"
+    },
+    "calendarDay": {
+      "holiday": "Holiday",
+      "working": "Working day",
+      "non-working": "Non-working day"
+    },
+    "center": {
+      "cost": "Cost centre",
+      "profit": "Profit centre"
+    },
+    "weekday": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "label": {
+      "structure": "Structure",
+      "unitTypes": "Levels",
+      "units": "Units",
+      "unit": "Unit",
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "parent": "Parent",
+      "ancestors": "Reports up through",
+      "children": "Contains",
+      "status": "Status",
+      "metadata": "Additional information",
+      "effectiveFrom": "In effect from",
+      "effectiveTo": "In effect until",
+      "asOf": "As at",
+      "legalEntity": "Legal entity",
+      "governingLegalEntity": "Governed by",
+      "country": "Country",
+      "currency": "Currency",
+      "registeredName": "Registered name",
+      "registrationNumber": "Registration number",
+      "taxIdentifier": "Tax identifier",
+      "incorporatedOn": "Incorporated on",
+      "costCenters": "Cost centres",
+      "profitCenters": "Profit centres",
+      "positions": "Positions",
+      "position": "Position",
+      "title": "Title",
+      "family": "Job family",
+      "grade": "Grade",
+      "criticality": "Criticality",
+      "establishment": "Establishment",
+      "calendars": "Calendars",
+      "calendar": "Calendar",
+      "timeZone": "Time zone",
+      "workingDays": "Working week",
+      "days": "Exception days",
+      "settings": "Organization settings",
+      "language": "Default language",
+      "numerals": "Numerals",
+      "invitationValidityDays": "Invitations stay open for",
+      "defaultPortals": "Portals opened on joining",
+      "placementHistory": "Placement history",
+      "import": "Import",
+      "export": "Export"
+    },
+    "action": {
+      "defineUnitType": "Add a level",
+      "retireUnitType": "Retire this level",
+      "createUnit": "Add a unit",
+      "renameUnit": "Rename",
+      "changeStatus": "Change status",
+      "place": "Move",
+      "detach": "Detach",
+      "registerLegalEntity": "Register a legal entity",
+      "amendLegalEntity": "Amend",
+      "close": "Close",
+      "openCostCenter": "Add a cost centre",
+      "openProfitCenter": "Add a profit centre",
+      "definePosition": "Add a position",
+      "revisePosition": "Revise",
+      "retirePosition": "Retire",
+      "setEstablishment": "Set budgeted headcount",
+      "approveEstablishment": "Approve",
+      "defineCalendar": "Add a calendar",
+      "recordDay": "Add a day",
+      "removeDay": "Remove",
+      "saveSettings": "Save settings",
+      "viewAsOf": "View as at a date",
+      "importStructure": "Import a structure",
+      "exportStructure": "Export the structure"
+    },
+    "empty": {
+      "unitTypes": "No levels defined yet. Add the ones this organization uses, or adopt the standard set.",
+      "units": "No units yet.",
+      "hierarchy": "Nothing has been placed in the structure yet.",
+      "unplaced": "These units exist but sit nowhere in the structure on this date.",
+      "legalEntities": "No legal entities registered yet.",
+      "positions": "No positions defined yet.",
+      "establishment": "No headcount budgeted for this unit.",
+      "calendars": "No calendars defined yet.",
+      "days": "No exception days recorded.",
+      "settings": "This organization has not been configured yet, so it uses the deployment defaults."
+    },
+    "hint": {
+      "unlimitedDepth": "A structure may be as deep as it needs to be. Levels are yours to define.",
+      "standardUnitTypes": "The standard set is a suggestion. Adopt what fits, edit it, or define your own.",
+      "countryFromLegalEntity": "Employment law follows the legal entity, not the organization, so one organization may operate in several countries at once.",
+      "historyPreserved": "Moving a unit records a new period. Previous structure is never rewritten.",
+      "importResumable": "An import can be run again after a correction — units that already exist are reused.",
+      "noEmployees": "This area holds structure only. People and their assignments live elsewhere."
+    }
+  }
+}

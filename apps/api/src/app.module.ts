@@ -7,6 +7,7 @@ import { environmentProvider } from './configuration/environment.provider.js';
 import { DatabaseModule } from './persistence/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { OrganizationModule } from './organization/organization.module.js';
 import { CorrelationMiddleware } from './observability/correlation.middleware.js';
 import { AuthenticatedTenantGuard } from './tenancy/authenticated-tenant.guard.js';
 import { TenantMiddleware } from './tenancy/tenant.middleware.js';
@@ -24,6 +25,7 @@ import { loggingOptions } from './observability/logging.js';
     LoggerModule.forRoot(loggingOptions(loadProcessEnvironment())),
     DatabaseModule,
     IdentityModule,
+    OrganizationModule,
     HealthModule,
   ],
   providers: [

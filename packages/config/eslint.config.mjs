@@ -18,7 +18,13 @@ export default [
   ...standards,
   {
     name: 'work/config/environment-access',
-    files: ['src/environment.ts', 'src/environment.test.ts'],
+    files: [
+      'src/environment.ts',
+      'src/environment.test.ts',
+      // The portals' environment. A separate file because a presentation application must not be
+      // handed a database connection string in order to start (Phase 3).
+      'src/portal-environment.ts',
+    ],
     rules: { 'no-restricted-properties': 'off' },
   },
 ];

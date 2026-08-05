@@ -220,4 +220,45 @@ $ curl -s http://localhost:3000/health/live | jq .status
 ```
 
 The application must connect as a role that owns no tables and holds no `BYPASSRLS`; it checks at
-startup and exits if it can bypass isolation (ADR-0030).
+startup and exits if it can bypass isolation (ADR-0030). The role the migrations run as will not
+do — create an unprivileged one:
+
+```bash
+psql "$DATABASE_URL" -c "
+  create role work_app login nosuperuser password 'work_app';
+  grant usage on schema public to work_app;
+  grant select, insert, update, delete on all tables in schema public to work_app;
+  grant execute on all functions in schema public to work_app;"
+```
+
+then point `DATABASE_URL` at `work_app`. Starting as the migration user produces:
+
+```
+Failed to start: IsolationNotEnforcedError: Refusing to start: the database role "work" can
+bypass row-level security because it is a superuser.
+```
+
+which is the guard working, not a fault.
+
+## Running a portal locally
+
+The portals read the product through the API and hold no business logic. They take one variable,
+validated at startup like everything else (`@work/config`):
+
+| Variable | Default | What it sets |
+| -------- | ------- | ------------ |
+| `WORK_API_URL` | `http://127.0.0.1:3000` | Where the portal reaches the API |
+
+```bash
+WORK_API_URL=http://127.0.0.1:3000 pnpm --filter @work/admin dev
+```
+
+The organization screens live at `/organization`. They take `?asOf=` to render the structure as
+at a date and `?lang=ar` to switch language and direction together:
+
+```bash
+curl -s "http://localhost:3001/organization?lang=ar" | grep -o 'dir="[a-z]*"'
+```
+
+Until Platform's authentication adapter is wired in the API answers 401, so the screens render
+their empty states. That is the expected condition today rather than a fault.
