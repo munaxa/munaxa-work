@@ -53,6 +53,7 @@ apps/manager-portal          # manager self-service
 apps/mobile                  # Flutter application (own toolchain)
 packages/kernel              # Shared Kernel (Phase 1)
 packages/modules/<module>    # business modules, layered inside (ADR-0023)
+packages/persistence         # connections, Unit of Work, tenant scoping — the only package that knows a driver exists
 packages/config              # the only place the environment is read
 packages/contracts           # cross-module public contracts
 packages/sdk                 # typed API client
@@ -95,6 +96,30 @@ closed. It skips without a database locally and **refuses to skip in CI**.
 pnpm db:up
 TEST_DATABASE_URL=postgresql://work:work@localhost:5432/work pnpm test
 ```
+
+## Writing through the Unit of Work
+
+Every write goes through it, and it guarantees three things so no module has to remember them:
+
+```ts
+await runInContext({ tenantId, correlationId, actor }, async () =>
+  unitOfWork.execute(async (transaction) => {
+    const request = LeaveRequest.approve(...);      // records events, does not publish them
+    await repository.save(transaction, request);    // asserts the version it read
+    transaction.collect(request.pullEvents());      // published only after commit
+  }),
+);
+```
+
+1. `app.tenant_id` is set **transaction-local**. A session-level setting would survive a pooled
+   connection's checkout and apply one request's tenant to the next — failing *open*, while
+   looking like it works.
+2. Events publish **after** commit. Nothing downstream reacts to a change that rolled back.
+3. A failure rolls back and publishes nothing.
+
+A handler that fails after commit does not undo the write — it cannot, the transaction is
+durable. The error surfaces to the caller and the business fact stands, which is the honest
+outcome.
 
 ## Conventions worth knowing before your first commit
 

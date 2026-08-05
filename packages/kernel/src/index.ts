@@ -37,6 +37,18 @@ export type { CalendarDate, CalendarSystem } from './time/calendar.js';
 export { formatServicePeriod, serviceBetween } from './time/service-period.js';
 export type { ServicePeriod } from './time/service-period.js';
 
+export { AggregateRoot, Entity, ValueObject } from './domain/entity.js';
+export { createDomainEvent } from './domain/domain-event.js';
+export type { DomainEvent, EventOrigin, EventSubject } from './domain/domain-event.js';
+export { InProcessEventDispatcher } from './domain/in-process-dispatcher.js';
+export type {
+  EventDispatcher,
+  EventHandler,
+  Transaction,
+  TransactionalWork,
+  UnitOfWork,
+} from './persistence/unit-of-work.js';
+
 export { Money } from './money/money.js';
 export type { Currency, Rounding } from './money/money.js';
 
