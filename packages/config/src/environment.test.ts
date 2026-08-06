@@ -57,6 +57,35 @@ describe('loadEnvironment', () => {
   });
 });
 
+describe('the People duplicate-match key', () => {
+  it('applies a development default so a checkout runs', () => {
+    expect(loadEnvironment(valid).PII_MATCH_SECRET).toMatch(/development-only/);
+  });
+
+  it('refuses that default in production, because a shipped key is the same key everywhere', () => {
+    const act = (): unknown => loadEnvironment({ ...valid, NODE_ENV: 'production' });
+
+    expect(act).toThrow(ConfigurationError);
+    expect(act).toThrow(/PII_MATCH_SECRET/);
+  });
+
+  it('accepts a real key in production', () => {
+    const environment = loadEnvironment({
+      ...valid,
+      NODE_ENV: 'production',
+      PII_MATCH_SECRET: 'a'.repeat(48),
+    });
+
+    expect(environment.PII_MATCH_SECRET).toHaveLength(48);
+  });
+
+  it('refuses a key too short to be one', () => {
+    expect(() => loadEnvironment({ ...valid, PII_MATCH_SECRET: 'short' })).toThrow(
+      ConfigurationError,
+    );
+  });
+});
+
 describe('loadProcessEnvironment', () => {
   it('reads the real process environment', async () => {
     process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/work';

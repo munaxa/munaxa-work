@@ -164,7 +164,33 @@ Never rebuild any of these in a module — that is what the shared kernel is for
 | Feature flag | `InMemoryFeatureFlags` — user beats tenant beats default; unknown is off |
 | Tests | `@work/testing` — `InMemoryUnitOfWork`, `FakeRepository`, `permitting`, `assertEventRaised` |
 
+## Two things People learned that the next module should not rediscover
+
+**A parameter a query never references is a query PostgreSQL refuses.** Building a `where` clause
+from a fixed placeholder list and passing `null` for the unused filters looks tidy and fails with
+`could not determine data type of parameter $2` the moment every filter is absent — which is the
+*ordinary* case for a first page. Build the clause and its parameters together
+(`person-search.ts`). Organization's repositories carry the older shape and have not hit it because
+their unfiltered path goes through a different method.
+
+**A check constraint passes when its result is NULL.** `check (kind = 'skill' and title ? 'en')` is
+NULL — and therefore accepted — for a skill with no title at all, which is exactly the row it exists
+to refuse. Write the rule as a `case` that returns a definite boolean on every branch. The
+integration suite caught this one; a unit test could not have.
+
+**Row-level security stops the planner using an index for a substring search.** `ilike` is not a
+leakproof operator, so PostgreSQL will not evaluate it as an index condition ahead of a security
+qual — a trigram index on a name is therefore unused by an application that connects with RLS in
+force, and it costs writes for nothing. Measured both ways in the Phase 4 report. Do not add one
+without measuring *as the application role*.
+
 ## Conventions worth knowing before your first commit
+
+**One secret is required, and refused if it is the default.** `PII_MATCH_SECRET` is the key
+People derives duplicate-match digests with — a national identifier is compared through a keyed
+digest rather than in plaintext, so the query that finds who already holds a number never reads
+one. A development default ships so a checkout runs; `loadEnvironment` refuses it when
+`NODE_ENV=production`, because a shipped default is the same key in every deployment.
 
 **The environment is read once.** `packages/config` validates `process.env` at startup and
 exposes a frozen, typed value. Reading `process.env` anywhere else is a lint error. A missing or
@@ -253,11 +279,12 @@ validated at startup like everything else (`@work/config`):
 WORK_API_URL=http://127.0.0.1:3000 pnpm --filter @work/admin dev
 ```
 
-The organization screens live at `/organization`. They take `?asOf=` to render the structure as
-at a date and `?lang=ar` to switch language and direction together:
+The organization screens live at `/organization` and the people register at `/people`. Both take
+`?asOf=` to render as at a date and `?lang=ar` to switch language and direction together:
 
 ```bash
 curl -s "http://localhost:3001/organization?lang=ar" | grep -o 'dir="[a-z]*"'
+curl -s "http://localhost:3001/people?lang=ar" | grep -o 'dir="[a-z]*"'
 ```
 
 Until Platform's authentication adapter is wired in the API answers 401, so the screens render

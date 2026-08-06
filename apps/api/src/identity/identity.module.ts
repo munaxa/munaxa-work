@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
+import { PinoLogger } from 'nestjs-pino';
 import {
   IdentityDispatcher,
   InvitationsController,
@@ -20,6 +21,7 @@ import {
   ModuleRegistry,
   UnauthenticatedPort,
   type EventDispatcher,
+  type PermissionChecker,
   type PlatformAuthenticationPort,
   type UnitOfWork,
   type WorkModule,
@@ -38,6 +40,7 @@ import {
   DeferredCommandSender,
   organizationModuleFor,
 } from '../organization/organization.composition.js';
+import { DeferredPeopleSender, peopleModuleFor } from '../people/people.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -45,6 +48,9 @@ import {
   DISPATCHER,
   MEMBERSHIP_DIRECTORY,
   MODULE_REGISTRY,
+  PEOPLE_COMMAND_SENDER,
+  PEOPLE_MODULE,
+  PERMISSION_CHECKER,
 } from './identity.tokens.js';
 import { PlatformPermissionChecker } from './permission-checker.js';
 
@@ -87,30 +93,61 @@ import { PlatformPermissionChecker } from './permission-checker.js';
       useFactory: (): DeferredCommandSender => new DeferredCommandSender(),
     },
     {
+      provide: PEOPLE_COMMAND_SENDER,
+      useFactory: (): DeferredPeopleSender => new DeferredPeopleSender(),
+    },
+    {
+      // One checker, given to the pipeline *and* to People's reads. Two would eventually differ,
+      // and the difference would be a caller redacted by one and not the other.
+      provide: PERMISSION_CHECKER,
+      useFactory: (): PermissionChecker => new PlatformPermissionChecker(),
+    },
+    {
+      provide: PEOPLE_MODULE,
+      inject: [UNIT_OF_WORK, PERMISSION_CHECKER, ENVIRONMENT, PinoLogger, PEOPLE_COMMAND_SENDER],
+      useFactory: (
+        unitOfWork: UnitOfWork,
+        permissions: PermissionChecker,
+        environment: Environment,
+        logger: PinoLogger,
+        sender: DeferredPeopleSender,
+      ): WorkModule => peopleModuleFor(unitOfWork, permissions, environment, logger.logger, sender),
+    },
+    {
       provide: MODULE_REGISTRY,
-      inject: [UNIT_OF_WORK, DATABASE_POOL, ENVIRONMENT, COMMAND_SENDER],
+      inject: [UNIT_OF_WORK, DATABASE_POOL, ENVIRONMENT, COMMAND_SENDER, PEOPLE_MODULE],
       useFactory: (
         unitOfWork: UnitOfWork,
         pool: Pool,
         environment: Environment,
         sender: DeferredCommandSender,
+        people: WorkModule,
       ): ModuleRegistry => {
         const registry = new ModuleRegistry();
 
         registry.register(identityModuleFor(unitOfWork, pool, environment));
         registry.register(organizationModuleFor(unitOfWork, sender));
+        registry.register(people);
         return registry;
       },
     },
     {
       provide: DISPATCHER,
-      inject: [MODULE_REGISTRY, EVENT_DISPATCHER, COMMAND_SENDER],
+      inject: [
+        MODULE_REGISTRY,
+        EVENT_DISPATCHER,
+        COMMAND_SENDER,
+        PEOPLE_COMMAND_SENDER,
+        PERMISSION_CHECKER,
+      ],
       useFactory: (
         registry: ModuleRegistry,
         events: EventDispatcher,
         sender: DeferredCommandSender,
+        peopleSender: DeferredPeopleSender,
+        permissions: PermissionChecker,
       ): Dispatcher => {
-        const dispatcher = new Dispatcher(new PlatformPermissionChecker());
+        const dispatcher = new Dispatcher(permissions);
 
         for (const module of registry.registered) {
           for (const handler of module.commands ?? []) {
@@ -122,6 +159,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
           for (const handler of module.eventHandlers ?? []) events.register(handler);
         }
         sender.attach(dispatcher);
+        peopleSender.attach(dispatcher);
         return dispatcher;
       },
     },

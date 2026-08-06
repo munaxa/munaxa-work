@@ -304,6 +304,123 @@ forever, because nobody is ever asked for the other one again.
 
 ---
 
+## The people register
+
+### One person, once — and why the product argues with you about it
+
+A Person is a human being, not a job. The same record follows somebody through being hired,
+promoted, made a manager, leaving, and coming back four years later.
+
+Creating somebody who looks like an existing record is **refused**, with the candidates. That is
+deliberately in your way, because a second record for one human being does not look like an error
+afterwards — it looks like a shorter career:
+
+- an end-of-service gratuity computed on four years instead of eleven,
+- half a leave balance,
+- a loan repaid twice,
+- one national identifier registered twice with a social insurance authority.
+
+If they genuinely are different people — two brothers, the same name, the same birthday — re-send
+with `acknowledgedDuplicates`, and both are created *and* the pair is queued for review. Nothing is
+merged automatically, ever.
+
+The check recognises `أحمد` and `احمد` as one name, and `1234-5678-90` and `1234 5678 90` as one
+document.
+
+### The review queue
+
+`GET /api/v1/people/duplicates?status=pending` is the work list. Each entry says *why* the system
+suspects a match and how strongly — a shared government identifier is near-certain, a shared mobile
+number is strong but families share landlines, a shared name and birthday is the weakest and never
+enough on its own.
+
+Deciding is `PATCH /api/v1/people/duplicates/{id}` with `confirmed` or `dismissed`. **Confirming
+does not merge them.** Merging is a separate operation with its own permission, because it is
+effectively irreversible for every module that has since referenced the record that loses.
+
+A merge is a redirect, not a deletion: the losing record stays, points at the survivor, and refuses
+further changes. Everything that ever referenced it still resolves, which is the whole reason a
+merge is not a delete.
+
+### Names are dated, and you should date them
+
+A legal name change — marriage, naturalisation, a court correction — is recorded with the date it
+took effect, not the date you typed it. `POST /api/v1/people/{id}/names` takes `effectiveFrom`.
+
+Get that date right. A settlement letter, a visa application and a government submission are
+documents *about a date*, and they resolve the name in force then. A certificate that arrives three
+weeks late is recorded with the date on the certificate, and doing so splits the history correctly
+rather than discarding anything recorded since.
+
+`GET /api/v1/people/{id}?asOf=2026-03-01` answers with the name as it stood.
+
+### Who can see what
+
+Permissions here are finer than anywhere else in the product, and that is deliberate. Seeing that
+somebody exists, seeing their date of birth, and seeing the number on their passport are three
+different permissions.
+
+| If a user lacks | They see |
+| --------------- | -------- |
+| `people.person.read-sensitive` | The person, with date of birth, place of birth, gender and marital status **absent** — and a flag saying fields were hidden |
+| `people.identifier.read-value` | `••••7890` — enough to confirm the right document, not enough to be it |
+| `people.identifier.read` | No identifiers section at all, and `withheld` says so |
+| `people.note.read` | No notes section at all |
+
+A missing field is **absent**, not blank and not zero. If a screen shows nothing where a date of
+birth should be, that is either "not recorded" or "not yours to see", and the response distinguishes
+them — check `sensitiveWithheld` and `withheld` before assuming data is missing.
+
+**Grant `people.identifier.read-value` to very few people.** Every use of it is recorded.
+
+### Metadata is not a place for personal data
+
+The `metadata` field on a person is yours: stored, returned, never interpreted. It is also
+**excluded from the redaction above**, because the product cannot know what is in it. Do not put a
+national identifier, a medical detail or anything else sensitive there — it will be visible to
+everybody who can read the person.
+
+### Bulk load
+
+`POST /api/v1/people/import` takes up to 2,000 rows and sends each through the same command a person
+would. Two consequences you should plan for:
+
+- **It is not atomic.** A bad row leaves everything before it written. It is, however, *resumable* —
+  a person number that already exists is skipped rather than failed — so fix the file and run it
+  again.
+- **It refuses matches by default**, reporting them rather than writing them. Review those before
+  re-running with `acknowledgedDuplicates`, or you will import the duplicates you are trying to
+  avoid.
+
+Names are required in Arabic *and* English on every row, exactly as they are on a screen.
+
+### The secret you must set
+
+`PII_MATCH_SECRET` is the key the duplicate check derives its digests from — the reason the product
+can find who already holds a national identifier without ever reading one.
+
+- At least 32 characters, random, stored with your other secrets.
+- A development default ships so a checkout runs. **Startup refuses it when `NODE_ENV=production`.**
+- **Do not rotate it casually.** Rotating invalidates every stored match digest, so the duplicate
+  check stops finding existing records until each is re-recorded. Treat it as a long-lived key.
+
+### What the register does not hold
+
+No unit, position, manager, cost centre, shift, salary or attendance. If you are looking for where
+somebody works, that is Employment — a different module, referencing this one.
+
+### What it cannot do yet
+
+- **Erasure.** A right-to-erasure request cannot be satisfied by this release. Identity records are
+  never destroyed by design, and reconciling that with erasure is a governance decision recorded for
+  Phase 21.
+- **Answering "who read this person's passport last year".** Each disclosure is written to the
+  structured log, so it is alertable, but it is not yet a queryable ledger.
+- **A scheduled duplicate sweep.** `POST /api/v1/people/duplicates/rescan/{personId}` re-runs the
+  check on demand and is safe to repeat; running it on a timer waits for Phase 24.
+
+---
+
 ## Operational checks
 
 | Endpoint | Question it answers | Who asks |

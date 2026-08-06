@@ -31,7 +31,8 @@
     "@work/persistence": "workspace:*",
     "pg": "^8.13.1",
     "@work/identity": "workspace:*",
-    "@work/organization": "workspace:*"
+    "@work/organization": "workspace:*",
+    "@work/people": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",

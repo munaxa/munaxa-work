@@ -38,6 +38,10 @@ jobs:
   node:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
+    # A job that exceeds this is not slow, it is stuck — and the default is six hours of a runner
+    # producing no output and no logs, which is the worst way to learn that a test suite hangs.
+    # Failing here surfaces the logs instead.
+    timeout-minutes: 25
     permissions:
       contents: read
       packages: read
@@ -116,6 +120,7 @@ jobs:
   mobile:
     name: Mobile
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
 

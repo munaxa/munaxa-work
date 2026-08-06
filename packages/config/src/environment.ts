@@ -65,8 +65,24 @@ export const environmentSchema = z.object({
     )
     .pipe(z.array(z.enum(['employee', 'manager', 'admin'])).min(1)),
 
+  /**
+   * The key People's duplicate detection derives its match digests with (Phase 4).
+   *
+   * A national identifier is compared through a keyed digest rather than in plaintext, so the
+   * query that answers "who else holds this number" never reads anybody's number, and the index
+   * that makes it fast holds nothing worth stealing. An unkeyed hash would not do: national
+   * identifier spaces are small enough to enumerate, so a plain SHA-256 of one is recoverable by
+   * anybody who obtains the column.
+   *
+   * The development default exists so a checkout runs; `refineEnvironment` below refuses it in
+   * production, because a shipped default key is the same key in every deployment.
+   */
+  PII_MATCH_SECRET: z.string().min(32).default('development-only-people-match-secret-change-me'),
+
   OPENAPI_ENABLED: booleanFromEnvironment(true),
 });
+
+const DEVELOPMENT_MATCH_SECRET = 'development-only-people-match-secret-change-me';
 
 export type Environment = z.infer<typeof environmentSchema>;
 
@@ -92,8 +108,25 @@ export const loadEnvironment = (source: Record<string, string | undefined>): Env
     throw new ConfigurationError(issues);
   }
 
+  const issues = refineEnvironment(result.data);
+
+  if (issues.length > 0) throw new ConfigurationError(issues);
+
   return Object.freeze(result.data);
 };
+
+/**
+ * The rules a single variable's schema cannot express, because they depend on another variable.
+ *
+ * Checked here rather than at the point of use, so a deployment that would be insecure fails at
+ * startup instead of behaving correctly until the day somebody looks.
+ */
+const refineEnvironment = (environment: Environment): readonly string[] =>
+  environment.NODE_ENV === 'production' && environment.PII_MATCH_SECRET === DEVELOPMENT_MATCH_SECRET
+    ? [
+        'PII_MATCH_SECRET: the development default must not be used in production. It is the key People derives duplicate-match digests with, and a shipped default is the same key in every deployment.',
+      ]
+    : [];
 
 /**
  * Reads and validates the real process environment. This is the only expression in Munaxa Work
