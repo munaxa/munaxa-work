@@ -123,6 +123,29 @@ const ensureApplicationRole = async (admin: Pool, role: string): Promise<string>
   return url.toString();
 };
 
+/**
+ * Every wait this fixture can make is bounded.
+ *
+ * A `pg.Pool` waits **forever** for a free connection by default, and a statement waits forever
+ * for a lock. Either one turns a contended database — several modules' integration suites running
+ * at once against one server, which is exactly what CI does — into a test run that produces no
+ * output and no failure until the job's own timeout hours later. A bounded wait fails with a
+ * message that names itself.
+ *
+ * The numbers are generous by design: nothing here legitimately waits seconds, so exceeding them
+ * is a finding rather than a tuning problem.
+ */
+const BOUNDS = {
+  connectionTimeoutMillis: 15_000,
+  statement_timeout: 30_000,
+  max: 5,
+} as const;
+
+const openApplicationPool = async (admin: Pool, role: string): Promise<Pool> => {
+  await assertSchemaApplied(admin);
+  return new Pool({ connectionString: await ensureApplicationRole(admin, role), ...BOUNDS });
+};
+
 const AUDIT = `now(), 'test', now(), 'test', 1`;
 
 const seedPersonWith = async (
@@ -162,12 +185,21 @@ const seedNameWith = async (
   return id;
 };
 
+/**
+ * Opens the fixture, and closes what it opened if opening fails.
+ *
+ * Without the `catch`, a failure in `assertSchemaApplied` or `ensureApplicationRole` leaves the
+ * `admin` pool open and unreferenced: `beforeAll` fails, `afterAll` has no fixture to close, and
+ * the socket keeps Node alive forever. The suite would report a failure *and* hang, and the hang
+ * is what a reader sees first.
+ */
 export const openPeopleFixture = async (role: string): Promise<PeopleFixture> => {
-  const admin = new Pool({ connectionString: CONNECTION });
+  const admin = new Pool({ connectionString: CONNECTION, ...BOUNDS });
 
-  await assertSchemaApplied(admin);
-
-  const application = new Pool({ connectionString: await ensureApplicationRole(admin, role) });
+  const application = await openApplicationPool(admin, role).catch(async (error: unknown) => {
+    await admin.end();
+    throw error;
+  });
   const unitOfWork = new PostgresUnitOfWork(application, new InProcessEventDispatcher());
   const stores = postgresPeopleStores();
 
@@ -187,10 +219,23 @@ export const openPeopleFixture = async (role: string): Promise<PeopleFixture> =>
     truncate: async () => {
       await admin.query(`truncate ${PEOPLE_TABLES.join(', ')} cascade`);
     },
+    /**
+     * Ends both pools, whatever else fails.
+     *
+     * A pg `Pool` holds an open socket, and an open socket keeps Node's event loop alive — so a
+     * pool that is not ended does not fail a test, it **hangs the process after the tests pass**,
+     * which in CI is a job that runs until the six-hour timeout with no output to explain it.
+     *
+     * The tidy-up truncate is therefore inside a `finally` rather than in front of `admin.end()`.
+     * It is a courtesy to the next suite; the pools closing is not.
+     */
     close: async () => {
-      await application.end();
-      await admin.query(`truncate ${PEOPLE_TABLES.join(', ')} cascade`);
-      await admin.end();
+      try {
+        await application.end();
+        await admin.query(`truncate ${PEOPLE_TABLES.join(', ')} cascade`);
+      } finally {
+        await admin.end();
+      }
     },
   };
 };
