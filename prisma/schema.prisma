@@ -451,3 +451,361 @@ model TenantSettings {
 
   @@map("tenant_settings")
 }
+
+// ------------------------------------------------------------------------------------------
+// People — the enterprise master registry of human identity (Phase 4).
+//
+// Three decisions in this section are the ones a reviewer should challenge.
+//
+//   * There is **no name column on `person`**. A legal name changes — marriage, naturalisation,
+//     a court correction — and "what was this person's legal name when they signed that
+//     contract" has legal force. So names live entirely in `person_name`, on a timeline, and
+//     the person row holds no cached copy, because a cached copy is a second answer. ADR-0037.
+//
+//   * `person_identifier` carries a `match_key` beside the value, and duplicate detection
+//     compares **only the key**. A national identifier space is small enough to enumerate, so
+//     the key is a keyed digest (PII_MATCH_SECRET) rather than a plain hash — the index that
+//     makes duplicate detection fast holds nothing worth stealing.
+//
+//   * Nothing here is ever deleted. Every child record is withdrawn or superseded, because
+//     historical identity information is never destroyed (AD-009) and a merge is a redirect.
+// ------------------------------------------------------------------------------------------
+
+/// One permanent human identity. Holds no employment, no assignment and no organizational
+/// placement: Employment references Person, and Person never references Employment (AD-002).
+model Person {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  person_number        String    @db.VarChar(64)
+  /// A civil date, not an instant: a date of birth is the same date in every time zone.
+  date_of_birth        DateTime? @db.Date
+  place_of_birth       String?   @db.VarChar(255)
+  /// A tenant-supplied code, never an enumeration this product ships (00B).
+  gender_code          String?   @db.VarChar(64)
+  marital_status_code  String?   @db.VarChar(64)
+  status               String    @db.VarChar(32)
+  /// A reference into the document store, never bytes in a row.
+  photo_document_id    String?   @db.VarChar(64)
+  /// Set when this record was found to be the same human being as another (AD-001).
+  merged_into_person_id String?  @db.Uuid
+  /// Tenant-authored, stored and never interpreted. No rule in the module reads a key.
+  metadata             Json
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, status], map: "person_tenant_status_idx")
+  @@index([tenant_id, date_of_birth], map: "person_tenant_birth_idx")
+  @@map("person")
+}
+
+/// What a person was called, and from when. The versioned child entity that makes a legal name
+/// answerable as at a date (ADR-0037).
+model PersonName {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  person_id      String    @db.Uuid
+  /// Language tag to text. Both first-class languages are present before a row is written.
+  legal_name     Json
+  preferred_name Json?
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, person_id, effective_from], map: "person_name_person_idx")
+  @@map("person_name")
+}
+
+/// A government or business identifier. The type is a code the tenant or a country pack
+/// supplies — identity document types are country-pack content, never a list this product ships.
+model PersonIdentifier {
+  id              String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  person_id       String    @db.Uuid
+  identifier_type String    @db.VarChar(64)
+  value           String    @db.VarChar(64)
+  /// The keyed digest duplicate detection compares. Finding who holds a number never reads one.
+  match_key       String    @db.VarChar(128)
+  issuing_country String?   @db.Char(2)
+  issued_on       DateTime? @db.Date
+  expires_on      DateTime? @db.Date
+  is_primary      Boolean
+  withdrawn_at    DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @db.Timestamptz(6)
+  created_by      String    @db.VarChar(255)
+  updated_at      DateTime  @db.Timestamptz(6)
+  updated_by      String    @db.VarChar(255)
+  deleted_at      DateTime? @db.Timestamptz(6)
+  deleted_by      String?   @db.VarChar(255)
+  version         Int
+
+  @@index([tenant_id, person_id], map: "person_identifier_person_idx")
+  @@index([tenant_id, match_key], map: "person_identifier_match_idx")
+  @@index([tenant_id, expires_on], map: "person_identifier_expiry_idx")
+  @@map("person_identifier")
+}
+
+/// A citizenship this person holds. A row rather than a column, because dual nationality is
+/// ordinary. Nationality is an input to statutory rules and never a business rule here (00B).
+model PersonNationality {
+  id           String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id    String    @db.Uuid
+  person_id    String    @db.Uuid
+  country_code String    @db.Char(2)
+  is_primary   Boolean
+  acquired_on  DateTime? @db.Date
+  withdrawn_at DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @db.Timestamptz(6)
+  created_by   String    @db.VarChar(255)
+  updated_at   DateTime  @db.Timestamptz(6)
+  updated_by   String    @db.VarChar(255)
+  deleted_at   DateTime? @db.Timestamptz(6)
+  deleted_by   String?   @db.VarChar(255)
+  version      Int
+
+  @@index([tenant_id, person_id], map: "person_nationality_person_idx")
+  @@map("person_nationality")
+}
+
+/// How a person is reached, and from when. Versioned, because "which number did we have when we
+/// tried to reach them" is a question about a date.
+model PersonContact {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  person_id      String    @db.Uuid
+  channel        String    @db.VarChar(32)
+  purpose        String    @db.VarChar(32)
+  /// Normalized: lower-cased for email, separators stripped for telephone. What matching reads.
+  value          String    @db.VarChar(320)
+  /// As entered, so a screen shows the customer their own formatting back.
+  display_value  String    @db.VarChar(320)
+  is_primary     Boolean
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, person_id], map: "person_contact_person_idx")
+  @@index([tenant_id, value], map: "person_contact_value_idx")
+  @@map("person_contact")
+}
+
+/// Where a person lives or receives post. No country's address format is assumed: an ordered
+/// list of lines the customer wrote, and the country as a two-letter shape (00B).
+model PersonAddress {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  person_id      String    @db.Uuid
+  kind           String    @db.VarChar(32)
+  /// An ordered array of language-tag-to-text objects, in the order the customer wrote them.
+  lines          Json
+  city           Json
+  region         Json?
+  postal_code    String?   @db.VarChar(16)
+  country_code   String    @db.Char(2)
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, person_id, kind], map: "person_address_person_idx")
+  @@map("person_address")
+}
+
+/// Another human being's data, held about somebody who never consented to this system. Guarded
+/// by its own permission rather than folded into the person's general record.
+model PersonEmergencyContact {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  person_id           String    @db.Uuid
+  name                Json
+  /// A tenant-supplied code. Family structures differ; a fixed list is a product opinion.
+  relationship_code   String    @db.VarChar(64)
+  telephone           String    @db.VarChar(32)
+  alternate_telephone String?   @db.VarChar(32)
+  email               String?   @db.VarChar(320)
+  /// 1 is called first. The person's own ordering, not a rank this product assigns.
+  priority            Int
+  effective_from      DateTime  @db.Timestamptz(6)
+  effective_to        DateTime? @db.Timestamptz(6)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@index([tenant_id, person_id, priority], map: "person_emergency_contact_person_idx")
+  @@map("person_emergency_contact")
+}
+
+/// A personal configuration the person chose, and from when. Not the user's *application*
+/// preferences — language and calendar are `identity`'s, defaulted from the tenant (ADR-0036).
+model PersonPreference {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  person_id      String    @db.Uuid
+  preference_key String    @db.VarChar(64)
+  /// Opaque. No rule in this module reads a preference value.
+  value          String    @db.VarChar(1024)
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, person_id, preference_key], map: "person_preference_person_idx")
+  @@map("person_preference")
+}
+
+/// A language spoken or a skill held. Self-declared claims, not assessments — Learning owns
+/// assessment (Phase 14).
+model PersonCapability {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  person_id           String    @db.Uuid
+  kind                String    @db.VarChar(16)
+  /// A BCP 47 tag for a language; a tenant-supplied code for a skill.
+  capability_code     String    @db.VarChar(64)
+  title               Json?
+  level               String    @db.VarChar(32)
+  years_of_experience Decimal?  @db.Decimal(4, 1)
+  last_used_on        DateTime? @db.Date
+  withdrawn_at        DateTime? @db.Timestamptz(6)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@index([tenant_id, person_id], map: "person_capability_person_idx")
+  @@index([tenant_id, kind, capability_code], map: "person_capability_code_idx")
+  @@map("person_capability")
+}
+
+/// Education, professional experience elsewhere, and certifications. None of this is employment
+/// with this company — that is Phase 5's, and this module holds no assignment (AD-002).
+model PersonHistory {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  person_id         String    @db.Uuid
+  kind              String    @db.VarChar(16)
+  organization_name Json
+  title             Json
+  field_of_study    Json?
+  country_code      String?   @db.Char(2)
+  from_date         DateTime  @db.Date
+  to_date           DateTime? @db.Date
+  /// A certification's expiry. Refused on an education or an experience record.
+  expires_on        DateTime? @db.Date
+  reference         String?   @db.VarChar(128)
+  withdrawn_at      DateTime? @db.Timestamptz(6)
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, person_id, kind], map: "person_history_person_idx")
+  @@index([tenant_id, expires_on], map: "person_history_expiry_idx")
+  @@map("person_history")
+}
+
+/// A label a tenant applies to group people its own way. A code, never a list this product ships.
+model PersonTag {
+  id           String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id    String    @db.Uuid
+  person_id    String    @db.Uuid
+  tag_code     String    @db.VarChar(64)
+  withdrawn_at DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @db.Timestamptz(6)
+  created_by   String    @db.VarChar(255)
+  updated_at   DateTime  @db.Timestamptz(6)
+  updated_by   String    @db.VarChar(255)
+  deleted_at   DateTime? @db.Timestamptz(6)
+  deleted_by   String?   @db.VarChar(255)
+  version      Int
+
+  @@index([tenant_id, tag_code], map: "person_tag_code_idx")
+  @@index([tenant_id, person_id], map: "person_tag_person_idx")
+  @@map("person_tag")
+}
+
+/// Free text an administrator wrote about somebody. Never amended and never deleted: a note that
+/// could be edited after the fact cannot be relied on in a disciplinary case.
+model PersonNote {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  person_id     String    @db.Uuid
+  category_code String    @db.VarChar(64)
+  body          String    @db.Text
+  /// Taken from the authenticated context. A caller cannot supply it.
+  authored_by   String    @db.VarChar(255)
+  authored_at   DateTime  @db.Timestamptz(6)
+  withdrawn_at  DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@index([tenant_id, person_id, authored_at], map: "person_note_person_idx")
+  @@map("person_note")
+}
+
+/// Two records the system suspects are one human being, awaiting a decision. The pair is stored
+/// ordered, so detecting A against B and later B against A queues one decision rather than two.
+model PersonDuplicateCandidate {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  person_id                String    @db.Uuid
+  duplicate_of_person_id   String    @db.Uuid
+  reason                   String    @db.VarChar(64)
+  confidence               Int
+  status                   String    @db.VarChar(16)
+  reviewed_by              String?   @db.VarChar(255)
+  reviewed_at              DateTime? @db.Timestamptz(6)
+  review_note              String?   @db.VarChar(1024)
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@unique([tenant_id, person_id, duplicate_of_person_id], map: "person_duplicate_candidate_pair_key")
+  @@index([tenant_id, status], map: "person_duplicate_candidate_status_idx")
+  @@map("person_duplicate_candidate")
+}

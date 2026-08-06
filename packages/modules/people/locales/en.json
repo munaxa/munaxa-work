@@ -1,0 +1,128 @@
+{
+  "people": {
+    "rejection": {
+      "name_requires_both_languages": "A name is required in both Arabic and English. The missing one is {missing}.",
+      "code_malformed": "\"{code}\" is not a valid code. Use letters, digits, dots, dashes or underscores.",
+      "metadata_entry_too_long": "The metadata entry \"{key}\" is too long.",
+      "text_required": "{field} is required.",
+      "text_too_long": "{field} is too long.",
+      "date_malformed": "{field} is not a date. Use the form YYYY-MM-DD.",
+      "period_ends_before_it_begins": "{field} cannot end before it begins.",
+      "period_already_closed": "That period has already ended.",
+      "country_code_malformed": "\"{country}\" is not a two-letter country code.",
+      "language_tag_malformed": "That is not a language tag.",
+
+      "date_of_birth_in_the_future": "A date of birth cannot be in the future.",
+      "date_of_birth_implausible": "That date of birth is too far in the past to be right. Check for a typing mistake.",
+      "person_already_in_status": "This person is already {status}.",
+      "person_merged": "This record has been merged into another and can no longer be changed.",
+      "merge_is_not_a_status_change": "Use the merge operation, which needs the record to merge into.",
+      "person_cannot_merge_into_itself": "A person cannot be merged into themselves.",
+      "person_cannot_duplicate_itself": "A person cannot be a duplicate of themselves.",
+      "document_reference_malformed": "That is not a valid document reference.",
+
+      "identifier_value_empty": "An identifier value is required.",
+      "identifier_expires_before_issue": "An identifier cannot expire before it was issued.",
+      "identifier_withdrawn": "This identifier has been withdrawn. Record the replacement instead.",
+
+      "nationality_already_held": "This person already holds that citizenship.",
+
+      "email_malformed": "That is not an email address.",
+      "telephone_malformed": "That is not a telephone number. Include the country code, as in +966500000000.",
+      "priority_out_of_range": "Priority must be between 1 and {limit}. 1 is called first.",
+
+      "address_requires_a_line": "An address needs at least one line.",
+      "address_has_too_many_lines": "An address has too many lines.",
+
+      "capability_level_unknown": "\"{level}\" is not a level on that scale.",
+      "skill_requires_a_name": "A skill needs a name in both Arabic and English.",
+      "years_out_of_range": "Years of experience must be between 0 and {limit}.",
+
+      "field_of_study_only_on_education": "A field of study belongs to an education record, not to a {kind}.",
+      "only_a_certification_expires": "Only a certification expires. A {kind} does not.",
+
+      "record_already_withdrawn": "That record has already been withdrawn.",
+      "duplicate_already_reviewed": "This has already been reviewed as {status}."
+    },
+    "conflict": {
+      "person_number_taken": "Another person already uses that number.",
+      "person_may_already_exist": "Somebody matching this record already exists. Review the candidates, then create anyway if they are different people.",
+      "identifier_may_belong_to_another_person": "Another person already holds an identifier of this kind with this value.",
+      "contact_may_belong_to_another_person": "Another person already has this contact value."
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "archived": "Archived",
+      "merged": "Merged"
+    },
+    "duplicate": {
+      "pending": "Awaiting review",
+      "confirmed": "Confirmed as the same person",
+      "dismissed": "Dismissed as different people",
+      "reason": {
+        "government-identifier": "The same government identifier",
+        "contact-value": "The same email address or telephone number",
+        "name-and-date-of-birth": "The same name and date of birth"
+      }
+    },
+    "channel": {
+      "email": "Email",
+      "mobile": "Mobile",
+      "phone": "Telephone",
+      "fax": "Fax",
+      "messaging": "Messaging"
+    },
+    "purpose": {
+      "personal": "Personal",
+      "work": "Work",
+      "emergency": "Emergency"
+    },
+    "addressKind": {
+      "residential": "Residential",
+      "mailing": "Mailing",
+      "national": "National",
+      "other": "Other"
+    },
+    "historyKind": {
+      "education": "Education",
+      "experience": "Experience",
+      "certification": "Certification"
+    },
+    "label": {
+      "register": "People",
+      "person": "Person",
+      "personNumber": "Number",
+      "legalName": "Legal name",
+      "preferredName": "Preferred name",
+      "dateOfBirth": "Date of birth",
+      "nationalities": "Nationalities",
+      "identifiers": "Identifiers",
+      "contacts": "Contact",
+      "addresses": "Addresses",
+      "emergencyContacts": "Emergency contacts",
+      "capabilities": "Languages and skills",
+      "history": "Education and experience",
+      "tags": "Tags",
+      "notes": "Notes",
+      "duplicates": "Possible duplicates",
+      "asOf": "As at",
+      "confidence": "Confidence",
+      "reviewedBy": "Reviewed by"
+    },
+    "hint": {
+      "identityIsPermanent": "A person is created once. Employment, attendance and payroll reference this record; it references none of them.",
+      "nameHasHistory": "A legal name has a history. Every name here is shown as it stood on the date above.",
+      "sensitiveWithheld": "Some fields are hidden because of your permissions.",
+      "sectionWithheld": "You do not have permission to see this section.",
+      "identifierMasked": "Only the last four characters are shown. Seeing the full value is a separate permission, and each use is recorded.",
+      "noEmployment": "This register holds no unit, position, manager, salary or attendance.",
+      "duplicatesNeedReview": "The system suspects these are the same human being. Nothing is merged automatically."
+    },
+    "empty": {
+      "register": "No people yet.",
+      "duplicates": "No duplicates awaiting review.",
+      "unavailable": "The register could not be read. You may not be signed in yet."
+    }
+  }
+}

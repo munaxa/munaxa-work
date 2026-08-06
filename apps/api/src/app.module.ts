@@ -8,6 +8,7 @@ import { DatabaseModule } from './persistence/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { IdentityModule } from './identity/identity.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
+import { PeopleModule } from './people/people.module.js';
 import { CorrelationMiddleware } from './observability/correlation.middleware.js';
 import { AuthenticatedTenantGuard } from './tenancy/authenticated-tenant.guard.js';
 import { TenantMiddleware } from './tenancy/tenant.middleware.js';
@@ -26,6 +27,7 @@ import { loggingOptions } from './observability/logging.js';
     DatabaseModule,
     IdentityModule,
     OrganizationModule,
+    PeopleModule,
     HealthModule,
   ],
   providers: [

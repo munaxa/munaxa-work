@@ -26,3 +26,25 @@ export const MODULE_REGISTRY = Symbol('MODULE_REGISTRY');
  * that breaks the cycle without letting import bypass the application service.
  */
 export const COMMAND_SENDER = Symbol('COMMAND_SENDER');
+
+/** The same seam for People's bulk import, which sends `people.create-person` per row. */
+export const PEOPLE_COMMAND_SENDER = Symbol('PEOPLE_COMMAND_SENDER');
+
+/**
+ * The permission checker, exposed as a token as well as being wired into the dispatcher.
+ *
+ * People's *reads* assemble their answer from what the caller holds — a caller who may read the
+ * register but not its sensitive fields gets the person with those fields withheld rather than a
+ * 403 — so the module needs to ask, not merely be checked.
+ */
+export const PERMISSION_CHECKER = Symbol('PERMISSION_CHECKER');
+
+/**
+ * People's assembled module.
+ *
+ * A provider of its own rather than an expression inside the registry factory, because People
+ * needs the application's logger — its disclosure log writes through it — and a factory that
+ * assembled four modules with four different dependency lists would be the longest function in
+ * the composition root.
+ */
+export const PEOPLE_MODULE = Symbol('PEOPLE_MODULE');

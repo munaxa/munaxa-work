@@ -13,7 +13,7 @@ them afterwards.
 
 | Concept                                   | Owning module   | Introduced in |
 | ----------------------------------------- | --------------- | ------------- |
-| Person, identity, personal data           | `people`        | Phase 4       |
+| Person, identity, personal data           | `people`        | Phase 4 ✅    |
 | Workforce user, tenant membership          | `identity`      | Phase 2 ✅    |
 | Invitation, portal access                  | `identity`      | Phase 2 ✅    |
 | Employment link, delegation                | `identity`      | Phase 2 ✅    |
@@ -65,9 +65,30 @@ validity — are `organization`'s too, consumed by `identity` through the port i
 
 `identity` owns the *business* identity of a person: which Platform account they are, which
 tenants have admitted them, and how each of those tenants presents them. It does not own the
-person. Legal name, date of birth, nationality and identity documents belong to `people` in
-Phase 4, and this module will not acquire them: two modules that both held a legal name would
-produce two answers on a contract.
+person. Legal name, date of birth, nationality and identity documents belong to `people`, and this
+module did not acquire them: two modules that both held a legal name would produce two answers on a
+contract. `business_profile.display_name` is how a tenant *presents* somebody; it is not their name,
+and Phase 4 changed nothing in `identity` to keep that true.
+
+`people` owns one permanent human identity per human being, and everything about *who somebody is*:
+their names over time, their government identifiers, their citizenships, how they are reached, where
+they live, who to call in an emergency, what they can do, and what they did before they arrived. It
+owns no employment, no assignment, no organizational placement, no salary and no attendance
+(AD-002 to AD-005). Employment references Person; Person references nothing downstream of it.
+
+Two boundaries inside `people` are worth naming because they look like near-misses:
+
+- A person's **legal name** is effective-dated and has no column on `person` (ADR-0037). Later
+  phases resolve it through the contract with an `asOf`, never by reading a field.
+- A person's **application preferences** — language, calendar, numerals, time zone — remain
+  `identity`'s `user_preference`, defaulted from the tenant's settings (ADR-0036).
+  `person_preference` holds the *person's* preferences: dietary requirement, uniform size, consent
+  to appear in a directory photograph. Two modules holding a language preference would produce two
+  answers on the first screen that read the wrong one.
+
+A person's **nationality is an input to statutory rules and never a business rule in itself** (00B).
+Nothing in `people` branches on a country code, and a person's country of *employment* comes from
+their legal entity (ADR-0035), never from their passport.
 
 ## Rules
 

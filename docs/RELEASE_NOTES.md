@@ -5,6 +5,83 @@ and what is still missing.
 
 ---
 
+## Phase 4 — People master registry
+
+**2026-08-06** · [Verification report](verification/phase-4-report.md)
+
+The register of who somebody is. Thirteen tables, twenty-nine endpoints, and the first personal
+data this product has ever held.
+
+### One person, once
+
+A Person is created once and stays one Person through everything a career does to them — hired,
+promoted, made a manager, gone for four years, back again. Every workforce module from here on
+references that record; it references none of them.
+
+**Why the product refuses to let you create somebody twice.** A second record for one human being
+is not untidy data. It splits their service period, so an end-of-service gratuity computes on four
+years instead of eleven; it splits their leave balance and their loan repayments; and it registers
+one national identifier twice with a social insurance authority. Every one of those looks like a
+correct number on the page it appears on.
+
+So creating a person runs a duplicate check first, and refuses with the candidates rather than
+writing. If they really are different people — two brothers, the same name, the same birthday — you
+say so and it creates both, and queues the pair for somebody to look at. **Nothing is ever merged
+automatically.**
+
+The check finds `أحمد` and `احمد`, and `1234-5678-90` and `1234 5678 90`. One name typed on two
+keyboards is one name; one document written three ways is one document.
+
+### Names have a history
+
+A person's legal name changes — marriage, naturalisation, a court correction — and this product
+keeps every one of them with the date it took effect. `GET /api/v1/people/{id}?asOf=2026-03-01`
+answers with the name that was in force then.
+
+**Operators should know:** that is not a reporting nicety. A settlement letter, a visa application
+and a government submission are all documents about a *date*, and a register that overwrote the name
+would put the wrong person on all three. Recording a change back-dated in front of a later one
+splits the history rather than discarding the later change.
+
+### Personal data, and what protects it
+
+This is the first release holding national identifiers, dates of birth, home addresses, emergency
+contacts and notes about people. Six things protect them, and all six are enforced rather than
+promised — see [ADR-0038](adr/0038-personal-data-protection.md):
+
+- **Seeing a person and seeing their date of birth are different permissions.** Without the second
+  you still get the person; the field is simply absent, and the response says so.
+- **Seeing that somebody holds a passport and seeing the number are different permissions.** Without
+  the second you get `••••7890`, which is enough to confirm you have the right document and not
+  enough to be the document.
+- **Every time somebody is shown a full identifier value, it is recorded** — who, whose, and what
+  kind. Never the number.
+- **The duplicate check never reads a number.** It compares a keyed digest, so the index that makes
+  it fast holds nothing worth stealing.
+- **No event, refusal or export carries a value.** An export deliberately omits identifiers, notes,
+  addresses and dates of birth: a file on a laptop is the one copy this product cannot protect.
+- **Nothing is deleted.** Records are withdrawn or superseded; a merge redirects. A note is never
+  amendable and never deletable — an editable note evidences nothing.
+
+**Operators must set `PII_MATCH_SECRET`.** It is the key the duplicate-match digests are derived
+with. A development default ships so a checkout runs, and **startup refuses it when
+`NODE_ENV=production`**, because a shipped default is the same key in every deployment. Generate at
+least 32 random characters, store it with your other secrets, and do not rotate it casually —
+rotating it invalidates every stored match digest, so the duplicate check stops finding existing
+records until they are re-recorded.
+
+### What is not here
+
+No employment, no assignment, no unit, no position, no manager, no salary, no attendance. Those are
+Phase 5 and later, and they reference this register rather than living in it.
+
+Erasure is not implemented: this release cannot satisfy a right-to-erasure request, and resolving
+that against "historical identity information is never destroyed" is a governance decision recorded
+for Phase 21. The disclosure record is a structured log rather than a queryable ledger, so "who read
+this person's passport this year" is not yet a question the product answers.
+
+---
+
 ## Phase 3 — Organization
 
 **2026-08-06** · [Verification report](verification/phase-3-report.md)
