@@ -5,6 +5,72 @@ and what is still missing.
 
 ---
 
+## Phase 3 — Organization
+
+**2026-08-06** · [Verification report](verification/phase-3-report.md)
+
+The enterprise's structure, and the closure of the tenant-settings limitation Phase 2 shipped
+with.
+
+### Every customer gets its own language and calendar
+
+Before this release a deployment had one default language, one calendar, one time zone and one
+invitation validity, shared by every tenant in it — so a hosting arrangement containing a Riyadh
+customer and an Amman customer had to pick one of them.
+
+Tenants now configure themselves, through `PUT /api/v1/organization/tenant-settings`. A tenant
+that has configured nothing behaves exactly as it did before, falling back to the deployment's
+values, so nothing changes until somebody chooses to change it.
+
+**Operators should know:** the `DEFAULT_LOCALE`, `DEFAULT_CALENDAR`, `DEFAULT_TIME_ZONE`,
+`DEFAULT_NUMERALS`, `INVITATION_VALIDITY_DAYS` and `DEFAULT_PORTALS` variables are unchanged and
+still required — they are now the *fallback* for an unconfigured tenant rather than the answer
+for every tenant.
+
+### Organization
+
+Eleven tables, thirty-three endpoints, and the structure beneath them:
+
+- **Units of any depth.** The levels of the hierarchy — company, branch, department, or whatever
+  a customer calls them — are the tenant's own data rather than a fixed ladder in the schema. A
+  retail group with company / region / store defines those three and nothing else; a franchise
+  nesting twelve deep simply does. The nine levels the specification names are offered as a
+  starting set from `GET /organization/standard-unit-types`, and nothing installs them.
+- **Reorganizations that keep their history.** Moving a department records a new period rather
+  than overwriting the old one, so "which division was this under last March" keeps its answer
+  forever. Every structure endpoint takes `?asOf=` and defaults it to now.
+- **Legal entities, each with its country.** A tenant may operate in several countries at once,
+  and an employment will resolve its statutory rules from its legal entity rather than from the
+  tenant — which is what makes end of service, social insurance and wage protection correct for a
+  group operating across borders. `GET /organization/units/{id}/governing-legal-entity` answers
+  which one governs a unit on a date.
+- **Cost and profit centres**, as reference data finance recognizes. No budgets: financial
+  ownership stays with the finance system this product integrates with.
+- **A position catalogue** of reusable roles, holding no people, and an **establishment** of
+  budgeted headcount per position per unit, effective dated and separately approved.
+- **Organizational calendars** — the working week and the dates that are exceptions to it. This
+  product knows no country's holidays; they are data a tenant or a country pack loads.
+- **Import and export** of a whole structure. Import applies every rule an administrator would
+  meet one unit at a time, and can be re-run after a correction without duplicating anything.
+
+### Administration screens
+
+The admin portal gains an organization section: the org chart as at any date, the levels defined,
+the legal entities and their countries, and the tenant's settings. Bilingual and bidirectional —
+`?lang=ar` switches language and direction together.
+
+**Operators should know:** the portal reads through the API, which returns 401 until Platform's
+authentication adapter is supplied. Until then the screens render their empty states, which is
+the expected condition rather than a fault.
+
+### Configuration
+
+| Variable | Default | What it sets |
+| -------- | ------- | ------------ |
+| `WORK_API_URL` | `http://127.0.0.1:3000` | Where the portals reach the API |
+
+---
+
 ## Phase 2 — Workforce Identity
 
 **2026-08-05** · [Verification report](verification/phase-2-report.md)

@@ -17,3 +17,12 @@ export const DISPATCHER = Symbol('DISPATCHER');
 
 /** The module registry, from which permissions, navigation and health are derived. */
 export const MODULE_REGISTRY = Symbol('MODULE_REGISTRY');
+
+/**
+ * A command sender handed its dispatcher after the dispatcher is built.
+ *
+ * Organization's bulk import sends the same commands an administrator would, and the dispatcher
+ * that receives them is assembled from a handler list that includes import. This is the seam
+ * that breaks the cycle without letting import bypass the application service.
+ */
+export const COMMAND_SENDER = Symbol('COMMAND_SENDER');

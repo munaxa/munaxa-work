@@ -54,6 +54,7 @@ private, and the lint layer enforces that rather than a review comment.
 | Module | Owns | Phase |
 | ------ | ---- | ----- |
 | [`identity`](docs/modules/identity.md) | Workforce identity: tenant membership, invitations, portal access, employment links, delegation | 2 |
+| [`organization`](docs/modules/organization.md) | The enterprise's structure: units of any depth, legal entities and the country each operates under, cost and profit centres, positions and their establishment, calendars, tenant settings | 3 |
 
 ## Layers inside a module
 

@@ -14,6 +14,15 @@ export type {
   WorkforceUserStatus,
 } from '../domain/identity-vocabulary.js';
 
+/**
+ * The portal keys themselves, not just their type.
+ *
+ * A consumer narrowing an untyped string — a database row, a request body — to a `PortalKey`
+ * needs the set, and the alternative is every consumer writing its own copy of the list. Three
+ * copies of a closed set is three places to forget the fourth portal.
+ */
+export { PORTAL_KEYS } from '../domain/identity-vocabulary.js';
+
 export type { TenantMembershipDirectory, ResolvedMembership } from './membership-directory.js';
 export { DenyAllMembershipDirectory } from './membership-directory.js';
 

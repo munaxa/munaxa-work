@@ -1,0 +1,193 @@
+{
+  "organization": {
+    "rejection": {
+      "name_requires_both_languages": "الاسم مطلوب بالعربية والإنجليزية معًا. الناقص هو {missing}.",
+      "code_malformed": "\"{code}\" ليس رمزًا صالحًا. استخدم حروفًا أو أرقامًا أو نقاطًا أو شرطات.",
+      "metadata_entry_too_long": "قيمة الحقل الإضافي \"{key}\" أطول من المسموح.",
+
+      "unit_type_already_retired": "تم إيقاف هذا المستوى من قبل.",
+      "unit_already_in_status": "هذه الوحدة {status} بالفعل.",
+      "unit_closed": "أُغلقت هذه الوحدة ولم يعد بالإمكان تعديلها.",
+      "unit_closed_before_it_existed": "لا يمكن إغلاق وحدة قبل تاريخ إنشائها.",
+
+      "placement_already_closed": "انتهت فترة الارتباط هذه من قبل.",
+      "placement_closed_before_it_opened": "لا يمكن أن تنتهي فترة الارتباط قبل أن تبدأ.",
+      "placement_would_create_cycle": "لا يمكن أن تقع \"{unit}\" تحت نفسها، فذلك يجعل الهيكل حلقة مغلقة.",
+      "placement_not_permitted_by_type": "لا يمكن أن تقع {type} تحت {parent} في هذا الهيكل.",
+      "parent_not_accepting_structure": "الوحدة الأعلى {status} ولا تقبل هيكلًا جديدًا.",
+
+      "country_code_malformed": "\"{country}\" ليس رمز دولة من حرفين.",
+      "currency_code_malformed": "\"{currency}\" ليس رمز عملة من ثلاثة أحرف.",
+      "registration_number_malformed": "رقم السجل مطلوب.",
+      "legal_entity_closed": "أُغلق هذا السجل.",
+      "legal_entity_closed_before_it_existed": "لا يمكن إغلاق السجل قبل تاريخ تسجيله.",
+      "unit_type_carries_no_legal_entity": "وحدات من نوع {type} لا تحمل سجلًا قانونيًا.",
+
+      "center_closed": "أُغلق مركز {kind} هذا.",
+      "center_closed_before_it_existed": "لا يمكن إغلاق مركز قبل تاريخ فتحه.",
+
+      "position_retired": "أُوقفت هذه الوظيفة.",
+      "position_retired_before_it_existed": "لا يمكن إيقاف وظيفة قبل تاريخ تعريفها.",
+      "position_criticality_unknown": "\"{criticality}\" ليست درجة أهمية معروفة.",
+
+      "headcount_not_a_whole_number": "العدد المعتمد يجب أن يكون رقمًا صحيحًا لا يقل عن صفر.",
+      "headcount_implausible": "العدد المعتمد لا يمكن أن يتجاوز {limit}.",
+      "establishment_not_draft": "لا يُعتمد إلا الملاك في حالة المسودة. حالته الآن {status}.",
+      "establishment_already_closed": "انتهت فترة الملاك هذه من قبل.",
+      "establishment_closed_before_it_opened": "لا يمكن أن تنتهي فترة الملاك قبل أن تبدأ.",
+
+      "calendar_closed": "أُغلق هذا التقويم.",
+      "calendar_date_malformed": "\"{date}\" ليس تاريخًا. استخدم الصيغة YYYY-MM-DD.",
+      "calendar_day_kind_unknown": "\"{kind}\" ليس نوعًا معروفًا ليوم في التقويم.",
+      "time_zone_unknown": "\"{timeZone}\" ليست منطقة زمنية معروفة.",
+      "weekday_out_of_range": "\"{weekday}\" ليس يومًا من أيام الأسبوع. الاثنين ١ والأحد ٧.",
+      "working_week_empty": "التقويم يحتاج يوم عمل واحدًا على الأقل.",
+
+      "language_tag_malformed": "\"{language}\" ليس رمز لغة صالحًا.",
+      "calendar_system_unknown": "\"{calendar}\" ليس تقويمًا يدعمه هذا النظام.",
+      "numeral_system_unknown": "\"{numerals}\" ليس نظام أرقام يدعمه هذا النظام.",
+      "invitation_validity_out_of_range": "مدة صلاحية الدعوة بين يوم واحد و{limit} يومًا."
+    },
+    "conflict": {
+      "unit_type_code_taken": "هناك مستوى آخر يستخدم هذا الرمز.",
+      "unit_code_taken": "هناك وحدة أخرى تستخدم هذا الرمز.",
+      "center_code_taken": "هناك مركز آخر من النوع نفسه يستخدم هذا الرمز.",
+      "position_code_taken": "هناك وظيفة أخرى تستخدم هذا الرمز.",
+      "calendar_code_taken": "هناك تقويم آخر يستخدم هذا الرمز.",
+      "unit_already_registered": "هذه الوحدة تحمل سجلًا قانونيًا بالفعل."
+    },
+    "status": {
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "closed": "مغلق"
+    },
+    "establishment": {
+      "status": {
+        "draft": "مسودة",
+        "approved": "معتمد",
+        "withdrawn": "مسحوب"
+      },
+      "approved": "المعتمد",
+      "filled": "المشغول",
+      "vacant": "الشاغر",
+      "budgetedHeadcount": "العدد المعتمد",
+      "filledFromEmployment": "يُحتسب المشغول من التوظيف، لا من هنا."
+    },
+    "criticality": {
+      "standard": "عادية",
+      "important": "مهمة",
+      "critical": "حرجة"
+    },
+    "calendarDay": {
+      "holiday": "عطلة",
+      "working": "يوم عمل",
+      "non-working": "يوم بلا عمل"
+    },
+    "center": {
+      "cost": "مركز تكلفة",
+      "profit": "مركز ربحية"
+    },
+    "weekday": {
+      "1": "الاثنين",
+      "2": "الثلاثاء",
+      "3": "الأربعاء",
+      "4": "الخميس",
+      "5": "الجمعة",
+      "6": "السبت",
+      "7": "الأحد"
+    },
+    "label": {
+      "structure": "الهيكل التنظيمي",
+      "unitTypes": "المستويات",
+      "units": "الوحدات",
+      "unit": "وحدة",
+      "code": "الرمز",
+      "name": "الاسم",
+      "description": "الوصف",
+      "parent": "الوحدة الأعلى",
+      "ancestors": "يتبع",
+      "children": "يضم",
+      "status": "الحالة",
+      "metadata": "معلومات إضافية",
+      "effectiveFrom": "سارٍ من",
+      "effectiveTo": "سارٍ حتى",
+      "asOf": "كما في تاريخ",
+      "legalEntity": "الكيان القانوني",
+      "governingLegalEntity": "يخضع لـ",
+      "country": "الدولة",
+      "currency": "العملة",
+      "registeredName": "الاسم المسجل",
+      "registrationNumber": "رقم السجل",
+      "taxIdentifier": "الرقم الضريبي",
+      "incorporatedOn": "تاريخ التأسيس",
+      "costCenters": "مراكز التكلفة",
+      "profitCenters": "مراكز الربحية",
+      "positions": "الوظائف",
+      "position": "وظيفة",
+      "title": "المسمى",
+      "family": "المجموعة الوظيفية",
+      "grade": "الدرجة",
+      "criticality": "درجة الأهمية",
+      "establishment": "الملاك الوظيفي",
+      "calendars": "التقاويم",
+      "calendar": "التقويم",
+      "timeZone": "المنطقة الزمنية",
+      "workingDays": "أيام العمل",
+      "days": "الأيام الاستثنائية",
+      "settings": "إعدادات المنشأة",
+      "language": "اللغة الافتراضية",
+      "numerals": "الأرقام",
+      "invitationValidityDays": "مدة صلاحية الدعوة",
+      "defaultPortals": "البوابات التي تُفتح عند الانضمام",
+      "placementHistory": "سجل الارتباطات",
+      "import": "استيراد",
+      "export": "تصدير"
+    },
+    "action": {
+      "defineUnitType": "إضافة مستوى",
+      "retireUnitType": "إيقاف هذا المستوى",
+      "createUnit": "إضافة وحدة",
+      "renameUnit": "إعادة التسمية",
+      "changeStatus": "تغيير الحالة",
+      "place": "نقل",
+      "detach": "فصل",
+      "registerLegalEntity": "تسجيل كيان قانوني",
+      "amendLegalEntity": "تعديل",
+      "close": "إغلاق",
+      "openCostCenter": "إضافة مركز تكلفة",
+      "openProfitCenter": "إضافة مركز ربحية",
+      "definePosition": "إضافة وظيفة",
+      "revisePosition": "تعديل",
+      "retirePosition": "إيقاف",
+      "setEstablishment": "تحديد العدد المعتمد",
+      "approveEstablishment": "اعتماد",
+      "defineCalendar": "إضافة تقويم",
+      "recordDay": "إضافة يوم",
+      "removeDay": "حذف",
+      "saveSettings": "حفظ الإعدادات",
+      "viewAsOf": "عرض كما في تاريخ",
+      "importStructure": "استيراد هيكل",
+      "exportStructure": "تصدير الهيكل"
+    },
+    "empty": {
+      "unitTypes": "لم تُعرَّف مستويات بعد. أضف ما تستخدمه هذه المنشأة، أو اعتمد المجموعة القياسية.",
+      "units": "لا توجد وحدات بعد.",
+      "hierarchy": "لم يُوضع شيء في الهيكل بعد.",
+      "unplaced": "هذه الوحدات موجودة لكنها لا تقع في الهيكل في هذا التاريخ.",
+      "legalEntities": "لا توجد كيانات قانونية مسجلة بعد.",
+      "positions": "لم تُعرَّف وظائف بعد.",
+      "establishment": "لا يوجد عدد معتمد لهذه الوحدة.",
+      "calendars": "لم تُعرَّف تقاويم بعد.",
+      "days": "لا توجد أيام استثنائية مسجلة.",
+      "settings": "لم تُضبط إعدادات هذه المنشأة بعد، فهي تستخدم الإعدادات الافتراضية للنظام."
+    },
+    "hint": {
+      "unlimitedDepth": "يمكن للهيكل أن يكون بأي عمق تحتاجه، والمستويات أنت من يحددها.",
+      "standardUnitTypes": "المجموعة القياسية اقتراح لا أكثر. اعتمد ما يناسبك، أو عدّله، أو عرّف مستوياتك.",
+      "countryFromLegalEntity": "يتبع نظام العمل الكيان القانوني لا المنشأة، فقد تعمل المنشأة الواحدة في أكثر من دولة في وقت واحد.",
+      "historyPreserved": "نقل الوحدة يسجّل فترة جديدة، ولا يُعاد كتابة الهيكل السابق أبدًا.",
+      "importResumable": "يمكن إعادة تشغيل الاستيراد بعد التصحيح، فالوحدات الموجودة يُعاد استخدامها.",
+      "noEmployees": "هذا القسم للهيكل فقط. الأشخاص وارتباطاتهم الوظيفية في مكان آخر."
+    }
+  }
+}

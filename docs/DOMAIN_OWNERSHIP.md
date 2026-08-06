@@ -18,7 +18,12 @@ them afterwards.
 | Invitation, portal access                  | `identity`      | Phase 2 ✅    |
 | Employment link, delegation                | `identity`      | Phase 2 ✅    |
 | Business profile, user preference          | `identity`      | Phase 2 ✅    |
-| Legal entity, org unit, position, job     | `organization`  | Phase 3       |
+| Organization unit, unit type, placement   | `organization`  | Phase 3 ✅    |
+| Legal entity, country of registration     | `organization`  | Phase 3 ✅    |
+| Cost centre, profit centre                | `organization`  | Phase 3 ✅    |
+| Position catalogue, establishment         | `organization`  | Phase 3 ✅    |
+| Organization calendar, exception days     | `organization`  | Phase 3 ✅    |
+| Tenant settings (language, calendar, zone)| `organization`  | Phase 3 ✅    |
 | Employment, contract, assignment          | `employment`    | Phase 5       |
 | Requisition, candidate, application       | `recruitment`   | Phase 6       |
 | Onboarding journey                        | `onboarding`    | Phase 7       |
@@ -46,6 +51,17 @@ them afterwards.
 The table is the intent recorded by the phase specifications. Rows become real as their phase
 lands — marked ✅ — and the owning module is the one that holds the concept's persistence,
 business rules and domain events.
+
+`organization` owns the enterprise's *structure* and nothing else. It holds no person, no
+employee count, no manager and no assignment (AD-001, AD-002): Employment references structure,
+and structure never references Employment. The one number that looks like a headcount — the
+establishment's *budgeted* figure — is a budget, and the *filled* count beside it is supplied by
+Employment's assignment events through a port, never counted here.
+
+The country an employment is governed by is `organization`'s, on the legal entity, and never the
+tenant's (ADR-0035, 00B). Tenant settings — language, calendar, time zone, numerals, invitation
+validity — are `organization`'s too, consumed by `identity` through the port it already had
+(ADR-0036).
 
 `identity` owns the *business* identity of a person: which Platform account they are, which
 tenants have admitted them, and how each of those tenants presents them. It does not own the

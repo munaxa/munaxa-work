@@ -190,3 +190,264 @@ model UserPreference {
   @@unique([tenant_id, membership_id], map: "user_preference_membership_key")
   @@map("user_preference")
 }
+
+// ------------------------------------------------------------------------------------------
+// Organization (Phase 3).
+//
+// There is no `Company`, `Branch` or `Team` model here, and no model per level at all. Nine
+// models would be nine levels, and AD-003 requires unlimited depth — so the levels are rows in
+// `OrganizationUnitType` and every node is an `OrganizationUnit` (ADR-0034).
+// ------------------------------------------------------------------------------------------
+
+model OrganizationUnitType {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  code                 String    @db.VarChar(64)
+  /// Language tag to text. Both first-class languages are present before a row is written.
+  name                 Json
+  /// Display order in an administration screen. Deliberately not a depth (AD-003).
+  ordinal              Int
+  allowed_parent_codes String[]
+  allowed_at_root      Boolean
+  carries_legal_entity Boolean
+  status               String    @db.VarChar(32)
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, ordinal], map: "organization_unit_type_tenant_ordinal_idx")
+  @@map("organization_unit_type")
+}
+
+model OrganizationUnit {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  unit_type_id   String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  description    Json?
+  status         String    @db.VarChar(32)
+  /// Tenant-authored, stored and never interpreted. No rule in the module reads a key (AD-005).
+  metadata       Json
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, unit_type_id], map: "organization_unit_tenant_type_idx")
+  @@index([tenant_id, status], map: "organization_unit_tenant_status_idx")
+  @@map("organization_unit")
+}
+
+/// Where each unit sat, and from when. Never edited — a move closes one period and opens
+/// another, so "what did this structure look like on this date" keeps exactly one answer.
+model OrganizationUnitPlacement {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  unit_id        String    @db.Uuid
+  /// Null means the unit was a root of the tenant's structure for this period.
+  parent_unit_id String?   @db.Uuid
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, unit_id, effective_from], map: "organization_unit_placement_unit_idx")
+  @@index([tenant_id, effective_from, effective_to], map: "organization_unit_placement_in_force_idx")
+  @@index([tenant_id, parent_unit_id], map: "organization_unit_placement_parent_idx")
+  @@map("organization_unit_placement")
+}
+
+model LegalEntity {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  unit_id             String    @db.Uuid
+  /// ISO 3166-1 alpha-2. An employment resolves its country pack from here and never from the
+  /// tenant (00B, ADR-0035), which is what lets one tenant operate several countries at once.
+  country_code        String    @db.Char(2)
+  registered_name     Json
+  registration_number String    @db.VarChar(64)
+  tax_identifier      String?   @db.VarChar(64)
+  /// ISO 4217. On the entity rather than the tenant, for the same reason the country is.
+  currency_code       String    @db.Char(3)
+  incorporated_on     DateTime? @db.Date
+  status              String    @db.VarChar(32)
+  metadata            Json
+  effective_from      DateTime  @db.Timestamptz(6)
+  effective_to        DateTime? @db.Timestamptz(6)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@index([tenant_id, country_code], map: "legal_entity_tenant_country_idx")
+  @@map("legal_entity")
+}
+
+/// Cost and profit centres share a table and differ by `kind`. Two near-identical tables would
+/// be duplicated logic that drifts the first time one of them gains a column (AD-007).
+model FinancialCenter {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  kind           String    @db.VarChar(16)
+  code           String    @db.VarChar(64)
+  name           Json
+  unit_id        String?   @db.Uuid
+  status         String    @db.VarChar(32)
+  metadata       Json
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, kind, status], map: "financial_center_tenant_kind_status_idx")
+  @@index([tenant_id, unit_id], map: "financial_center_unit_idx")
+  @@map("financial_center")
+}
+
+/// Named `job_position` because POSITION is a SQL function, and a table of that name needs
+/// quoting in every statement that touches it. No occupant column: people occupy positions
+/// through Employment assignments (AD-006).
+model JobPosition {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  title          Json
+  description    Json?
+  family         String?   @db.VarChar(64)
+  grade          String?   @db.VarChar(64)
+  criticality    String    @db.VarChar(16)
+  status         String    @db.VarChar(32)
+  metadata       Json
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, status], map: "job_position_tenant_status_idx")
+  @@index([tenant_id, family], map: "job_position_tenant_family_idx")
+  @@map("job_position")
+}
+
+/// Budgeted headcount per position per unit, effective dated. Organization owns the budgeted
+/// number and never the filled one — filled counts assignments, and Employment owns those
+/// (AD-002).
+model PositionEstablishment {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  position_id        String    @db.Uuid
+  unit_id            String    @db.Uuid
+  budgeted_headcount Int
+  status             String    @db.VarChar(32)
+  approved_at        DateTime? @db.Timestamptz(6)
+  approved_by        String?   @db.VarChar(255)
+  effective_from     DateTime  @db.Timestamptz(6)
+  effective_to       DateTime? @db.Timestamptz(6)
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, unit_id], map: "position_establishment_unit_idx")
+  @@index([tenant_id, position_id, effective_from], map: "position_establishment_position_idx")
+  @@map("position_establishment")
+}
+
+model OrganizationCalendar {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  unit_id        String?   @db.Uuid
+  time_zone      String    @db.VarChar(64)
+  /// ISO-8601 weekdays ordinarily worked: Monday is 1, Sunday is 7. Tenant configuration; there
+  /// is no default anywhere in the product (00B).
+  working_days   Int[]     @db.SmallInt
+  status         String    @db.VarChar(32)
+  effective_from DateTime  @db.Timestamptz(6)
+  effective_to   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, unit_id], map: "organization_calendar_unit_idx")
+  @@map("organization_calendar")
+}
+
+/// A holiday is a day in a place, not an instant, so `on_date` is a date and the calendar
+/// carries the zone. Stored as a timestamp it lands a day out for anybody east or west of it.
+model OrganizationCalendarDay {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  calendar_id String    @db.Uuid
+  on_date     DateTime  @db.Date
+  kind        String    @db.VarChar(16)
+  name        Json
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@unique([tenant_id, calendar_id, on_date], map: "organization_calendar_day_date_key")
+  @@index([tenant_id, calendar_id, on_date], map: "organization_calendar_day_range_idx")
+  @@map("organization_calendar_day")
+}
+
+/// One tenant's own language, calendar, time zone, numerals and invitation validity. This table
+/// closes the deployment-wide-settings debt the Phase 2 report recorded (ADR-0036).
+model TenantSettings {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  language                 String    @db.VarChar(35)
+  calendar                 String    @db.VarChar(16)
+  time_zone                String    @db.VarChar(64)
+  numerals                 String    @db.VarChar(16)
+  invitation_validity_days Int
+  default_portals          String[]
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@map("tenant_settings")
+}

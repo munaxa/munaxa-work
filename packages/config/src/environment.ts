@@ -47,8 +47,11 @@ export const environmentSchema = z.object({
   /**
    * Workforce Identity defaults. They are configuration rather than constants because a tenant
    * with a slow onboarding process and one that expects same-day acceptance are both ordinary,
-   * and hardcoding either would make the other wrong. Per-tenant overrides arrive with
-   * Organization in Phase 3; until then these are the deployment's answer for every tenant.
+   * and hardcoding either would make the other wrong.
+   *
+   * As of Phase 3 these are the *fallback* rather than the answer: a tenant that has configured
+   * itself resolves its own settings from `tenant_settings`, and these apply only to a tenant
+   * that has not (ADR-0036). Keeping them means a tenant created five minutes ago still works.
    */
   INVITATION_VALIDITY_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   DEFAULT_PORTALS: z

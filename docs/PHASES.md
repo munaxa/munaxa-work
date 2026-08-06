@@ -19,7 +19,7 @@ ADRs updated.
 | 1   | Foundation                  | [`02_PHASE_1_FOUNDATION.md`](../work%20prompts/02_PHASE_1_FOUNDATION.md)                              | Complete    |
 | 1.1 | Architecture verification   | [`02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md`](../work%20prompts/02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md) | Complete    |
 | 2   | Workforce identity          | [`03_PHASE_2_WORKFORCE_IDENTITY.md`](../work%20prompts/03_PHASE_2_WORKFORCE_IDENTITY.md)              | Complete    |
-| 3   | Organization                | [`04_PHASE_3_ORGANIZATION.md`](../work%20prompts/04_PHASE_3_ORGANIZATION.md)                          | Not started |
+| 3   | Organization                | [`04_PHASE_3_ORGANIZATION.md`](../work%20prompts/04_PHASE_3_ORGANIZATION.md)                          | Awaiting approval |
 | 4   | People master registry      | [`05_PHASE_4_PEOPLE_MASTER_REGISTRY.md`](../work%20prompts/05_PHASE_4_PEOPLE_MASTER_REGISTRY.md)      | Not started |
 | 4.1 | Employee documents & expiry | [`05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md`](../work%20prompts/05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md)          | Not started |
 | 5   | Employment                  | [`06_PHASE_5_EMPLOYMENT.md`](../work%20prompts/06_PHASE_5_EMPLOYMENT.md)                              | Not started |
@@ -73,6 +73,13 @@ Phase 2 completed on 2026-08-05 and was approved and merged the same day (#3): t
 module, and the closure of the tenant-header risk Phase 1.1 named as the largest one open. Its
 report, the carried-forward debt register and its production-readiness assessment are in
 [`verification/phase-2-report.md`](verification/phase-2-report.md).
+
+Phase 3 completed on 2026-08-06: the Organization domain — structure of unlimited depth, the
+legal entity that carries the country every later statutory calculation resolves from, the
+position catalogue and its establishment, organizational calendars, and the closure of the
+tenant-settings debt Phase 2 recorded. Its report, the carried-forward debt register and its
+production-readiness assessment are in
+[`verification/phase-3-report.md`](verification/phase-3-report.md).
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

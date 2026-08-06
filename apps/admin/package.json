@@ -2,7 +2,7 @@
   "name": "@work/admin",
   "version": "0.1.0",
   "private": true,
-  "description": "Enterprise HR administration. Presentation only — no business logic.",
+  "description": "Enterprise HR administration. Presentation only \u2014 no business logic.",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev --port 3001",
@@ -17,7 +17,9 @@
     "@munaxa/ui": "^1.0.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@work/organization": "workspace:*",
+    "@work/config": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",

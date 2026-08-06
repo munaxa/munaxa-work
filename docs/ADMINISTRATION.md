@@ -151,6 +151,159 @@ in a support request: they are what turns a conversation into a log query.
 
 ---
 
+## Setting up the organization
+
+Everything below is under `/api/v1/organization`, and none of it is about people.
+
+### Levels come first, and they are yours
+
+Before creating a single unit, decide what your levels are called. This product ships **no**
+levels — it offers a suggested set at `GET /organization/standard-unit-types` (company, legal
+entity, business unit, branch, division, department, section, team) that you may adopt whole,
+adopt partly, edit, or ignore entirely.
+
+```
+POST /api/v1/organization/unit-types
+{ "code": "region", "name": { "en": "Region", "ar": "منطقة" }, "ordinal": 20,
+  "allowedParentCodes": ["company"], "allowedAtRoot": false }
+```
+
+A structure of company / region / store is as valid as one using all eight suggestions, and a
+structure twelve levels deep of the same kind is valid too. `allowedParentCodes` is your rule
+about your own shape; leaving it empty means any parent, which is the honest default.
+
+### Units exist before they are placed
+
+Creating a unit does not put it anywhere. That is deliberate — a branch approved before anybody
+decides which region owns it is a real state, and forcing a parent at creation would make you
+invent one. `GET /organization/hierarchy` reports such units separately as `unplacedUnitIds`
+rather than hiding them.
+
+Placing one is a separate act, and it carries a date:
+
+```
+POST /api/v1/organization/units/{unitId}/placement
+{ "parentUnitId": "…", "effectiveFrom": "2026-06-01T00:00:00Z" }
+```
+
+### Moving a unit never erases where it was
+
+A move closes the period the unit had and opens a new one. Ask for the chart as at any date:
+
+```
+GET /api/v1/organization/hierarchy?asOf=2026-03-01T00:00:00Z
+```
+
+March's answer stays March's answer, permanently. `GET /organization/units/{id}/placements`
+shows the whole history. Back-dating a correction works and does not disturb a later move.
+
+Two things are refused, and both are refusals you want: a unit may not be placed beneath itself
+(that is a chart that never finishes drawing), and a placement your own level rules forbid is
+declined with the two level names in the message.
+
+### The country belongs to the legal entity, not to you
+
+This is the setting most worth getting right, because getting it wrong produces numbers that look
+correct.
+
+```
+POST /api/v1/organization/units/{unitId}/legal-entity
+{ "countryCode": "SA", "currencyCode": "SAR", "registrationNumber": "1010123456",
+  "registeredName": { "en": "Munaxa Arabia Ltd", "ar": "مناكسا العربية المحدودة" },
+  "effectiveFrom": "2026-01-01T00:00:00Z" }
+```
+
+An organization may hold several registrations in several countries at once, and each part of the
+structure is governed by the nearest one above it:
+
+```
+GET /api/v1/organization/units/{unitId}/governing-legal-entity?asOf=…
+```
+
+That is what end of service, social insurance and wage protection will be computed from. If it
+answers with nothing, nothing above that unit is registered — fix the structure rather than
+assuming a default, because there is deliberately no default to assume.
+
+**The country cannot be changed afterwards.** An entity that changed country is a different
+registration under a different law; register the new one and close the old one, and both remain
+answerable.
+
+### Positions, and the headcount you budget
+
+A position is a *role*, not a person, and it is attached to no unit. What is per-unit is the
+budgeted headcount, which is proposed and then separately approved:
+
+```
+POST  /api/v1/organization/establishment            (budgeted, in draft)
+PATCH /api/v1/organization/establishment/{id}/approve
+GET   /api/v1/organization/units/{unitId}/establishment?asOf=…
+```
+
+The `filled` and `vacant` figures read zero and equal-to-budget today. That is not a bug: filled
+counts employment assignments, this product has no employment module yet, and Organization does
+not count people. It becomes real in Phase 5 with no change to what you configure.
+
+### Calendars know no holidays
+
+Define the working week — this product has no default, anywhere:
+
+```
+POST /api/v1/organization/calendars
+{ "code": "CORP", "name": { "en": "Corporate", "ar": "المؤسسي" },
+  "timeZone": "Asia/Riyadh", "workingDays": [7, 1, 2, 3, 4],
+  "effectiveFrom": "2026-01-01T00:00:00Z" }
+```
+
+Weekdays are ISO: Monday is 1, Sunday is 7. Holidays and other exception dates are rows you add:
+
+```
+POST /api/v1/organization/calendars/{calendarId}/days
+{ "onDate": "2027-03-20", "kind": "holiday",
+  "name": { "en": "Eid al-Fitr", "ar": "عيد الفطر" } }
+```
+
+Dates are civil dates in the calendar's own time zone, not moments — a holiday is a day in a
+place. Recording a date twice replaces the entry rather than adding a second.
+
+### Your organization's own defaults
+
+```
+PUT /api/v1/organization/tenant-settings
+{ "language": "ar", "calendar": "hijri", "timeZone": "Asia/Riyadh",
+  "numerals": "arabic-indic", "invitationValidityDays": 14,
+  "defaultPortals": ["employee"] }
+```
+
+Submitted whole, because that is what a settings screen sends and a half-applied set is a state
+nobody chose. Until you submit it, your organization uses the deployment's defaults — and `GET`
+returns nothing rather than those defaults, so you can always tell which of the two you are on.
+
+### Loading a structure you already have
+
+```
+POST /api/v1/organization/import
+```
+
+The rows may be in any order — a department may appear above the division it belongs to. Every
+rule that applies when you create a unit by hand applies here too, so a name missing its Arabic
+is refused in an import exactly as it is at the keyboard.
+
+**If an import fails partway, fix the row and run the same file again.** Units that already exist
+are reused rather than duplicated, and a unit already sitting where the file says it sits is left
+alone. Imports are limited to 2,000 rows; beyond that the request is refused and says so.
+
+`GET /organization/export` returns the whole structure including **every** placement period, not
+just today's — an export of only the current shape would be a backup that threw the history away.
+
+### Names are always in two languages
+
+Every name you author — a level, a unit, a legal entity, a centre, a position, a calendar, a
+holiday — is required in Arabic *and* English, and is refused without both. This is not
+bureaucracy: a name entered once in one language is a name that stays wrong on half your screens
+forever, because nobody is ever asked for the other one again.
+
+---
+
 ## Operational checks
 
 | Endpoint | Question it answers | Who asks |
