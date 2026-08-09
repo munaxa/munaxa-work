@@ -38,7 +38,8 @@ export interface PlanRow {
   readonly version: number | string;
 }
 
-export const PLAN_COLUMNS = 'p.id, p.tenant_id, p.code, p.name, p.description, p.status, p.metadata, p.version';
+export const PLAN_COLUMNS =
+  'p.id, p.tenant_id, p.code, p.name, p.description, p.status, p.metadata, p.version';
 
 export const toPlan = (row: PlanRow): PlanState => ({
   id: row.id,

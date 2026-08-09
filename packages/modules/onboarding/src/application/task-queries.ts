@@ -53,7 +53,17 @@ export interface SearchTasks extends Query {
  */
 const filtersOf = (query: SearchTasks): Record<string, string | boolean> =>
   Object.fromEntries(
-    (['onboardingId', 'ownerKind', 'ownerRef', 'ownerRole', 'status', 'kind', 'requiredOnly'] as const)
+    (
+      [
+        'onboardingId',
+        'ownerKind',
+        'ownerRef',
+        'ownerRole',
+        'status',
+        'kind',
+        'requiredOnly',
+      ] as const
+    )
       .filter((key) => query[key] !== undefined)
       .map((key) => [key, query[key] as string | boolean]),
   );
@@ -72,9 +82,7 @@ export const searchTasksHandler = (
         limit: size,
         offset: (page - 1) * size,
         ...filtersOf(query),
-        ...(query.overdue === true
-          ? { overdueAsOf: civilDateOf(dependencies.clock.now()) }
-          : {}),
+        ...(query.overdue === true ? { overdueAsOf: civilDateOf(dependencies.clock.now()) } : {}),
       });
 
       return success(pagedResult(found.items.map(taskView), page, size, found.total));

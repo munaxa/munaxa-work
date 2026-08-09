@@ -191,7 +191,12 @@ const applyPlanAndInsert = async (
     readonly planId?: string;
   },
 ): Promise<Result<number, HandlerFailure>> => {
-  const templates = await resolvePlan(transaction, dependencies, request.onboarding, request.planId);
+  const templates = await resolvePlan(
+    transaction,
+    dependencies,
+    request.onboarding,
+    request.planId,
+  );
 
   if (!templates.ok) return templates;
 
@@ -229,9 +234,7 @@ const resolvePlan = async (
   const version = await dependencies.stores.planVersions.publishedForPlan(transaction, planId);
 
   if (version === undefined) {
-    return conflicted<readonly TaskTemplateState[]>(
-      'plan_has_no_published_version',
-    );
+    return conflicted<readonly TaskTemplateState[]>('plan_has_no_published_version');
   }
 
   const recorded = onboarding.recordPlan(planId, version.id);

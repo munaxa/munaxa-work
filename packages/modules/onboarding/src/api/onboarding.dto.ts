@@ -94,7 +94,8 @@ export class CompleteTaskBody extends VersionedBody {
 
   @ApiPropertyOptional({
     example: 'doc:2026/passport/9f3',
-    description: 'A reference into the document store. Required for a `document` task. Never bytes.',
+    description:
+      'A reference into the document store. Required for a `document` task. Never bytes.',
   })
   @IsOptional()
   @Matches(DOCUMENT_REFERENCE_PATTERN)

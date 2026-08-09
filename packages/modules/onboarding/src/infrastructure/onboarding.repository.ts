@@ -2,11 +2,7 @@ import { Repository } from '@work/persistence';
 import type { Transaction } from '@work/kernel';
 
 import type { OnboardingInstanceState } from '../domain/onboarding-state.js';
-import type {
-  OnboardingQuery,
-  OnboardingStore,
-  Page,
-} from '../application/onboarding-ports.js';
+import type { OnboardingQuery, OnboardingStore, Page } from '../application/onboarding-ports.js';
 
 import {
   INSTANCE_COLUMNS,

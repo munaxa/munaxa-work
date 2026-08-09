@@ -30,10 +30,8 @@ export const taskFilters = (query: Record<string, string>): Record<string, strin
  * because a filter that switched on for any present value would make `?overdue=false` return exactly
  * the rows it says it excludes.
  */
-export const flag = (
-  query: Record<string, string>,
-  key: string,
-): Record<string, boolean> => (query[key] === 'true' ? { [key]: true } : {});
+export const flag = (query: Record<string, string>, key: string): Record<string, boolean> =>
+  query[key] === 'true' ? { [key]: true } : {};
 
 /** A paging parameter from the query string, bounded rather than trusted. */
 export const paging = (query: Record<string, string>): { page: number; size: number } => ({

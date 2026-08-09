@@ -11,11 +11,7 @@ import {
 } from './onboarding-aggregate.js';
 import { OnboardingEvents } from './onboarding-events.js';
 import { accept, refuse, type OnboardingResult } from './onboarding-rejection.js';
-import {
-  TASK_TRANSITIONS,
-  isTaskTerminal,
-  type TaskStatus,
-} from './onboarding-vocabulary.js';
+import { TASK_TRANSITIONS, isTaskTerminal, type TaskStatus } from './onboarding-vocabulary.js';
 import { checkedTaskDefinition, type DefineTask, type TaskState } from './task-definition.js';
 
 export type { TaskState, DefineTask } from './task-definition.js';
@@ -193,7 +189,11 @@ export class Task extends OnboardingAggregate {
 
   /** Reassigns the task. A deliberate act, recorded, rather than a silent consequence of a move. */
   public reassign(
-    owner: { readonly ownerKind: TaskState['ownerKind']; readonly ownerRef?: string; readonly ownerRole?: string },
+    owner: {
+      readonly ownerKind: TaskState['ownerKind'];
+      readonly ownerRef?: string;
+      readonly ownerRole?: string;
+    },
     origin: EventOrigin,
     occurredAt: Date,
   ): OnboardingResult<TaskState> {
@@ -230,7 +230,10 @@ export class Task extends OnboardingAggregate {
   }
 
   /** Moves the due date. Audited, because a date that quietly moved is a deadline nobody missed. */
-  public reschedule(dueOn: string | undefined, occurredAt: Date): OnboardingResult<string | undefined> {
+  public reschedule(
+    dueOn: string | undefined,
+    occurredAt: Date,
+  ): OnboardingResult<string | undefined> {
     if (isTaskTerminal(this.task.status)) return refuse('task_concluded');
 
     const checked = checkedOptionalCivilDate(dueOn, 'dueOn');

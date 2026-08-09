@@ -73,7 +73,8 @@ export const onboardingFilters = (tenantId: string, query: OnboardingQuery): Com
   const clauses = new Clauses('o', tenantId);
 
   if (query.state !== undefined) clauses.add((value) => `o.state = ${value}`, query.state);
-  if (query.planId !== undefined) clauses.add((value) => `o.plan_id = ${value}::uuid`, query.planId);
+  if (query.planId !== undefined)
+    clauses.add((value) => `o.plan_id = ${value}::uuid`, query.planId);
   if (query.employmentId !== undefined) {
     clauses.add((value) => `o.employment_id = ${value}::uuid`, query.employmentId);
   }

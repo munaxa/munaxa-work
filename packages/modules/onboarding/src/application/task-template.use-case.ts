@@ -1,11 +1,7 @@
 import { success, type Command, type CommandHandler } from '@work/kernel';
 
 import { taskTemplate } from '../domain/plan-version.js';
-import type {
-  DueAnchor,
-  OwnerKind,
-  TaskKind,
-} from '../domain/onboarding-vocabulary.js';
+import type { DueAnchor, OwnerKind, TaskKind } from '../domain/onboarding-vocabulary.js';
 import type { Metadata } from '../domain/onboarding-aggregate.js';
 
 import { conflicted, currentTenant, notFound, refusedBy } from './onboarding-context.js';

@@ -128,9 +128,7 @@ describe('the Onboarding endpoints', () => {
 
   const server = (): Server => wired?.application.getHttpServer() as Server;
 
-  const openApplication = async (
-    granted: readonly string[] = ALL,
-  ): Promise<Wired> => {
+  const openApplication = async (granted: readonly string[] = ALL): Promise<Wired> => {
     wired = await applicationWith(permitting(...granted));
     return wired;
   };

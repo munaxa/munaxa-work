@@ -102,6 +102,17 @@ are in [`verification/phase-6-plan.md`](verification/phase-6-plan.md); the repor
 debt register and the production-readiness assessment are in
 [`verification/phase-6-report.md`](verification/phase-6-report.md).
 
+Phase 7 completed on 2026-08-10: Onboarding — configurable plans and their immutable versions, the
+onboarding instance for one employment, tasks with owners and due dates, completion and cancellation,
+and the reconciliation that guarantees a joiner has an induction even when the hire event that should
+have started one was never delivered. It creates no Person and no Employment
+([ADR-0047](adr/0047-onboarding-owns-no-employment-fact.md)) and starts by idempotent command rather
+than by event ([ADR-0050](adr/0050-onboarding-starts-by-command-not-by-event.md)). The planning
+checkpoint and the approved decisions are in
+[`verification/phase-7-plan.md`](verification/phase-7-plan.md); the report, the carried-forward debt
+register and the production-readiness assessment are in
+[`verification/phase-7-report.md`](verification/phase-7-report.md).
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

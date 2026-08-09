@@ -1,6 +1,10 @@
 import type { Transaction } from '@work/kernel';
 
-import { isOnboardingLive, isTaskSatisfied, isTaskTerminal } from '../domain/onboarding-vocabulary.js';
+import {
+  isOnboardingLive,
+  isTaskSatisfied,
+  isTaskTerminal,
+} from '../domain/onboarding-vocabulary.js';
 import type { OnboardingInstanceState } from '../domain/onboarding-state.js';
 import type { PlanState } from '../domain/plan.js';
 import type { PlanVersionState, TaskTemplateState } from '../domain/plan-version.js';
@@ -216,10 +220,7 @@ class InMemoryOnboardingStore
   }
 
   /** The partial unique index, in memory — including the error the driver would raise. */
-  public override insert(
-    transaction: Transaction,
-    state: OnboardingInstanceState,
-  ): Promise<void> {
+  public override insert(transaction: Transaction, state: OnboardingInstanceState): Promise<void> {
     const clash = this.scoped(transaction).find(
       (row) => row.employmentId === state.employmentId && isOnboardingLive(row.state),
     );
@@ -270,7 +271,9 @@ class InMemoryTaskStore extends InMemoryStore<TaskState> implements TaskStore {
   }
 
   public dependents(transaction: Transaction, taskId: string): Promise<readonly TaskState[]> {
-    return Promise.resolve(this.scoped(transaction).filter((row) => row.dependsOnTaskId === taskId));
+    return Promise.resolve(
+      this.scoped(transaction).filter((row) => row.dependsOnTaskId === taskId),
+    );
   }
 
   public search(transaction: Transaction, query: TaskQuery): Promise<Page<TaskState>> {
@@ -281,11 +284,7 @@ class InMemoryTaskStore extends InMemoryStore<TaskState> implements TaskStore {
     return Promise.resolve(paged(matched, query));
   }
 
-  public tally(
-    transaction: Transaction,
-    onboardingId: string,
-    asOf: string,
-  ): Promise<TaskTally> {
+  public tally(transaction: Transaction, onboardingId: string, asOf: string): Promise<TaskTally> {
     const tasks = this.scoped(transaction).filter((row) => row.onboardingId === onboardingId);
     const required = tasks.filter((task) => task.required);
     const optional = tasks.filter((task) => !task.required);

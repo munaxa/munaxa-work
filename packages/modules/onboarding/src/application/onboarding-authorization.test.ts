@@ -111,7 +111,7 @@ describe('Every operation is its own permission', () => {
    * has to hold at the handler rather than at a screen: a task owned by somebody else is refused
    * even though the caller holds the permission and the task exists.
    */
-  it('refuses to complete somebody else\'s task through the self-service path', async () => {
+  it("refuses to complete somebody else's task through the self-service path", async () => {
     const harness = harnessFor(TENANT_A);
 
     await asTenant(TENANT_A, async () => {
@@ -169,7 +169,7 @@ describe('One tenant sees nothing of another', () => {
    * confirm that somebody is being onboarded in this system — one tenant learning another has a
    * joiner starting on Monday.
    */
-  it('cannot read, search, or move another tenant\'s onboarding', async () => {
+  it("cannot read, search, or move another tenant's onboarding", async () => {
     const stores = inMemoryOnboardingStores();
     const a = harnessWithStores(TENANT_A, stores);
     const b = harnessWithStores(TENANT_B, stores, undefined, {
@@ -185,7 +185,10 @@ describe('One tenant sees nothing of another', () => {
     });
 
     await asTenant(TENANT_B, async () => {
-      const read = await ask(b, { queryName: 'onboarding.read', onboardingId: started.onboardingId });
+      const read = await ask(b, {
+        queryName: 'onboarding.read',
+        onboardingId: started.onboardingId,
+      });
       const searched = await ask<{ readonly items: readonly unknown[] }>(b, {
         queryName: 'onboarding.search',
       });
@@ -201,7 +204,7 @@ describe('One tenant sees nothing of another', () => {
     });
   });
 
-  it('cannot see another tenant\'s plans or tasks', async () => {
+  it("cannot see another tenant's plans or tasks", async () => {
     const stores = inMemoryOnboardingStores();
     const a = harnessWithStores(TENANT_A, stores);
     const b = harnessWithStores(TENANT_B, stores, undefined, {
@@ -232,7 +235,7 @@ describe('One tenant sees nothing of another', () => {
    * Reconciliation is the one operation that reaches for a *list* of employments rather than a named
    * one, so it is the one that would leak a whole workforce if the scope were wrong.
    */
-  it('reconciles only its own tenant\'s employments', async () => {
+  it("reconciles only its own tenant's employments", async () => {
     const stores = inMemoryOnboardingStores();
     const a = harnessWithStores(TENANT_A, stores);
     const b = harnessWithStores(TENANT_B, stores, undefined, {

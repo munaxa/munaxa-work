@@ -61,7 +61,8 @@ export const draftPlanVersionHandler = (
         return conflicted('plan_already_has_a_draft');
       }
 
-      const next = versions.reduce((highest, version) => Math.max(highest, version.versionNumber), 0) + 1;
+      const next =
+        versions.reduce((highest, version) => Math.max(highest, version.versionNumber), 0) + 1;
       const drafted = PlanVersion.draft(
         { tenantId: currentTenant(), planId: command.planId, versionNumber: next },
         dependencies.clock.now(),
@@ -127,10 +128,7 @@ export const publishPlanVersionHandler = (
 
   handle: async (command) =>
     dependencies.unitOfWork.execute(async (transaction) => {
-      const state = await dependencies.stores.planVersions.byId(
-        transaction,
-        command.planVersionId,
-      );
+      const state = await dependencies.stores.planVersions.byId(transaction, command.planVersionId);
 
       if (state === undefined) return notFound<PlanVersionAffected>('plan version');
 

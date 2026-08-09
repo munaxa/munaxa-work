@@ -39,7 +39,10 @@ import { insertRow, pageOf } from './row-writer.js';
  * there.
  */
 
-export class PlanRepository extends Repository<{ id: string; version: number }> implements PlanStore {
+export class PlanRepository
+  extends Repository<{ id: string; version: number }>
+  implements PlanStore
+{
   public constructor() {
     super('onboarding_plan');
   }
@@ -99,11 +102,7 @@ export class PlanRepository extends Repository<{ id: string; version: number }> 
     await insertRow(transaction, this.table, planInsert(state), new Date());
   }
 
-  public async update(
-    transaction: Transaction,
-    state: PlanState,
-    expected: number,
-  ): Promise<void> {
+  public async update(transaction: Transaction, state: PlanState, expected: number): Promise<void> {
     await this.updateRow(transaction, state.id, expected, planUpdate(state));
   }
 }

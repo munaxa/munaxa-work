@@ -172,7 +172,9 @@ const checkedCodes = (
  */
 const checkedOwner = (
   request: DefineTask,
-): OnboardingResult<Pick<CheckedTask, 'ownerKind'> & Partial<Pick<CheckedTask, 'ownerRef' | 'ownerRole'>>> => {
+): OnboardingResult<
+  Pick<CheckedTask, 'ownerKind'> & Partial<Pick<CheckedTask, 'ownerRef' | 'ownerRole'>>
+> => {
   if (!OWNER_KINDS.includes(request.ownerKind)) return refuse('owner_kind_unknown');
 
   const ownerRole = checkedOptionalCode(request.ownerRole, 'ownerRole');

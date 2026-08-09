@@ -121,8 +121,7 @@ export const instanceInsert = (state: OnboardingInstanceState): RowValues => ({
   ...mutableInstance(state),
 });
 
-export const instanceUpdate = (state: OnboardingInstanceState): RowValues =>
-  mutableInstance(state);
+export const instanceUpdate = (state: OnboardingInstanceState): RowValues => mutableInstance(state);
 
 export interface TaskRow {
   readonly id: string;

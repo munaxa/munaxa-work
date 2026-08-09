@@ -58,6 +58,7 @@ private, and the lint layer enforces that rather than a review comment.
 | [`people`](docs/modules/people.md) | The master registry of human identity: one permanent Person per human being, their names over time, government identifiers, citizenships, contacts, addresses and history | 4 |
 | [`employment`](docs/modules/employment.md) | The relationship between a person and the workforce: employment identity and lifecycle, organizational assignment on a timeline, the managerial relationship, contracts and probation | 5 |
 | [`recruitment`](docs/modules/recruitment.md) | Hiring: requisitions and their approval, vacancies, candidates, applications and their pipeline, interviews and feedback, offers, and the transition that turns an accepted offer into a Person and an Employment | 6 |
+| [`onboarding`](docs/modules/onboarding.md) | The induction: configurable plans and their immutable versions, the onboarding of one employment, tasks with owners and due dates, completion and cancellation, and the reconciliation that guarantees a joiner has one | 7 |
 
 ### Acting inside another module
 

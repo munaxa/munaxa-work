@@ -11,12 +11,7 @@ import { Onboarding } from '../domain/onboarding.js';
 import { Task } from '../domain/task.js';
 import { civilDateOf } from '../domain/onboarding-vocabulary.js';
 
-import {
-  currentActor,
-  notFound,
-  originOfCurrentRequest,
-  refusedBy,
-} from './onboarding-context.js';
+import { currentActor, notFound, originOfCurrentRequest, refusedBy } from './onboarding-context.js';
 import { OnboardingPermissions } from './onboarding-permissions.js';
 import type { OnboardingDependencies } from './onboarding-dependencies.js';
 

@@ -216,4 +216,3 @@ const onboardingIsLive = async (
 
   return state !== undefined && state.state !== 'completed' && state.state !== 'cancelled';
 };
-

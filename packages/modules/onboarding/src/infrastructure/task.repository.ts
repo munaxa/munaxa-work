@@ -20,7 +20,10 @@ import { insertRow, pageOf } from './row-writer.js';
  * date the caller supplies. There is no flag, no sweeper and therefore no window in which the flag
  * is wrong.
  */
-export class TaskRepository extends Repository<{ id: string; version: number }> implements TaskStore {
+export class TaskRepository
+  extends Repository<{ id: string; version: number }>
+  implements TaskStore
+{
   public constructor() {
     super('onboarding_task');
   }
@@ -66,10 +69,7 @@ export class TaskRepository extends Repository<{ id: string; version: number }> 
   }
 
   /** What waited on this task. Read inside the completing transaction, so nothing lags behind. */
-  public async dependents(
-    transaction: Transaction,
-    taskId: string,
-  ): Promise<readonly TaskState[]> {
+  public async dependents(transaction: Transaction, taskId: string): Promise<readonly TaskState[]> {
     const rows = await transaction.execute<TaskRow>(
       `select ${TASK_COLUMNS} from onboarding_task k
         where k.tenant_id = $1 and k.depends_on_task_id = $2 and k.deleted_at is null
@@ -98,11 +98,7 @@ export class TaskRepository extends Repository<{ id: string; version: number }> 
     );
   }
 
-  public tally(
-    transaction: Transaction,
-    onboardingId: string,
-    asOf: string,
-  ): Promise<TaskTally> {
+  public tally(transaction: Transaction, onboardingId: string, asOf: string): Promise<TaskTally> {
     return tallyOf(transaction, onboardingId, asOf);
   }
 

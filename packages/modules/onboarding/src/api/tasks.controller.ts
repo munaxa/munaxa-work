@@ -130,7 +130,9 @@ export class TasksController {
   }
 
   @Post(':taskId/schedule')
-  @ApiOperation({ summary: 'Move a deadline. Audited — a date that quietly moved is a date missed' })
+  @ApiOperation({
+    summary: 'Move a deadline. Audited — a date that quietly moved is a date missed',
+  })
   public async reschedule(
     @Param('taskId') taskId: string,
     @Body() body: RescheduleTaskBody,

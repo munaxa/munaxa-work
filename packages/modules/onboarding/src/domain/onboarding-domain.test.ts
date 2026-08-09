@@ -37,10 +37,7 @@ describe('A plan holds no tasks, and a published version never changes', () => {
 
   it('refuses to activate a plan with no published version', () => {
     const plan = unwrap(
-      Plan.create(
-        { tenantId: TENANT, code: 'joiner', name: { en: 'Joiner', ar: 'منضم' } },
-        NOW,
-      ),
+      Plan.create({ tenantId: TENANT, code: 'joiner', name: { en: 'Joiner', ar: 'منضم' } }, NOW),
     );
 
     expect(plan.activate(false, NOW).ok).toBe(false);
@@ -166,8 +163,8 @@ describe('An onboarding is a process, and owns no employment fact', () => {
     const onboarding = anOnboarding();
     const planId = uuidV7();
 
-    expect(onboarding.recordPlan(planId, uuidV7(), NOW).ok).toBe(true);
-    expect(onboarding.recordPlan(uuidV7(), uuidV7(), NOW).ok).toBe(false);
+    expect(onboarding.recordPlan(planId, uuidV7()).ok).toBe(true);
+    expect(onboarding.recordPlan(uuidV7(), uuidV7()).ok).toBe(false);
   });
 });
 
@@ -210,9 +207,9 @@ describe('A task carries who owns it, when it is due, and how it ended', () => {
     const waived = aTask();
     const cancelled = aTask();
 
-    expect(waived.waive({ reasonCode: 'not-applicable', waivedBy: 'user:hr' }, ORIGIN, NOW).ok).toBe(
-      true,
-    );
+    expect(
+      waived.waive({ reasonCode: 'not-applicable', waivedBy: 'user:hr' }, ORIGIN, NOW).ok,
+    ).toBe(true);
     expect(cancelled.cancel(ORIGIN, NOW).ok).toBe(true);
     expect(isTaskSatisfied(waived.status)).toBe(true);
     expect(isTaskSatisfied(cancelled.status)).toBe(false);

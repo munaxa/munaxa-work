@@ -1,12 +1,10 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import {
-  ApiForbiddenResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import type { AwaitingOnboarding, ReconcileOnboardingCommand } from '../application/reconcile.use-case.js';
+import type {
+  AwaitingOnboarding,
+  ReconcileOnboardingCommand,
+} from '../application/reconcile.use-case.js';
 import type { ExportOnboarding } from '../application/transfer.use-case.js';
 
 import { ReconcileBody } from './onboarding.dto.js';

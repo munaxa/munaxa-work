@@ -139,7 +139,10 @@ const ownerFor = (
     };
   }
   if (template.ownerKind === 'role') {
-    return { ownerKind: 'role', ...(template.ownerRole === undefined ? {} : { ownerRole: template.ownerRole }) };
+    return {
+      ownerKind: 'role',
+      ...(template.ownerRole === undefined ? {} : { ownerRole: template.ownerRole }),
+    };
   }
   return {
     ownerKind: template.ownerKind,
@@ -154,10 +157,7 @@ const ownerFor = (
  * is the only other date this module has. A task with no due date at all would drop out of every
  * overdue query, which is the quiet failure.
  */
-const dueDateFor = (
-  template: TaskTemplateState,
-  onboarding: OnboardingInstanceState,
-): string => {
+const dueDateFor = (template: TaskTemplateState, onboarding: OnboardingInstanceState): string => {
   const anchor =
     template.dueAnchor === 'employment_start'
       ? (onboarding.employmentStartOn ?? onboarding.plannedStartOn)

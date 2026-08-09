@@ -2,10 +2,7 @@ import type { Command, CommandHandler, Query, QueryHandler, WorkModule } from '@
 
 import { amendPlanHandler, createPlanHandler, retirePlanHandler } from './plan.use-case.js';
 import { draftPlanVersionHandler, publishPlanVersionHandler } from './plan-version.use-case.js';
-import {
-  defineTaskTemplateHandler,
-  removeTaskTemplateHandler,
-} from './task-template.use-case.js';
+import { defineTaskTemplateHandler, removeTaskTemplateHandler } from './task-template.use-case.js';
 import { startOnboardingHandler } from './start.use-case.js';
 import {
   beginOnboardingHandler,
@@ -28,11 +25,7 @@ import {
   searchOnboardingsHandler,
   searchPlansHandler,
 } from './onboarding-queries.js';
-import {
-  readMyTasksHandler,
-  readTaskHistoryHandler,
-  searchTasksHandler,
-} from './task-queries.js';
+import { readMyTasksHandler, readTaskHistoryHandler, searchTasksHandler } from './task-queries.js';
 import { ALL_ONBOARDING_PERMISSIONS, OnboardingPermissions } from './onboarding-permissions.js';
 import type { CommandSender } from './transfer.use-case.js';
 import type { OnboardingDependencies } from './onboarding-dependencies.js';
@@ -98,9 +91,7 @@ const commandsOf = (
     reconcileOnboardingHandler(dependencies, sender),
   ] as readonly CommandHandler<Command, unknown>[];
 
-const queriesOf = (
-  dependencies: OnboardingDependencies,
-): readonly QueryHandler<Query, unknown>[] =>
+const queriesOf = (dependencies: OnboardingDependencies): readonly QueryHandler<Query, unknown>[] =>
   [
     searchPlansHandler(dependencies),
     readPlanHandler(dependencies),

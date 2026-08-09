@@ -152,9 +152,7 @@ export const searchOnboardingsHandler = (
         ...(query.state === undefined ? {} : { state: query.state }),
         ...(query.planId === undefined ? {} : { planId: query.planId }),
         ...(query.employmentId === undefined ? {} : { employmentId: query.employmentId }),
-        ...(query.overdue === true
-          ? { overdueAsOf: civilDateOf(dependencies.clock.now()) }
-          : {}),
+        ...(query.overdue === true ? { overdueAsOf: civilDateOf(dependencies.clock.now()) } : {}),
         ...(query.plannedStartFrom === undefined
           ? {}
           : { plannedStartFrom: query.plannedStartFrom }),

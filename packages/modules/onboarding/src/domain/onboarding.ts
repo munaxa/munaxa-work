@@ -148,7 +148,10 @@ export class Onboarding extends OnboardingAggregate {
   }
 
   /** Preboarding: work before the first day. It says nothing about the employment's status. */
-  public beginPreboarding(origin: EventOrigin, occurredAt: Date): OnboardingResult<OnboardingState> {
+  public beginPreboarding(
+    origin: EventOrigin,
+    occurredAt: Date,
+  ): OnboardingResult<OnboardingState> {
     return this.moveTo('preboarding', origin, occurredAt);
   }
 

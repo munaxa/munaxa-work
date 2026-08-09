@@ -5,6 +5,60 @@ and what is still missing.
 
 ---
 
+## Phase 7 — Onboarding
+
+**2026-08-10** · [Verification report](verification/phase-7-report.md)
+
+The induction, from the day somebody is hired to the day they are working. Six tables, twenty-five
+endpoints, and one decision about reliability that is worth reading even if nothing else here is.
+
+### An onboarding is never started by an event alone
+
+The obvious design is that hiring raises an event and onboarding listens for it. This product's event
+delivery is in-process and at-most-once with nothing that replays a lost one — so that design's
+failure is a joiner arriving on their first day with no induction and no record that one was expected.
+
+So the way an onboarding begins is a command that is safe to send twice. Send it again and you get
+back the onboarding that already exists, not a second one and not an error. Two requests arriving at
+the same instant converge on one, because the database — not the application — decides.
+
+And because a command nobody sends starts nothing, there is a list: **the employments that have no
+onboarding**. It is on the screen, and there is an endpoint that starts one for each of them. Running
+it twice creates nothing twice. That list is the guarantee; an event is only ever a shortcut to it.
+
+### Onboarding holds no employment facts
+
+There is no employment status here, no unit, no position, no manager and no employee number — and no
+plan to add them. Completing an induction does not make somebody an employee, and cancelling one does
+not end anybody's employment. The person and the employment are created by hiring; this module could
+not create either if it tried, because the database would refuse the row.
+
+### A published checklist never changes
+
+An administrator improving next quarter's plan drafts a new version of it. The published one stays
+exactly as it was, and every onboarding generated from it keeps the list it was actually given. A year
+later, "what were we asking of joiners last March" has one answer.
+
+Nothing is shipped: no plan, no task, no reason code. What a joiner is asked to do is the customer's
+decision, and in several of this product's markets part of it is written in law.
+
+### What is not here
+
+No document upload. A document task records a *reference* and says which document it wants; no part of
+this product stores a file yet, and the report marks that **not verified** rather than implying
+otherwise. No notifications are delivered, for the same reason recruitment's are not. No approvals
+routing — an approval task records a decision by the person who made it, and Phase 16 will route it
+without changing the task.
+
+No employee self-service screens. The data an employee's own task list needs is published and tested;
+what is missing is the step that turns a signed-in user into their employment, and building a route
+without it would be a route that can close somebody else's task.
+
+Deadlines are calendar days. Which days a customer's week-end falls on is country data this product
+does not yet hold.
+
+---
+
 ## Phase 6 — Recruitment
 
 **2026-08-09** · [Verification report](verification/phase-6-report.md)

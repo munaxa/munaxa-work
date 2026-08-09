@@ -3,12 +3,7 @@ import { success, type Command, type CommandHandler } from '@work/kernel';
 import { Plan } from '../domain/plan.js';
 import type { Metadata } from '../domain/onboarding-aggregate.js';
 
-import {
-  conflicted,
-  currentTenant,
-  notFound,
-  refusedBy,
-} from './onboarding-context.js';
+import { conflicted, currentTenant, notFound, refusedBy } from './onboarding-context.js';
 import { OnboardingPermissions } from './onboarding-permissions.js';
 import type { OnboardingDependencies } from './onboarding-dependencies.js';
 
@@ -52,10 +47,7 @@ export const createPlanHandler = (
       // than a constraint violation they cannot act on.
       if (existing !== undefined) return conflicted('plan_code_taken');
 
-      const plan = Plan.create(
-        { tenantId: currentTenant(), ...command },
-        dependencies.clock.now(),
-      );
+      const plan = Plan.create({ tenantId: currentTenant(), ...command }, dependencies.clock.now());
 
       if (!plan.ok) return refusedBy(plan.error);
 

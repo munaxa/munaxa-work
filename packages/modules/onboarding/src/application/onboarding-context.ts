@@ -54,9 +54,8 @@ export const currentActor = (): string => originOfCurrentRequest().actor;
  * The catalogue key travels with it rather than a sentence, so the message an Arabic-speaking user
  * reads is chosen at the edge from their language instead of being fixed here in English.
  */
-export const refusedBy = <TValue>(
-  rejection: OnboardingRejection,
-): Result<TValue, HandlerFailure> => rejected(rejection.messageKey);
+export const refusedBy = <TValue>(rejection: OnboardingRejection): Result<TValue, HandlerFailure> =>
+  rejected(rejection.messageKey);
 
 /**
  * Nothing found, for a caller who has no business learning otherwise.

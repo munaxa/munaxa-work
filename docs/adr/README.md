@@ -26,6 +26,14 @@ line; the decision that replaced it is a new record.
 | [0040](0040-employment-lifecycle.md)             | The employment lifecycle, and why "on leave" belongs to Leave | Accepted |
 | [0041](0041-work-location-is-not-modelled.md)    | Work location is not modelled, and no false relationship stands in for it | Accepted |
 | [0042](0042-how-employment-references-another-module.md) | How Employment references another module: one foreign key, one published query, one gap | Accepted |
+| [0043](0043-bounded-service-grant.md)            | The bounded service grant | Accepted |
+| [0044](0044-a-candidate-is-not-a-person.md)      | A candidate is not a person | Accepted |
+| [0045](0045-requisition-approval-is-real.md)     | A requisition approval is made by a named human, not by an adapter | Accepted |
+| [0046](0046-the-hire-is-a-saga.md)               | The hire is a saga with a recoverable state, not a distributed transaction | Accepted |
+| [0047](0047-onboarding-owns-no-employment-fact.md) | Onboarding owns no employment fact, and creates neither a Person nor an Employment | Accepted |
+| [0048](0048-plan-versions-are-immutable.md)      | A plan version is immutable once published, and an instance copies its tasks at creation | Accepted |
+| [0049](0049-onboarding-is-not-a-workflow-engine.md) | Onboarding is a checklist with one predecessor per task, not a workflow engine | Accepted |
+| [0050](0050-onboarding-starts-by-command-not-by-event.md) | An onboarding is started by an idempotent command and guaranteed by reconciliation, never by an event | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

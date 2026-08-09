@@ -52,11 +52,7 @@ suite('Onboarding isolation', () => {
     return result.value as TValue;
   };
 
-  const instanceFor = (
-    tenantId: string,
-    employmentId: string,
-    personId: string,
-  ): Onboarding =>
+  const instanceFor = (tenantId: string, employmentId: string, personId: string): Onboarding =>
     unwrap(
       Onboarding.start(
         { tenantId, employmentId, personId, plannedStartOn: '2026-09-01' },
@@ -78,7 +74,7 @@ suite('Onboarding isolation', () => {
     );
   });
 
-  it('hides one tenant\'s onboarding from another, by read and by identifier', async () => {
+  it("hides one tenant's onboarding from another, by read and by identifier", async () => {
     const seeded = await fixture.seedEmployment(TENANT_A);
     const onboarding = instanceFor(TENANT_A, seeded.employmentId, seeded.personId);
 
@@ -101,7 +97,7 @@ suite('Onboarding isolation', () => {
    * Reconciliation's read is the one that could leak a whole workforce, because it asks for a set
    * rather than for a named row.
    */
-  it('hides one tenant\'s employments from another tenant\'s reconciliation read', async () => {
+  it("hides one tenant's employments from another tenant's reconciliation read", async () => {
     const seeded = await fixture.seedEmployment(TENANT_A);
     const onboarding = instanceFor(TENANT_A, seeded.employmentId, seeded.personId);
 
@@ -118,7 +114,7 @@ suite('Onboarding isolation', () => {
     expect(seen).toEqual([]);
   });
 
-  it('hides one tenant\'s tasks and their history from another', async () => {
+  it("hides one tenant's tasks and their history from another", async () => {
     const seeded = await fixture.seedEmployment(TENANT_A);
     const onboarding = instanceFor(TENANT_A, seeded.employmentId, seeded.personId);
     const task = unwrap(

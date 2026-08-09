@@ -184,9 +184,9 @@ describe('An onboarding carries the checklist it was given', () => {
         'completed',
       ]);
       expect(history.ok && history.value[1]?.detail).toBe('2026-08-29 → 2026-08-31');
-      expect(history.ok && history.value.every((event) => event.recordedBy.startsWith('user:'))).toBe(
-        true,
-      );
+      expect(
+        history.ok && history.value.every((event) => event.recordedBy.startsWith('user:')),
+      ).toBe(true);
     });
   });
 

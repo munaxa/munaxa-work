@@ -102,11 +102,7 @@ export interface OnboardingStore {
   search(transaction: Transaction, query: OnboardingQuery): Promise<Page<OnboardingInstanceState>>;
   all(transaction: Transaction): Promise<readonly OnboardingInstanceState[]>;
   insert(transaction: Transaction, state: OnboardingInstanceState): Promise<void>;
-  update(
-    transaction: Transaction,
-    state: OnboardingInstanceState,
-    expected: number,
-  ): Promise<void>;
+  update(transaction: Transaction, state: OnboardingInstanceState, expected: number): Promise<void>;
 }
 
 export interface TaskQuery extends Paged {
