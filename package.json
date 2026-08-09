@@ -26,7 +26,8 @@
     "db:migrate": "pnpm --filter @work/api exec prisma migrate deploy --schema ../../prisma/schema.prisma",
     "db:reset": "pnpm --filter @work/api exec prisma migrate reset --schema ../../prisma/schema.prisma",
     "measure:recruitment": "node scripts/measure-recruitment-performance.mjs",
-    "measure:onboarding": "node scripts/measure-onboarding-performance.mjs"
+    "measure:onboarding": "node scripts/measure-onboarding-performance.mjs",
+    "measure:attendance": "node scripts/measure-attendance-performance.mjs"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",

@@ -27,7 +27,7 @@ them afterwards.
 | Employment, contract, assignment, reporting line | `employment` | Phase 5 ✅  |
 | Requisition, vacancy, candidate, application, interview, offer | `recruitment` | Phase 6 ✅ |
 | Onboarding plan, onboarding instance, onboarding task | `onboarding` | Phase 7 ✅ |
-| Attendance, shift, timesheet              | `attendance`    | Phase 8       |
+| Attendance, time event, shift, schedule, roster | `attendance` | Phase 8 ✅ |
 | Leave type, entitlement, balance, request | `leave`         | Phase 9       |
 | Salary structure, grade, pay element      | `compensation`  | Phase 10      |
 | Payroll run, payslip, payroll result      | `payroll`       | Phase 11      |

@@ -1597,3 +1597,458 @@ model OnboardingTaskEvent {
   @@index([tenant_id, task_id, occurred_at], map: "onboarding_task_event_task_idx")
   @@map("onboarding_task_event")
 }
+
+// ---------------------------------------------------------------------------------------------
+// Attendance (Phase 8) — the highest-volume domain in the product.
+//
+// Four rules run through every model below.
+//
+//   * **A raw event is immutable.** `attendance_time_event` is inserted and read. No repository
+//     offers an update, a correction never rewrites one, and the audit trail is the sequence
+//     itself.
+//   * **An attendance day is a derivation, not a fact somebody recorded.** It stores the inputs it
+//     was computed from — schedule, shift, policy, roster, calculation version, a digest of the
+//     event set — so the same inputs reproduce it and a changed input is detectable without an
+//     event ever being delivered (ADR-0053).
+//   * **No employment fact is copied.** No employee number, no employment status, no contracted
+//     hours, no manager, no person. `employment_id` is a reference with a foreign key, and every
+//     employment question is asked of Employment as at the attendance date (ADR-0051).
+//   * **No money, anywhere.** Attendance produces candidate minutes; what time is worth is
+//     Compensation's and Payroll's (ADR-0054).
+// ---------------------------------------------------------------------------------------------
+
+/// One raw time event, exactly as it was captured. Inserted and read; never updated.
+model AttendanceTimeEvent {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  /// Employment's, by identifier and by foreign key. Attendance never references a Person.
+  employment_id      String    @db.Uuid
+  kind               String    @db.VarChar(24)
+  source             String    @db.VarChar(24)
+  /// The originating system's own identifier, opaque. Never parsed, only stored and compared.
+  source_reference   String?   @db.VarChar(128)
+  device_reference   String?   @db.VarChar(128)
+  /// The deduplication identity. A partial unique index on (tenant_id, event_key) is what makes
+  /// ingestion idempotent under device retries, mobile sync and re-run imports.
+  event_key          String    @db.VarChar(200)
+  /// The instant the domain treats as authoritative.
+  occurred_at        DateTime  @db.Timestamptz(6)
+  /// What the client claimed, and when the server accepted it. Kept apart even when equal.
+  reported_at        DateTime  @db.Timestamptz(6)
+  received_at        DateTime  @db.Timestamptz(6)
+  /// reported_at − received_at. Divergence is data, not an error to discard.
+  clock_skew_seconds Int
+  captured_offline   Boolean
+  /// The IANA zone resolved at ingestion, stored so a recalculation years later uses the zone
+  /// that applied then rather than the zone that applies now.
+  zone               String    @db.VarChar(64)
+  /// The civil date this event belongs to, resolved through the schedule (never a UTC truncation).
+  attendance_date    DateTime  @db.Date
+  /// Set only on a correction event. The original is never touched.
+  supersedes_event_id String?  @db.Uuid
+  /// Punch location evidence, captured only where the tenant enables it for that source. It is
+  /// not an authoritative work location and there is no geofence verdict here (ADR-0055).
+  latitude           Decimal?  @db.Decimal(9, 6)
+  longitude          Decimal?  @db.Decimal(9, 6)
+  location_accuracy_metres Int?
+  note               String?   @db.VarChar(1024)
+  import_batch_id    String?   @db.Uuid
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, employment_id, attendance_date], map: "attendance_time_event_day_idx")
+  @@index([tenant_id, attendance_date], map: "attendance_time_event_date_idx")
+  @@index([tenant_id, source, received_at], map: "attendance_time_event_source_idx")
+  @@map("attendance_time_event")
+}
+
+/// The calculated working day for one employment. Replaceable by recalculation, and it records
+/// every input it was produced from so that replacement is reproducible rather than merely plausible.
+model AttendanceDay {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  employment_id      String    @db.Uuid
+  attendance_date    DateTime  @db.Date
+  zone               String    @db.VarChar(64)
+  /// The inputs as resolved for this date. Versions rather than live references, because a
+  /// schedule edited in June must not change what March meant.
+  schedule_id        String?   @db.Uuid
+  schedule_version   Int?
+  shift_id           String?   @db.Uuid
+  roster_entry_id    String?   @db.Uuid
+  policy_id          String?   @db.Uuid
+  policy_version     Int?
+  day_kind           String    @db.VarChar(24)
+  expected_start_at  DateTime? @db.Timestamptz(6)
+  expected_end_at    DateTime? @db.Timestamptz(6)
+  expected_minutes   Int
+  expected_break_minutes Int
+  first_in_at        DateTime? @db.Timestamptz(6)
+  last_out_at        DateTime? @db.Timestamptz(6)
+  worked_minutes     Int
+  break_minutes_taken Int
+  paid_break_minutes Int
+  /// Candidate buckets. Payroll decides what any of them is worth; Attendance never does.
+  regular_candidate_minutes  Int
+  overtime_candidate_minutes Int
+  unpaid_minutes     Int
+  absence_minutes    Int
+  /// What Leave was able to say. `unknown` is a real answer and is not the same as `none`.
+  leave_state        String    @db.VarChar(16)
+  leave_minutes      Int
+  state              String    @db.VarChar(24)
+  approved_at        DateTime? @db.Timestamptz(6)
+  approved_by        String?   @db.VarChar(255)
+  locked_at          DateTime? @db.Timestamptz(6)
+  /// Reserved for Workflow (Phase 16). Null while Attendance records the decision directly.
+  approval_reference String?   @db.VarChar(64)
+  /// Reproducibility, and staleness detection that needs no event to be delivered.
+  calculation_version Int
+  inputs_digest      String    @db.VarChar(64)
+  calculated_at      DateTime? @db.Timestamptz(6)
+  inputs_changed_at  DateTime? @db.Timestamptz(6)
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, attendance_date, state], map: "attendance_day_date_idx")
+  @@index([tenant_id, employment_id, attendance_date], map: "attendance_day_employment_idx")
+  @@map("attendance_day")
+}
+
+/// A named deviation on one day. A child of the day rather than an aggregate: an exception that
+/// could be resolved while the day disagreed is one a screen shows open on a day that reads closed.
+model AttendanceDayException {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  attendance_day_id String @db.Uuid
+  employment_id  String    @db.Uuid
+  attendance_date DateTime @db.Date
+  kind           String    @db.VarChar(40)
+  severity       String    @db.VarChar(16)
+  state          String    @db.VarChar(16)
+  detail         String?   @db.VarChar(1024)
+  minutes        Int?
+  resolution_reason_code String? @db.VarChar(64)
+  resolved_at    DateTime? @db.Timestamptz(6)
+  resolved_by    String?   @db.VarChar(255)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, state, severity, attendance_date], map: "attendance_day_exception_queue_idx")
+  @@index([tenant_id, attendance_day_id], map: "attendance_day_exception_day_idx")
+  @@map("attendance_day_exception")
+}
+
+/// A shift: the pattern of time a working day is expected to contain. Immutable once published.
+model AttendanceShift {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  kind           String    @db.VarChar(24)
+  /// Wall-clock times, meaningless without the zone the schedule supplies.
+  start_local    String    @db.VarChar(5)
+  end_local      String    @db.VarChar(5)
+  /// Derived and stored, because every query about overnight work filters on it.
+  crosses_midnight Boolean
+  flex_window_minutes Int?
+  core_start_local String? @db.VarChar(5)
+  core_end_local String?   @db.VarChar(5)
+  grace_in_minutes Int
+  grace_out_minutes Int
+  /// The authored expectation, so a daylight-saving day does not silently change what was asked.
+  expected_minutes Int
+  status         String    @db.VarChar(24)
+  version_number Int
+  published_at   DateTime? @db.Timestamptz(6)
+  published_by   String?   @db.VarChar(255)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, status], map: "attendance_shift_status_idx")
+  @@map("attendance_shift")
+}
+
+/// The ordered work and break segments of one shift. Rows rather than JSON because the calculation
+/// reads them and the database checks that they are ordered and consistent.
+model AttendanceShiftSegment {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  shift_id      String    @db.Uuid
+  sequence      Int
+  kind          String    @db.VarChar(16)
+  start_local   String    @db.VarChar(5)
+  end_local     String    @db.VarChar(5)
+  /// Meaningful only for a break. A paid break counts as worked time; an unpaid one does not.
+  paid          Boolean
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@index([tenant_id, shift_id, sequence], map: "attendance_shift_segment_shift_idx")
+  @@map("attendance_shift_segment")
+}
+
+/// A schedule: shifts arranged over a repeating cycle, in an explicit time zone. Immutable once
+/// published, because attendance days were calculated from it and an auditor will read it.
+model AttendanceSchedule {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  /// The IANA zone its wall-clock times mean. Required: `08:00` is not a time without one.
+  zone           String    @db.VarChar(64)
+  cycle_length_days Int
+  /// The civil date at which cycle position 0 begins. What makes a rotation reconstructable.
+  cycle_anchor_date DateTime @db.Date
+  status         String    @db.VarChar(24)
+  version_number Int
+  published_at   DateTime? @db.Timestamptz(6)
+  published_by   String?   @db.VarChar(255)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, status], map: "attendance_schedule_status_idx")
+  @@map("attendance_schedule")
+}
+
+/// One position in a schedule's cycle. A position with no row is a rest day.
+model AttendanceScheduleDay {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  schedule_id   String    @db.Uuid
+  cycle_position Int
+  shift_id      String    @db.Uuid
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@index([tenant_id, schedule_id, cycle_position], map: "attendance_schedule_day_idx")
+  @@map("attendance_schedule_day")
+}
+
+/// Which schedule an employment follows, from when. Non-overlapping by construction: two schedules
+/// in force on one day is two answers to when somebody was expected at work.
+model AttendanceScheduleAssignment {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  employment_id  String    @db.Uuid
+  schedule_id    String    @db.Uuid
+  effective_from DateTime  @db.Date
+  effective_to   DateTime? @db.Date
+  reason_code    String?   @db.VarChar(64)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, employment_id, effective_from], map: "attendance_schedule_assignment_idx")
+  @@map("attendance_schedule_assignment")
+}
+
+/// An explicit statement about one employment on one date, overriding the schedule. Superseded
+/// rather than edited once its day has been calculated, so June cannot silently rewrite March.
+model AttendanceRosterEntry {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  employment_id String    @db.Uuid
+  on_date       DateTime  @db.Date
+  kind          String    @db.VarChar(24)
+  shift_id      String?   @db.Uuid
+  reason_code   String?   @db.VarChar(64)
+  note          String?   @db.VarChar(1024)
+  swap_of_entry_id String? @db.Uuid
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@index([tenant_id, on_date], map: "attendance_roster_entry_date_idx")
+  @@index([tenant_id, employment_id, on_date], map: "attendance_roster_entry_employment_idx")
+  @@map("attendance_roster_entry")
+}
+
+/// How a tenant wants attendance interpreted: rounding, tolerance, and the threshold above which
+/// worked time becomes an overtime *candidate*. No statutory rule ships here (00B).
+model AttendancePolicy {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  /// `tenant` today; `country_pack` when Phase 11.1 supplies the statutory version.
+  source         String    @db.VarChar(24)
+  rounding_minutes Int
+  rounding_mode  String    @db.VarChar(16)
+  late_tolerance_minutes Int
+  early_departure_tolerance_minutes Int
+  duplicate_window_seconds Int
+  clock_skew_tolerance_seconds Int
+  /// Minutes beyond the expected day before worked time is an overtime candidate.
+  overtime_threshold_minutes Int
+  /// Whether an overtime candidate needs a decision before it reaches the payable snapshot.
+  overtime_requires_approval Boolean
+  /// Whether an absence with no known leave blocks the day from being approved.
+  absence_blocks_approval Boolean
+  status         String    @db.VarChar(24)
+  version_number Int
+  effective_from DateTime  @db.Date
+  effective_to   DateTime? @db.Date
+  published_at   DateTime? @db.Timestamptz(6)
+  published_by   String?   @db.VarChar(255)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, status, effective_from], map: "attendance_policy_effective_idx")
+  @@map("attendance_policy")
+}
+
+/// A request to change what an attendance day says, and the decision on it. The original event is
+/// never touched: applying a correction writes a *new* event that supersedes it.
+model AttendanceCorrectionRequest {
+  id              String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  employment_id   String    @db.Uuid
+  attendance_date DateTime  @db.Date
+  kind            String    @db.VarChar(24)
+  target_event_id String?   @db.Uuid
+  /// The proposed event, as authored data. Applied only after a decision.
+  proposed_kind   String?   @db.VarChar(24)
+  proposed_occurred_at DateTime? @db.Timestamptz(6)
+  proposed_minutes Int?
+  reason_code     String    @db.VarChar(64)
+  justification   String    @db.VarChar(1024)
+  state           String    @db.VarChar(16)
+  requested_by    String    @db.VarChar(255)
+  requested_at    DateTime  @db.Timestamptz(6)
+  decided_by      String?   @db.VarChar(255)
+  decided_at      DateTime? @db.Timestamptz(6)
+  decision_note   String?   @db.VarChar(1024)
+  /// The link from intent to effect, written when the correction is applied.
+  resulting_event_id String? @db.Uuid
+  /// Reserved for Workflow (Phase 16). Null while Attendance records the decision directly.
+  approval_reference String? @db.VarChar(64)
+  metadata        Json
+  created_at      DateTime  @db.Timestamptz(6)
+  created_by      String    @db.VarChar(255)
+  updated_at      DateTime  @db.Timestamptz(6)
+  updated_by      String    @db.VarChar(255)
+  deleted_at      DateTime? @db.Timestamptz(6)
+  deleted_by      String?   @db.VarChar(255)
+  version         Int
+
+  @@index([tenant_id, state, requested_at], map: "attendance_correction_state_idx")
+  @@index([tenant_id, employment_id, attendance_date], map: "attendance_correction_day_idx")
+  @@map("attendance_correction_request")
+}
+
+/// The frozen output Payroll consumes. A later correction never alters one; it produces the next
+/// sequence, so a dispute can compare what was paid with what is now true.
+model AttendancePayableSnapshot {
+  id              String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  employment_id   String    @db.Uuid
+  period_start    DateTime  @db.Date
+  period_end      DateTime  @db.Date
+  sequence        Int
+  frozen_at       DateTime  @db.Timestamptz(6)
+  frozen_by       String    @db.VarChar(255)
+  worked_minutes  Int
+  regular_candidate_minutes Int
+  overtime_candidate_minutes Int
+  unpaid_minutes  Int
+  absence_minutes Int
+  leave_minutes   Int
+  leave_state     String    @db.VarChar(16)
+  days_total      Int
+  days_approved   Int
+  days_unapproved Int
+  /// On the contract rather than filtered out, so Payroll decides visibly rather than paying an
+  /// incomplete month without noticing.
+  blocking_exceptions Int
+  calculation_version Int
+  inputs_digest   String    @db.VarChar(64)
+  created_at      DateTime  @db.Timestamptz(6)
+  created_by      String    @db.VarChar(255)
+  updated_at      DateTime  @db.Timestamptz(6)
+  updated_by      String    @db.VarChar(255)
+  deleted_at      DateTime? @db.Timestamptz(6)
+  deleted_by      String?   @db.VarChar(255)
+  version         Int
+
+  @@index([tenant_id, employment_id, period_start], map: "attendance_payable_snapshot_idx")
+  @@map("attendance_payable_snapshot")
+}
+
+/// Where a batch of imported events came from, and what happened to it. Provenance for a re-run.
+model AttendanceImportBatch {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  source        String    @db.VarChar(24)
+  source_label  String?   @db.VarChar(128)
+  submitted_at  DateTime  @db.Timestamptz(6)
+  submitted_by  String    @db.VarChar(255)
+  rows_submitted Int
+  rows_created  Int
+  rows_skipped  Int
+  rows_failed   Int
+  metadata      Json
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@index([tenant_id, submitted_at], map: "attendance_import_batch_idx")
+  @@map("attendance_import_batch")
+}

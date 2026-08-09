@@ -28,7 +28,7 @@ ADRs updated.
 | 5.3 | Assets & custody            | [`06C_PHASE_5.3_ASSETS_CUSTODY.md`](../work%20prompts/06C_PHASE_5.3_ASSETS_CUSTODY.md)                | Not started |
 | 6   | Recruitment                 | [`07_PHASE_6_RECRUITMENT.md`](../work%20prompts/07_PHASE_6_RECRUITMENT.md)                            | Not started |
 | 7   | Onboarding                  | [`08_PHASE_7_ONBOARDING.md`](../work%20prompts/08_PHASE_7_ONBOARDING.md)                              | Not started |
-| 8   | Attendance                  | [`09_PHASE_8_ATTENDANCE.md`](../work%20prompts/09_PHASE_8_ATTENDANCE.md)                              | Not started |
+| 8   | Attendance                  | [`09_PHASE_8_ATTENDANCE.md`](../work%20prompts/09_PHASE_8_ATTENDANCE.md)                              | Awaiting approval |
 | 9   | Leave                       | [`10_PHASE_9_LEAVE.md`](../work%20prompts/10_PHASE_9_LEAVE.md)                                        | Not started |
 | 10  | Compensation                | [`11_PHASE_10_COMPENSATION.md`](../work%20prompts/11_PHASE_10_COMPENSATION.md)                        | Not started |
 | 10.1| Loans & advances            | [`11A_PHASE_10.1_LOANS_ADVANCES.md`](../work%20prompts/11A_PHASE_10.1_LOANS_ADVANCES.md)              | Not started |
@@ -112,6 +112,18 @@ checkpoint and the approved decisions are in
 [`verification/phase-7-plan.md`](verification/phase-7-plan.md); the report, the carried-forward debt
 register and the production-readiness assessment are in
 [`verification/phase-7-report.md`](verification/phase-7-report.md).
+
+Phase 8 completed on 2026-08-11: Attendance — raw time events, shifts, schedules and their cycles,
+rosters, attendance policies, the calculated working day with its exceptions, corrections that never
+rewrite a punch, and the frozen snapshot Payroll reads. A raw event is immutable
+([ADR-0052](adr/0052-a-raw-time-event-is-immutable.md)); recalculation is found by asking rather than
+by being told ([ADR-0053](adr/0053-recalculation-is-found-by-asking.md)); the schedule owns the time
+zone, and no work location is invented
+([ADR-0055](adr/0055-the-schedule-owns-the-time-zone.md)); and "leave unknown" is not "no leave"
+([ADR-0056](adr/0056-leave-unknown-is-not-leave-none.md)). The planning checkpoint and the approved
+decisions are in [`verification/phase-8-plan.md`](verification/phase-8-plan.md); the report, the
+carried-forward debt register and the production-readiness assessment are in
+[`verification/phase-8-report.md`](verification/phase-8-report.md).
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

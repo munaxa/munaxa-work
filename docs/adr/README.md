@@ -34,6 +34,13 @@ line; the decision that replaced it is a new record.
 | [0048](0048-plan-versions-are-immutable.md)      | A plan version is immutable once published, and an instance copies its tasks at creation | Accepted |
 | [0049](0049-onboarding-is-not-a-workflow-engine.md) | Onboarding is a checklist with one predecessor per task, not a workflow engine | Accepted |
 | [0050](0050-onboarding-starts-by-command-not-by-event.md) | An onboarding is started by an idempotent command and guaranteed by reconciliation, never by an event | Accepted |
+| [0051](0051-attendance-owns-no-employment-fact.md) | Attendance owns no employment fact, and attaches to an employment rather than to a person | Accepted |
+| [0052](0052-a-raw-time-event-is-immutable.md)    | A raw time event is immutable, and a correction inserts rather than edits | Accepted |
+| [0053](0053-recalculation-is-found-by-asking.md) | Recalculation is found by asking, not by being told | Accepted |
+| [0054](0054-attendance-produces-candidate-minutes.md) | Attendance produces candidate minutes, never money, and freezes them in sequence | Accepted |
+| [0055](0055-the-schedule-owns-the-time-zone.md)  | The schedule owns the time zone, and a punch coordinate is evidence rather than a work location | Accepted |
+| [0056](0056-leave-unknown-is-not-leave-none.md)  | "Leave unknown" is not "no leave", and Attendance refuses to collapse them | Accepted |
+| [0057](0057-a-vendor-is-not-a-source.md)         | A vendor is not a source: devices reach Attendance through a normalized contract | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

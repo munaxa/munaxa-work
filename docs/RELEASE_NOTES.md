@@ -5,6 +5,94 @@ and what is still missing.
 
 ---
 
+## Phase 8 — Attendance
+
+**2026-08-11** · [Verification report](verification/phase-8-report.md)
+
+When people actually worked. Thirteen tables, thirty-two endpoints, and four decisions worth reading
+even if nothing else here is.
+
+### A punch is never rewritten
+
+What a reader captured stays exactly as it was captured. There is no way to edit a punch and no way
+to delete one — not a restricted way, no way at all: the table has no update path and the code has no
+method that could.
+
+Corrections still happen, constantly. Somebody forgot to clock out; a reader was offline; two devices
+recorded one arrival. So a correction *adds*: a new punch that supersedes the old one, or, where a
+punch should not count, a correction record that says so and takes it out of the sum. Both are still
+on the screen afterwards — the original time, who asked for the change, why, and who approved it.
+Nobody can approve their own correction, and that holds even for somebody who was granted both
+permissions, because the database refuses it too.
+
+### The system asks what needs recalculating, rather than waiting to be told
+
+Change a rota in June and May's days are affected. This product's internal events are delivered
+at-most-once with nothing that replays a lost one, so an attendance figure that waited for an event
+would sometimes wait forever — and a stale figure looks exactly like a correct one.
+
+Instead, every change that affects a day *marks* that day, in the same breath as the change itself.
+Recalculation takes what is marked and is safe to run as often as you like. And **the number of days
+still waiting is on the dashboard**, because it is the number that reveals a problem, and a number
+somebody can see is a number somebody notices growing.
+
+The same idea protects the punch clocks: send the same punch twice and the second is a success naming
+the first, not an error and not a duplicate. A turnstile with a flaky uplink retries; so does a phone
+flushing a queue after a tunnel; so does a re-run of yesterday's import file. All of them land once.
+
+### Two in the morning is not yesterday
+
+A punch at 02:00 in Riyadh is 23:00 the previous day in UTC. Filing it under the UTC date puts it on
+somebody else's shift and in the wrong pay period, and no arithmetic afterwards fixes it.
+
+So a schedule carries the time zone its hours are written in, and it is required — there is no
+default and no guess. Night shifts end on the following morning rather than 24 hours later. The
+Sunday the clocks go forward is 23 hours long, and nobody is marked an hour absent for it.
+
+### Nothing here decides what your time is worth
+
+Overtime is reported in minutes and labelled a *candidate*. There is no rate anywhere in this module,
+no multiplier and no amount, because what an hour is worth depends on a contract and a jurisdiction —
+neither of which is a question about when somebody arrived.
+
+Nothing statutory ships either: no grace period, no rounding, no late tolerance, no overtime
+threshold. Every one of them starts at zero until a customer configures it, because in several of
+this product's markets those numbers are written in law and belong to a country pack.
+
+When a month is closed, the figures are frozen. A correction afterwards produces the *next* version
+rather than editing the one payroll already read, so what was paid and what is now true are both
+still answerable.
+
+### "We can't tell" is a real answer
+
+There is no leave module yet. A scheduled day nobody worked could be approved leave or could be an
+unexplained absence, and this product has nowhere to look.
+
+So it says so. The day reads *absent, leave cannot yet be checked* — not *absent without leave*,
+which would be an assertion on somebody's record that nothing supports. The adapter that answers
+"nobody can be asked" is the one actually wired in, and there is a test that says so.
+
+### What is not here
+
+No device or biometric integration is verified. A reader reaches this module through an adapter that
+speaks the same normalized command a web client does, and no vendor's SDK is imported anywhere. **No
+raw biometric data is stored** — not a fingerprint, not a face template, not a hash of one.
+
+No work locations, no sites and no geofences. A punch can carry coordinates where a customer enables
+capture, and that is evidence, not a verified place of work: this product has no location model to
+check a coordinate against, and inventing one inside an attendance module would be worse than the
+gap. There is no location trail anywhere, and coordinates appear on no list screen and in no export.
+
+No employee or manager self-service, and no mobile app. The administration screen is read-only, like
+every other module's, and there is no punch button on it.
+
+No notifications and no documents, for the same reason the earlier phases have none.
+
+Public holidays are recorded as rota entries. A real holiday calendar is country data this product
+does not yet hold, and two owners of "is the 23rd a holiday" would give two answers.
+
+---
+
 ## Phase 7 — Onboarding
 
 **2026-08-10** · [Verification report](verification/phase-7-report.md)

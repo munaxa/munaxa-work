@@ -55,6 +55,10 @@ import {
   DeferredOnboardingSender,
   onboardingModuleFor,
 } from '../onboarding/onboarding.composition.js';
+import {
+  DeferredAttendanceSender,
+  attendanceModuleFor,
+} from '../attendance/attendance.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -109,6 +113,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         employment: new DeferredEmploymentSender(),
         recruitment: new DeferredRecruitmentSender(),
         onboarding: new DeferredOnboardingSender(),
+        attendance: new DeferredAttendanceSender(),
       }),
     },
     {
@@ -168,6 +173,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         registry.register(employmentModuleFor(unitOfWork, senders.employment));
         registry.register(recruitmentModuleFor(unitOfWork, senders.recruitment));
         registry.register(onboardingModuleFor(unitOfWork, senders.onboarding));
+        registry.register(attendanceModuleFor(unitOfWork, senders.attendance));
         return registry;
       },
     },
@@ -196,6 +202,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         senders.employment.attach(dispatcher);
         senders.recruitment.attach(dispatcher);
         senders.onboarding.attach(dispatcher);
+        senders.attendance.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -222,6 +229,7 @@ interface DeferredSenders {
   readonly employment: DeferredEmploymentSender;
   readonly recruitment: DeferredRecruitmentSender;
   readonly onboarding: DeferredOnboardingSender;
+  readonly attendance: DeferredAttendanceSender;
 }
 
 /**

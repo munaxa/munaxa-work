@@ -18,6 +18,7 @@
     "@work/config": "workspace:*",
     "@work/employment": "workspace:*",
     "@work/organization": "workspace:*",
+    "@work/attendance": "workspace:*",
     "@work/people": "workspace:*",
     "@work/onboarding": "workspace:*",
     "@work/recruitment": "workspace:*",
