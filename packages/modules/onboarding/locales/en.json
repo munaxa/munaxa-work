@@ -1,0 +1,123 @@
+{
+  "onboarding": {
+    "rejection": {
+      "code_malformed": "\"{field}\" is not a valid code. Use letters, digits, dots, dashes or underscores.",
+      "date_malformed": "{field} is not a date. Use the form YYYY-MM-DD.",
+      "text_too_long": "{field} is too long.",
+      "text_requires_both_languages": "{field} is needed in both English and Arabic.",
+      "metadata_entry_too_long": "The metadata entry \"{key}\" is too long.",
+      "document_reference_malformed": "That is not a valid document reference.",
+      "plan_retired": "This plan has been retired, so it can no longer be changed or applied.",
+      "plan_already_retired": "This plan is already retired.",
+      "plan_has_no_published_version": "This plan has no published version, so there is nothing to apply.",
+      "plan_version_not_draft": "A published version never changes. Draft the next one instead.",
+      "plan_version_not_published": "This version has not been published.",
+      "plan_version_has_no_tasks": "A version with no tasks would produce onboardings that finish the moment they begin.",
+      "plan_version_number_out_of_range": "That is not a valid version number.",
+      "task_kind_unknown": "That is not a kind of task this product understands.",
+      "task_sequence_out_of_range": "That is not a valid position in the checklist.",
+      "task_cannot_depend_on_itself": "A task cannot wait for itself.",
+      "document_task_needs_a_type": "A document task must say which document it is asking for.",
+      "document_task_needs_a_reference": "Completing a document task needs the reference of the document that was filed.",
+      "owner_kind_unknown": "That is not a kind of owner a task can have.",
+      "owner_reference_required": "This kind of owner has to name who or which unit the task belongs to.",
+      "role_owner_needs_a_role": "A role queue has to name the role.",
+      "role_owner_takes_no_reference": "A role queue belongs to whoever holds the role, not to one person.",
+      "resolved_owner_takes_no_reference": "The joiner and their manager are worked out for each onboarding, so no reference is needed here.",
+      "due_anchor_unknown": "That is not a date this product can measure a deadline from.",
+      "due_offset_out_of_range": "That is further from the anchor date than a deadline can sensibly be.",
+      "onboarding_transition_not_permitted": "An onboarding cannot move from {from} to {to}.",
+      "onboarding_already_in_state": "This onboarding is already at that stage.",
+      "onboarding_already_planned": "This onboarding already has a plan. A checklist cannot be replaced once it has been given.",
+      "onboarding_concluded": "This onboarding has finished, so nothing further can be recorded against it.",
+      "required_tasks_outstanding": "A required task is neither done nor waived, so this onboarding is not complete.",
+      "task_transition_not_permitted": "A task cannot move from {from} to {to}.",
+      "task_already_in_status": "This task is already in that state.",
+      "task_concluded": "This task has finished, so nothing further can be recorded against it.",
+      "task_blocked_by_predecessor": "This task is waiting for the one before it."
+    },
+    "conflict": {
+      "plan_code_taken": "A plan with that code already exists.",
+      "plan_already_has_a_draft": "This plan already has a draft version. Publish or discard it first.",
+      "plan_retired": "This plan has been retired.",
+      "plan_version_not_draft": "That version is published and cannot be changed.",
+      "task_template_code_taken": "A task with that code already exists in this version.",
+      "employment_ended": "That employment has ended, so there is nobody joining to onboard.",
+      "person_merged": "That person's record was merged into another. Use the record it was merged into.",
+      "onboarding_concluded": "This onboarding has finished.",
+      "onboarding_race_lost": "Another request created this onboarding first.",
+      "task_belongs_to_somebody_else": "That task belongs to somebody else.",
+      "export_too_large": "There is more here than one export can carry. Narrow it down."
+    },
+    "state": {
+      "draft": "Draft",
+      "preboarding": "Before the first day",
+      "in_progress": "Under way",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "taskStatus": {
+      "pending": "To do",
+      "blocked": "Waiting",
+      "in_progress": "In progress",
+      "done": "Done",
+      "waived": "Waived",
+      "cancelled": "Cancelled"
+    },
+    "taskKind": {
+      "checklist": "Checklist",
+      "acknowledgement": "Acknowledgement",
+      "document": "Document",
+      "approval": "Approval",
+      "external": "External"
+    },
+    "ownerKind": {
+      "employee": "The joiner",
+      "manager": "Their manager",
+      "employment": "A named person",
+      "role": "A role queue",
+      "unit": "A unit"
+    },
+    "planStatus": {
+      "draft": "Draft",
+      "active": "Active",
+      "retired": "Retired"
+    },
+    "versionStatus": {
+      "draft": "Draft",
+      "published": "Published",
+      "superseded": "Superseded"
+    },
+    "label": {
+      "onboarding": "Onboarding",
+      "joiners": "Joiners",
+      "plans": "Plans",
+      "tasks": "Tasks",
+      "reconciliation": "Reconciliation",
+      "plannedStart": "Planned start",
+      "progress": "Progress",
+      "required": "Required",
+      "optional": "Optional",
+      "overdue": "Overdue",
+      "dueOn": "Due",
+      "owner": "Owner",
+      "state": "State",
+      "plan": "Plan",
+      "version": "Version",
+      "awaiting": "Employments with no onboarding",
+      "started": "Started",
+      "alreadyStarted": "Already had one",
+      "scanned": "Scanned",
+      "unavailable": "The API could not be reached, or it refused this caller. Nothing is shown rather than something wrong.",
+      "empty": "Nothing here yet.",
+      "noPlan": "No plan has been applied, so this onboarding has no tasks.",
+      "noPlansConfigured": "No onboarding plans have been configured. This product ships none — what a joiner is asked to do is yours to decide.",
+      "boundaries": "What Onboarding does not hold",
+      "boundaryEmployment": "No employment fact. Status, unit, position, manager and employee number belong to Employment and Organization, read as at a date.",
+      "boundaryIdentity": "No person's identity. Onboarding never creates a person or an employment; it references the ones the hire created.",
+      "boundaryDocuments": "No documents. A document task records a reference; nothing here stores a file.",
+      "boundaryMessaging": "No messaging. Onboarding raises events; Communications delivers when it can address a recipient.",
+      "eventLimitation": "An onboarding is never started by an event alone. Reconciliation is what guarantees a joiner has one."
+    }
+  }
+}

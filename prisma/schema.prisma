@@ -1401,3 +1401,199 @@ model RecruitmentOffer {
   @@index([tenant_id, status], map: "recruitment_offer_status_idx")
   @@map("recruitment_offer")
 }
+
+// ---------------------------------------------------------------------------------------------
+// Onboarding (Phase 7)
+//
+// The process that carries a new employment from hire to a first working day. It owns the plan,
+// the instance and the tasks — and nothing else. There is no status column here that shadows
+// Employment's, no unit, no manager and no employee number: those are read from the modules that
+// own them (ADR-0047).
+// ---------------------------------------------------------------------------------------------
+
+/// A reusable onboarding definition. The plan is the identity; what it *contains* lives in its
+/// versions, which is what stops an edit reaching an onboarding already under way.
+model OnboardingPlan {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  /// Tenant-authored. Nothing is shipped: this product seeds no plan and no task (00B).
+  code        String    @db.VarChar(64)
+  name        Json
+  description Json?
+  status      String    @db.VarChar(32)
+  metadata    Json
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@index([tenant_id, status], map: "onboarding_plan_status_idx")
+  @@map("onboarding_plan")
+}
+
+/// One version of a plan. Immutable once published, because an instance is generated from it and
+/// "what were we asking of joiners last March" must stay answerable (ADR-0048).
+model OnboardingPlanVersion {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  plan_id        String    @db.Uuid
+  version_number Int
+  status         String    @db.VarChar(32)
+  published_at   DateTime? @db.Timestamptz(6)
+  published_by   String?   @db.VarChar(255)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, plan_id, version_number], map: "onboarding_plan_version_plan_idx")
+  @@map("onboarding_plan_version")
+}
+
+/// What a plan version asks for. Copied onto an instance at creation and never read again by it.
+model OnboardingTaskTemplate {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  plan_version_id          String    @db.Uuid
+  code                     String    @db.VarChar(64)
+  sequence                 Int
+  title                    Json
+  description              Json?
+  kind                     String    @db.VarChar(24)
+  owner_kind               String    @db.VarChar(24)
+  /// Set only for `employment` and `unit` owners. A `role` owner names its queue in `owner_role`.
+  owner_ref                String?   @db.Uuid
+  owner_role               String?   @db.VarChar(64)
+  required                 Boolean
+  /// `plan_start` or `employment_start`. Negative offsets are how a template says "before the day".
+  due_anchor               String    @db.VarChar(24)
+  due_offset_days          Int
+  /// One predecessor, by template code. A dependency graph is a workflow engine (ADR-0049).
+  depends_on_template_code String?   @db.VarChar(64)
+  document_type_code       String?   @db.VarChar(64)
+  metadata                 Json
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@index([tenant_id, plan_version_id, sequence], map: "onboarding_task_template_version_idx")
+  @@map("onboarding_task_template")
+}
+
+/// One onboarding process, for one employment. It references the employment and the person; it
+/// copies neither, and it changes neither.
+model OnboardingInstance {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  /// Employment's, by identifier and by foreign key. At most one live instance per employment.
+  employment_id    String    @db.Uuid
+  person_id        String    @db.Uuid
+  /// Recruitment's, when the hire came from an application. Null for a direct hire or a migration.
+  application_id   String?   @db.Uuid
+  plan_id          String?   @db.Uuid
+  plan_version_id  String?   @db.Uuid
+  state            String    @db.VarChar(24)
+  /// Onboarding's own planning date. Employment's start date is read, never written from here.
+  planned_start_on DateTime  @db.Date
+  employment_start_on DateTime? @db.Date
+  completed_on     DateTime? @db.Date
+  completed_at     DateTime? @db.Timestamptz(6)
+  completed_by     String?   @db.VarChar(255)
+  cancelled_at     DateTime? @db.Timestamptz(6)
+  cancelled_by     String?   @db.VarChar(255)
+  cancellation_reason_code String? @db.VarChar(64)
+  metadata         Json
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@index([tenant_id, state], map: "onboarding_instance_state_idx")
+  @@index([tenant_id, employment_id], map: "onboarding_instance_employment_idx")
+  @@index([tenant_id, planned_start_on], map: "onboarding_instance_planned_start_idx")
+  @@map("onboarding_instance")
+}
+
+/// One unit of work in one onboarding. Its own row rather than part of the instance, because ten
+/// people complete these concurrently and an instance-wide lock would serialize a checklist.
+model OnboardingTask {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  onboarding_id      String    @db.Uuid
+  /// The template it came from. Null for a task added to a running onboarding.
+  template_code      String?   @db.VarChar(64)
+  sequence           Int
+  title              Json
+  description        Json?
+  kind               String    @db.VarChar(24)
+  owner_kind         String    @db.VarChar(24)
+  owner_ref          String?   @db.Uuid
+  owner_role         String?   @db.VarChar(64)
+  required           Boolean
+  status             String    @db.VarChar(24)
+  /// A civil date. Overdue is `due_on < today and not terminal` — computed, never stored.
+  due_on             DateTime? @db.Date
+  depends_on_task_id String?   @db.Uuid
+  /// A reference into the document store. This module holds no bytes (§17 of the phase plan).
+  document_reference String?   @db.VarChar(128)
+  document_type_code String?   @db.VarChar(64)
+  /// Reserved for Workflow (Phase 16). Null while Onboarding records the decision directly.
+  approval_reference String?   @db.VarChar(64)
+  completed_at       DateTime? @db.Timestamptz(6)
+  completed_by       String?   @db.VarChar(255)
+  completion_note    String?   @db.VarChar(1024)
+  waiver_reason_code String?   @db.VarChar(64)
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, onboarding_id, sequence], map: "onboarding_task_instance_idx")
+  @@index([tenant_id, owner_kind, owner_ref, status], map: "onboarding_task_owner_idx")
+  @@index([tenant_id, owner_role, status], map: "onboarding_task_role_queue_idx")
+  @@index([tenant_id, due_on, status], map: "onboarding_task_due_idx")
+  @@map("onboarding_task")
+}
+
+/// Every movement of a task, appended and never amended: who reassigned it, who moved its date,
+/// who completed or waived it. The sequence is the evidence.
+model OnboardingTaskEvent {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  task_id     String    @db.Uuid
+  onboarding_id String  @db.Uuid
+  kind        String    @db.VarChar(24)
+  from_status String?   @db.VarChar(24)
+  to_status   String?   @db.VarChar(24)
+  detail      String?   @db.VarChar(1024)
+  occurred_at DateTime  @db.Timestamptz(6)
+  /// Taken from the authenticated context. A caller cannot supply it.
+  recorded_by String    @db.VarChar(255)
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@index([tenant_id, task_id, occurred_at], map: "onboarding_task_event_task_idx")
+  @@map("onboarding_task_event")
+}
