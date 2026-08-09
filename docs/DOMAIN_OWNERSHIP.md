@@ -25,7 +25,7 @@ them afterwards.
 | Organization calendar, exception days     | `organization`  | Phase 3 ✅    |
 | Tenant settings (language, calendar, zone)| `organization`  | Phase 3 ✅    |
 | Employment, contract, assignment, reporting line | `employment` | Phase 5 ✅  |
-| Requisition, candidate, application       | `recruitment`   | Phase 6       |
+| Requisition, vacancy, candidate, application, interview, offer | `recruitment` | Phase 6 ✅ |
 | Onboarding journey                        | `onboarding`    | Phase 7       |
 | Attendance, shift, timesheet              | `attendance`    | Phase 8       |
 | Leave type, entitlement, balance, request | `leave`         | Phase 9       |

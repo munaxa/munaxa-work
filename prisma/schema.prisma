@@ -1026,3 +1026,378 @@ model EmploymentNumberSequence {
   @@unique([tenant_id, series_key], map: "employment_number_sequence_series_key")
   @@map("employment_number_sequence")
 }
+
+// ------------------------------------------------------------------------------------------
+// Recruitment — the hiring process, and the candidates who are not yet people (Phase 6).
+//
+// Four decisions in this section are the ones a reviewer should challenge.
+//
+//   * A **candidate is not a Person**. `recruitment_candidate` holds contact points, a
+//     self-declared profile and a source — and no government identifier, no date of birth and no
+//     nationality (A-2). Those are collected by People at hire, where nine tested protections
+//     already surround them. `person_id` is null for a candidate's whole life until they are
+//     hired, and is written exactly once (ADR-0044).
+//
+//   * **Approval is real.** `recruitment_requisition_decision` records a human decision with the
+//     actor taken from the authenticated context, and is never amended — a reversal is another
+//     row. Nothing here is auto-approved, because a requisition authorizes headcount spending
+//     (ADR-0045).
+//
+//   * **The hire is a saga, not a transaction.** The unit of work opens a new transaction per
+//     call, so creating a Person and creating an Employment cannot be atomic with the application
+//     update. `hire_state` is what makes a half-finished hire *detectable and resumable* rather
+//     than silent (ADR-0046).
+//
+//   * There is **no talent-pool table and no pipeline table**. A talent pool is a tag on a
+//     candidate and a pipeline is a projection over applications; a stored copy of either would be
+//     a second answer that goes stale (A-7).
+// ------------------------------------------------------------------------------------------
+
+/// The counter recruitment's business numbers are drawn from, one row per tenant per series.
+/// Recruitment's own, not Employment's (A-8): sharing a counter would couple two modules'
+/// numbering, and a global PostgreSQL sequence is neither tenant-scoped nor transactional.
+model RecruitmentNumberSequence {
+  id         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  /// `requisition:2026`, `candidate:2026`, `application:2026`.
+  series_key String    @db.VarChar(64)
+  next_value Int
+  created_at DateTime  @db.Timestamptz(6)
+  created_by String    @db.VarChar(255)
+  updated_at DateTime  @db.Timestamptz(6)
+  updated_by String    @db.VarChar(255)
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.VarChar(255)
+  version    Int
+
+  @@unique([tenant_id, series_key], map: "recruitment_number_sequence_series_key")
+  @@map("recruitment_number_sequence")
+}
+
+/// Internal authority to hire: a position, a unit, a headcount and an approval. A vacancy cannot
+/// exist without one, which is what makes "approval authorises hiring" true rather than decorative.
+model RecruitmentRequisition {
+  id                          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                   String    @db.Uuid
+  requisition_number          String    @db.VarChar(64)
+  status                      String    @db.VarChar(32)
+  /// `organization`'s, by identifier. No cached title: a renamed position would leave a stale copy.
+  position_id                 String    @db.Uuid
+  unit_id                     String    @db.Uuid
+  cost_center_id              String?   @db.Uuid
+  headcount_requested         Int
+  /// Maintained by this module from its own hires. Organization owns the *budgeted* number and this
+  /// is not it (Phase 3 AD-002).
+  headcount_filled            Int
+  /// Tenant or country-pack codes. Why a role is being filled is not a list this product ships.
+  reason_code                 String    @db.VarChar(64)
+  priority_code               String?   @db.VarChar(64)
+  target_start_date           DateTime? @db.Date
+  requested_by_employment_id  String    @db.Uuid
+  hiring_manager_employment_id String?  @db.Uuid
+  /// Set when Workflow (Phase 16) routes the decision. Null while Recruitment decides it directly.
+  approval_id                 String?   @db.VarChar(64)
+  metadata                    Json
+  created_at                  DateTime  @db.Timestamptz(6)
+  created_by                  String    @db.VarChar(255)
+  updated_at                  DateTime  @db.Timestamptz(6)
+  updated_by                  String    @db.VarChar(255)
+  deleted_at                  DateTime? @db.Timestamptz(6)
+  deleted_by                  String?   @db.VarChar(255)
+  version                     Int
+
+  @@index([tenant_id, status], map: "recruitment_requisition_status_idx")
+  @@index([tenant_id, position_id, unit_id], map: "recruitment_requisition_placement_idx")
+  @@index([tenant_id, hiring_manager_employment_id], map: "recruitment_requisition_manager_idx")
+  @@map("recruitment_requisition")
+}
+
+/// A human decision on a requisition, appended and never amended. A reversal is another row, so
+/// "who approved this, and did anybody undo it" is answerable from the sequence itself (ADR-0045).
+model RecruitmentRequisitionDecision {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  requisition_id String    @db.Uuid
+  /// `approved`, `rejected`, `reversed`.
+  decision       String    @db.VarChar(16)
+  reason_code    String?   @db.VarChar(64)
+  note           String?   @db.VarChar(1024)
+  /// Taken from the authenticated context. A caller cannot supply it.
+  decided_by     String    @db.VarChar(255)
+  decided_at     DateTime  @db.Timestamptz(6)
+  /// The decision this one reverses. Set only on a reversal.
+  reverses_id    String?   @db.Uuid
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, requisition_id, decided_at], map: "recruitment_requisition_decision_idx")
+  @@map("recruitment_requisition_decision")
+}
+
+/// An opening that accepts applications. Publication channels are an array rather than a table:
+/// a channel has no lifecycle of its own, and a table per name is the shape A-7 refuses.
+model RecruitmentVacancy {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  requisition_id String    @db.Uuid
+  /// Language tag to text. Both first-class languages are present before a row is written.
+  title          Json
+  description    Json?
+  status         String    @db.VarChar(32)
+  channels       String[]
+  opened_on      DateTime? @db.Date
+  closes_on      DateTime? @db.Date
+  closed_reason_code String? @db.VarChar(64)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, status], map: "recruitment_vacancy_status_idx")
+  @@index([tenant_id, requisition_id], map: "recruitment_vacancy_requisition_idx")
+  @@map("recruitment_vacancy")
+}
+
+/// Somebody outside the company who might join it. Deliberately narrow (A-2): contact points, a
+/// display name and a source. No government identifier, no date of birth, no nationality.
+model RecruitmentCandidate {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  candidate_number String    @db.VarChar(64)
+  status           String    @db.VarChar(32)
+  /// Language tag to text. A candidate's own name, not a string this product ships.
+  display_name     Json
+  /// Normalized — lower-cased, separators stripped — because this is what matching compares.
+  email            String    @db.VarChar(320)
+  phone            String?   @db.VarChar(64)
+  /// As entered, so a screen shows the customer their own formatting back.
+  display_email    String    @db.VarChar(320)
+  source_code      String    @db.VarChar(64)
+  /// The Person this candidate turned out to be. Null until hire, then written exactly once.
+  person_id        String?   @db.Uuid
+  /// Set when the candidate's personal data has been anonymized under a retention policy. The row
+  /// survives so applications, interviews and offers still resolve (A-9).
+  anonymized_at    DateTime? @db.Timestamptz(6)
+  metadata         Json
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@index([tenant_id, status], map: "recruitment_candidate_status_idx")
+  @@index([tenant_id, email], map: "recruitment_candidate_email_idx")
+  @@index([tenant_id, phone], map: "recruitment_candidate_phone_idx")
+  @@map("recruitment_candidate")
+}
+
+/// A skill, a period of experience, a qualification or a certificate the candidate claims.
+/// Self-declared and unverified — which is why it is not `person_capability`, whose contents the
+/// register stands behind.
+model RecruitmentCandidateProfileEntry {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  candidate_id       String    @db.Uuid
+  kind               String    @db.VarChar(16)
+  code               String?   @db.VarChar(64)
+  title              Json
+  organization_name  Json?
+  from_date          DateTime? @db.Date
+  to_date            DateTime? @db.Date
+  level_code         String?   @db.VarChar(32)
+  /// A reference into the document store, never bytes in a row. Documents are Phase 4.1's.
+  document_reference String?   @db.VarChar(128)
+  withdrawn_at       DateTime? @db.Timestamptz(6)
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, candidate_id, kind], map: "recruitment_candidate_profile_idx")
+  @@index([tenant_id, kind, code], map: "recruitment_candidate_profile_code_idx")
+  @@map("recruitment_candidate_profile_entry")
+}
+
+/// One candidate's pursuit of one vacancy. The join *is* the process, which is why the pipeline
+/// status lives here and not on the candidate: somebody rejected for one role is not a rejected
+/// person.
+model RecruitmentApplication {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  application_number    String    @db.VarChar(64)
+  candidate_id          String    @db.Uuid
+  vacancy_id            String    @db.Uuid
+  status                String    @db.VarChar(32)
+  /// A tenant-defined stage inside `interviewing` — "phone screen", "panel". The status set is
+  /// closed and this is open, which is how AD-005 is honoured without shipping a workflow builder.
+  stage_code            String?   @db.VarChar(64)
+  source_code           String    @db.VarChar(64)
+  applied_on            DateTime  @db.Date
+  screening_outcome     String?   @db.VarChar(16)
+  screening_note        String?   @db.VarChar(1024)
+  rejection_reason_code String?   @db.VarChar(64)
+  /// How far the hire got. `pending` on an application that reached `hired` is a half-finished
+  /// transition, and it is detectable precisely because this column exists (ADR-0046).
+  hire_state            String?   @db.VarChar(24)
+  hire_failure_reason   String?   @db.VarChar(255)
+  /// Written once, by the hire, through Employment's application service. Never by a repository.
+  employment_id         String?   @db.Uuid
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, vacancy_id, status], map: "recruitment_application_pipeline_idx")
+  @@index([tenant_id, candidate_id], map: "recruitment_application_candidate_idx")
+  @@index([tenant_id, status], map: "recruitment_application_status_idx")
+  @@index([tenant_id, hire_state], map: "recruitment_application_hire_state_idx")
+  @@map("recruitment_application")
+}
+
+/// Every movement of an application through the pipeline, appended and never amended. The events
+/// are how a subscriber hears; this is how the database answers an auditor who arrived afterwards.
+model RecruitmentApplicationEvent {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  application_id String    @db.Uuid
+  from_status    String?   @db.VarChar(32)
+  to_status      String    @db.VarChar(32)
+  stage_code     String?   @db.VarChar(64)
+  reason_code    String?   @db.VarChar(64)
+  note           String?   @db.VarChar(1024)
+  occurred_at    DateTime  @db.Timestamptz(6)
+  /// Taken from the authenticated context. A caller cannot supply it.
+  recorded_by    String    @db.VarChar(255)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, application_id, occurred_at], map: "recruitment_application_event_idx")
+  @@map("recruitment_application_event")
+}
+
+/// A scheduled conversation about an application. Interviewers are **employments** (A-6) — a
+/// manager is a job and so is an interviewer, which keeps "who interviewed this candidate in March"
+/// answerable after they change roles.
+///
+/// No calendar is built here. `scheduled_from`/`scheduled_to` are instants and `meeting_reference`
+/// is opaque: a scheduling system is somebody else's domain.
+model RecruitmentInterview {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  application_id           String    @db.Uuid
+  round_number             Int
+  stage_code               String?   @db.VarChar(64)
+  mode_code                String    @db.VarChar(32)
+  status                   String    @db.VarChar(32)
+  scheduled_from           DateTime? @db.Timestamptz(6)
+  scheduled_to             DateTime? @db.Timestamptz(6)
+  location_text            String?   @db.VarChar(255)
+  meeting_reference        String?   @db.VarChar(255)
+  interviewer_employment_ids String[] @db.Uuid
+  cancelled_reason_code    String?   @db.VarChar(64)
+  metadata                 Json
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@unique([tenant_id, application_id, round_number], map: "recruitment_interview_round_key")
+  @@index([tenant_id, application_id], map: "recruitment_interview_application_idx")
+  @@index([tenant_id, scheduled_from], map: "recruitment_interview_schedule_idx")
+  @@map("recruitment_interview")
+}
+
+/// What an interviewer concluded. Written once and never edited: a recruiter who could amend an
+/// interviewer's score would make the score worthless in a dispute.
+model RecruitmentInterviewFeedback {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  interview_id             String    @db.Uuid
+  interviewer_employment_id String   @db.Uuid
+  /// 1 to 5. An ordered scale this product does ship, because a score without one is not comparable
+  /// between two interviewers. No aggregate is computed from it — that is a hiring policy.
+  score                    Int?
+  recommendation           String    @db.VarChar(24)
+  strengths                String?   @db.VarChar(2048)
+  concerns                 String?   @db.VarChar(2048)
+  submitted_at             DateTime  @db.Timestamptz(6)
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@unique([tenant_id, interview_id, interviewer_employment_id], map: "recruitment_feedback_interviewer_key")
+  @@index([tenant_id, interview_id], map: "recruitment_feedback_interview_idx")
+  @@map("recruitment_interview_feedback")
+}
+
+/// What was proposed to a candidate, and what they said. Versioned: a renegotiated offer is a new
+/// version and the previous one survives, because "what did we actually offer them" is asked in
+/// disputes long after the terms changed.
+///
+/// `proposed_compensation` is **opaque** (A-5). Recruitment records what a recruiter proposed; it
+/// performs no arithmetic on it and owns no salary structure. Compensation (Phase 10) is
+/// authoritative, and an accepted offer stays reconstructable after its configuration changes.
+model RecruitmentOffer {
+  id                            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                     String    @db.Uuid
+  application_id                String    @db.Uuid
+  offer_number                  String    @db.VarChar(64)
+  /// The offer's own version, not the row's. A renegotiation is version 2 with version 1 intact.
+  offer_version                 Int
+  status                        String    @db.VarChar(32)
+  proposed_start_date           DateTime  @db.Date
+  expires_on                    DateTime? @db.Date
+  proposed_position_id          String?   @db.Uuid
+  proposed_unit_id              String?   @db.Uuid
+  proposed_employment_type_code String?   @db.VarChar(64)
+  /// Stored, returned and never interpreted. No rule in this module reads a key.
+  proposed_compensation         Json
+  currency_code                 String?   @db.Char(3)
+  decision_note                 String?   @db.VarChar(1024)
+  issued_at                     DateTime? @db.Timestamptz(6)
+  decided_at                    DateTime? @db.Timestamptz(6)
+  decided_by                    String?   @db.VarChar(255)
+  document_reference            String?   @db.VarChar(128)
+  metadata                      Json
+  created_at                    DateTime  @db.Timestamptz(6)
+  created_by                    String    @db.VarChar(255)
+  updated_at                    DateTime  @db.Timestamptz(6)
+  updated_by                    String    @db.VarChar(255)
+  deleted_at                    DateTime? @db.Timestamptz(6)
+  deleted_by                    String?   @db.VarChar(255)
+  version                       Int
+
+  @@index([tenant_id, application_id, offer_version], map: "recruitment_offer_application_idx")
+  @@index([tenant_id, status], map: "recruitment_offer_status_idx")
+  @@map("recruitment_offer")
+}

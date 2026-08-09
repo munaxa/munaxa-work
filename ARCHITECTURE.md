@@ -57,6 +57,17 @@ private, and the lint layer enforces that rather than a review comment.
 | [`organization`](docs/modules/organization.md) | The enterprise's structure: units of any depth, legal entities and the country each operates under, cost and profit centres, positions and their establishment, calendars, tenant settings | 3 |
 | [`people`](docs/modules/people.md) | The master registry of human identity: one permanent Person per human being, their names over time, government identifiers, citizenships, contacts, addresses and history | 4 |
 | [`employment`](docs/modules/employment.md) | The relationship between a person and the workforce: employment identity and lifecycle, organizational assignment on a timeline, the managerial relationship, contracts and probation | 5 |
+| [`recruitment`](docs/modules/recruitment.md) | Hiring: requisitions and their approval, vacancies, candidates, applications and their pipeline, interviews and feedback, offers, and the transition that turns an accepted offer into a Person and an Employment | 6 |
+
+### Acting inside another module
+
+A module reaches another through its application service, and inherits that service's permission
+check — which is correct for a read the *user* is really making, and wrong for one the module makes on
+their behalf. A **bounded service grant** covers the second case: the module holds a named, explicitly
+listed permission for the duration of one operation, the user is still checked for the operation they
+asked for, grants cannot nest, the acting human stays on every audit column, and every use is logged.
+It is a decorator on the one permission checker, not a second authorization framework
+([ADR-0043](docs/adr/0043-bounded-service-grant.md)).
 
 ## Layers inside a module
 

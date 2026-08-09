@@ -5,6 +5,61 @@ and what is still missing.
 
 ---
 
+## Phase 6 — Recruitment
+
+**2026-08-09** · [Verification report](verification/phase-6-report.md)
+
+Hiring, from the authority to hire to the day somebody becomes an employee. Eleven tables, thirty-six
+endpoints, and one decision that changes how modules talk to each other.
+
+### A candidate is not a person, and applying does not create one
+
+Somebody who applies and is never contacted leaves this product no national identifier, no date of
+birth and no nationality — not because a rule forbids reading them, but because there is nowhere to
+put them. A Person appears at hire, once, through the module built to protect that data.
+
+The corollary is a control a recruiter cannot skip: two candidate records cannot resolve to one human
+being, and a create that finds the address already known refuses rather than quietly overwriting the
+record it found.
+
+### Recruiters no longer need permission to edit the person register
+
+Hiring creates a Person and an Employment. Until now, a module reaching another inherited its
+permission check — which would have made every recruiter hold `people.person.manage`.
+
+Instead, the *module* holds the narrow permission for the duration of one operation, under a grant
+that is explicit about what it permits, cannot nest, keeps the acting human's name on every audit
+column, and is written to the log every time it is used. A recruiter holds recruitment permissions
+only, and `recruitment.hire` is held by fewest people.
+
+### Approving a requisition is a real decision by a named person
+
+Nothing here auto-approves. A requisition records who approved it and when, approving is a separate
+permission from raising the request, and a decision is never edited — undoing one writes a new record
+naming the one it reverses. Once hiring has started against a requisition, its approval can no longer
+be unmade.
+
+### A hire that stops half way is visible
+
+Creating the person, creating the employment and closing the application happen in different modules
+and cannot be one transaction. So each step commits what it achieved, the application carries how far
+the hire got, and running the hire again continues from there rather than creating a second person or
+a second employment.
+
+An unfinished hire is one filter away — `?unfinishedHire=true` — rather than something a customer
+discovers. An application never reads *hired* without an employment behind it.
+
+### What is not here
+
+No candidate portal and no public careers pages: every action in this phase is taken by a recruiter.
+No CV parsing, scoring or ranking. No background checks, visas or work permits. No onboarding. No
+document storage — a résumé or an offer letter is a reference into the document store.
+
+Candidate and interviewer notifications are not delivered either, and the report says so rather than
+claiming email works: the notification contract addresses a workforce user, and a candidate is not one.
+
+---
+
 ## Phase 5 — Employment
 
 **2026-08-09** · [Verification report](verification/phase-5-report.md)

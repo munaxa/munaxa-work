@@ -93,6 +93,15 @@ planning checkpoint and the decisions it stopped on are in
 register and the production-readiness assessment are in
 [`verification/phase-5-report.md`](verification/phase-5-report.md).
 
+Phase 6 completed on 2026-08-09: Recruitment — requisitions and their approval, vacancies,
+candidates, applications and their pipeline, interviews and feedback, offers, and the transition that
+turns an accepted offer into a Person and an Employment. It introduces the bounded service grant that
+lets one module act inside another without widening a user's role
+([ADR-0043](adr/0043-bounded-service-grant.md)). The planning checkpoint and the approved decisions
+are in [`verification/phase-6-plan.md`](verification/phase-6-plan.md); the report, the carried-forward
+debt register and the production-readiness assessment are in
+[`verification/phase-6-report.md`](verification/phase-6-report.md).
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

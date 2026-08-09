@@ -18,6 +18,7 @@ import {
 import { StoredTenantSettings } from '@work/organization';
 import {
   Dispatcher,
+  GrantAwarePermissionChecker,
   ModuleRegistry,
   UnauthenticatedPort,
   type EventDispatcher,
@@ -46,6 +47,10 @@ import {
   employmentModuleFor,
 } from '../employment/employment.composition.js';
 import { assignmentFilledHeadcount, postgresEmploymentStores } from '@work/employment';
+import {
+  DeferredRecruitmentSender,
+  recruitmentModuleFor,
+} from '../recruitment/recruitment.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -98,13 +103,24 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         organization: new DeferredCommandSender(),
         people: new DeferredPeopleSender(),
         employment: new DeferredEmploymentSender(),
+        recruitment: new DeferredRecruitmentSender(),
       }),
     },
     {
       // One checker, given to the pipeline *and* to People's reads. Two would eventually differ,
       // and the difference would be a caller redacted by one and not the other.
+      //
+      // It is wrapped, not replaced. `GrantAwarePermissionChecker` consults Platform first and adds
+      // only the narrow, named authority a module holds while acting inside another under a bounded
+      // service grant (ADR-0043) — and adds nothing at all when no grant is open. Every elevation is
+      // logged with the operation that caused it and the human it was for, so "what did Recruitment
+      // do inside People, and for whom" is a question the logs answer.
       provide: PERMISSION_CHECKER,
-      useFactory: (): PermissionChecker => new PlatformPermissionChecker(),
+      inject: [PinoLogger],
+      useFactory: (logger: PinoLogger): PermissionChecker =>
+        new GrantAwarePermissionChecker(new PlatformPermissionChecker(), (elevation) => {
+          logger.logger.info({ elevation }, 'service grant elevated a cross-module permission');
+        }),
     },
     {
       provide: PEOPLE_MODULE,
@@ -145,6 +161,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         );
         registry.register(people);
         registry.register(employmentModuleFor(unitOfWork, senders.employment));
+        registry.register(recruitmentModuleFor(unitOfWork, senders.recruitment));
         return registry;
       },
     },
@@ -171,6 +188,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         senders.organization.attach(dispatcher);
         senders.people.attach(dispatcher);
         senders.employment.attach(dispatcher);
+        senders.recruitment.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -186,15 +204,16 @@ import { PlatformPermissionChecker } from './permission-checker.js';
 export class IdentityModule {}
 
 /**
- * The three senders that are handed their dispatcher once it exists.
+ * The senders that are handed their dispatcher once it exists.
  *
- * One object rather than three providers, so the factories that need them stay inside the
+ * One object rather than four providers, so the factories that need them stay inside the
  * five-parameter budget — a list any longer is one somebody eventually passes in the wrong order.
  */
 interface DeferredSenders {
   readonly organization: DeferredCommandSender;
   readonly people: DeferredPeopleSender;
   readonly employment: DeferredEmploymentSender;
+  readonly recruitment: DeferredRecruitmentSender;
 }
 
 /**
