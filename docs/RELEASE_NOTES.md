@@ -5,6 +5,83 @@ and what is still missing.
 
 ---
 
+## Phase 5 — Employment
+
+**2026-08-09** · [Verification report](verification/phase-5-report.md)
+
+The workforce. Six tables, sixteen endpoints, and the record every later part of this product will
+read before it does anything: *is this person employed, where do they sit, and who do they report
+to*.
+
+### A person is permanent; a job is not
+
+Somebody is hired, leaves after three years, and comes back. That is **one person and two
+employments**, with two employment numbers and one continuous identity — not a re-created person, and
+not an edited old record. Their original hire date travels to the new employment, so the service
+their entitlements are measured from is not silently reset to zero.
+
+The product refuses to give one person two employments at the same time. Retry a create that already
+succeeded and it fails, by name, rather than quietly producing a second job for one human being.
+
+### The employment number is ours, and it is never reused
+
+`EMP-2026-000123` is generated here — a caller cannot supply one, and no number is ever issued twice,
+even after somebody leaves. That is what stops an archived payslip, a bank file and a government
+submission resolving to the wrong person years later.
+
+**Your own numbers still travel.** A migration brings its legacy employee numbers in a separate
+field, indexed and searchable, without either number pretending to be the other.
+
+### Where somebody worked in March is still where they worked in March
+
+A transfer does not edit a record. It closes the period that was in force and opens a new one, so
+the org chart, the department and the manager are all answerable **as at a date** — this year and
+last. `GET /api/v1/employments/{id}?asOf=2026-03-01` answers with March's placement and March's
+manager, after both have changed twice.
+
+Back-dating works properly. Recording a March transfer for somebody who also moved in June leaves
+three periods, in order, with June intact — not a March record that swallowed the summer.
+
+### A manager is a job, not a name
+
+Reporting lines point at an *employment*. When a manager changes roles or leaves, "who did this
+person report to last year" still answers correctly, because the answer was never their name.
+
+### Ending is deliberate, and separately permitted
+
+Ending an employment needs a date and a reason, is terminal, and is guarded by its own permission —
+somebody who can suspend a colleague cannot dismiss them. The reason is a code you define:
+resignation, dismissal, end of contract and retirement mean different things in different countries,
+and this product commits to none of them.
+
+**This is not offboarding.** Exit interviews, clearance, asset return and final settlement are a
+later phase. What Employment owns is the relationship and its final state, which is what a
+settlement will read.
+
+### Vacancies are real numbers now
+
+Establishment screens have reported `filled: 0` and `vacant = budgeted` since Phase 3, because
+nothing had ever been assigned. Assignments now feed that figure. **Expect vacancy numbers to change
+the day this ships** — they are becoming correct rather than changing.
+
+### What Employment deliberately does not hold
+
+- **Leave status.** Somebody on annual leave is employed. Leave belongs to the Leave phase, and two
+  places holding it would give two answers.
+- **Work location.** A department and a place of work are different things, and this product does not
+  yet model the second. The field is absent and the screen says so, rather than a unit standing in
+  for a site.
+- **Salary, attendance, documents, disciplinary records.** Each has an owner, and none of them is
+  this one.
+
+### Still missing
+
+Nothing here can be used in a browser yet: every endpoint returns 401 until Platform's authentication
+adapter lands, which has been the position since Phase 2. The administration screen reads; every
+change goes through the API. Bulk import is bounded at 2,000 rows and is resumable but not atomic.
+
+---
+
 ## Phase 4 — People master registry
 
 **2026-08-06** · [Verification report](verification/phase-4-report.md)

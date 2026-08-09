@@ -1,10 +1,5 @@
-import {
-  NoAssignmentsYet,
-  organizationModule,
-  postgresOrganizationStores,
-  systemClock,
-} from '@work/organization';
-import type { CommandSender } from '@work/organization';
+import { organizationModule, postgresOrganizationStores, systemClock } from '@work/organization';
+import type { CommandSender, FilledHeadcountPort } from '@work/organization';
 import {
   type Command,
   type Dispatcher,
@@ -53,16 +48,23 @@ export class DeferredCommandSender implements CommandSender {
   }
 }
 
-/** Everything Organization needs, assembled. Registered by the identity module's composition. */
-export const organizationModuleFor = (unitOfWork: UnitOfWork, sender: CommandSender): WorkModule =>
+/**
+ * Everything Organization needs, assembled. Registered by the identity module's composition.
+ *
+ * `filled` is now **Employment's adapter** rather than `NoAssignmentsYet`. That is the port Phase 3
+ * declared being used as it was designed: Organization still never counts employees itself
+ * (AD-002), and none of its code changed — the composition root chooses the implementation.
+ *
+ * The visible consequence is that an establishment's `filled` figure stops being zero, and its
+ * `vacant` figure stops equalling its budget. That is the number becoming correct rather than
+ * changing, and it closes the debt item the Phase 4 register carried against this phase.
+ */
+export const organizationModuleFor = (
+  unitOfWork: UnitOfWork,
+  sender: CommandSender,
+  filled: FilledHeadcountPort,
+): WorkModule =>
   organizationModule(
-    {
-      unitOfWork,
-      stores: postgresOrganizationStores(),
-      // Employment supplies the real one from Phase 5. Zero until then, honestly and by
-      // construction: there are no assignments to count, and Organization never counts (AD-002).
-      filled: new NoAssignmentsYet(),
-      clock: systemClock,
-    },
+    { unitOfWork, stores: postgresOrganizationStores(), filled, clock: systemClock },
     sender,
   );

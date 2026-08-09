@@ -22,6 +22,10 @@ line; the decision that replaced it is a new record.
 | [0036](0036-tenant-settings-owned-by-organization.md) | Tenant settings owned by Organization | Accepted |
 | [0037](0037-legal-name-is-effective-dated.md)    | A person's legal name is effective-dated; every other attribute is not | Accepted |
 | [0038](0038-personal-data-protection.md)         | How personal data is protected in People | Accepted |
+| [0039](0039-employment-number.md)                | The employment number is generated, tenant-scoped, immutable and never reused | Accepted |
+| [0040](0040-employment-lifecycle.md)             | The employment lifecycle, and why "on leave" belongs to Leave | Accepted |
+| [0041](0041-work-location-is-not-modelled.md)    | Work location is not modelled, and no false relationship stands in for it | Accepted |
+| [0042](0042-how-employment-references-another-module.md) | How Employment references another module: one foreign key, one published query, one gap | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

@@ -20,9 +20,9 @@ ADRs updated.
 | 1.1 | Architecture verification   | [`02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md`](../work%20prompts/02A_PHASE_1.1_ARCHITECTURE_VERIFICATION.md) | Complete    |
 | 2   | Workforce identity          | [`03_PHASE_2_WORKFORCE_IDENTITY.md`](../work%20prompts/03_PHASE_2_WORKFORCE_IDENTITY.md)              | Complete    |
 | 3   | Organization                | [`04_PHASE_3_ORGANIZATION.md`](../work%20prompts/04_PHASE_3_ORGANIZATION.md)                          | Complete    |
-| 4   | People master registry      | [`05_PHASE_4_PEOPLE_MASTER_REGISTRY.md`](../work%20prompts/05_PHASE_4_PEOPLE_MASTER_REGISTRY.md)      | Awaiting approval |
+| 4   | People master registry      | [`05_PHASE_4_PEOPLE_MASTER_REGISTRY.md`](../work%20prompts/05_PHASE_4_PEOPLE_MASTER_REGISTRY.md)      | Complete    |
 | 4.1 | Employee documents & expiry | [`05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md`](../work%20prompts/05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md)          | Not started |
-| 5   | Employment                  | [`06_PHASE_5_EMPLOYMENT.md`](../work%20prompts/06_PHASE_5_EMPLOYMENT.md)                              | Not started |
+| 5   | Employment                  | [`06_PHASE_5_EMPLOYMENT.md`](../work%20prompts/06_PHASE_5_EMPLOYMENT.md)                              | Awaiting approval |
 | 5.1 | Employee letters            | [`06A_PHASE_5.1_EMPLOYEE_LETTERS.md`](../work%20prompts/06A_PHASE_5.1_EMPLOYEE_LETTERS.md)            | Not started |
 | 5.2 | Employee relations          | [`06B_PHASE_5.2_EMPLOYEE_RELATIONS.md`](../work%20prompts/06B_PHASE_5.2_EMPLOYEE_RELATIONS.md)        | Not started |
 | 5.3 | Assets & custody            | [`06C_PHASE_5.3_ASSETS_CUSTODY.md`](../work%20prompts/06C_PHASE_5.3_ASSETS_CUSTODY.md)                | Not started |
@@ -80,6 +80,18 @@ position catalogue and its establishment, organizational calendars, and the clos
 tenant-settings debt Phase 2 recorded. Its report, the carried-forward debt register and its
 production-readiness assessment are in
 [`verification/phase-3-report.md`](verification/phase-3-report.md).
+
+Phase 4 completed on 2026-08-06 and merged as #7: the master registry of human identity, one
+permanent Person per human being, with duplicate prevention before a second record can be created.
+Its report is in [`verification/phase-4-report.md`](verification/phase-4-report.md).
+
+Phase 5 completed on 2026-08-09: the Employment domain — the relationship between a person and the
+workforce, its lifecycle, organizational assignment on a timeline, the managerial relationship,
+contracts and probation, and the closure of the always-zero filled headcount Phase 3 left for it. The
+planning checkpoint and the decisions it stopped on are in
+[`verification/phase-5-plan.md`](verification/phase-5-plan.md); the report, the carried-forward debt
+register and the production-readiness assessment are in
+[`verification/phase-5-report.md`](verification/phase-5-report.md).
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

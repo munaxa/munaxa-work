@@ -24,7 +24,7 @@ them afterwards.
 | Position catalogue, establishment         | `organization`  | Phase 3 ✅    |
 | Organization calendar, exception days     | `organization`  | Phase 3 ✅    |
 | Tenant settings (language, calendar, zone)| `organization`  | Phase 3 ✅    |
-| Employment, contract, assignment          | `employment`    | Phase 5       |
+| Employment, contract, assignment, reporting line | `employment` | Phase 5 ✅  |
 | Requisition, candidate, application       | `recruitment`   | Phase 6       |
 | Onboarding journey                        | `onboarding`    | Phase 7       |
 | Attendance, shift, timesheet              | `attendance`    | Phase 8       |
@@ -85,6 +85,26 @@ Two boundaries inside `people` are worth naming because they look like near-miss
   `person_preference` holds the *person's* preferences: dietary requirement, uniform size, consent
   to appear in a directory photograph. Two modules holding a language preference would produce two
   answers on the first screen that read the wrong one.
+
+`employment` owns the *relationship* between a person and this tenant's workforce, and nothing else.
+It holds no identity — `person_id` is a reference, and there is no name, no date of birth and no
+document anywhere in it — no organizational structure, no attendance, no leave balance, no salary and
+no exit process. Its assignments reference `organization`'s units, positions and cost centres **by
+identifier only**, with no cached names, because a cached name is a second answer that goes stale on
+the first rename.
+
+Three boundaries inside `employment` are worth naming because each is a near-miss:
+
+- **Leave status is not an employment status.** An employee on annual leave is employed. `leave`
+  (Phase 9) owns leave, and an `on_leave` status here would be a second answer to a question that
+  domain already answers (ADR-0040).
+- **A manager is an employment, not a person and not a separate identity.** "Who was this person's
+  manager in March" survives both of them changing jobs only if the reference is to the job.
+- **Work location has no owner yet.** A unit and a physical place of work are different concepts, and
+  this product models only the first. Employment does not stand one in for the other (ADR-0041).
+
+The *filled* headcount `organization` reports now comes from Employment's assignments through the
+port Phase 3 declared for it. Organization still counts nothing itself (AD-002).
 
 A person's **nationality is an input to statutory rules and never a business rule in itself** (00B).
 Nothing in `people` branches on a country code, and a person's country of *employment* comes from

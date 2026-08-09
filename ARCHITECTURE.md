@@ -55,6 +55,8 @@ private, and the lint layer enforces that rather than a review comment.
 | ------ | ---- | ----- |
 | [`identity`](docs/modules/identity.md) | Workforce identity: tenant membership, invitations, portal access, employment links, delegation | 2 |
 | [`organization`](docs/modules/organization.md) | The enterprise's structure: units of any depth, legal entities and the country each operates under, cost and profit centres, positions and their establishment, calendars, tenant settings | 3 |
+| [`people`](docs/modules/people.md) | The master registry of human identity: one permanent Person per human being, their names over time, government identifiers, citizenships, contacts, addresses and history | 4 |
+| [`employment`](docs/modules/employment.md) | The relationship between a person and the workforce: employment identity and lifecycle, organizational assignment on a timeline, the managerial relationship, contracts and probation | 5 |
 
 ## Layers inside a module
 

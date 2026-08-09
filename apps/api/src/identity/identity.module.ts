@@ -41,14 +41,18 @@ import {
   organizationModuleFor,
 } from '../organization/organization.composition.js';
 import { DeferredPeopleSender, peopleModuleFor } from '../people/people.composition.js';
+import {
+  DeferredEmploymentSender,
+  employmentModuleFor,
+} from '../employment/employment.composition.js';
+import { assignmentFilledHeadcount, postgresEmploymentStores } from '@work/employment';
 
 import {
   AUTHENTICATION_PORT,
-  COMMAND_SENDER,
+  DEFERRED_SENDERS,
   DISPATCHER,
   MEMBERSHIP_DIRECTORY,
   MODULE_REGISTRY,
-  PEOPLE_COMMAND_SENDER,
   PEOPLE_MODULE,
   PERMISSION_CHECKER,
 } from './identity.tokens.js';
@@ -89,12 +93,12 @@ import { PlatformPermissionChecker } from './permission-checker.js';
     {
       // Built once and handed the dispatcher below, which is the only way to give bulk import a
       // dispatcher assembled from a list that includes bulk import.
-      provide: COMMAND_SENDER,
-      useFactory: (): DeferredCommandSender => new DeferredCommandSender(),
-    },
-    {
-      provide: PEOPLE_COMMAND_SENDER,
-      useFactory: (): DeferredPeopleSender => new DeferredPeopleSender(),
+      provide: DEFERRED_SENDERS,
+      useFactory: (): DeferredSenders => ({
+        organization: new DeferredCommandSender(),
+        people: new DeferredPeopleSender(),
+        employment: new DeferredEmploymentSender(),
+      }),
     },
     {
       // One checker, given to the pipeline *and* to People's reads. Two would eventually differ,
@@ -104,47 +108,53 @@ import { PlatformPermissionChecker } from './permission-checker.js';
     },
     {
       provide: PEOPLE_MODULE,
-      inject: [UNIT_OF_WORK, PERMISSION_CHECKER, ENVIRONMENT, PinoLogger, PEOPLE_COMMAND_SENDER],
+      inject: [UNIT_OF_WORK, PERMISSION_CHECKER, ENVIRONMENT, PinoLogger, DEFERRED_SENDERS],
       useFactory: (
         unitOfWork: UnitOfWork,
         permissions: PermissionChecker,
         environment: Environment,
         logger: PinoLogger,
-        sender: DeferredPeopleSender,
-      ): WorkModule => peopleModuleFor(unitOfWork, permissions, environment, logger.logger, sender),
+        senders: DeferredSenders,
+      ): WorkModule =>
+        peopleModuleFor(unitOfWork, permissions, environment, logger.logger, senders.people),
     },
     {
       provide: MODULE_REGISTRY,
-      inject: [UNIT_OF_WORK, DATABASE_POOL, ENVIRONMENT, COMMAND_SENDER, PEOPLE_MODULE],
+      inject: [UNIT_OF_WORK, DATABASE_POOL, ENVIRONMENT, DEFERRED_SENDERS, PEOPLE_MODULE],
       useFactory: (
         unitOfWork: UnitOfWork,
         pool: Pool,
         environment: Environment,
-        sender: DeferredCommandSender,
+        senders: DeferredSenders,
         people: WorkModule,
       ): ModuleRegistry => {
         const registry = new ModuleRegistry();
 
         registry.register(identityModuleFor(unitOfWork, pool, environment));
-        registry.register(organizationModuleFor(unitOfWork, sender));
+        // Organization is registered with Employment's filled-headcount adapter rather than
+        // `NoAssignmentsYet`: the port Phase 3 declared for exactly this, used as designed. Nothing
+        // in Organization changes — the composition root chooses the implementation, and the
+        // establishment's `filled` figure stops being zero because there are now assignments to
+        // count.
+        registry.register(
+          organizationModuleFor(
+            unitOfWork,
+            senders.organization,
+            assignmentFilledHeadcount(unitOfWork, postgresEmploymentStores()),
+          ),
+        );
         registry.register(people);
+        registry.register(employmentModuleFor(unitOfWork, senders.employment));
         return registry;
       },
     },
     {
       provide: DISPATCHER,
-      inject: [
-        MODULE_REGISTRY,
-        EVENT_DISPATCHER,
-        COMMAND_SENDER,
-        PEOPLE_COMMAND_SENDER,
-        PERMISSION_CHECKER,
-      ],
+      inject: [MODULE_REGISTRY, EVENT_DISPATCHER, DEFERRED_SENDERS, PERMISSION_CHECKER],
       useFactory: (
         registry: ModuleRegistry,
         events: EventDispatcher,
-        sender: DeferredCommandSender,
-        peopleSender: DeferredPeopleSender,
+        senders: DeferredSenders,
         permissions: PermissionChecker,
       ): Dispatcher => {
         const dispatcher = new Dispatcher(permissions);
@@ -158,8 +168,9 @@ import { PlatformPermissionChecker } from './permission-checker.js';
           }
           for (const handler of module.eventHandlers ?? []) events.register(handler);
         }
-        sender.attach(dispatcher);
-        peopleSender.attach(dispatcher);
+        senders.organization.attach(dispatcher);
+        senders.people.attach(dispatcher);
+        senders.employment.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -173,6 +184,18 @@ import { PlatformPermissionChecker } from './permission-checker.js';
   exports: [AUTHENTICATION_PORT, MEMBERSHIP_DIRECTORY, DISPATCHER, MODULE_REGISTRY],
 })
 export class IdentityModule {}
+
+/**
+ * The three senders that are handed their dispatcher once it exists.
+ *
+ * One object rather than three providers, so the factories that need them stay inside the
+ * five-parameter budget — a list any longer is one somebody eventually passes in the wrong order.
+ */
+interface DeferredSenders {
+  readonly organization: DeferredCommandSender;
+  readonly people: DeferredPeopleSender;
+  readonly employment: DeferredEmploymentSender;
+}
 
 /**
  * The tenant's identity defaults now come from *that tenant*, falling back to the deployment's

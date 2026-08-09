@@ -15,12 +15,13 @@
   "dependencies": {
     "@munaxa/theme": "^1.0.0",
     "@munaxa/ui": "^1.0.0",
+    "@work/config": "workspace:*",
+    "@work/employment": "workspace:*",
+    "@work/organization": "workspace:*",
+    "@work/people": "workspace:*",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@work/organization": "workspace:*",
-    "@work/config": "workspace:*",
-    "@work/people": "workspace:*"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
