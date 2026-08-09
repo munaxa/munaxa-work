@@ -1,14 +1,146 @@
 # Phase 6 — Recruitment: Definition of Ready
 
-**Status: planning checkpoint. No code has been changed.** No schema, no migration, no endpoint, no
-screen, no refactor of Phases 0–5. The only file this checkpoint adds is this one.
+**Status: approved. Implementation proceeds on the decisions recorded in §0**, on branch
+`claude/phase-6-recruitment`, based on the approved Phase 5 state.
 
 This document is what `07_PHASE_6_RECRUITMENT.md`, `27_DEVELOPMENT_PROTOCOL.md` Step 2 and the
 Phase 6 planning instruction require before implementation begins.
 
-**Nine decisions in §30 need an answer before a line is written.** Four of them change the
-architecture rather than the feature, and one — the authorization boundary for cross-module reference
-checks — was raised by the instruction itself as a correction to how Phase 5 composed.
+Nine decisions were raised in §30. All nine were answered, and are recorded verbatim in effect in §0
+below. Where an approved decision differs from the analysis that proposed it, §0 is what governs.
+
+---
+
+## 0. Approved decisions
+
+Binding, and taking precedence over any contrary wording elsewhere in this document or in the phase
+prompts.
+
+### A-1 — Authorization boundary: a bounded cross-module service context
+
+Recruitment must **not** require a recruiter to hold `people.person.manage`, broad People write
+permissions, or broad Organization hierarchy permissions in order to perform legitimate recruitment
+work.
+
+A narrow, auditable service capability performs the minimum cross-domain operations: existence checks,
+narrow reference resolution, candidate/person matching, and the approved candidate-to-person
+transition. The originating human actor stays in the audit context.
+
+Eight rules bind it: the user must still be authorized for the *Recruitment* operation; the service
+context may perform only explicitly permitted cross-domain operations; every operation stays
+tenant-scoped; every operation is auditable; no arbitrary People repository access; no arbitrary
+Organization repository access; no second authorization framework; extend the existing authorization
+contract only where necessary.
+
+**The Phase 5 composition issue is recorded as a separate architectural follow-up. Phase 5 is not
+modified to resolve it here.**
+
+### A-2 — Candidate personal information stays narrow
+
+Recruitment must not become a second identity registry. Government identifiers, date of birth and
+nationality are **not** authoritative Recruitment fields. Matching uses People's published
+search/matching capability for information People already owns. Identity-sensitive information is
+collected and managed by People when the candidate becomes a real person. No duplicated matching
+logic, no duplicated identity-document protection. Country-specific additions belong to a Country
+Compliance Pack.
+
+### A-3 — Approval is real, or it is not called approval
+
+`AutoApprovingPort` must **not** stand in for human approval of a control that authorizes headcount
+spending. Phase 6 implements a real, explicit requisition approval decision that identifies the actor,
+is auditable, tenant-scoped, permission-controlled, and **immutable once recorded except through an
+explicit correction/reversal mechanism**.
+
+`ApprovalPort` is consumed where it can represent a genuine approval. Where it cannot without using
+the auto-approving adapter dishonestly, Phase 6 implements the **smallest Recruitment-owned approval
+mechanism** required, preserves a clean adapter boundary for Phase 16, and records the migration path.
+No second general-purpose workflow engine. Phase 6 does not claim full Workflow integration.
+
+### A-4 — The hire transition is a recoverable state transition, not a distributed transaction
+
+The two-transaction limitation is accepted. No false distributed transaction is attempted.
+
+Required behaviour: an eligible hire state; Person creation/matching through the authoritative People
+capability; `person_id` written to Recruitment **once**, write-once after association, protected by a
+unique constraint; **Employment creation invoked through the Employment Application Service**; safely
+retryable; a partially completed transition detectable; a failed transition never silently appearing
+as a successful hire; and a recoverable state exposed for operational retry and reconciliation.
+
+No distributed transactions, no duplicated Employment creation logic, no direct writes to Employment
+repositories, no duplicate Person or Employment records. It behaves like a reliable saga boundary even
+though Workflow is Phase 16.
+
+> **Note on AD-003.** The in-repo Phase 6 specification says Recruitment hands off to Onboarding and
+> *Onboarding* creates the Employment. This approved decision instead has Recruitment invoke
+> Employment's application service directly, because Onboarding (Phase 7) does not exist and a hire
+> that stopped at a Person would leave the workforce record uncreated with nothing to complete it.
+> Recorded in ADR-0046: the approved decision governs Phase 6, and Phase 7 will orchestrate the
+> transition around the same application services rather than replacing them.
+
+### A-5 — Offer compensation is an opaque proposed value
+
+Recruitment stores what is needed to represent an offer and never becomes the Compensation domain. No
+payroll calculation, salary structure, deduction, statutory calculation or compensation rule. An
+accepted offer must remain **historically reconstructable** after Compensation configuration changes.
+
+### A-6 — Interviewers reference Employment
+
+Interviewers are employees, referenced by employment identifier. No second interviewer entity, no
+duplicated employee profile data inside Recruitment. Interview authorization verifies the referenced
+employment belongs to the same tenant.
+
+### A-7 — Aggregate scope stays minimal
+
+No aggregate root exists merely because a concept appears in a list. An authoritative aggregate is
+used only where it owns business invariants and a lifecycle; otherwise a value object, child entity,
+tag, projection or read model. No unnecessary tables to satisfy a list of names.
+
+### A-8 — Recruitment numbering
+
+Recruitment uses its own tenant-scoped counter. It does not reuse Employment's counter and does not
+use a PostgreSQL global sequence. Numbers are tenant-scoped, unique, immutable and never reused, on
+the transactional-counter principle Phase 5 established. **No generic kernel counter framework is
+built in this phase**; the reusable capability stays recorded as architectural debt.
+
+### A-9 — Scope
+
+**Candidate-facing portal: not in Phase 6.** No portal, no public careers pages, no candidate
+self-service authentication. Clean API and domain boundaries are left for a future candidate-facing
+application.
+
+**Candidate erasure:** the minimum privacy and data-lifecycle architecture, with no invented
+country-specific retention period. Candidate data must support a future retention/deletion framework.
+Nothing is physically deleted merely because an "erase" button seems desirable. Any deletion or
+anonymization preserves audit integrity and referential integrity, respects retention policy, is
+tenant-scoped and is auditable.
+
+**Candidate search performance:** the documented `ilike`/RLS limitation is accepted. RLS is not
+weakened, tenant isolation is not bypassed, and no unsafe database shortcut is introduced. Indexed,
+searchable fields are implemented where they are usable under the current security architecture. The
+real performance is measured; if name search cannot meet the target at 100,000 records because of
+planner behaviour under RLS, the measured result and its cause are documented, **the target is not
+claimed as achieved**, and the future solution is recorded as technical debt.
+
+### Kernel ports
+
+`ApprovalPort`, `NotificationPort` and `DocumentPort` are consumed through their published contracts
+where appropriate. No duplicate notification or document infrastructure. `AutoApprovingPort` is not
+used to fake human approval. Candidate document management is not claimed complete while
+`DocumentPort` is only a contract, and candidate notification delivery is not claimed complete while
+`NotificationPort` has no production provider.
+
+**The completion report must distinguish IMPLEMENTED from CONTRACT AVAILABLE from NOT VERIFIED.**
+
+### Standing constraints
+
+Platform capabilities are consumed, never duplicated; a missing reusable capability is documented
+rather than recreated. Phase 6 implements Recruitment only — no Onboarding, Attendance, Leave,
+Compensation, Payroll, Benefits, Performance, Learning, Career, Offboarding, Workforce Relations, full
+Document Management, Loans, Claims, Country Packs, Government Integrations, Mobile, AI or Candidate
+Portal. Future integrations are represented through contracts and events only.
+
+Phase 0–5 behaviour is not modified. If a Phase 0–5 change becomes necessary, work stops and approval
+is requested with the reason, the affected ADR and the smallest compatible change.
 
 ---
 
