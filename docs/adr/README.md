@@ -49,7 +49,7 @@ line; the decision that replaced it is a new record.
 | [0063](0063-a-compensation-change-supersedes.md) | A compensation change supersedes; a pay grade is not a job grade | Accepted |
 | [0064](0064-payroll-calculates-from-a-snapshot.md) | Payroll calculates from an immutable snapshot, never from a live source | Accepted |
 | [0065](0065-a-candidate-is-not-an-approved-fact.md) | A candidate is not an approved fact, and configuration cannot promote one | Accepted |
-| 0066 | The finalized-payroll immutability mechanism | Proposed — the requirement is approved (D-9); the mechanism is recorded once the three options are compared against a real schema and the cost measured |
+| [0066](0066-finalized-payroll-is-immutable-at-the-table.md) | Finalized payroll is immutable at the table, not only in the code | Accepted |
 | [0067](0067-payroll-publishes-outputs-and-posts-nothing.md) | Payroll publishes outputs and posts nothing, and an absent capability is named | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and

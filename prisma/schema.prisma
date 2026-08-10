@@ -2987,3 +2987,445 @@ model CompensationImportBatch {
   @@index([tenant_id, submitted_at], map: "compensation_import_batch_idx")
   @@map("compensation_import_batch")
 }
+
+// ---------------------------------------------------------------------------------------------
+// Payroll — what is actually paid for a period (Phase 11).
+//
+// Fourteen tables. Every monetary value is `amount_minor BigInt` + `currency_code` +
+// `currency_exponent`, the convention ADR-0061 set: never `Float`, never `Decimal`, never a
+// JavaScript number. The exponent travels on every row because nothing in this product publishes
+// one, and two decimal places is a habit rather than a rule.
+//
+// `payroll_input_snapshot` holds the four published contract views verbatim as `Json`. That is
+// deliberate (ADR-0064): the snapshot's job is to preserve what a contract *said*, and a contract
+// that gains a field later must not make an old snapshot unreadable or force a migration of
+// historical payroll.
+//
+// Six tables carry `finalized_at`, and a database trigger refuses any update or delete of a row
+// where it is set (ADR-0066). Prisma cannot express that; the migration does.
+//
+// Absent, and deliberately: no tax column, no social-security column, no exchange rate, no bank
+// account, no ledger, and no `posted` or `executed` state anywhere (ADR-0067).
+// ---------------------------------------------------------------------------------------------
+
+model PayrollGroup {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  legal_entity_id          String    @db.Uuid
+  code                     String    @db.VarChar(64)
+  name                     Json
+  pay_frequency            String    @db.VarChar(24)
+  permitted_currencies     Json
+  proration_basis          String    @db.VarChar(24)
+  rounding_mode            String    @db.VarChar(16)
+  pays_suspended           Boolean
+  eligibility_rule         Json?
+  eligibility_rule_version Int
+  country_pack_id          String?   @db.VarChar(64)
+  country_pack_version     Int?
+  expense_account          String    @db.VarChar(64)
+  deduction_account        String    @db.VarChar(64)
+  payable_account          String    @db.VarChar(64)
+  payment_method_code      String    @db.VarChar(64)
+  active                   Boolean
+  metadata                 Json
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@unique([tenant_id, code], map: "payroll_group_code_idx")
+  @@map("payroll_group")
+}
+
+model PayrollDeductionDefinition {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  payroll_group_id       String    @db.Uuid
+  code                   String    @db.VarChar(64)
+  name                   Json
+  deduction_source       String    @db.VarChar(24)
+  payroll_treatment_code String    @db.VarChar(64)
+  basis                  String    @db.VarChar(24)
+  amount_minor           BigInt?
+  currency_code          String?   @db.Char(3)
+  currency_exponent      Int?      @db.SmallInt
+  basis_points           Int?
+  rounding_mode          String    @db.VarChar(16)
+  priority               Int       @db.SmallInt
+  active                 Boolean
+  metadata               Json
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@unique([tenant_id, payroll_group_id, code], map: "payroll_deduction_definition_code_idx")
+  @@map("payroll_deduction_definition")
+}
+
+/// A payroll period. Both endpoints are inclusive civil dates, and non-overlap per group is
+/// enforced by a GiST exclusion constraint the migration creates — Prisma cannot express one.
+model PayrollPeriod {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  payroll_group_id String    @db.Uuid
+  code             String    @db.VarChar(64)
+  period_start     DateTime  @db.Date
+  period_end       DateTime  @db.Date
+  payment_date     DateTime  @db.Date
+  status           String    @db.VarChar(24)
+  opened_at        DateTime? @db.Timestamptz(6)
+  opened_by        String?   @db.VarChar(255)
+  closed_at        DateTime? @db.Timestamptz(6)
+  closed_by        String?   @db.VarChar(255)
+  metadata         Json
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@unique([tenant_id, payroll_group_id, code], map: "payroll_period_code_idx")
+  @@index([tenant_id, period_start], map: "payroll_period_register_idx")
+  @@map("payroll_period")
+}
+
+model PayrollRun {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  payroll_period_id        String    @db.Uuid
+  payroll_group_id         String    @db.Uuid
+  run_sequence             Int
+  run_kind                 String    @db.VarChar(16)
+  status                   String    @db.VarChar(24)
+  calculation_version      Int
+  rule_set_digest          String    @db.VarChar(16)
+  population_digest        String?   @db.VarChar(16)
+  snapshot_digest          String?   @db.VarChar(16)
+  eligibility_rule_version Int
+  country_pack_id          String?   @db.VarChar(64)
+  country_pack_version     Int?
+  cursor_employment_id     String?   @db.Uuid
+  population_size          Int
+  result_count             Int
+  exception_count          Int
+  stale_count              Int
+  calculated_at            DateTime? @db.Timestamptz(6)
+  calculated_by            String?   @db.VarChar(255)
+  approved_at              DateTime? @db.Timestamptz(6)
+  approved_by              String?   @db.VarChar(255)
+  finalized_at             DateTime? @db.Timestamptz(6)
+  finalized_by             String?   @db.VarChar(255)
+  reversal_of_run_id       String?   @db.Uuid
+  reversed_at              DateTime? @db.Timestamptz(6)
+  reversed_by              String?   @db.VarChar(255)
+  stale_detected_at        DateTime? @db.Timestamptz(6)
+  accounting_prepared_at   DateTime? @db.Timestamptz(6)
+  payment_prepared_at      DateTime? @db.Timestamptz(6)
+  failure_reason           String?   @db.VarChar(128)
+  metadata                 Json
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@unique([tenant_id, payroll_period_id, run_sequence], map: "payroll_run_sequence_idx")
+  @@index([tenant_id, created_at], map: "payroll_run_register_idx")
+  @@map("payroll_run")
+}
+
+/// What Payroll consumed, frozen. The four contract payloads are `Json` so a contract that gains a
+/// field later cannot make an old snapshot unreadable (ADR-0064).
+model PayrollInputSnapshot {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  payroll_run_id           String    @db.Uuid
+  employment_id            String    @db.Uuid
+  employment_facts         Json?
+  compensation_facts       Json?
+  attendance_facts         Json?
+  leave_facts              Json?
+  employment_version       Int?
+  compensation_digest      String?   @db.VarChar(16)
+  compensation_version     Int?
+  attendance_digest        String?   @db.VarChar(16)
+  attendance_sequence      Int?
+  leave_digest             String?   @db.VarChar(16)
+  leave_version            Int?
+  snapshot_digest          String    @db.VarChar(16)
+  eligibility_rule_version Int
+  captured_at              DateTime  @db.Timestamptz(6)
+  finalized_at             DateTime? @db.Timestamptz(6)
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@unique([tenant_id, payroll_run_id, employment_id], map: "payroll_input_snapshot_unique_idx")
+  @@map("payroll_input_snapshot")
+}
+
+/// One result per run, employment and currency. Nothing is ever totalled across currencies.
+model PayrollResult {
+  id                      String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id               String    @db.Uuid
+  payroll_run_id          String    @db.Uuid
+  employment_id           String    @db.Uuid
+  currency_code           String    @db.Char(3)
+  currency_exponent       Int       @db.SmallInt
+  gross_amount_minor      BigInt
+  deductions_amount_minor BigInt
+  net_amount_minor        BigInt
+  snapshot_digest         String    @db.VarChar(16)
+  calculation_version     Int
+  finalized_at            DateTime? @db.Timestamptz(6)
+  created_at              DateTime  @db.Timestamptz(6)
+  created_by              String    @db.VarChar(255)
+  updated_at              DateTime  @db.Timestamptz(6)
+  updated_by              String    @db.VarChar(255)
+  deleted_at              DateTime? @db.Timestamptz(6)
+  deleted_by              String?   @db.VarChar(255)
+  version                 Int
+
+  @@unique([tenant_id, payroll_run_id, employment_id, currency_code], map: "payroll_result_unique_idx")
+  @@index([tenant_id, employment_id, created_at], map: "payroll_result_employment_idx")
+  @@map("payroll_result")
+}
+
+model PayrollEarningLine {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  payroll_result_id      String    @db.Uuid
+  payroll_run_id         String    @db.Uuid
+  employment_id          String    @db.Uuid
+  sequence               Int       @db.SmallInt
+  earning_source         String    @db.VarChar(32)
+  component_id           String?   @db.Uuid
+  component_code         String    @db.VarChar(64)
+  payroll_treatment_code String    @db.VarChar(64)
+  amount_minor           BigInt
+  currency_code          String    @db.Char(3)
+  currency_exponent      Int       @db.SmallInt
+  calculation_reason     String    @db.VarChar(64)
+  detail                 Json
+  source_reference       String?   @db.VarChar(64)
+  effective_from         DateTime? @db.Date
+  effective_to           DateTime? @db.Date
+  finalized_at           DateTime? @db.Timestamptz(6)
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@index([tenant_id, payroll_result_id, sequence], map: "payroll_earning_line_result_idx")
+  @@index([tenant_id, payroll_run_id], map: "payroll_earning_line_run_idx")
+  @@map("payroll_earning_line")
+}
+
+model PayrollDeductionLine {
+  id                      String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id               String    @db.Uuid
+  payroll_result_id       String    @db.Uuid
+  payroll_run_id          String    @db.Uuid
+  employment_id           String    @db.Uuid
+  sequence                Int       @db.SmallInt
+  deduction_source        String    @db.VarChar(24)
+  deduction_definition_id String?   @db.Uuid
+  deduction_code          String    @db.VarChar(64)
+  payroll_treatment_code  String    @db.VarChar(64)
+  amount_minor            BigInt
+  currency_code           String    @db.Char(3)
+  currency_exponent       Int       @db.SmallInt
+  calculation_reason      String    @db.VarChar(64)
+  detail                  Json
+  source_reference        String?   @db.VarChar(64)
+  priority                Int       @db.SmallInt
+  finalized_at            DateTime? @db.Timestamptz(6)
+  created_at              DateTime  @db.Timestamptz(6)
+  created_by              String    @db.VarChar(255)
+  updated_at              DateTime  @db.Timestamptz(6)
+  updated_by              String    @db.VarChar(255)
+  deleted_at              DateTime? @db.Timestamptz(6)
+  deleted_by              String?   @db.VarChar(255)
+  version                 Int
+
+  @@index([tenant_id, payroll_result_id, sequence], map: "payroll_deduction_line_result_idx")
+  @@index([tenant_id, payroll_run_id], map: "payroll_deduction_line_run_idx")
+  @@map("payroll_deduction_line")
+}
+
+/// Why an employment was not calculated. A real answer reported, never a silent skip or a zero.
+model PayrollException {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  payroll_run_id String    @db.Uuid
+  employment_id  String    @db.Uuid
+  exception_code String    @db.VarChar(48)
+  detail         Json
+  resolved_at    DateTime? @db.Timestamptz(6)
+  resolved_by    String?   @db.VarChar(255)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, payroll_run_id, exception_code], map: "payroll_exception_run_idx")
+  @@map("payroll_exception")
+}
+
+model PayrollAdjustment {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  payroll_run_id           String    @db.Uuid
+  employment_id            String    @db.Uuid
+  kind                     String    @db.VarChar(16)
+  code                     String    @db.VarChar(64)
+  payroll_treatment_code   String    @db.VarChar(64)
+  amount_minor             BigInt
+  currency_code            String    @db.Char(3)
+  currency_exponent        Int       @db.SmallInt
+  reason_code              String    @db.VarChar(64)
+  note                     String
+  retroactive_of_period_id String?   @db.Uuid
+  retroactive_of_run_id    String?   @db.Uuid
+  requested_by             String    @db.VarChar(255)
+  recorded_at              DateTime  @db.Timestamptz(6)
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@index([tenant_id, payroll_run_id, employment_id], map: "payroll_adjustment_run_idx")
+  @@map("payroll_adjustment")
+}
+
+/// An approval decision by a named human. `requested_by` is copied here so the self-approval check
+/// constraint is enforceable — a check constraint cannot reach another table.
+model PayrollApprovalDecision {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  payroll_run_id       String    @db.Uuid
+  sequence             Int       @db.SmallInt
+  decision             String    @db.VarChar(16)
+  decided_by           String    @db.VarChar(255)
+  decided_at           DateTime  @db.Timestamptz(6)
+  requested_by         String    @db.VarChar(255)
+  comment              String?
+  reverses_decision_id String?   @db.Uuid
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@unique([tenant_id, payroll_run_id, sequence], map: "payroll_approval_decision_sequence_idx")
+  @@map("payroll_approval_decision")
+}
+
+/// What reconciliation found: which employment's which source moved after the run was calculated.
+model PayrollReconciliation {
+  id              String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  payroll_run_id  String    @db.Uuid
+  employment_id   String    @db.Uuid
+  stale_source    String    @db.VarChar(16)
+  previous_digest String?   @db.VarChar(16)
+  current_digest  String?   @db.VarChar(16)
+  detected_at     DateTime  @db.Timestamptz(6)
+  created_at      DateTime  @db.Timestamptz(6)
+  created_by      String    @db.VarChar(255)
+  updated_at      DateTime  @db.Timestamptz(6)
+  updated_by      String    @db.VarChar(255)
+  deleted_at      DateTime? @db.Timestamptz(6)
+  deleted_by      String?   @db.VarChar(255)
+  version         Int
+
+  @@index([tenant_id, payroll_run_id, detected_at], map: "payroll_reconciliation_run_idx")
+  @@map("payroll_reconciliation")
+}
+
+/// A balanced journal in Payroll's own table. `account_reference` is an opaque tenant code: there
+/// is no Finance module, no ledger and no chart of accounts, and nothing is posted (ADR-0067).
+model PayrollAccountingLine {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  payroll_run_id    String    @db.Uuid
+  payroll_result_id String    @db.Uuid
+  employment_id     String    @db.Uuid
+  direction         String    @db.VarChar(8)
+  account_reference String    @db.VarChar(64)
+  cost_center_id    String?   @db.Uuid
+  unit_id           String?   @db.Uuid
+  amount_minor      BigInt
+  currency_code     String    @db.Char(3)
+  currency_exponent Int       @db.SmallInt
+  source_reference  String    @db.VarChar(64)
+  journal_reference String    @db.VarChar(64)
+  finalized_at      DateTime? @db.Timestamptz(6)
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, payroll_run_id, id], map: "payroll_accounting_line_run_idx")
+  @@map("payroll_accounting_line")
+}
+
+/// A payment instruction that nothing executes. No account number, no credential, and no state
+/// beyond prepared — there is no bank domain and no payment integration in this repository.
+model PayrollPaymentInstruction {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  payroll_run_id      String    @db.Uuid
+  payroll_result_id   String    @db.Uuid
+  employment_id       String    @db.Uuid
+  amount_minor        BigInt
+  currency_code       String    @db.Char(3)
+  currency_exponent   Int       @db.SmallInt
+  payment_date        DateTime  @db.Date
+  payment_method_code String    @db.VarChar(64)
+  payment_reference   String    @db.VarChar(64)
+  payee_account_ref   String?   @db.VarChar(128)
+  status              String    @db.VarChar(16)
+  finalized_at        DateTime? @db.Timestamptz(6)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@unique([tenant_id, payroll_result_id], map: "payroll_payment_instruction_unique_idx")
+  @@index([tenant_id, payroll_run_id, payment_date], map: "payroll_payment_instruction_run_idx")
+  @@map("payroll_payment_instruction")
+}
