@@ -390,6 +390,64 @@ it, because in several of this product's markets those numbers are statutory (00
 | **D-5** | **Foreign-key indexes lead with `tenant_id`, so hard deletes scan** (inherited, and worse here) | `attendance_time_event` references itself, so a hard delete of a million rows is a million scans. The product soft-deletes and never meets it; a future retention sweep would. Documented in the benchmark script |
 | **D-6** | **The daily attendance screen fetches wide rows before paging** (45.2 ms at 4,000 rows for one date) | Correct at the measured volume. A narrower projection for the list is the answer if it ever is not, and it is a contract change rather than an index |
 | **D-7** | **No attendance policy list endpoint** | A policy is read through the day it governed, which stores the policy and its version. A list read invites reading "the" policy rather than the one in force on the disputed date |
+| **D-8** | ~~**The composition root's Employment call was never exercised**~~ | **Closed by §13a.** Every cross-module adapter in this repository was, until now, covered only by a fake. The lesson generalises: a fake answers whatever it is asked, so it cannot notice that the question was malformed. Recruitment's and Onboarding's composition adapters remain uncovered at their real boundary, and are the next candidates |
+
+---
+
+## 13a. Defect fix after approval — the composition-root call to Employment
+
+**Date** 2026-08-10 · Found by the Phase 9 Definition of Ready's repository analysis, corrected
+before Phase 9 implementation began, on the approver's instruction. A corrective fix, not a feature
+change: no domain model, schema, migration, endpoint or screen was touched.
+
+`apps/api/src/attendance/attendance.composition.ts` held **two** defects in one call, and the second
+was found only by the regression test written for the first.
+
+**Defect 1 — a civil date sent where an instant was required.** `AttendanceEmploymentDirectory.find`
+took a civil attendance date and passed the *string* to `employment.read-employment`, whose published
+contract is `asOf?: Date`. The call site cast the literal to `Query`, so the compiler saw nothing. At
+runtime the value reached `DateRange.contains(instant)` → `instant.getTime()`, which throws on a
+string.
+
+**Defect 2 — the response read as though it were flat.** `employment.read-employment` returns an
+`EmploymentSnapshot`, which *wraps* the employment alongside its assignments, its reporting line and
+`statusOn`. The adapter destructured it as a flat `{ employmentId, status, startDate, … }`, so every
+field it took would have been `undefined`. Defect 1 masked it: the call threw before the mapping ran.
+
+Both were unreachable in production only because every business endpoint returns 401 until
+Platform's authentication adapter lands (ADR-0032), and because every other Attendance test uses
+`FakeEmployment`, which answers whatever it is asked and therefore cannot notice a malformed
+question.
+
+**The correction.**
+
+- The civil date is converted to UTC midnight by `asOfInstant`, which is the same conversion
+  Employment's own edge performs on a ten-character date (`employment/src/api/as-of.ts`). Employment's
+  contract was **not** changed to accommodate the caller: it was already right.
+- The response is typed as Employment's own published `EmploymentSnapshot` rather than a guessed
+  shape, and flattened by `fromSnapshot`. **`statusOn` is preferred over the employment row's
+  `status`** — the row answers "now", `statusOn` is reconstructed from the status history and answers
+  "then", and a March recalculation must see March.
+- Both `as Query` casts are gone. The two queries are typed against local interfaces that mirror
+  Employment's, so the next mismatch is a compile error in this file rather than a `TypeError` in
+  production. The mirror is named as a mirror in the file, because Employment does not export its
+  query types and adding an export to a completed phase to satisfy a caller is the wrong direction.
+
+**The regression test.** `apps/api/src/attendance/attendance.composition.spec.ts` registers **both**
+modules on one real dispatcher and exercises the real adapter — the first test in this repository to
+cross that boundary without a fake. Four cases: an employment resolved as at a civil date; the
+malformed shape the adapter used to send, asserted to be refused; the `asOf` genuinely reaching
+Employment rather than defaulting to today; and the roster scan.
+
+Both defects were verified to fail the suite before the fix, by reintroducing each in isolation:
+
+| Reintroduced | Failure |
+| --- | --- |
+| The civil-date string | `TypeError: instant.getTime is not a function`, in `versioned-child.ts` |
+| The flat mapping | `expected undefined to be '019df15b-…'` — every field lost |
+
+`pnpm verify` passes: all four gates, format, lint, typecheck, **1,113 tests** (103 in the API, up
+from 99) and build.
 
 ---
 

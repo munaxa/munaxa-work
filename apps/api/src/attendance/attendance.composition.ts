@@ -7,6 +7,7 @@ import {
   type EmploymentDirectoryPort,
   type EmploymentForAttendance,
 } from '@work/attendance';
+import type { EmploymentSnapshot, EmploymentView } from '@work/employment';
 import {
   runWithServiceGrant,
   type Command,
@@ -96,18 +97,58 @@ const EMPLOYMENT_READ = 'employment.employment.read';
  */
 const SCAN_PAGE = 200;
 
-interface EmploymentReadResult {
-  readonly employmentId: string;
-  readonly status: string;
-  readonly startDate: string;
-  readonly endDate?: string;
-  readonly unitId?: string;
-  readonly managerEmploymentId?: string;
+/**
+ * What Employment answers, taken from Employment's own published contract rather than mirrored.
+ *
+ * The composition root is the one place allowed to know both modules, so there is no reason to
+ * guess this shape — and guessing it is what went wrong. `employment.read-employment` returns an
+ * `EmploymentSnapshot`, which *wraps* the employment alongside its assignments, its reporting line
+ * and the status in force on the date asked for. The original adapter read it as though it were
+ * flat, so every field it took was `undefined`.
+ */
+interface EmploymentSearchResult {
+  readonly items: readonly EmploymentView[];
 }
 
-interface EmploymentSearchResult {
-  readonly items: readonly EmploymentReadResult[];
+/**
+ * The two Employment queries this adapter sends, typed rather than asserted.
+ *
+ * They mirror `employment.read-employment` and `employment.search`, and they exist because the
+ * alternative — an object literal cast to bare `Query` — is what let a defect through: a civil-date
+ * string was passed where the contract takes an instant, and the compiler could not see it because
+ * the cast had already discarded the shape.
+ *
+ * A mirror is not the real type; Employment does not export its query interfaces, and adding an
+ * export to a completed phase to satisfy a caller is the wrong direction. What the mirror buys is
+ * that the *next* mismatch is a compile error in this file rather than a `TypeError` in production,
+ * and `attendance.composition.spec.ts` covers the gap a mirror cannot: that the shape is still the
+ * one Employment actually answers.
+ */
+interface ReadEmploymentQuery extends Query {
+  readonly queryName: 'employment.read-employment';
+  readonly employmentId: string;
+  readonly asOf?: Date;
 }
+
+interface SearchEmploymentsQuery extends Query {
+  readonly queryName: 'employment.search';
+  readonly status?: string;
+  readonly size?: number;
+}
+
+/**
+ * A civil date, as the instant Employment's timelines are compared against.
+ *
+ * Attendance speaks civil dates — an attendance date is a date in a schedule's zone, not an instant.
+ * `employment.read-employment` takes an instant, and compares it through `DateRange.contains`, which
+ * calls `getTime()` on whatever it is given. A string reaching that comparison throws.
+ *
+ * UTC midnight is not a guess: it is the conversion Employment's own edge performs on a
+ * ten-character date (`employment/src/api/as-of.ts`), and Employment writes its effective dates the
+ * same way. Converting here rather than there keeps the translation in the adapter, which is what an
+ * adapter is for.
+ */
+const asOfInstant = (civilDate: string): Date => new Date(`${civilDate}T00:00:00.000Z`);
 
 /**
  * Employment, asked two questions and never told anything.
@@ -138,14 +179,14 @@ export class AttendanceEmploymentDirectory implements EmploymentDirectoryPort {
         reason: 'confirming the employment a time event belongs to, as at the attendance date',
       },
       () =>
-        this.sender.ask<EmploymentReadResult, Query>({
+        this.sender.ask<EmploymentSnapshot, ReadEmploymentQuery>({
           queryName: 'employment.read-employment',
           employmentId,
-          asOf,
-        } as Query),
+          asOf: asOfInstant(asOf),
+        }),
     );
 
-    return result.ok ? forAttendance(result.value) : undefined;
+    return result.ok ? fromSnapshot(result.value) : undefined;
   }
 
   public async activeEmployments(limit: number): Promise<readonly EmploymentForAttendance[]> {
@@ -157,26 +198,46 @@ export class AttendanceEmploymentDirectory implements EmploymentDirectoryPort {
         reason: 'listing the employments a roster or an attendance screen covers',
       },
       () =>
-        this.sender.ask<EmploymentSearchResult, Query>({
+        this.sender.ask<EmploymentSearchResult, SearchEmploymentsQuery>({
           queryName: 'employment.search',
           status: 'active',
           size: Math.min(limit, SCAN_PAGE),
-        } as Query),
+        }),
     );
 
     return result.ok ? result.value.items.map(forAttendance) : [];
   }
 }
 
-const forAttendance = (employment: EmploymentReadResult): EmploymentForAttendance => ({
+/**
+ * One employment as Attendance needs it, from the view the search returns.
+ *
+ * `EmploymentView` already carries its placement and its manager **as at the date it was resolved
+ * for**, so the unit and the manager are read from it rather than reconstructed.
+ */
+const forAttendance = (employment: EmploymentView): EmploymentForAttendance => ({
   employmentId: employment.employmentId,
   status: employment.status,
   startDate: employment.startDate,
   ...(employment.endDate === undefined ? {} : { endDate: employment.endDate }),
-  ...(employment.unitId === undefined ? {} : { unitId: employment.unitId }),
+  ...(employment.assignment?.unitId === undefined ? {} : { unitId: employment.assignment.unitId }),
   ...(employment.managerEmploymentId === undefined
     ? {}
     : { managerEmploymentId: employment.managerEmploymentId }),
+});
+
+/**
+ * The snapshot, flattened to what Attendance may hold.
+ *
+ * **`statusOn` is preferred over the employment row's `status`, and the difference is the whole
+ * reason this adapter passes a date at all.** The row answers "now"; `statusOn` is reconstructed
+ * from the status history and answers "then". An attendance day being recalculated for March must
+ * see March's status — reading the row would tell it whether the person is employed *today*, which
+ * is a different question and the wrong one.
+ */
+const fromSnapshot = (snapshot: EmploymentSnapshot): EmploymentForAttendance => ({
+  ...forAttendance(snapshot.employment),
+  status: snapshot.statusOn ?? snapshot.employment.status,
 });
 
 /** Everything Attendance needs, assembled. Registered by the identity module's composition. */
