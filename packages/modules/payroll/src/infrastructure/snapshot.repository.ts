@@ -1,7 +1,7 @@
 import { uuidV7, type Transaction } from '@work/kernel';
 
 import { snapshotDigest, type EmploymentSnapshot } from '../domain/payroll-snapshot.js';
-import type { SnapshotStore, StoredDigests } from '../application/payroll-ports.js';
+import type { CostAllocation, SnapshotStore, StoredDigests } from '../application/payroll-ports.js';
 import { snapshotDigests, snapshotState, type SnapshotRow } from './run-rows.js';
 
 /**
@@ -60,6 +60,35 @@ export class PostgresSnapshotRepository implements SnapshotStore {
     );
 
     return new Map(rows.map((row) => [row.employment_id, snapshotDigests(row)]));
+  }
+
+  /** See `SnapshotStore.allocationsFor`: one statement, two projected fields, no blob. */
+  public async allocationsFor(
+    transaction: Transaction,
+    runId: string,
+  ): Promise<ReadonlyMap<string, CostAllocation>> {
+    const rows = await transaction.execute<{
+      employment_id: string;
+      cost_center_id: string | null;
+      unit_id: string | null;
+    }>(
+      `select employment_id,
+              employment_facts ->> 'costCenterId' as cost_center_id,
+              employment_facts ->> 'unitId' as unit_id
+         from payroll_input_snapshot
+         where tenant_id = $1 and payroll_run_id = $2 and deleted_at is null`,
+      [transaction.tenantId, runId],
+    );
+
+    return new Map(
+      rows.map((row) => [
+        row.employment_id,
+        {
+          ...(row.cost_center_id === null ? {} : { costCenterId: row.cost_center_id }),
+          ...(row.unit_id === null ? {} : { unitId: row.unit_id }),
+        },
+      ]),
+    );
   }
 
   /**

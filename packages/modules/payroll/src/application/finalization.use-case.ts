@@ -63,15 +63,16 @@ export const finalizeRunHandler = (
 
       if (!outputs.ok) return refusedBy<RunFinalized>(outputs.error);
 
-      await dependencies.stores.accounting.insertMany(transaction, outputs.accounting);
-      await dependencies.stores.payments.insertMany(transaction, outputs.payments);
+      const moment = dependencies.clock.now();
+
+      // Written already finalized. These rows exist only because this command created them, so
+      // there is no moment at which either is legally mutable, and stamping them on insert saves
+      // the sweep re-touching three hundred thousand rows written seconds earlier.
+      await dependencies.stores.accounting.insertMany(transaction, outputs.accounting, moment);
+      await dependencies.stores.payments.insertMany(transaction, outputs.payments, moment);
       await dependencies.stores.runs.update(transaction, finalized.value, context.run.version);
       // Last, because it is what makes every row above immutable: after this the trigger refuses.
-      await dependencies.stores.runs.finalize(
-        transaction,
-        context.run.payrollRunId,
-        dependencies.clock.now(),
-      );
+      await dependencies.stores.runs.finalize(transaction, context.run.payrollRunId, moment);
 
       transaction.collect([
         payrollEvent(
@@ -153,15 +154,20 @@ const generate = async (
 ): Promise<Generated> => {
   const accounting: AccountingLine[] = [];
   const payments: PaymentInstruction[] = [];
+  // **One query for the whole run**, not one per employment. Asking for each employment's snapshot
+  // separately was a hundred thousand round trips at a hundred thousand people, and the benchmark
+  // measured it at 71 s against a 20 s budget. Only the two fields cost allocation needs are
+  // projected, so the map stays small where a full snapshot would carry every compensation
+  // component for everybody.
+  const allocations = await dependencies.stores.snapshots.allocationsFor(
+    transaction,
+    context.run.payrollRunId,
+  );
 
   for (const result of context.results) {
-    const snapshot = await dependencies.stores.snapshots.forEmployment(
-      transaction,
-      context.run.payrollRunId,
-      result.employmentId,
-    );
-    const centre = snapshot?.employment?.costCenterId;
-    const unit = snapshot?.employment?.unitId;
+    const allocation = allocations.get(result.employmentId);
+    const centre = allocation?.costCenterId;
+    const unit = allocation?.unitId;
     const lines = accountingFor({
       result,
       allocations:

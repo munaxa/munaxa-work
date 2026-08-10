@@ -81,6 +81,12 @@ export interface RunStore {
   finalize(transaction: Transaction, runId: string, moment: Date): Promise<void>;
 }
 
+/** Where an employment's cost belongs, as the snapshot recorded it. Both may legitimately be absent. */
+export interface CostAllocation {
+  readonly costCenterId?: string;
+  readonly unitId?: string;
+}
+
 export interface SnapshotStore {
   forRun(transaction: Transaction, runId: string): Promise<readonly EmploymentSnapshot[]>;
   forEmployment(
@@ -109,6 +115,20 @@ export interface SnapshotStore {
     runId: string,
     employmentIds: readonly string[],
   ): Promise<void>;
+
+  /**
+   * The cost allocation for every employment in a run, in **one** query.
+   *
+   * Finalization needs a cost centre and a unit per result, and it used to ask for each employment's
+   * whole snapshot one at a time — a hundred thousand round trips for a hundred thousand people,
+   * which the benchmark measured at 71 seconds against a 20-second budget. This projects the two
+   * fields it actually needs, so the cost is one statement and a small map rather than a round trip
+   * and a compensation blob per person.
+   */
+  allocationsFor(
+    transaction: Transaction,
+    runId: string,
+  ): Promise<ReadonlyMap<string, CostAllocation>>;
 }
 
 export interface StoredDigests {
@@ -223,14 +243,33 @@ export interface ReconciliationStore {
   insertMany(transaction: Transaction, records: readonly ReconciliationRecord[]): Promise<void>;
 }
 
+/**
+ * Both outputs are written **already finalized**.
+ *
+ * They exist only because finalization created them, so there is no moment at which one is legally
+ * mutable — and stamping `finalized_at` on insert rather than by a sweep afterwards saves updating
+ * three hundred thousand rows that were written seconds earlier. The benchmark measured that sweep;
+ * it was a third of finalization's cost at a hundred thousand employees.
+ *
+ * The trigger therefore protects these rows from the instant they exist, which is strictly stronger
+ * than protecting them a statement later.
+ */
 export interface AccountingStore {
   forRun(transaction: Transaction, runId: string, paged: Paged): Promise<Page<AccountingLine>>;
-  insertMany(transaction: Transaction, lines: readonly AccountingLine[]): Promise<void>;
+  insertMany(
+    transaction: Transaction,
+    lines: readonly AccountingLine[],
+    finalizedAt: Date,
+  ): Promise<void>;
 }
 
 export interface PaymentStore {
   forRun(transaction: Transaction, runId: string, paged: Paged): Promise<Page<PaymentInstruction>>;
-  insertMany(transaction: Transaction, instructions: readonly PaymentInstruction[]): Promise<void>;
+  insertMany(
+    transaction: Transaction,
+    instructions: readonly PaymentInstruction[],
+    finalizedAt: Date,
+  ): Promise<void>;
 }
 
 export interface DashboardCounts {

@@ -49,11 +49,18 @@ export class PostgresAccountingRepository implements AccountingStore {
     );
   }
 
-  public insertMany(transaction: Transaction, lines: readonly AccountingLine[]): Promise<void> {
+  public insertMany(
+    transaction: Transaction,
+    lines: readonly AccountingLine[],
+    finalizedAt: Date,
+  ): Promise<void> {
     return insertRows(
       transaction,
       'payroll_accounting_line',
-      lines.map((line) => accountingValues(line, transaction.tenantId)),
+      lines.map((line) => ({
+        ...accountingValues(line, transaction.tenantId),
+        finalized_at: finalizedAt,
+      })),
       new Date(),
     );
   }
@@ -88,11 +95,15 @@ export class PostgresPaymentRepository implements PaymentStore {
   public insertMany(
     transaction: Transaction,
     instructions: readonly PaymentInstruction[],
+    finalizedAt: Date,
   ): Promise<void> {
     return insertRows(
       transaction,
       'payroll_payment_instruction',
-      instructions.map((instruction) => paymentValues(instruction, transaction.tenantId)),
+      instructions.map((instruction) => ({
+        ...paymentValues(instruction, transaction.tenantId),
+        finalized_at: finalizedAt,
+      })),
       new Date(),
     );
   }

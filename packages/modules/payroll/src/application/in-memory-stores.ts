@@ -197,6 +197,24 @@ const recordStores = (tables: Tables): Pick<PayrollStores, 'snapshots' | 'except
         for (const employmentId of employmentIds) snapshots.delete(`${runId}:${employmentId}`);
         return Promise.resolve();
       },
+      allocationsFor: (_transaction, runId) =>
+        Promise.resolve(
+          new Map(
+            [...snapshots.values()]
+              .filter((held) => held.runId === runId)
+              .map((held) => [
+                held.employmentId,
+                {
+                  ...(held.employment?.costCenterId === undefined
+                    ? {}
+                    : { costCenterId: held.employment.costCenterId }),
+                  ...(held.employment?.unitId === undefined
+                    ? {}
+                    : { unitId: held.employment.unitId }),
+                },
+              ]),
+          ),
+        ),
     },
 
     exceptions: {
