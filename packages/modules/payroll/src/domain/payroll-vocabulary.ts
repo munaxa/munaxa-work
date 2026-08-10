@@ -221,6 +221,15 @@ export const EXCEPTION_CODES = [
   'net_would_be_negative',
   'cost_centre_missing',
   'duplicate_one_time',
+  /**
+   * The group's eligibility rule could not be evaluated for this employment.
+   *
+   * Distinct from being excluded by it. Both leave somebody unpaid and only one of them should:
+   * this one is a broken configuration, and recording it means a misconfigured rule shows up as a
+   * number somebody must resolve before the run can be finalized, rather than as a quietly smaller
+   * payroll.
+   */
+  'eligibility_rule_failed',
 ] as const;
 export type ExceptionCode = (typeof EXCEPTION_CODES)[number];
 
