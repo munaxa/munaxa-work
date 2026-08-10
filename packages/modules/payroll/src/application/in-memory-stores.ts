@@ -164,8 +164,13 @@ const executionStores = (tables: Tables): Pick<PayrollStores, 'runs'> => {
   };
 };
 
-const recordStores = (tables: Tables): Pick<PayrollStores, 'snapshots' | 'exceptions'> => {
-  const { snapshots, exceptions } = tables;
+const recordStores = (tables: Tables): Pick<PayrollStores, 'snapshots' | 'exceptions'> => ({
+  ...snapshotStore(tables),
+  ...exceptionStore(tables),
+});
+
+const snapshotStore = (tables: Tables): Pick<PayrollStores, 'snapshots'> => {
+  const { snapshots } = tables;
 
   return {
     snapshots: {
@@ -216,7 +221,13 @@ const recordStores = (tables: Tables): Pick<PayrollStores, 'snapshots' | 'except
           ),
         ),
     },
+  };
+};
 
+const exceptionStore = (tables: Tables): Pick<PayrollStores, 'exceptions'> => {
+  const { exceptions } = tables;
+
+  return {
     exceptions: {
       forRun: (_transaction, runId) =>
         Promise.resolve(exceptions.filter((held) => held.payrollRunId === runId)),
