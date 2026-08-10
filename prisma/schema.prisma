@@ -2052,3 +2052,485 @@ model AttendanceImportBatch {
   @@index([tenant_id, submitted_at], map: "attendance_import_batch_idx")
   @@map("attendance_import_batch")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// Leave & Absence Management (Phase 9)
+//
+// Leave owns the authorization to be absent. Attendance owns what actually happened. Payroll owns
+// what it costs. Fourteen tables, and three of them carry the module's whole reliability argument:
+// `leave_ledger_entry` is append-only and authoritative, `leave_balance` is a projection derived
+// from it, and `leave_request_day` is the coverage Attendance reads.
+//
+// No column here holds money. No table holds a person, an employee number or an employment status.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/// A category of leave, entirely tenant-configured. Nothing is seeded — not annual, not sick, not
+/// a code. `statutory_source_code` is null until a country pack authors one (00B, ADR-0025).
+model LeaveType {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  code                  String    @db.VarChar(64)
+  name                  Json
+  /// The unit the type is *expressed* in. Storage is always minutes.
+  unit                  String    @db.VarChar(16)
+  /// A tenant or country-pack code. Leave stores it and never interprets it; Payroll does.
+  paid_treatment_code   String    @db.VarChar(64)
+  /// Whether the type has entitlement at all. Unpaid leave typically does not.
+  accrues               Boolean
+  requires_attachment   Boolean
+  requires_replacement  Boolean
+  requires_contact      Boolean
+  requires_address      Boolean
+  /// A code, never an enumeration of our own — maternity and Iddah leave without this product
+  /// deciding who may take them.
+  gender_restriction    String?   @db.VarChar(32)
+  statutory_source_code String?   @db.VarChar(64)
+  status                String    @db.VarChar(24)
+  version_number        Int
+  published_at          DateTime? @db.Timestamptz(6)
+  published_by          String?   @db.VarChar(255)
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, status], map: "leave_type_status_idx")
+  @@map("leave_type")
+}
+
+/// The rules governing one leave type, versioned and effective-dated. A published version never
+/// changes; a request records which version governed it, so June cannot re-entitle March.
+model LeavePolicy {
+  id                                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                          String    @db.Uuid
+  leave_type_id                      String    @db.Uuid
+  code                               String    @db.VarChar(64)
+  name                               Json
+  version_number                     Int
+  status                             String    @db.VarChar(24)
+  effective_from                     DateTime  @db.Date
+  effective_to                       DateTime? @db.Date
+  minimum_service_months             Int
+  available_during_probation         Boolean
+  /// A RuleDefinition evaluated by the shared rule engine. A country pack supplies bands as data.
+  eligibility_rule                   Json?
+  maximum_consecutive_minutes        Int?
+  maximum_per_request_minutes        Int?
+  maximum_per_year_minutes           Int?
+  minimum_notice_days                Int
+  maximum_backdate_days              Int
+  hourly_permitted                   Boolean
+  hourly_minimum_minutes             Int?
+  hourly_maximum_per_day_minutes     Int?
+  hourly_maximum_per_month_minutes   Int?
+  half_day_permitted                 Boolean
+  /// `working_days` asks Attendance; `calendar_days` counts every date. Never a silent fallback.
+  duration_basis                     String    @db.VarChar(16)
+  /// Zero prohibits a negative balance; a positive value is a floor; null is unlimited.
+  negative_balance_limit_minutes     Int?
+  accrual_method                     String    @db.VarChar(24)
+  accrual_amount_minutes             Int
+  proration_basis                    String    @db.VarChar(24)
+  carry_over_method                  String    @db.VarChar(24)
+  carry_over_cap_minutes             Int?
+  carry_over_cap_percent             Int?
+  carry_over_expiry_months           Int?
+  /// Which calendar governs the leave year. Configuration, not code (00B).
+  leave_year_calendar                String    @db.VarChar(16)
+  leave_year_start_month             Int       @db.SmallInt
+  leave_year_start_day               Int       @db.SmallInt
+  approval_required                  Boolean
+  approvals_required                 Int       @db.SmallInt
+  self_approval_permitted            Boolean
+  /// Eligibility only. What an encashable minute is worth is Payroll's (ADR-0054).
+  encashable                         Boolean
+  encashment_cap_minutes             Int?
+  attachment_required_beyond_minutes Int?
+  country_pack_id                    String?   @db.VarChar(64)
+  country_pack_version               String?   @db.VarChar(32)
+  published_at                       DateTime? @db.Timestamptz(6)
+  published_by                       String?   @db.VarChar(255)
+  metadata                           Json
+  created_at                         DateTime  @db.Timestamptz(6)
+  created_by                         String    @db.VarChar(255)
+  updated_at                         DateTime  @db.Timestamptz(6)
+  updated_by                         String    @db.VarChar(255)
+  deleted_at                         DateTime? @db.Timestamptz(6)
+  deleted_by                         String?   @db.VarChar(255)
+  version                            Int
+
+  @@index([tenant_id, leave_type_id, status], map: "leave_policy_type_idx")
+  @@map("leave_policy")
+}
+
+/// Which employments a policy version governs. Most-specific scope wins, as at the leave date.
+model LeavePolicyAssignment {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  leave_policy_id   String    @db.Uuid
+  /// `tenant` | `legal_entity` | `unit` | `employment`. A pack resolves from the legal entity.
+  scope             String    @db.VarChar(24)
+  scope_id          String?   @db.Uuid
+  effective_from    DateTime  @db.Date
+  effective_to      DateTime? @db.Date
+  reason_code       String?   @db.VarChar(64)
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, scope, scope_id, effective_from], map: "leave_policy_assignment_scope_idx")
+  @@map("leave_policy_assignment")
+}
+
+/// A grant for one employment, one leave type and one leave year. An input to a balance, not a
+/// balance. Every grant names where it came from.
+model LeaveEntitlement {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  employment_id     String    @db.Uuid
+  leave_type_id     String    @db.Uuid
+  leave_policy_id   String    @db.Uuid
+  leave_year_start  DateTime  @db.Date
+  leave_year_end    DateTime  @db.Date
+  granted_minutes   Int
+  /// `opening` | `accrual` | `carry_over` | `adjustment` | `statutory`
+  source            String    @db.VarChar(24)
+  source_id         String?   @db.Uuid
+  reason_code       String?   @db.VarChar(64)
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, employment_id, leave_type_id, leave_year_start], map: "leave_entitlement_bucket_idx")
+  @@map("leave_entitlement")
+}
+
+/// The authoritative record of every balance movement. Inserted and read; never updated, never
+/// deleted. A correction is a reversal plus a replacement. `minutes` is signed: credits positive,
+/// consumption and expiry negative, so a balance is a sum rather than a case expression.
+model LeaveLedgerEntry {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  employment_id     String    @db.Uuid
+  leave_type_id     String    @db.Uuid
+  leave_year_start  DateTime  @db.Date
+  /// `opening` | `accrual` | `carry_in` | `carry_out` | `consumption` | `expiry` | `adjustment` | `reversal`
+  kind              String    @db.VarChar(24)
+  minutes           Int
+  /// The civil date the movement belongs to, which may be back-dated.
+  effective_on      DateTime  @db.Date
+  /// When it was written. Distinct from `effective_on`, always.
+  recorded_at       DateTime  @db.Timestamptz(6)
+  /// `request` | `accrual_run` | `adjustment` | `leave_year` | `entitlement`
+  source_kind       String    @db.VarChar(24)
+  source_id         String    @db.Uuid
+  reverses_entry_id String?   @db.Uuid
+  leave_policy_id   String?   @db.Uuid
+  reason_code       String?   @db.VarChar(64)
+  note              String?   @db.VarChar(1024)
+  /// The projected balance before and after, captured when the row is written, so "what did this
+  /// change" needs no replay.
+  balance_before_minutes Int
+  balance_after_minutes  Int
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, employment_id, leave_type_id, leave_year_start, effective_on], map: "leave_ledger_bucket_idx")
+  @@index([tenant_id, source_kind, source_id], map: "leave_ledger_source_idx")
+  @@map("leave_ledger_entry")
+}
+
+/// The balance projection. Never written except by recalculation from the ledger; a stale mark and
+/// a digest make a wrong figure detectable rather than plausible (ADR-0053's pattern).
+model LeaveBalance {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  employment_id          String    @db.Uuid
+  leave_type_id          String    @db.Uuid
+  leave_year_start       DateTime  @db.Date
+  leave_year_end         DateTime  @db.Date
+  opening_minutes        Int
+  accrued_minutes        Int
+  carried_in_minutes     Int
+  consumed_minutes       Int
+  adjusted_minutes       Int
+  expired_minutes        Int
+  carried_out_minutes    Int
+  available_minutes      Int
+  entries_digest         String    @db.VarChar(64)
+  entry_count            Int
+  calculated_at          DateTime? @db.Timestamptz(6)
+  /// Set in the same transaction as the ledger write that moved an input. Cleared by recalculation.
+  inputs_changed_at      DateTime? @db.Timestamptz(6)
+  closed_at              DateTime? @db.Timestamptz(6)
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@index([tenant_id, employment_id], map: "leave_balance_employment_idx")
+  @@map("leave_balance")
+}
+
+/// One request for authorized absence. Carries no employment fact and no money.
+model LeaveRequest {
+  id                        String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                 String    @db.Uuid
+  employment_id             String    @db.Uuid
+  leave_type_id             String    @db.Uuid
+  leave_policy_id           String    @db.Uuid
+  from_date                 DateTime  @db.Date
+  to_date                   DateTime  @db.Date
+  total_minutes             Int
+  duration_basis            String    @db.VarChar(16)
+  state                     String    @db.VarChar(24)
+  reason_code               String?   @db.VarChar(64)
+  justification             String?   @db.VarChar(1024)
+  requested_by              String    @db.VarChar(255)
+  requested_at              DateTime  @db.Timestamptz(6)
+  submitted_at              DateTime? @db.Timestamptz(6)
+  /// What they had when they asked. The first question in every dispute.
+  balance_at_request_minutes Int
+  approvals_required        Int       @db.SmallInt
+  approved_at               DateTime? @db.Timestamptz(6)
+  rejected_at               DateTime? @db.Timestamptz(6)
+  cancelled_at              DateTime? @db.Timestamptz(6)
+  cancelled_by              String?   @db.VarChar(255)
+  cancellation_reason_code  String?   @db.VarChar(64)
+  withdrawn_at              DateTime? @db.Timestamptz(6)
+  contact_during_absence    String?   @db.VarChar(255)
+  address_during_absence    String?   @db.VarChar(512)
+  /// Covers the work. Distinct from the delegation, which covers the authority.
+  replacement_employment_id String?   @db.Uuid
+  /// Workforce Identity owns delegations. Referenced, never copied.
+  delegation_id             String?   @db.Uuid
+  /// A reference. Leave stores no bytes.
+  attachment_reference      String?   @db.VarChar(512)
+  supersedes_request_id     String?   @db.Uuid
+  /// Reserved for Workflow (Phase 16). Null while Leave records the decision directly.
+  approval_id               String?   @db.VarChar(64)
+  metadata                  Json
+  created_at                DateTime  @db.Timestamptz(6)
+  created_by                String    @db.VarChar(255)
+  updated_at                DateTime  @db.Timestamptz(6)
+  updated_by                String    @db.VarChar(255)
+  deleted_at                DateTime? @db.Timestamptz(6)
+  deleted_by                String?   @db.VarChar(255)
+  version                   Int
+
+  @@index([tenant_id, employment_id, from_date], map: "leave_request_employment_idx")
+  @@index([tenant_id, state, requested_at], map: "leave_request_queue_idx")
+  @@map("leave_request")
+}
+
+/// The authoritative coverage: one row per civil date a request covers. This is exactly what the
+/// Leave directory contract returns, so Attendance and Leave cannot disagree about which dates are
+/// covered. A date on which nothing was expected has no row.
+model LeaveRequestDay {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  leave_request_id  String    @db.Uuid
+  employment_id     String    @db.Uuid
+  on_date           DateTime  @db.Date
+  /// `full_day` | `first_half` | `second_half` | `hours`
+  portion           String    @db.VarChar(16)
+  minutes           Int
+  /// The minutes-of-day the portion occupies, as a range, maintained by the database. It exists so
+  /// the exclusion constraint can refuse an overlap that application code alone would race on:
+  /// a full day is [0,1440), the halves are [0,720) and [720,1440), and an hourly portion is its
+  /// own span. Two halves coexist; a full day and anything else do not.
+  span              Unsupported("int4range")?
+  /// Wall clock, for an hourly portion, meant in `zone`.
+  start_local       String?   @db.VarChar(5)
+  end_local         String?   @db.VarChar(5)
+  zone              String    @db.VarChar(64)
+  /// What Attendance said was expected on this date, recorded so the charge stays reproducible.
+  expected_minutes  Int
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, employment_id, on_date], map: "leave_request_day_coverage_idx")
+  @@index([tenant_id, leave_request_id], map: "leave_request_day_request_idx")
+  @@map("leave_request_day")
+}
+
+/// One decision by one named human. Inserted and read; a correction is a reversal. `requested_by`
+/// is copied here so the self-approval check constraint is enforceable in the database.
+model LeaveRequestDecision {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  leave_request_id     String    @db.Uuid
+  sequence             Int       @db.SmallInt
+  decision             String    @db.VarChar(16)
+  decided_by           String    @db.VarChar(255)
+  decided_at           DateTime  @db.Timestamptz(6)
+  requested_by         String    @db.VarChar(255)
+  comment              String?   @db.VarChar(1024)
+  reverses_decision_id String?   @db.Uuid
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, leave_request_id, sequence], map: "leave_request_decision_chain_idx")
+  @@map("leave_request_decision")
+}
+
+/// Every movement of a request, appended and never amended. What state a request was in on a date
+/// must be answerable to somebody who was not subscribed.
+model LeaveRequestEvent {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  leave_request_id String    @db.Uuid
+  kind             String    @db.VarChar(32)
+  from_state       String?   @db.VarChar(24)
+  to_state         String?   @db.VarChar(24)
+  detail           String?   @db.VarChar(1024)
+  occurred_at      DateTime  @db.Timestamptz(6)
+  recorded_by      String    @db.VarChar(255)
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@index([tenant_id, leave_request_id, occurred_at], map: "leave_request_event_idx")
+  @@map("leave_request_event")
+}
+
+/// The administrative record behind an `adjustment` ledger entry. Never a silent balance change.
+model LeaveAdjustment {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  employment_id    String    @db.Uuid
+  leave_type_id    String    @db.Uuid
+  leave_year_start DateTime  @db.Date
+  minutes          Int
+  effective_on     DateTime  @db.Date
+  reason_code      String    @db.VarChar(64)
+  note             String    @db.VarChar(1024)
+  adjusted_by      String    @db.VarChar(255)
+  adjusted_at      DateTime  @db.Timestamptz(6)
+  metadata         Json
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@index([tenant_id, employment_id, leave_type_id], map: "leave_adjustment_employment_idx")
+  @@map("leave_adjustment")
+}
+
+/// One accrual run: what it covered and what it wrote. Idempotency and provenance for a rerun.
+model LeaveAccrualRun {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  leave_policy_id       String    @db.Uuid
+  leave_type_id         String    @db.Uuid
+  period_start          DateTime  @db.Date
+  period_end            DateTime  @db.Date
+  run_by                String    @db.VarChar(255)
+  run_at                DateTime  @db.Timestamptz(6)
+  employments_examined  Int
+  entries_written       Int
+  entries_skipped       Int
+  refusals              Int
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, leave_policy_id, period_start], map: "leave_accrual_run_idx")
+  @@map("leave_accrual_run")
+}
+
+/// A period a policy forbids leave in — a stocktake, a month-end. Organizational rather than a
+/// property of a leave type, so it is scoped like an assignment.
+model LeaveBlackout {
+  id              String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  leave_type_id   String?   @db.Uuid
+  scope           String    @db.VarChar(24)
+  scope_id        String?   @db.Uuid
+  name            Json
+  from_date       DateTime  @db.Date
+  to_date         DateTime  @db.Date
+  reason_code     String?   @db.VarChar(64)
+  created_at      DateTime  @db.Timestamptz(6)
+  created_by      String    @db.VarChar(255)
+  updated_at      DateTime  @db.Timestamptz(6)
+  updated_by      String    @db.VarChar(255)
+  deleted_at      DateTime? @db.Timestamptz(6)
+  deleted_by      String?   @db.VarChar(255)
+  version         Int
+
+  @@index([tenant_id, from_date, to_date], map: "leave_blackout_period_idx")
+  @@map("leave_blackout")
+}
+
+/// A closed leave year, with the carry pair it produced. Closing does not delete a projection:
+/// "what did they have on the last day of 2026" must be answerable in 2029.
+model LeaveYear {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  leave_policy_id     String    @db.Uuid
+  leave_type_id       String    @db.Uuid
+  leave_year_start    DateTime  @db.Date
+  leave_year_end      DateTime  @db.Date
+  closed_at           DateTime  @db.Timestamptz(6)
+  closed_by           String    @db.VarChar(255)
+  employments_closed  Int
+  carried_out_minutes Int
+  carried_in_minutes  Int
+  expired_minutes     Int
+  metadata            Json
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@index([tenant_id, leave_policy_id, leave_year_start], map: "leave_year_idx")
+  @@map("leave_year")
+}

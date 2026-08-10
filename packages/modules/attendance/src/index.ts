@@ -28,16 +28,16 @@ export {
   AttendancePermissions,
 } from './application/attendance-permissions.js';
 export type { AttendancePermission } from './application/attendance-permissions.js';
-export { leaveUnavailable, systemClock } from './application/attendance-ports.js';
+export { leaveUnavailable, systemClock } from './application/cross-module-ports.js';
+export type { AttendanceStores } from './application/attendance-ports.js';
 export type {
   ApprovedLeaveDay,
-  AttendanceStores,
   Clock,
   EmploymentDirectoryPort,
   EmploymentForAttendance,
   LeaveCoverage,
   LeaveDirectoryPort,
-} from './application/attendance-ports.js';
+} from './application/cross-module-ports.js';
 export type { AttendanceDependencies } from './application/attendance-dependencies.js';
 export type { CommandSender } from './application/transfer.use-case.js';
 export { postgresAttendanceStores } from './infrastructure/attendance-stores.js';
@@ -55,6 +55,23 @@ export type {
   RecalculationOutcome,
 } from './application/recalculate.use-case.js';
 export type { AwaitingRecalculationView } from './application/reconciliation-query.js';
+
+/**
+ * The working-day read Leave consumes, and the reconciliation Attendance runs against Leave.
+ *
+ * Both are Phase 9 additions and both keep the dependency pointing one way: Attendance publishes
+ * what it knows about a working pattern, and Attendance *pulls* leave changes rather than Leave
+ * pushing them. Leave never writes an Attendance row (ADR-0058).
+ */
+export type {
+  ExpectedWorkingDayView,
+  ExpectedWorkingDays,
+  ExpectedWorkingDaysView,
+} from './application/working-day-query.js';
+export type {
+  LeaveReconciliationOutcome,
+  ReconcileLeaveCommand,
+} from './application/leave-reconciliation.use-case.js';
 export type { AttendanceExport } from './application/transfer.use-case.js';
 
 // Transport — the controllers the API mounts.

@@ -59,6 +59,7 @@ import {
   DeferredAttendanceSender,
   attendanceModuleFor,
 } from '../attendance/attendance.composition.js';
+import { DeferredLeaveDispatcher, leaveModuleFor } from '../leave/leave.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -114,6 +115,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         recruitment: new DeferredRecruitmentSender(),
         onboarding: new DeferredOnboardingSender(),
         attendance: new DeferredAttendanceSender(),
+        leave: new DeferredLeaveDispatcher(),
       }),
     },
     {
@@ -174,6 +176,10 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         registry.register(recruitmentModuleFor(unitOfWork, senders.recruitment));
         registry.register(onboardingModuleFor(unitOfWork, senders.onboarding));
         registry.register(attendanceModuleFor(unitOfWork, senders.attendance));
+        // Leave is registered after Attendance, and the order is not arbitrary: Attendance's leave
+        // adapter asks Leave's published read, and Leave's working-day adapter asks Attendance's.
+        // Both go through the one dispatcher assembled below, so neither module imports the other.
+        registry.register(leaveModuleFor(unitOfWork, senders.leave));
         return registry;
       },
     },
@@ -203,6 +209,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         senders.recruitment.attach(dispatcher);
         senders.onboarding.attach(dispatcher);
         senders.attendance.attach(dispatcher);
+        senders.leave.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -230,6 +237,7 @@ interface DeferredSenders {
   readonly recruitment: DeferredRecruitmentSender;
   readonly onboarding: DeferredOnboardingSender;
   readonly attendance: DeferredAttendanceSender;
+  readonly leave: DeferredLeaveDispatcher;
 }
 
 /**

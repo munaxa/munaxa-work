@@ -1,11 +1,7 @@
 import type { UnitOfWork } from '@work/kernel';
 
-import type {
-  AttendanceStores,
-  Clock,
-  EmploymentDirectoryPort,
-  LeaveDirectoryPort,
-} from './attendance-ports.js';
+import type { AttendanceStores } from './attendance-ports.js';
+import type { Clock, EmploymentDirectoryPort, LeaveDirectoryPort } from './cross-module-ports.js';
 
 /**
  * Everything this module's use cases need, injected once.

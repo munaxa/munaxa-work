@@ -22,7 +22,7 @@ import type {
   EmploymentForAttendance,
   LeaveCoverage,
   LeaveDirectoryPort,
-} from './attendance-ports.js';
+} from './cross-module-ports.js';
 import type { CommandSender } from './transfer.use-case.js';
 
 /**
@@ -130,6 +130,17 @@ export class FakeLeave implements LeaveDirectoryPort {
   }
 
   public approvedLeaveFor(): Promise<LeaveCoverage> {
+    return Promise.resolve(this.answer);
+  }
+
+  /**
+   * The incremental read Attendance's reconciliation calls.
+   *
+   * The fake ignores `changedSince` and answers with whatever it holds: what the reconciliation
+   * test is about is the *direction* — Attendance asking Leave and marking its own days — and a
+   * fake that filtered by an instant would only be testing the fake.
+   */
+  public approvedLeaveAffecting(): Promise<LeaveCoverage> {
     return Promise.resolve(this.answer);
   }
 }

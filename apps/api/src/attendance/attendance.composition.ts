@@ -1,6 +1,5 @@
 import {
   attendanceModule,
-  leaveUnavailable,
   postgresAttendanceStores,
   systemClock,
   type CommandSender,
@@ -8,6 +7,9 @@ import {
   type EmploymentForAttendance,
 } from '@work/attendance';
 import type { EmploymentSnapshot, EmploymentView } from '@work/employment';
+
+import { AttendanceLeaveDirectory } from './leave.directory.js';
+import type { Asking } from '../leave/leave.composition.js';
 import {
   runWithServiceGrant,
   type Command,
@@ -37,11 +39,16 @@ import {
  *   and every event still names the human being who asked;
  * - is **observable**: every elevation is logged with the operation that caused it.
  *
- * **Leave is wired to the adapter that says "nobody can be asked".** There is no Leave module in
- * this repository, and `leaveUnavailable` answers `{ known: false }` honestly. Wiring a stub that
- * answered "no leave approved" would turn every unexplained absence into an absence *without leave*
- * on somebody's record — a false statement the product has no way to support (ADR-0056). Phase 9
- * replaces this line with a real adapter and nothing else in the module changes.
+ * **Leave is now wired to the real thing.** Phase 8 left this as `leaveUnavailable`, which answered
+ * `{ known: false }` honestly because there was no Leave module. Phase 9 supplies
+ * `AttendanceLeaveDirectory`, and — exactly as that comment predicted — **nothing else in this
+ * module changed**: the port was the right shape, the three answers were already modelled, and the
+ * calculation already distinguished "no leave" from "nobody could be asked".
+ *
+ * The adapter keeps that third answer. Every failure path in it returns `{ known: false }`,
+ * including a thrown exception, because collapsing a Leave outage into "no leave approved" would
+ * write absence *without leave* onto somebody's record on the strength of a system fault
+ * (ADR-0056).
  *
  * Note what is absent, and stays absent. There is **no `create`** on the adapter and no `personId`
  * anywhere in it. Employment owns the employment; Attendance references it and copies no fact from
@@ -57,7 +64,7 @@ import {
  * the seam is made explicit. It refuses rather than returning something wrong if used before
  * attachment.
  */
-export class DeferredAttendanceSender implements CommandSender {
+export class DeferredAttendanceSender implements CommandSender, Asking {
   private dispatcher: Dispatcher | undefined;
 
   public attach(dispatcher: Dispatcher): void {
@@ -250,8 +257,9 @@ export const attendanceModuleFor = (
       unitOfWork,
       stores: postgresAttendanceStores(),
       employment: new AttendanceEmploymentDirectory(sender),
-      // The honest adapter, not a stub that would invent an answer (ADR-0056).
-      leave: leaveUnavailable,
+      // The real Leave read, under a bounded grant. Its failure path answers "nobody could be
+      // asked" rather than "no leave approved" (ADR-0056).
+      leave: new AttendanceLeaveDirectory(sender),
       clock: systemClock,
     },
     sender,

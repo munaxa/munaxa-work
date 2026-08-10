@@ -23,7 +23,7 @@ import {
 import { resolveExpectation } from './expectation-resolution.js';
 import { AttendancePermissions } from './attendance-permissions.js';
 import type { AttendanceDependencies } from './attendance-dependencies.js';
-import type { LeaveCoverage } from './attendance-ports.js';
+import type { LeaveCoverage } from './cross-module-ports.js';
 
 /**
  * Recalculation, and the reconciliation that makes it reliable.

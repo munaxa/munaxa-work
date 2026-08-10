@@ -2,6 +2,8 @@ import type { Command, CommandHandler, Query, QueryHandler, WorkModule } from '@
 
 import { recordEventHandler } from './ingest.use-case.js';
 import { recalculateHandler } from './recalculate.use-case.js';
+import { reconcileLeaveHandler } from './leave-reconciliation.use-case.js';
+import { expectedWorkingDaysHandler } from './working-day-query.js';
 import { daysAwaitingRecalculationHandler } from './reconciliation-query.js';
 import { approveDayHandler, resolveExceptionHandler, reviewDayHandler } from './day.use-case.js';
 import {
@@ -77,6 +79,7 @@ const commandsOf = (
   [
     recordEventHandler(dependencies),
     recalculateHandler(dependencies),
+    reconcileLeaveHandler(dependencies),
 
     reviewDayHandler(dependencies),
     approveDayHandler(dependencies),
@@ -113,6 +116,7 @@ const queriesOf = (dependencies: AttendanceDependencies): readonly QueryHandler<
     readSnapshotsHandler(dependencies),
     readDashboardHandler(dependencies),
     daysAwaitingRecalculationHandler(dependencies),
+    expectedWorkingDaysHandler(dependencies),
     exportAttendanceHandler(dependencies),
 
     listShiftsHandler(dependencies),
