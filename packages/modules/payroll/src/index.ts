@@ -64,5 +64,6 @@ export type {
 } from './domain/payroll-snapshot.js';
 export type { MoneyAmount } from './domain/money-amount.js';
 
+export { postgresPayrollStores } from './infrastructure/payroll-stores.js';
 export { inMemoryPayrollStores } from './application/in-memory-stores.js';
 export { FixedClock } from './application/payroll-test-harness.js';

@@ -34,6 +34,8 @@ export interface AccountingLine {
 export interface PaymentInstruction {
   readonly paymentInstructionId: string;
   readonly payrollRunId: string;
+  /** One instruction per result, enforced by a unique index — a retried finalize writes once. */
+  readonly payrollResultId: string;
   readonly employmentId: string;
   readonly amount: MoneyAmount;
   readonly paymentDate: string;
@@ -161,6 +163,7 @@ export interface PaymentRequest {
 export const paymentFor = (request: PaymentRequest): PaymentInstruction => ({
   paymentInstructionId: request.paymentInstructionId,
   payrollRunId: request.result.payrollRunId,
+  payrollResultId: request.result.payrollResultId,
   employmentId: request.result.employmentId,
   amount: request.result.net,
   paymentDate: request.paymentDate,
