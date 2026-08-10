@@ -90,7 +90,11 @@ export interface SnapshotStore {
   ): Promise<EmploymentSnapshot | undefined>;
   /** The digests as stored, for reconciliation to compare without loading the payloads. */
   digestsFor(transaction: Transaction, runId: string): Promise<ReadonlyMap<string, StoredDigests>>;
-  insertMany(transaction: Transaction, snapshots: readonly EmploymentSnapshot[]): Promise<void>;
+  insertMany(
+    transaction: Transaction,
+    runId: string,
+    snapshots: readonly EmploymentSnapshot[],
+  ): Promise<void>;
 }
 
 export interface StoredDigests {

@@ -50,6 +50,17 @@ export interface PayrollGroupState {
   /** The country pack this group's statutory rules would come from. Nothing implements one. */
   readonly countryPackId?: string;
   readonly countryPackVersion?: number;
+  /**
+   * Opaque tenant-configured account codes, and the payment method a run's instructions name.
+   *
+   * **Payroll owns no chart of accounts** and no payment rail. These are strings a tenant supplies
+   * so the accounting output and the payment instruction carry a reference a future Finance or
+   * payment domain can resolve; nothing here interprets one (ADR-0067).
+   */
+  readonly expenseAccount: string;
+  readonly deductionAccount: string;
+  readonly payableAccount: string;
+  readonly paymentMethodCode: string;
   readonly active: boolean;
   readonly version: number;
 }
@@ -67,6 +78,10 @@ export interface DefinePayrollGroup {
   readonly eligibilityRule?: RuleDefinition;
   readonly countryPackId?: string;
   readonly countryPackVersion?: number;
+  readonly expenseAccount: string;
+  readonly deductionAccount: string;
+  readonly payableAccount: string;
+  readonly paymentMethodCode: string;
 }
 
 export const definePayrollGroup = (
@@ -104,6 +119,10 @@ export const definePayrollGroup = (
     ...(command.countryPackVersion === undefined
       ? {}
       : { countryPackVersion: command.countryPackVersion }),
+    expenseAccount: command.expenseAccount,
+    deductionAccount: command.deductionAccount,
+    payableAccount: command.payableAccount,
+    paymentMethodCode: command.paymentMethodCode,
     active: true,
     version: 1,
   });

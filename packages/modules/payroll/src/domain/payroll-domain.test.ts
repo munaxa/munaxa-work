@@ -89,6 +89,10 @@ const aGroup = () => ({
   prorationBasis: 'calendar_days',
   roundingMode: 'half-up',
   paysSuspended: false,
+  expenseAccount: 'payroll-expense',
+  deductionAccount: 'payroll-deductions',
+  payableAccount: 'payroll-payable',
+  paymentMethodCode: 'bank-transfer',
 });
 
 describe('payroll period', () => {

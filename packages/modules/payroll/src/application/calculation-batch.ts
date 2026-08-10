@@ -195,7 +195,7 @@ const persist = async (
   snapshots: readonly EmploymentSnapshot[],
   computed: Computed,
 ): Promise<void> => {
-  await dependencies.stores.snapshots.insertMany(transaction, snapshots);
+  await dependencies.stores.snapshots.insertMany(transaction, request.payrollRunId, snapshots);
   await dependencies.stores.results.insertMany(transaction, computed.results);
   await dependencies.stores.earnings.insertMany(
     transaction,
