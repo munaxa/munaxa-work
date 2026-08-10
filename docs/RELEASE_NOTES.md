@@ -5,6 +5,39 @@ and what is still missing.
 
 ---
 
+## Phase 9 — Leave & Absence Management
+
+Leave explains authorized absence. Attendance records what happened. Payroll decides what it costs.
+
+**Configured, not shipped.** No leave type, entitlement figure, accrual formula or eligibility
+threshold ships with the product. A tenant configures leave types and versioned policies, and a
+country pack supplies statutory content through stated extension points — an eligibility
+`RuleDefinition`, service bands as data, a Hijri leave year, a gender restriction as a code.
+
+**A balance you can audit.** Every figure is a sum of append-only ledger rows. The stored balance is
+a projection with a digest, reconciled by asking rather than by being told, and a second query
+re-derives the same number from the ledger independently. A cancellation writes a reversal; nothing
+is ever deleted. Every duration is integer minutes.
+
+**Requests, decided by people.** A per-date breakdown makes duration unambiguous and is exactly what
+Attendance reads. Approval is recorded against a named human taken from the authenticated context;
+self-approval is refused by the domain, by the permission separation and by a database constraint.
+A policy requiring no approval produces no decision row at all, and the screen says so rather than
+naming a system approver. Overlapping leave is refused by the database, including two overlapping
+hourly requests on one date.
+
+**Attendance and Leave, agreeing.** Leave counts working days by asking Attendance's new
+`attendance.expected-working-days` read rather than duplicating the schedule engine. Attendance
+learns of a leave change by asking Leave on its own reconciliation run — Leave never writes an
+Attendance row. An attendance day moves from an unexplained absence to leave applied end to end, and
+when Leave cannot be asked the day says the question is open rather than asserting somebody was
+absent without leave.
+
+**Not built, and said plainly.** No employee or manager self-service. No scheduled execution of
+accrual, leave-year closure or carry-over expiry — those are operator commands, because nothing in
+this product runs on a timer. No document verification. No notification delivery. No cross-midnight
+hourly leave.
+
 ## Phase 8 — Attendance
 
 **2026-08-11** · [Verification report](verification/phase-8-report.md)

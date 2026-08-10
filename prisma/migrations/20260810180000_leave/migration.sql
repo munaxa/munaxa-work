@@ -451,6 +451,11 @@ create table leave_request (
 
 create index leave_request_employment_idx on leave_request (tenant_id, employment_id, from_date);
 create index leave_request_queue_idx on leave_request (tenant_id, state, requested_at);
+-- The register's own order. Without it, a date-filtered register sorts the whole matched set to
+-- return twenty-five rows — measured at 87 ms over 400,000 requests, against a 50 ms budget.
+create index leave_request_register_idx
+  on leave_request (tenant_id, requested_at desc, id)
+  where deleted_at is null;
 create index leave_request_type_idx on leave_request (tenant_id, leave_type_id, from_date);
 
 create table leave_request_day (

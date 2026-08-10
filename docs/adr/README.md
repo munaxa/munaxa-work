@@ -41,6 +41,9 @@ line; the decision that replaced it is a new record.
 | [0055](0055-the-schedule-owns-the-time-zone.md)  | The schedule owns the time zone, and a punch coordinate is evidence rather than a work location | Accepted |
 | [0056](0056-leave-unknown-is-not-leave-none.md)  | "Leave unknown" is not "no leave", and Attendance refuses to collapse them | Accepted |
 | [0057](0057-a-vendor-is-not-a-source.md)         | A vendor is not a source: devices reach Attendance through a normalized contract | Accepted |
+| [0058](0058-attendance-pulls-leave-changes.md)   | Attendance pulls leave changes; Leave never writes to Attendance | Accepted |
+| [0059](0059-the-leave-ledger-is-authoritative.md) | The leave ledger is authoritative; the balance is a projection | Accepted |
+| [0060](0060-leave-ships-no-statutory-content.md) | Leave ships no statutory content, and approval is recorded rather than delegated | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

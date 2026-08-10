@@ -125,6 +125,21 @@ decisions are in [`verification/phase-8-plan.md`](verification/phase-8-plan.md);
 carried-forward debt register and the production-readiness assessment are in
 [`verification/phase-8-report.md`](verification/phase-8-report.md).
 
+Phase 9 completed on 2026-08-10: Leave & Absence Management — tenant-configured leave types and
+versioned policies, entitlement, an append-only ledger with a derived balance projection, requests
+with a per-date breakdown, approval by a named human, cancellation and amendment that reverse rather
+than delete, accrual, leave-year closure and carry-over expiry as bounded restartable runs. Leave
+never writes to Attendance: Attendance pulls leave changes on its own reconciliation run
+([ADR-0058](adr/0058-attendance-pulls-leave-changes.md)). The ledger is authoritative and the balance
+is a projection ([ADR-0059](adr/0059-the-leave-ledger-is-authoritative.md)). Nothing statutory ships,
+and approval is recorded rather than delegated to an auto-approving port
+([ADR-0060](adr/0060-leave-ships-no-statutory-content.md)). Attendance gained one published read —
+`attendance.expected-working-days` — so Leave counts working days against the schedule engine that
+already owns them rather than duplicating it. The planning checkpoint and the approved decisions are
+in [`verification/phase-9-plan.md`](verification/phase-9-plan.md); the report, the carried-forward
+debt register and the production-readiness assessment are in
+[`verification/phase-9-report.md`](verification/phase-9-report.md).
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final
