@@ -1,6 +1,20 @@
 # Phase 11 — Payroll — Definition of Ready
 
-**Status** Ready for review · **Date** 2026-08-10 · **Baseline** Phase 10 at `b0c82b5`
+**Status** Approved with corrections · **Date** 2026-08-10 · **Baseline** Phase 10 at `b0c82b5`
+
+> **Review outcome.** The plan is approved as the architectural baseline. Two decisions were
+> corrected in review and are recorded here in their corrected form:
+>
+> - **D-16 — Overtime: the original recommendation was rejected.** A candidate is not an approved
+>   fact, and a Payroll configuration flag must not be able to turn one into the other. Payroll
+>   consumes an approved overtime result **only** through an explicit published Attendance contract;
+>   until one exists, overtime payroll is `NOT VERIFIED`.
+> - **D-9 — Finalized immutability: the requirement is approved, the mechanism is not yet.** Three
+>   enforcement options must be compared explicitly before the repository's first business trigger is
+>   introduced, and the outcome recorded in an ADR.
+>
+> D-15, D-17 and D-18 are approved as written, with the constraints stated in their entries. All
+> other decisions proceed as recommended.
 
 **Compensation says what a person is entitled to receive. Payroll says what is actually paid for a
 period, and can still say why, five years later, after every source record has moved on.** That
@@ -148,7 +162,12 @@ Four properties of this contract matter to the design:
 3. **`inputsDigest` and `calculationVersion` make staleness detectable by comparison** — the
    mechanism §55 requires, already present.
 4. **`overtimeCandidateMinutes` is candidate, not approved** (ADR-0054). Nothing in Attendance
-   publishes an *approved* overtime quantity. See §19 and decision **D-16**.
+   publishes an *approved* overtime quantity, and **no Payroll configuration may promote one into
+   the other** — a candidate is not an approved fact, and a flag that said otherwise would make
+   Payroll the approver while pretending Attendance still was. Candidate minutes are snapshotted,
+   because they are part of what Attendance said, and they produce **no earning line**. Overtime
+   payroll is `NOT VERIFIED` until Attendance publishes an approved-overtime contract. See decision
+   **D-16**.
 
 `leaveState` on the snapshot is Attendance's record of whether it could reach Leave. `unknown` must
 not be read as "no leave" (ADR-0056) — a snapshot whose leave state is unknown is not a payable
@@ -461,7 +480,7 @@ A generic earning line, with **no country-specific category**:
 | Column group | Content |
 | --- | --- |
 | Identity | run, employment, result, line sequence |
-| Classification | `earning_source` (`compensation_recurring`, `compensation_one_time`, `attendance_overtime`, `leave_paid`, `payroll_adjustment`), `payroll_treatment_code` (from Compensation, uninterpreted at source), `component_code` |
+| Classification | `earning_source` (`compensation_recurring`, `compensation_one_time`, `attendance_overtime` — **declared and unreachable**, D-16 — `leave_paid`, `payroll_adjustment`), `payroll_treatment_code` (from Compensation, uninterpreted at source), `component_code` |
 | Money | `amount_minor`, `currency_code`, `currency_exponent` |
 | Explanation | `calculation_reason` (a code), `calculation_detail` (jsonb: basis, quantity, multiplier, denominator, rounding mode) |
 | Provenance | `source_reference` (the compensation recurring id, one-time id, or attendance snapshot id), `snapshot_id` |
@@ -1299,10 +1318,10 @@ calculation command; a duplicate request; reconciliation after each of the three
 | Risk | Severity | Mitigation |
 | --- | --- | --- |
 | **Leave publishes no payroll query (D-15)** | **High** — unpaid-leave deduction is unimplementable without it | Raise as a decision. If declined, mark leave-driven deductions `NOT VERIFIED` rather than approximating from day coverage |
-| **No approved-overtime contract (D-16)** | **High** — overtime pay is a headline payroll feature | Raise. Do **not** build a second overtime engine (§19). If declined, overtime is `NOT VERIFIED` |
+| **No approved-overtime contract (D-16)** | **High** — overtime pay is a headline payroll feature | Overtime is `NOT VERIFIED` and ships as an unreachable `earning_source`. Candidate minutes are never promoted by configuration; no second overtime engine is built |
+| Finalized-immutability mechanism is the repository's first business trigger (D-9) | Medium | Three options compared explicitly before building; the outcome recorded in an ADR; the trigger's cost measured, not assumed |
 | Snapshot storage growth (§45) | Medium | Sized in the plan; retention policy raised as an open question rather than assumed |
 | 100,000-employee run duration | Medium | Batched and resumable; benchmarked before the strategy is trusted; a missed budget is reported |
-| Finalized-immutability trigger is the repository's first (D-9) | Medium | Raised explicitly; the `where finalized_at is null` predicate ships regardless, so declining the trigger weakens but does not break the guarantee |
 | Accounting output with no consumer | Medium | Persisted and balanced, so it is reproducible when Finance exists. No posted state is claimed |
 | Country-pack interface designed with no implementation | Medium | Kept minimal and pure. Phase 11.1 will find gaps; a narrow interface is cheaper to widen than a speculative one is to narrow |
 | Cost-centre codes unresolvable (D-17) | Low | Lines carry identifiers, which are sufficient and honest |
@@ -1405,10 +1424,26 @@ generates the accounting and payment outputs. After it, the only paths are an ex
 an explicit correction run, an adjustment run, or a controlled recalculation at a stated version —
 all preserving the original.
 
-**Enforcement requires approval on one point**: alongside `where finalized_at is null` on every
-update path, the plan proposes a **`before update or delete` trigger** on the result and line tables.
-This would be **the first trigger in this repository** and is therefore raised rather than
-introduced. Declining it leaves the predicate, which is weaker but not nothing.
+**The requirement is approved**: a finalized result, earning line, deduction line and snapshot must
+be impossible to mutate through any normal or accidental application path.
+
+**The mechanism is decided by explicit comparison, not by preference.** `where finalized_at is null`
+ships on every application update path regardless; the question is what sits underneath it. Three
+options, compared before any is built:
+
+| Option | Protects against | Fails against |
+| --- | --- | --- |
+| 1. Application-level only (`where finalized_at is null`) | Every path that remembers the predicate | A new repository method that omits it; a migration; a direct `update`; an ad-hoc fix in production |
+| 2. `before update or delete` trigger raising on a finalized row | Every write to the table, from any path, including SQL nobody wrote in TypeScript | Nothing at the row level. Costs: the repository's **first business trigger**, a new class of thing to reason about, and a per-statement overhead to measure |
+| 3. Another repository-compatible database mechanism | — | Evaluated in §25's follow-up: a `check` constraint cannot see the previous row; a rule is deprecated and interacts badly with `returning`; a revoked `update` grant cannot work because the application role owns the table and needs `update` on the not-yet-finalized rows; RLS `with check` **can** discriminate on the *new* row but not on the old, so it cannot express "was finalized" |
+
+Option 3 is included because it must be, and the comparison is what shows it does not exist: no
+constraint, rule, grant or policy in PostgreSQL can express "this row was already finalized" without
+reading the old row, and only a trigger reads the old row.
+
+**Recorded in an ADR before implementation**, with the trigger's cost measured rather than assumed
+(§48). Introducing the repository's first business trigger is architecturally significant and is not
+done as a side effect of writing a migration.
 
 ### D-10 — Calculation versioning
 
@@ -1454,43 +1489,94 @@ application memory.** Batch size tuned by benchmark.
 `LeavePayrollPeriodView` is declared and exported by Leave and **no query handler returns it**.
 Leave's only published reads are the two day-coverage queries built for Attendance.
 
-**Recommend**: Leave adds a `leave.payroll-period` query returning the view it already declares —
-additive, no schema change, no behaviour change to Leave. Under §65 this is still "Leave modified
-beyond a published contract" and is raised for explicit approval. **If declined**, unpaid-leave
-deduction and leave encashment are marked **`NOT VERIFIED`**, and Payroll does **not** approximate
-them from day coverage.
+**Decided (approved)**: Leave adds a `leave.payroll-period` query handler returning the view it
+already declares — additive, no schema change, no behaviour change to Leave, no new view type.
+
+Explicitly forbidden, and asserted by test:
+
+- reading a Leave table from Payroll;
+- interpreting a Leave type identifier inside Payroll;
+- reconstructing paid or unpaid treatment from Attendance day coverage;
+- holding a Payroll-owned copy of Leave data beyond the input snapshot's verbatim record of what
+  the contract returned.
+
+**If the contract cannot be completed**, leave-driven payroll deductions remain **`NOT VERIFIED`**
+and are not approximated.
 
 ### D-16 — Attendance publishes no approved-overtime result *(repository gap, §19, §65)*
+
+*The original recommendation — paying candidate minutes where a payroll group configured them as
+approved-by-policy — was **rejected in review**, and rightly. Configuration is not authority. A flag
+in Payroll that promotes a candidate to an approved fact would make Payroll the approver of overtime
+while pretending Attendance still was, which is worse than either owning it outright.*
 
 `PayableSnapshotView` carries `overtimeCandidateMinutes` — **candidate** minutes by design
 (ADR-0054). Nothing in Attendance publishes an approved overtime quantity or an overtime approval
 decision.
 
-**Recommend**: overtime is paid from `overtimeCandidateMinutes` **only where the payroll group
-explicitly configures it as approved-by-policy**, with the line recording that basis; otherwise
-overtime is `NOT VERIFIED` pending an Attendance overtime-approval contract. **Payroll does not build
-a second overtime engine** (§19) and does not read an attendance table.
+**Decided**:
+
+- Payroll consumes an approved overtime result **only** through an explicit published Attendance
+  contract.
+- `overtimeCandidateMinutes` is **never** treated as approved overtime, by configuration or by any
+  other route. It is snapshotted, because it is part of what Attendance said, and it produces no
+  earning line.
+- Payroll builds **no second overtime calculation engine and no overtime approval engine**.
+- Until Attendance publishes an authoritative approved-overtime contract, **overtime payroll is
+  `NOT VERIFIED`**.
+- Attendance is **not modified silently**. The required contract is recorded here as an explicit
+  dependency, and adding it is a separate approved change (see "Approved additive contract changes"
+  below).
+
+The shape such a contract would need — recorded so the dependency is concrete rather than gestural —
+is an approved overtime quantity per employment and period, carrying the approving actor and
+instant, the minutes at each approved rate band, and a digest, produced by an Attendance command
+rather than derived at read time.
+
+**Consequence for Phase 11**: `attendance_overtime` exists as an `earning_source` value in the
+schema and **no code path produces a line with it**. That is the honest representation of a
+capability whose authoritative input does not exist, and it is asserted by test.
 
 ### D-17 — Cost centres are readable only via full structure export *(repository gap, §37)*
 
 `FinancialCenterView` is returned only by `organization.export-structure`, which returns the entire
 `OrganizationSnapshot`. There is no bounded centre read.
 
-**Recommend**: Organization adds a bounded `organization.list-centers` — additive, no schema change.
-**If declined**, accounting lines carry the cost centre **identifier** without a code or name, which
-is reproducible and honest, and no full-structure export runs on a payroll path.
+**Decided (approved)**: Organization adds a bounded `organization.list-centers` — additive, no schema
+change. **`organization.export-structure` is never called on a payroll calculation path.**
+
+**If that contract is not completed**, accounting lines carry the cost centre **identifier** without
+a code or name — reproducible and honest — and **no unbounded Organization dependency is
+introduced**.
 
 ### D-18 — Employment publishes no payroll-eligibility fact *(§13)*
 
 `EmploymentView` has no payroll-eligibility flag, and adding one would modify a completed module
 (§65).
 
-**Recommend**: eligibility is a **Payroll-owned rule** over facts Employment already publishes —
-status on the period end date, employment type code, start and end dates, governing legal entity —
-expressed as data via `evaluateRule` and versioned with the payroll group. **Employment is not
-modified.**
+**Decided (approved)**: eligibility is a **Payroll-owned rule** over facts Employment already
+publishes — status on the period end date, employment type code, start and end dates, governing
+legal entity — expressed as data via `evaluateRule`. **Employment is not modified.**
+
+The rule is **versioned**, and both the rule definition and its version are written into the input
+snapshot, so historical population selection is reproducible: re-running a closed period selects the
+people the rule selected *then*, not the people today's rule would select.
 
 ---
+
+### Approved additive contract changes
+
+Exactly three, all additive, none altering an existing behaviour or view type:
+
+| Module | Change | Status |
+| --- | --- | --- |
+| Leave | `leave.payroll-period` query handler returning the existing `LeavePayrollPeriodView` | Approved (D-15) |
+| Organization | bounded `organization.list-centers` query returning existing `FinancialCenterView` | Approved (D-17) |
+| Attendance | approved-overtime contract | Approved **only if required by the final implementation design** (D-16) — and Phase 11 does not require it, because overtime is `NOT VERIFIED` |
+
+**If any of these turns out to need a broader domain-model change — a new view type, a new table, a
+changed invariant — implementation stops and the change is raised.** No completed module is modified
+beyond this list.
 
 ## 56. Definition of Done
 
@@ -1559,7 +1645,37 @@ down.
 - [ ] `docs/verification/phase-11-report.md` records what was measured, what failed before it was
       fixed, and everything marked `NOT VERIFIED`.
 
+### Implementation order
+
+Dependency order, and **the UI is not reached early**:
+
+1. ADRs and approved decisions recorded. 2. Domain model and invariants. 3. Schema, constraints, RLS.
+4. Published source adapters. 5. Input snapshot with version and digest capture. 6. Pure calculation
+engine. 7. Earnings. 8. Deductions. 9. Proration. 10. Gross/net and multi-currency separation.
+11. Runs and idempotency. 12. Reconciliation and stale detection. 13. Approval. 14. Finalization and
+immutability. 15. Reversal and correction. 16. Accounting output. 17. Payment instructions.
+18. Payslip data. 19. API. 20. Admin UI. 21. Cross-module integration tests. 22. RLS and security
+tests. 23. Two-connection concurrency tests. 24. Performance benchmarks. 25. Full `pnpm verify`.
+
+### Mandatory proof
+
+**`pnpm verify` passing is not completion.** The Phase 11 report must demonstrate, against real
+infrastructure:
+
+- the real Employment, Attendance, Leave, Compensation and Organization adapters — not fakes;
+- real PostgreSQL, with RLS proved under an unprivileged role;
+- two-connection concurrency for every race in §49;
+- replay reproducibility of a finalized run;
+- source-change reconciliation, including a **deliberately lost event**;
+- finalized-result mutation attempts through every write path, all refused;
+- exact calculation above 2^53 through the real driver;
+- multi-currency separation with nothing totalled across currencies;
+- performance at 500, 10,000 and 100,000 employees, reported per stage.
+
+**Failures are reported before their fixes**, as every previous phase has done.
+
 ---
 
 **Nothing in this plan has been implemented.** No application code, no Prisma model, no migration,
-no endpoint and no screen was created or modified in producing it.
+no endpoint and no screen was created or modified in producing it — the corrections above are
+recorded decisions, not code.
