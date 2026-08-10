@@ -2,7 +2,7 @@
   "name": "munaxa-work",
   "version": "0.1.0",
   "private": true,
-  "description": "Munaxa Work \u2014 an independent Munaxa product repository. Consumes the shared design system from @munaxa/*.",
+  "description": "Munaxa Work — an independent Munaxa product repository. Consumes the shared design system from @munaxa/*.",
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.33.0",
   "engines": {
@@ -23,6 +23,7 @@
     "measure:compensation": "node scripts/measure-compensation-performance.mjs",
     "measure:leave": "node scripts/measure-leave-performance.mjs",
     "measure:onboarding": "node scripts/measure-onboarding-performance.mjs",
+    "measure:payroll": "node scripts/measure-payroll-performance.mjs",
     "measure:recruitment": "node scripts/measure-recruitment-performance.mjs",
     "prisma:generate": "pnpm --filter @work/api exec prisma generate --schema ../../prisma/schema.prisma",
     "prisma:validate": "pnpm --filter @work/api exec prisma validate --schema ../../prisma/schema.prisma",

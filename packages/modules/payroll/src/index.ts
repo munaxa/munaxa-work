@@ -69,6 +69,21 @@ export { inMemoryPayrollStores } from './application/in-memory-stores.js';
 export { FixedClock } from './application/payroll-test-harness.js';
 
 /**
+ * The two pure stages, published so a benchmark measures **this code** rather than a copy of it.
+ *
+ * `scripts/measure-payroll-performance.mjs` must report snapshot assembly and pure calculation as
+ * separate numbers, and the only honest way to do that is to call the functions the production path
+ * calls. A benchmark that reimplemented either would be measuring the reimplementation, and would
+ * stop reflecting reality on the first change nobody mirrored.
+ *
+ * Neither is a second way to run a payroll: `calculateEmployment` touches no database and no clock,
+ * and `captureSnapshots` reads sources and writes nothing. The command handler remains the only
+ * path that persists anything.
+ */
+export { captureSnapshots } from './application/snapshot-capture.js';
+export { calculateEmployment } from './domain/payroll-calculation.js';
+
+/**
  * The HTTP edge. Registered by the API app's Payroll Nest module; nothing else imports it.
  *
  * Route ordering is load-bearing: `PayrollConfigurationController` declares only literal segments

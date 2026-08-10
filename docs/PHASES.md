@@ -158,6 +158,30 @@ ships. The planning checkpoint and the approved decisions are in
 debt register and the production-readiness assessment are in
 [`verification/phase-10-report.md`](verification/phase-10-report.md).
 
+Phase 11 completed on 2026-08-10: Payroll — payroll groups and pay calendars, deduction
+definitions, periods, runs with a resumable cursor, an immutable input snapshot per employment,
+results with earning and deduction lines that each explain their own arithmetic, exceptions,
+manual adjustments with a written reason, named-human approval, finalization, reversal,
+reconciliation, and the two outputs this system prepares and nothing consumes. A run calculates
+from its snapshot rather than from live sources, which is what makes a payslip explainable eight
+months later ([ADR-0064](adr/0064-payroll-calculates-from-a-snapshot.md)). Attendance publishes
+**candidate** overtime minutes and Payroll will not promote one into pay: the classification is
+reserved, unreachable, and asserted so
+([ADR-0065](adr/0065-a-candidate-is-not-an-approved-fact.md)). Finalized payroll is immutable at
+the table — a trigger refuses any update or delete of a frozen row from any path, at a measured
++8% on single-row updates ([ADR-0066](adr/0066-finalized-payroll-is-immutable-at-the-table.md)).
+Payroll prepares balanced accounting lines against opaque tenant codes and payment instructions
+carrying no account identifier, and posts and executes nothing
+([ADR-0067](adr/0067-payroll-publishes-outputs-and-posts-nothing.md)). Reconciliation is a pull, so
+correctness never depends on an event having been delivered. Leave gained one published read —
+`leave.payroll-period` — so Payroll consumes authorized absence through a contract rather than by
+interpreting Leave's tables. Nothing statutory ships: no tax, no social security, no GOSI, no WPS,
+no Mudad, no Muqeem, and no country pack. The planning checkpoint and the approved decisions are in
+[`verification/phase-11-plan.md`](verification/phase-11-plan.md); the report, the defects the tests
+caught, the measured performance at 500, 10,000 and 100,000 employees, the carried-forward debt
+register and the production-readiness assessment are in
+[`verification/phase-11-report.md`](verification/phase-11-report.md).
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

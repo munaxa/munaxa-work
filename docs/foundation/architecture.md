@@ -79,6 +79,25 @@ Three layers, described in ADR-0030. The application half is `runInContext`; the
 is row-level security; the guard that refuses to start when the database cannot enforce it is
 `assertIsolationEnforced`.
 
+## Invariants the database enforces
+
+Most invariants live in the domain, and the database repeats the ones whose failure is
+unrecoverable: tenant isolation by row-level security, uniqueness and overlap by index and
+exclusion constraint, self-approval by check constraint.
+
+Phase 11 added the first **business trigger** in the repository, and it is deliberately the only
+one. Once a payroll run is finalized, `app_payroll_refuse_finalized` rejects any update or delete
+of a row it owns, on six tables. A trigger is used here because nothing cheaper can express it: a
+check constraint cannot see the old row, and neither can a rule, a grant or a row-level-security
+policy. The alternatives were compared explicitly and the cost was measured before it was
+introduced (ADR-0066) — +8% on single-row updates, ≈14 µs per row, and within run-to-run noise in
+bulk. Application-level enforcement remains in place as well; the trigger is the net, not the
+rule.
+
+The bar for the next one is the same: application enforcement alone is insufficient, no
+declarative constraint can express it, the alternatives are compared in an ADR, and the cost is
+measured rather than assumed.
+
 ## Ports that precede their engines
 
 Workflow is Phase 16 and Communications is Phase 17, but five earlier domains need approvals and

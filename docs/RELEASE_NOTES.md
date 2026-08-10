@@ -5,6 +5,68 @@ and what is still missing.
 
 ---
 
+## Phase 11 — Payroll
+
+Employment says somebody is employed. Compensation says what they are entitled to receive. Payroll
+says what is actually paid for a period. This is the third of those, and the last module in the
+chain.
+
+**A payslip you can still explain eight months later.** Every run records, per employment, exactly
+what it read: the employment facts, the compensation components, the attendance answer and the
+leave answer, with a digest of each. The figure is then a pure function of that record. By the time
+somebody disputes a payslip the sources have all moved; the snapshot has not, and replaying it
+reproduces the stored figure exactly. Every earning and deduction line carries its own arithmetic —
+the basis, the fraction, the rounding — so a person who disputes a figure can be shown how it was
+reached rather than told the system computed it.
+
+**Finalized means finalized.** Approving a payroll and finalizing one are separate permissions, and
+neither can be exercised by whoever requested the run — the domain refuses it and a database
+constraint refuses it again. Once finalized, the figures are frozen at the table: a trigger rejects
+any update or delete of a frozen row, from any path, including SQL nobody wrote in the application.
+A wrong finalized run is corrected by a reversal that creates new state and leaves the original
+intact. Nothing edits history.
+
+**It notices when it has gone wrong.** After a run is calculated, reconciliation asks every source
+whether it has moved — a pull, not a subscription. A lost event therefore cannot leave a payroll
+quietly wrong: the next reconciliation finds the difference by digest, marks the run stale, and a
+stale run cannot be approved or finalized until it is recalculated. Recalculation is narrow: only
+the employments that actually went stale are recomputed, and it replaces their figures rather than
+adding a second set.
+
+**Nobody is silently skipped.** An employment the run could not calculate becomes a named exception
+with a reason — missing compensation, an unknown leave state, an unreachable dependency, a broken
+eligibility rule — never a result of zero and never an omission. A misconfigured eligibility rule
+blocks finalization rather than quietly producing a smaller payroll. If Organization cannot be
+reached, the run is refused outright: calculating a workforce under no statutory rules because a
+dependency blinked would be silently wrong.
+
+**Money that survives the whole path.** Amounts are integer minor units in a `bigint` carrying their
+own currency exponent, and cross every boundary — including HTTP — as exact decimal strings. A
+salary of 9,007,199,254,740,993 minor units is carried through the API, the application, the
+repository, the column and back unchanged; a JSON number would have quietly returned
+9,007,199,254,740,992. Nothing is totalled across currencies, because there is no exchange rate in
+this product.
+
+**Built for a real workforce.** A hundred-thousand-employee run is about two hundred bounded
+transactions rather than one, driven by repeated calls rather than a request that holds a connection
+open for the duration. A crash resumes from a committed cursor instead of restarting. Measured
+against real PostgreSQL as an unprivileged role with row-level security on, at 500, 10,000 and
+100,000 employees — every figure, including the ones that missed their target first time, is in the
+verification report.
+
+**Not built, and said plainly.** No approved overtime: Attendance publishes *candidate* minutes by
+design, a candidate is not an approved fact, and Payroll will not promote one. No tax, no social
+security, no GOSI, no end-of-service, and no country pack of any kind. No WPS, Mudad or Muqeem. No
+journal posting — the accounting output is balanced lines against opaque tenant codes, prepared in
+Payroll's own table and posted nowhere. No payment execution — the instruction carries an amount, a
+date and a method code, no account identifier of any kind, and the status `prepared` and nothing
+beyond it. No currency conversion. No payslip document: Payroll owns the data, and rendering,
+storage and delivery have no owner yet. No benefits, no loans, no workflow routing, no
+notifications. Each is absent rather than stubbed, and where a classification is reserved for one, a
+test asserts it has no producer.
+
+---
+
 ## Phase 10 — Compensation Management
 
 Employment says somebody is employed. Compensation says what they are entitled to receive. Payroll

@@ -40,12 +40,33 @@ export const insertRow = async (
 };
 
 /**
- * A whole batch in **one multi-row insert**, with the audit columns applied to every row.
+ * PostgreSQL's wire protocol counts bind parameters in a **signed 16-bit field**: 65,535 is the
+ * hard ceiling for one statement, and it is a protocol limit rather than a tunable.
+ *
+ * Found by the benchmark at 10,000 employees. Finalization writes one payment instruction per
+ * employment in a single multi-row insert, and at that size the statement carried more parameters
+ * than the protocol can express — `bind message has 46784 parameter formats but 0 parameters`,
+ * which is the count overflowing rather than anything about the data. A 500-employee run never
+ * reached it, so no test before the benchmark could have.
+ */
+const MAX_BIND_PARAMETERS = 65_535;
+
+/**
+ * A whole batch in **as few multi-row inserts as the protocol permits**, with the audit columns
+ * applied to every row.
  *
  * Never a statement per row: at five hundred employments per batch that is five hundred round trips
  * where one will do, and the difference is most of what makes a hundred-thousand-employee run
  * finish. The column list comes from the first row, so every row in a batch must have the same
  * shape — which every caller here does, because they all come from one mapper.
+ *
+ * The chunking is derived from the row's own width rather than fixed, because the tables here range
+ * from eleven columns to twenty-six and a constant tuned for one of them would be wrong for the
+ * rest. Callers that already batch (the calculation loop, at 500) produce one statement exactly as
+ * before; the ones that write a whole run at once (finalization's accounting and payment outputs)
+ * now produce several instead of one that cannot be sent.
+ *
+ * Every chunk runs inside the caller's transaction, so a batch is still all-or-nothing.
  */
 export const insertRows = async (
   transaction: Transaction,
@@ -58,8 +79,21 @@ export const insertRows = async (
   const audit: AuditColumns = auditForInsert(now);
   const complete: RowValues[] = rows.map((values) => ({ ...values, ...audit }));
   const columns = Object.keys(complete[0] ?? {});
+  const perStatement = Math.max(1, Math.floor(MAX_BIND_PARAMETERS / Math.max(1, columns.length)));
+
+  for (let from = 0; from < complete.length; from += perStatement) {
+    await insertChunk(transaction, table, columns, complete.slice(from, from + perStatement));
+  }
+};
+
+const insertChunk = async (
+  transaction: Transaction,
+  table: string,
+  columns: readonly string[],
+  rows: readonly RowValues[],
+): Promise<void> => {
   const parameters: unknown[] = [];
-  const tuples = complete.map((row, index) => {
+  const tuples = rows.map((row, index) => {
     parameters.push(...columns.map((column) => row[column]));
     return `(${columns
       .map((_, column) => `$${String(index * columns.length + column + 1)}`)
