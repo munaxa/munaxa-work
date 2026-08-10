@@ -83,6 +83,10 @@ const prepare = async (
     const run = await runFor(dependencies, { transaction, command, period, group, definitions });
 
     if (run === undefined) return refused('run_not_found');
+    // **A finalized run is never recalculated into.** Its rows are frozen and the trigger would
+    // refuse the writes anyway (ADR-0066), but a caller who named one deserves a refusal rather
+    // than a partial batch that fails halfway through. The remedy is a correction run.
+    if (run.status === 'finalized' || run.status === 'reversed') return refused('run_finalized');
 
     return {
       ok: true,

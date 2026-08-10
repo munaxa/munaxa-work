@@ -64,6 +64,7 @@ import {
   DeferredCompensationDispatcher,
   compensationModuleFor,
 } from '../compensation/compensation.composition.js';
+import { DeferredPayrollDispatcher, payrollModuleFor } from '../payroll/payroll.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -121,6 +122,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         attendance: new DeferredAttendanceSender(),
         leave: new DeferredLeaveDispatcher(),
         compensation: new DeferredCompensationDispatcher(),
+        payroll: new DeferredPayrollDispatcher(),
       }),
     },
     {
@@ -189,6 +191,10 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // nobody in this repository yet — Payroll (Phase 11) is its first consumer, and it will
         // pull through `compensation.payroll-period` rather than being pushed to.
         registry.register(compensationModuleFor(unitOfWork, senders.compensation));
+        // Payroll is registered last, and reads all five modules above through their published
+        // queries under bounded service grants. Nothing pushes to it: a payroll run pulls what it
+        // needs and reconciles by asking again, so a lost event costs nothing (ADR-0064).
+        registry.register(payrollModuleFor(unitOfWork, senders.payroll));
         return registry;
       },
     },
@@ -220,6 +226,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         senders.attendance.attach(dispatcher);
         senders.leave.attach(dispatcher);
         senders.compensation.attach(dispatcher);
+        senders.payroll.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -249,6 +256,7 @@ interface DeferredSenders {
   readonly attendance: DeferredAttendanceSender;
   readonly leave: DeferredLeaveDispatcher;
   readonly compensation: DeferredCompensationDispatcher;
+  readonly payroll: DeferredPayrollDispatcher;
 }
 
 /**
