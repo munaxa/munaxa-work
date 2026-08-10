@@ -55,6 +55,15 @@ export type {
   ApprovedLeaveView,
 } from './application/directory-queries.js';
 export type { AwaitingRecalculationView } from './application/reconciliation-query.js';
+
+/**
+ * The Payroll read, exported so Payroll's adapter can type the query it sends rather than casting
+ * an object literal to a bare `Query` — the discipline the Phase 8 defect taught.
+ */
+export type {
+  LeavePayrollPeriodPage,
+  ReadLeavePayrollPeriod,
+} from './application/payroll-period-query.js';
 export type {
   RecalculateBalancesCommand,
   RecalculationOutcome,

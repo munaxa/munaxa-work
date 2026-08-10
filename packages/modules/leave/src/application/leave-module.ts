@@ -33,6 +33,7 @@ import {
 } from './definition-queries.js';
 import { approvedLeaveAffectingHandler, approvedLeaveForHandler } from './directory-queries.js';
 import { balancesAwaitingRecalculationHandler } from './reconciliation-query.js';
+import { readLeavePayrollPeriodHandler } from './payroll-period-query.js';
 import {
   readApprovalChainHandler,
   readCalendarHandler,
@@ -119,7 +120,9 @@ const queriesOf = (dependencies: LeaveDependencies): readonly QueryHandler<Query
     readApprovalChainHandler(dependencies),
     readCalendarHandler(dependencies),
 
-    // The two Attendance calls. The whole of Leave's published cross-module surface.
+    // The two Attendance calls and the one Payroll call. The whole of Leave's published
+    // cross-module surface, and it points one way: nothing here writes to another module.
     approvedLeaveForHandler(dependencies),
     approvedLeaveAffectingHandler(dependencies),
+    readLeavePayrollPeriodHandler(dependencies),
   ] as readonly QueryHandler<Query, unknown>[];
