@@ -67,3 +67,15 @@ export type { MoneyAmount } from './domain/money-amount.js';
 export { postgresPayrollStores } from './infrastructure/payroll-stores.js';
 export { inMemoryPayrollStores } from './application/in-memory-stores.js';
 export { FixedClock } from './application/payroll-test-harness.js';
+
+/**
+ * The HTTP edge. Registered by the API app's Payroll Nest module; nothing else imports it.
+ *
+ * Route ordering is load-bearing: `PayrollConfigurationController` declares only literal segments
+ * and is registered before the controllers carrying `:parameter` segments at the same depth.
+ */
+export { PayrollDispatcher } from './api/payroll-dispatcher.js';
+export { PayrollConfigurationController } from './api/configuration.controller.js';
+export { PayrollRunController } from './api/run.controller.js';
+export { PayrollDecisionController } from './api/decision.controller.js';
+export { PayrollResultController } from './api/result.controller.js';

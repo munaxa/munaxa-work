@@ -187,7 +187,18 @@ const exceptionFor = (
   ...(detail === undefined ? {} : { detail }),
 });
 
-/** Four batched inserts. Never one row at a time, at any scale. */
+/**
+ * Replace, then insert — five batched writes each way. Never one row at a time, at any scale.
+ *
+ * The clear is what makes a **recalculation** a replacement rather than a second set of rows. On a
+ * first pass it matches nothing and costs one indexed delete per table; on a recalculation it is
+ * the difference between correct figures and `payroll_result_unique_idx` raising 23505 halfway
+ * through a batch. It is narrow by design (D-14): only the employments this batch is about to
+ * write, so a result that did not go stale is never touched.
+ *
+ * Found by the API suite — a repeated calculation left one employment holding two results, because
+ * `clearRun` existed on every store and nothing ever called it.
+ */
 const persist = async (
   dependencies: PayrollDependencies,
   transaction: Transaction,
@@ -195,6 +206,23 @@ const persist = async (
   snapshots: readonly EmploymentSnapshot[],
   computed: Computed,
 ): Promise<void> => {
+  const { payrollRunId, employmentIds } = request;
+  const {
+    snapshots: snapshotStore,
+    results,
+    earnings,
+    deductions,
+    exceptions,
+  } = dependencies.stores;
+
+  // Lines before results: `payroll_earning_line_result_fk` and its deduction counterpart point at
+  // `payroll_result`, so removing the parent first would violate the foreign key.
+  await earnings.clearEmployments(transaction, payrollRunId, employmentIds);
+  await deductions.clearEmployments(transaction, payrollRunId, employmentIds);
+  await results.clearEmployments(transaction, payrollRunId, employmentIds);
+  await exceptions.clearEmployments(transaction, payrollRunId, employmentIds);
+  await snapshotStore.clearEmployments(transaction, payrollRunId, employmentIds);
+
   await dependencies.stores.snapshots.insertMany(transaction, request.payrollRunId, snapshots);
   await dependencies.stores.results.insertMany(transaction, computed.results);
   await dependencies.stores.earnings.insertMany(

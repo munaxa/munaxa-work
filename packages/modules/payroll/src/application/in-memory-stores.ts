@@ -183,8 +183,18 @@ const recordStores = (tables: Tables): Pick<PayrollStores, 'snapshots' | 'except
         ),
       insertMany: (_transaction, runId, batch) => {
         for (const snapshot of batch) {
-          snapshots.set(`${runId}:${snapshot.employmentId}`, { ...snapshot, runId });
+          const key = `${runId}:${snapshot.employmentId}`;
+
+          // `payroll_input_snapshot_unique_idx`. Keying by employment would have overwritten
+          // silently, which is how a missing clear step stayed invisible in memory while
+          // PostgreSQL would have raised 23505.
+          if (snapshots.has(key)) throw new ConstraintViolation('23505');
+          snapshots.set(key, { ...snapshot, runId });
         }
+        return Promise.resolve();
+      },
+      clearEmployments: (_transaction, runId, employmentIds) => {
+        for (const employmentId of employmentIds) snapshots.delete(`${runId}:${employmentId}`);
         return Promise.resolve();
       },
     },
@@ -199,6 +209,17 @@ const recordStores = (tables: Tables): Pick<PayrollStores, 'snapshots' | 'except
       clearRun: (_transaction, runId) => {
         for (let index = exceptions.length - 1; index >= 0; index -= 1) {
           if (exceptions[index]?.payrollRunId === runId) exceptions.splice(index, 1);
+        }
+        return Promise.resolve();
+      },
+      clearEmployments: (_transaction, runId, employmentIds) => {
+        const named = new Set(employmentIds);
+
+        for (let index = exceptions.length - 1; index >= 0; index -= 1) {
+          const raised = exceptions[index];
+
+          if (raised?.payrollRunId !== runId) continue;
+          if (named.has(raised.employmentId)) exceptions.splice(index, 1);
         }
         return Promise.resolve();
       },

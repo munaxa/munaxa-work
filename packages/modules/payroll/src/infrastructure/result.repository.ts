@@ -92,4 +92,26 @@ export class PostgresResultRepository implements ResultStore {
       [transaction.tenantId, runId],
     );
   }
+
+  /**
+   * The same delete, narrowed to the employments a batch is about to write.
+   *
+   * This runs before every batch's inserts. On a first pass it matches nothing; on a recalculation
+   * it is what makes the write a replacement rather than a second row — `payroll_result_unique_idx`
+   * would otherwise raise 23505 partway through a batch. `finalized_at is null` keeps a frozen
+   * result out of reach; the trigger refuses the same delete (ADR-0066).
+   */
+  public async clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void> {
+    if (employmentIds.length === 0) return;
+    await transaction.execute(
+      `delete from payroll_result
+         where tenant_id = $1 and payroll_run_id = $2 and employment_id = any($3::uuid[])
+           and finalized_at is null`,
+      [transaction.tenantId, runId, employmentIds],
+    );
+  }
 }

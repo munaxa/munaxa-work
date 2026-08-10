@@ -44,6 +44,14 @@ export const drive = async (
       break;
     }
 
+    // The loop terminates only because the population source honours the cursor. A source that
+    // hands back a page ending where the last one ended would grind forever and exhaust memory,
+    // so it is refused here rather than trusted. Found by the API suite, which OOMed on a fake
+    // that ignored `after`.
+    if (cursor !== undefined && page[page.length - 1] === cursor) {
+      return conflicted<RunCalculated>('population_source_did_not_advance');
+    }
+
     const outcome = await runBatch(dependencies, context, page);
 
     covered.push(...outcome.snapshots.map((snapshot) => snapshot.employmentId));

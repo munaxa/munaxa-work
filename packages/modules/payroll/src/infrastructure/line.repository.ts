@@ -73,6 +73,20 @@ export class PostgresEarningLineRepository implements EarningLineStore {
       [transaction.tenantId, runId],
     );
   }
+
+  public async clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void> {
+    if (employmentIds.length === 0) return;
+    await transaction.execute(
+      `delete from payroll_earning_line
+         where tenant_id = $1 and payroll_run_id = $2 and employment_id = any($3::uuid[])
+           and finalized_at is null`,
+      [transaction.tenantId, runId, employmentIds],
+    );
+  }
 }
 
 export class PostgresDeductionLineRepository implements DeductionLineStore {
@@ -119,6 +133,20 @@ export class PostgresDeductionLineRepository implements DeductionLineStore {
       [transaction.tenantId, runId],
     );
   }
+
+  public async clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void> {
+    if (employmentIds.length === 0) return;
+    await transaction.execute(
+      `delete from payroll_deduction_line
+         where tenant_id = $1 and payroll_run_id = $2 and employment_id = any($3::uuid[])
+           and finalized_at is null`,
+      [transaction.tenantId, runId, employmentIds],
+    );
+  }
 }
 
 export class PostgresExceptionRepository implements ExceptionStore {
@@ -153,6 +181,19 @@ export class PostgresExceptionRepository implements ExceptionStore {
     await transaction.execute(
       `delete from payroll_exception where tenant_id = $1 and payroll_run_id = $2`,
       [transaction.tenantId, runId],
+    );
+  }
+
+  public async clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void> {
+    if (employmentIds.length === 0) return;
+    await transaction.execute(
+      `delete from payroll_exception
+         where tenant_id = $1 and payroll_run_id = $2 and employment_id = any($3::uuid[])`,
+      [transaction.tenantId, runId, employmentIds],
     );
   }
 }

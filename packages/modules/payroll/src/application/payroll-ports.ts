@@ -95,6 +95,20 @@ export interface SnapshotStore {
     runId: string,
     snapshots: readonly EmploymentSnapshot[],
   ): Promise<void>;
+  /**
+   * Removes the snapshots a named set of employments produced in this run.
+   *
+   * Called before every batch's inserts, for the same reason the result store has one: a
+   * recalculation must **replace** what it consumed rather than insert alongside it, or
+   * `payroll_input_snapshot_unique_idx` raises 23505 and — worse, where a fake does not enforce
+   * that index — the persisted snapshot stops matching the result it explains, which is the
+   * property the whole reproducibility argument rests on.
+   */
+  clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void>;
 }
 
 export interface StoredDigests {
@@ -117,6 +131,20 @@ export interface ResultStore {
   insertMany(transaction: Transaction, results: readonly PayrollResultState[]): Promise<void>;
   /** Removes the results of a run **that is not finalized**, so a recalculation can replace them. */
   clearRun(transaction: Transaction, runId: string): Promise<void>;
+  /**
+   * Removes the rows a **named set of employments** produced in this run, so a recalculation
+   * replaces them instead of inserting alongside them.
+   *
+   * Called before every batch's inserts. On a first pass it matches nothing; on a recalculation it
+   * is what stops `payroll_result_unique_idx` being violated and — where a fake does not enforce
+   * that index — what stops one person holding two results for one run. Narrow by design (D-14):
+   * an employment that did not go stale is never touched.
+   */
+  clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void>;
 }
 
 export interface EarningLineStore {
@@ -127,6 +155,12 @@ export interface EarningLineStore {
     lines: readonly ResultLine<EarningLine>[],
   ): Promise<void>;
   clearRun(transaction: Transaction, runId: string): Promise<void>;
+  /** As `clearRun`, for a named set of employments only. Called before every batch's inserts. */
+  clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void>;
 }
 
 export interface DeductionLineStore {
@@ -137,6 +171,12 @@ export interface DeductionLineStore {
     lines: readonly ResultLine<DeductionLine>[],
   ): Promise<void>;
   clearRun(transaction: Transaction, runId: string): Promise<void>;
+  /** As `clearRun`, for a named set of employments only. Called before every batch's inserts. */
+  clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void>;
 }
 
 /** A line and the result it belongs to, so the batch insert needs no second lookup. */
@@ -149,6 +189,12 @@ export interface ExceptionStore {
   forRun(transaction: Transaction, runId: string): Promise<readonly PayrollExceptionState[]>;
   insertMany(transaction: Transaction, exceptions: readonly PayrollExceptionState[]): Promise<void>;
   clearRun(transaction: Transaction, runId: string): Promise<void>;
+  /** As `clearRun`, for a named set of employments only. Called before every batch's inserts. */
+  clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void>;
 }
 
 export interface AdjustmentStore {

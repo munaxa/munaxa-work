@@ -112,6 +112,21 @@ export class PostgresSnapshotRepository implements SnapshotStore {
       parameters,
     );
   }
+
+  /** See `SnapshotStore.clearEmployments`: a recalculation replaces what it consumed. */
+  public async clearEmployments(
+    transaction: Transaction,
+    runId: string,
+    employmentIds: readonly string[],
+  ): Promise<void> {
+    if (employmentIds.length === 0) return;
+    await transaction.execute(
+      `delete from payroll_input_snapshot
+         where tenant_id = $1 and payroll_run_id = $2 and employment_id = any($3::uuid[])
+           and finalized_at is null`,
+      [transaction.tenantId, runId, employmentIds],
+    );
+  }
 }
 
 /**
