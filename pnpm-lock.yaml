@@ -61,6 +61,9 @@ importers:
       '@work/organization':
         specifier: workspace:*
         version: link:../../packages/modules/organization
+      '@work/payroll':
+        specifier: workspace:*
+        version: link:../../packages/modules/payroll
       '@work/people':
         specifier: workspace:*
         version: link:../../packages/modules/people
