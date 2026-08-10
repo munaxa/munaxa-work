@@ -8,6 +8,7 @@ import {
   type PermissionChecker,
   type Query,
   type Result,
+  type UnitOfWork,
   type WorkModule,
 } from '@work/kernel';
 import {
@@ -96,7 +97,37 @@ export interface Wired {
   as<TResult>(actor: string, work: () => Promise<TResult>): Promise<TResult>;
 }
 
-export const wire = (): Wired => {
+/**
+ * Where the three modules keep their rows.
+ *
+ * The default is in-memory, which is what the behavioural cross-module suite wants: it is asking
+ * whether the *modules* agree with each other, and a database would only slow that question down.
+ * `payroll.production-scenario.spec.ts` passes real PostgreSQL stores and a real unit of work
+ * through the same wiring, so the production scenario exercises the same composition rather than a
+ * second one assembled to look like it.
+ */
+export interface Persistence {
+  readonly unitOfWork: UnitOfWork;
+  readonly employment: EmploymentStoresFor;
+  readonly compensation: CompensationStoresFor;
+  readonly payroll: PayrollStoresFor;
+}
+
+// Taken from what each module's factory accepts rather than from the in-memory factory's return
+// type: the fakes are structurally *wider* (they expose their rows for assertions), and typing the
+// seam by them would refuse the real repositories.
+type EmploymentStoresFor = Parameters<typeof employmentModule>[0]['stores'];
+type CompensationStoresFor = Parameters<typeof compensationModule>[0]['stores'];
+type PayrollStoresFor = Parameters<typeof payrollModule>[0]['stores'];
+
+const inMemory = (): Persistence => ({
+  unitOfWork: new InMemoryUnitOfWork(TENANT),
+  employment: inMemoryEmploymentStores(),
+  compensation: inMemoryCompensationStores(),
+  payroll: inMemoryPayrollStores(),
+});
+
+export const wire = (persistence: Persistence = inMemory()): Wired => {
   const dispatcher = new Dispatcher(
     permitting(
       ...ALL_EMPLOYMENT_PERMISSIONS,
@@ -107,7 +138,7 @@ export const wire = (): Wired => {
       'organization.legal-entity.read',
     ),
   );
-  const work = new InMemoryUnitOfWork(TENANT);
+  const work = persistence.unitOfWork;
   const people = new FakePeople();
   const clock = new FixedClock(NOW);
   const attendance = new Map<string, AttendanceStub>();
@@ -120,7 +151,7 @@ export const wire = (): Wired => {
       dispatcher.ask<TResult>(query),
   };
 
-  register(dispatcher, modulesFor({ dispatcher, work, people, clock, asking }));
+  register(dispatcher, modulesFor({ dispatcher, work, people, clock, asking, persistence }));
 
   registerSourceStubs(dispatcher, {
     attendance,
@@ -146,18 +177,26 @@ export const wire = (): Wired => {
 
 interface Wiring {
   readonly dispatcher: Dispatcher;
-  readonly work: InMemoryUnitOfWork;
+  readonly work: UnitOfWork;
   readonly people: FakePeople;
   readonly clock: FixedClock;
   readonly asking: Asking;
+  readonly persistence: Persistence;
 }
 
 /** Three real modules on one dispatcher, connected by the production adapters. */
-const modulesFor = ({ dispatcher, work, people, clock, asking }: Wiring): readonly WorkModule[] => [
+const modulesFor = ({
+  dispatcher,
+  work,
+  people,
+  clock,
+  asking,
+  persistence,
+}: Wiring): readonly WorkModule[] => [
   employmentModule(
     {
       unitOfWork: work,
-      stores: inMemoryEmploymentStores(),
+      stores: persistence.employment,
       people,
       organization: new FakeEmploymentOrganization(),
       clock,
@@ -166,14 +205,14 @@ const modulesFor = ({ dispatcher, work, people, clock, asking }: Wiring): readon
   ),
   compensationModule({
     unitOfWork: work,
-    stores: inMemoryCompensationStores(),
+    stores: persistence.compensation,
     employment: new CompensationEmploymentDirectory(asking),
     organization: new CompensationOrganizationDirectory(asking),
     clock,
   }),
   payrollModule({
     unitOfWork: work,
-    stores: inMemoryPayrollStores(),
+    stores: persistence.payroll,
     // The production adapters, not fakes. This is the point of the suite.
     employment: new PayrollEmploymentSource(asking),
     compensation: new PayrollCompensationSource(asking),

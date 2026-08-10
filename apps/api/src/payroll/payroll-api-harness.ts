@@ -202,6 +202,7 @@ export interface ResultItem {
   readonly payrollResultId: string;
   readonly employmentId: string;
   readonly gross: MoneyBody;
+  readonly totalDeductions: MoneyBody;
   readonly net: MoneyBody;
 }
 

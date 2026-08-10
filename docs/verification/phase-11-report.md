@@ -38,7 +38,8 @@ corrected. None was silently redesigned.
 
 The test gate was re-run with `--force` so no result came from turbo's cache: **1,446 tests, none
 skipped**, with `TEST_DATABASE_URL` set so every integration suite executed rather than
-self-skipping.
+self-skipping. `apps/api` runs one test file at a time; see §3 for the race that made that
+necessary.
 
 No `any`, no `eslint-disable`, no `TODO`, no `FIXME`, no skipped test and no disabled check was
 introduced. One narrow ESLint exemption was added, scoped to `apps/api/src/**/*.fixture.ts` and
@@ -49,9 +50,9 @@ database to connect to, and no business code lives in a `.fixture.ts`.
 
 ## 3. Tests
 
-**137 tests** across the module, the API app, the admin workspace and Leave's new contract — 80 in
-`@work/payroll`, 44 in `@work/api`, 11 in `@work/admin` and 2 in `@work/leave`. The repository's
-full suite is 1,446 tests and passes with none skipped.
+**138 tests** across the module, the API app, the admin workspace and Leave's new contract — 80 in
+`@work/payroll`, 45 in `@work/api`, 11 in `@work/admin` and 2 in `@work/leave`. The repository's
+full suite is 1,447 tests and passes with none skipped.
 
 | Suite | Count | Runs against |
 | --- | --- | --- |
@@ -59,9 +60,41 @@ full suite is 1,446 tests and passes with none skipped.
 | Application — `payroll-lifecycle`, `payroll-reconciliation` | 13 | In-memory stores, through the real dispatcher |
 | Integration — persistence, isolation, immutability, concurrency, recalculation | 35 | **Real PostgreSQL**, as an unprivileged role |
 | API — controller, security, lifecycle, PostgreSQL | 35 | Real Nest, real filter, real pipe; nine of them on real PostgreSQL |
+| Production scenario — `payroll.production-scenario` | 1 | **Everything real at once.** See below |
 | Cross-module — `payroll.cross-module`, `payroll.lifecycle` | 9 | Real Employment and Compensation modules, real dispatcher |
 | Admin — `lifecycle` | 11 | Pure |
 | Leave — `leave-payroll-contract` | 2 | In-memory |
+
+### The final production scenario
+
+One test, one chain, nothing faked along it:
+
+```text
+Employment → Compensation → Attendance → Leave → Payroll population → immutable snapshot →
+calculation → results → reconciliation → approval → finalization →
+accounting output + payment instruction → immutable historical result → reversal
+```
+
+Real PostgreSQL, real repositories for **all three** modules, the real production cross-module
+adapters, the real dispatcher, real permission checks, and the real HTTP API for every payroll
+step — in one composition, as a role that owns nothing and cannot bypass row-level security.
+
+The employment is created by Employment's own command and the salary by Compensation's own
+commands. Payroll is told neither: it resolves the population through Employment's published search
+and the figures through `compensation.payroll-period`. Attendance, Leave and Organization remain
+query handlers answering in their published views' shapes, because their modules are not in this
+composition — the adapters under test map real contract payloads either way.
+
+Each earlier suite holds one variable fixed: the cross-module suite runs the real modules over
+in-memory stores, and the PostgreSQL API suite runs the real repositories against stubbed sources.
+This one holds nothing fixed.
+
+**A latent flake this surfaced.** Two suites reset the same database, and a reset is not scoped to
+the file that issued it — run in parallel, one truncates the tables the other is midway through
+using, and the failure appears as an unrelated assertion in whichever suite lost the race. Scoping
+each reset to its own tenant does not work, because a finalized payroll row cannot be deleted at all
+and `truncate` is the only reset the trigger does not refuse. `apps/api` now runs one test file at a
+time. It was reproducible, not theoretical.
 
 ### Reliability, proven rather than described
 
@@ -354,6 +387,7 @@ precedent.
 | `pnpm verify` | ✅ Green |
 | Final report | ✅ This document |
 | Documentation updated | ✅ Module guide, ARCHITECTURE, DOMAIN_OWNERSHIP, PHASES, ADR register, release notes |
+| Final production scenario | ✅ Everything real at once — see §3 |
 | Final diff reviewed | ✅ §10 |
 
 **One budget is missed and stated as missed**: finalization, by 25% at 10,000 employees and 36% at

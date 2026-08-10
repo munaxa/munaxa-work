@@ -31,9 +31,15 @@ interface Ready {
   readonly payrollPeriodId: string;
 }
 
-/** A real employment, a real salary, real attendance and leave facts, and an open payroll period. */
-export const configured = async (wired: Wired): Promise<Ready> => {
-  const personId = wired.people.add(uuidV7(), { en: 'Rania Odeh', ar: 'رانيا عودة' });
+/**
+ * A real employment, a real salary, real attendance and leave facts, and an open payroll period.
+ *
+ * `personId` is a parameter because against real PostgreSQL the `person` row has to exist before
+ * `employment_person_fk` will accept the employment — the production scenario seeds it first and
+ * passes the identifier in. In memory the default is fine.
+ */
+export const configured = async (wired: Wired, personId = uuidV7()): Promise<Ready> => {
+  wired.people.add(personId, { en: 'Rania Odeh', ar: 'رانيا عودة' });
   const created = await send<{ employmentId: string }>(wired, {
     commandName: 'employment.create-employment',
     personId,
