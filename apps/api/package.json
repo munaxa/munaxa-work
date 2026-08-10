@@ -20,6 +20,7 @@
     "@nestjs/swagger": "^11.0.0",
     "@prisma/client": "^6.2.0",
     "@work/attendance": "workspace:*",
+    "@work/compensation": "workspace:*",
     "@work/config": "workspace:*",
     "@work/employment": "workspace:*",
     "@work/identity": "workspace:*",

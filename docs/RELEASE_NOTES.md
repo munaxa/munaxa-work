@@ -5,6 +5,56 @@ and what is still missing.
 
 ---
 
+## Phase 10 — Compensation Management
+
+Employment says somebody is employed. Compensation says what they are entitled to receive. Payroll
+says what is actually paid for a period.
+
+**Money that is exact, and stays exact.** Every amount is stored as integer minor units in a
+`bigint`, alongside its currency code *and its currency's number of decimal places*. Two decimals is
+a habit rather than a rule — the Kuwaiti dinar, the Bahraini dinar and the Omani rial all have three
+— and a system that assumed two would be wrong by a factor of ten in three of this product's
+markets. Amounts cross every boundary as decimal strings; there is no path on which one becomes a
+JavaScript number, and a test proves a figure above nine quadrillion minor units survives a database
+round trip unchanged.
+
+**Configured, not shipped.** No basic salary, no housing allowance, no transport allowance, no
+minimum wage, no tax treatment and no statutory progression. Components, plans, grades, scales and
+steps are all things a tenant or a country pack defines. A new tenant sees empty tables, and the
+screen says so.
+
+**A hierarchy nobody is forced into.** Structures, grades, scales and steps are each optional and
+none implies another; a forty-person company assigns a bare amount and configures none of it. Where
+a grade *is* named, it constrains the amount and never supplies one — a system that filled in a
+midpoint would be deciding somebody's salary.
+
+**History you can rely on.** A change closes the previous period and opens a new one; no historical
+value is ever rewritten. An amount taken from a salary step is copied onto the assignment, so
+revising the step next year cannot restate what last year's payroll was run against. Both time axes
+are recorded — when a change took effect, and when the system learned about it — which is what makes
+a back-dated raise distinguishable from one everybody always knew about. Two administrators
+assigning the same allowance concurrently race in the database rather than both succeeding.
+
+**Decisions made by people.** Approving a salary change is a separate permission from making one,
+and self-approval is refused by the domain, by the permission separation and by a database
+constraint. A wrong decision is corrected by a reversal that stays in the record, never by an edit.
+A plan requiring no approval produces no decision row at all, and the chain says so rather than
+naming a system approver.
+
+**The contract Payroll will read.** One query resolves a page of five hundred employments over a
+period in a single statement, publishing amounts per currency, a payroll-treatment code it never
+interprets, and flags saying a component *may* be prorated and a period *is* partial. It publishes
+no gross, no net, no tax and no conversion, and nothing sums across currencies. Payroll will find
+retroactive corrections by asking rather than by being told.
+
+**Not built, and said plainly.** No payroll. No deductions of any kind — statutory deductions belong
+to Payroll and loan recovery to a later phase, and half of one here would have created a second
+owner. No tax, social security, pension or end-of-service. No benefits administration. No currency
+conversion. No country pack, so no statutory behaviour is exercised anywhere. No employee or manager
+self-service.
+
+---
+
 ## Phase 9 — Leave & Absence Management
 
 Leave explains authorized absence. Attendance records what happened. Payroll decides what it costs.

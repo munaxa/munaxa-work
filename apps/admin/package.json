@@ -16,6 +16,7 @@
     "@munaxa/theme": "^1.0.0",
     "@munaxa/ui": "^1.0.0",
     "@work/attendance": "workspace:*",
+    "@work/compensation": "workspace:*",
     "@work/config": "workspace:*",
     "@work/employment": "workspace:*",
     "@work/leave": "workspace:*",

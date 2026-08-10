@@ -60,6 +60,10 @@ import {
   attendanceModuleFor,
 } from '../attendance/attendance.composition.js';
 import { DeferredLeaveDispatcher, leaveModuleFor } from '../leave/leave.composition.js';
+import {
+  DeferredCompensationDispatcher,
+  compensationModuleFor,
+} from '../compensation/compensation.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -116,6 +120,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         onboarding: new DeferredOnboardingSender(),
         attendance: new DeferredAttendanceSender(),
         leave: new DeferredLeaveDispatcher(),
+        compensation: new DeferredCompensationDispatcher(),
       }),
     },
     {
@@ -180,6 +185,10 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // adapter asks Leave's published read, and Leave's working-day adapter asks Attendance's.
         // Both go through the one dispatcher assembled below, so neither module imports the other.
         registry.register(leaveModuleFor(unitOfWork, senders.leave));
+        // Compensation is registered last. It reads Employment and Organization and is read by
+        // nobody in this repository yet — Payroll (Phase 11) is its first consumer, and it will
+        // pull through `compensation.payroll-period` rather than being pushed to.
+        registry.register(compensationModuleFor(unitOfWork, senders.compensation));
         return registry;
       },
     },
@@ -210,6 +219,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         senders.onboarding.attach(dispatcher);
         senders.attendance.attach(dispatcher);
         senders.leave.attach(dispatcher);
+        senders.compensation.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -238,6 +248,7 @@ interface DeferredSenders {
   readonly onboarding: DeferredOnboardingSender;
   readonly attendance: DeferredAttendanceSender;
   readonly leave: DeferredLeaveDispatcher;
+  readonly compensation: DeferredCompensationDispatcher;
 }
 
 /**

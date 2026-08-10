@@ -2534,3 +2534,456 @@ model LeaveYear {
   @@index([tenant_id, leave_policy_id, leave_year_start], map: "leave_year_idx")
   @@map("leave_year")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// COMPENSATION MANAGEMENT (Phase 10)
+//
+// What an employment is entitled to receive. Employment says somebody is employed; Compensation
+// says what they are entitled to; Payroll says what is actually paid for a period. Fourteen
+// tables, and three decisions carry the module's whole reliability argument: money is integer
+// minor units with its currency and exponent beside it, `compensation_recurring` is authoritative
+// and its value columns are never rewritten, and overlapping periods are refused by a GiST
+// exclusion constraint rather than by application code.
+//
+// No column here holds a tax, a social-security treatment, a gross, a net, a deduction or an
+// end-of-service figure. No table holds a person, an employment status or an attendance fact.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/// A compensation plan version — the configuration an employment is assigned to. Immutable once
+/// published: a compensation record names the version that governed it, so a plan edited in June
+/// cannot rewrite what March meant. Nothing is seeded.
+model CompensationPlan {
+  id                            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                     String    @db.Uuid
+  code                          String    @db.VarChar(64)
+  name                          Json
+  version_number                Int
+  status                        String    @db.VarChar(24)
+  /// Optional. Every level of the salary hierarchy is optional; a plan naming no structure is the
+  /// ordinary shape for a company paying simple salaries.
+  salary_structure_id           String?   @db.Uuid
+  default_currency_code         String    @db.Char(3)
+  /// Carried rather than looked up: nothing in this product publishes a currency's exponent, and
+  /// two decimal places is a habit rather than a rule (D-2).
+  default_currency_exponent     Int       @db.SmallInt
+  approval_required             Boolean
+  approvals_required            Int       @db.SmallInt
+  self_approval_permitted       Boolean
+  /// Change control in basis points. Nullable and inert when null; nothing statutory is implied.
+  maximum_increase_basis_points Int?
+  maximum_decrease_basis_points Int?
+  /// Null for a tenant-defined plan; set when a country pack authored this version.
+  country_pack_id               String?   @db.VarChar(64)
+  country_pack_version          Int?
+  published_at                  DateTime? @db.Timestamptz(6)
+  published_by                  String?   @db.VarChar(255)
+  metadata                      Json
+  created_at                    DateTime  @db.Timestamptz(6)
+  created_by                    String    @db.VarChar(255)
+  updated_at                    DateTime  @db.Timestamptz(6)
+  updated_by                    String    @db.VarChar(255)
+  deleted_at                    DateTime? @db.Timestamptz(6)
+  deleted_by                    String?   @db.VarChar(255)
+  version                       Int
+
+  @@index([tenant_id, status], map: "compensation_plan_status_idx")
+  @@map("compensation_plan")
+}
+
+/// Which plan version governs which scope, effective-dated. Most-specific-wins is resolved in the
+/// domain; a tie is refused rather than broken.
+model CompensationPlanAssignment {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  compensation_plan_id String    @db.Uuid
+  scope                String    @db.VarChar(24)
+  scope_id             String?   @db.Uuid
+  effective_from       DateTime  @db.Date
+  effective_to         DateTime? @db.Date
+  reason_code          String?   @db.VarChar(64)
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, scope, scope_id, effective_from], map: "compensation_plan_assignment_scope_idx")
+  @@index([tenant_id, compensation_plan_id], map: "compensation_plan_assignment_plan_idx")
+  @@map("compensation_plan_assignment")
+}
+
+/// The optional root of the salary hierarchy. A tenant paying simple salaries has none.
+model CompensationSalaryStructure {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  description    String?   @db.VarChar(1024)
+  status         String    @db.VarChar(24)
+  effective_from DateTime  @db.Date
+  effective_to   DateTime? @db.Date
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, status], map: "compensation_salary_structure_status_idx")
+  @@map("compensation_salary_structure")
+}
+
+/// A pay range: minimum, midpoint, maximum and a currency, effective-dated. Reference data — a
+/// grade never supplies somebody's salary, it constrains it.
+model CompensationPayGrade {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  salary_structure_id  String?   @db.Uuid
+  code                 String    @db.VarChar(64)
+  name                 Json
+  description          String?   @db.VarChar(1024)
+  minimum_minor        BigInt
+  midpoint_minor       BigInt
+  maximum_minor        BigInt
+  currency_code        String    @db.Char(3)
+  currency_exponent    Int       @db.SmallInt
+  /// Organization's `position.grade`, as an optional label rather than a foreign key (D-8). A
+  /// foreign key would make Compensation unable to price anything Organization had not graded.
+  position_grade_label String?   @db.VarChar(64)
+  status               String    @db.VarChar(24)
+  effective_from       DateTime  @db.Date
+  effective_to         DateTime? @db.Date
+  metadata             Json
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, salary_structure_id, effective_from], map: "compensation_pay_grade_structure_idx")
+  @@map("compensation_pay_grade")
+}
+
+/// A scale within a grade. `progression_model` is a code stored and never acted on: nothing here
+/// moves an employment between steps by itself.
+model CompensationPayScale {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  pay_grade_id      String    @db.Uuid
+  code              String    @db.VarChar(64)
+  name              Json
+  minimum_minor     BigInt
+  midpoint_minor    BigInt
+  maximum_minor     BigInt
+  currency_code     String    @db.Char(3)
+  currency_exponent Int       @db.SmallInt
+  progression_model String    @db.VarChar(64)
+  status            String    @db.VarChar(24)
+  effective_from    DateTime  @db.Date
+  effective_to      DateTime? @db.Date
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, pay_grade_id], map: "compensation_pay_scale_grade_idx")
+  @@map("compensation_pay_scale")
+}
+
+/// A step under a scale **or** under a grade — exactly one, by check constraint. An assignment made
+/// from a step copies the amount, so revising the step next year cannot restate last year's
+/// payroll.
+model CompensationSalaryStep {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  pay_scale_id      String?   @db.Uuid
+  pay_grade_id      String?   @db.Uuid
+  step_number       Int       @db.SmallInt
+  code              String?   @db.VarChar(64)
+  amount_minor      BigInt
+  currency_code     String    @db.Char(3)
+  currency_exponent Int       @db.SmallInt
+  effective_from    DateTime  @db.Date
+  effective_to      DateTime? @db.Date
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, pay_scale_id, step_number], map: "compensation_salary_step_scale_idx")
+  @@map("compensation_salary_step")
+}
+
+/// A configurable thing an employment can be entitled to. Nothing is seeded — no basic salary, no
+/// housing, no transport. `payroll_treatment_code` is the whole tax boundary: stored here, never
+/// interpreted here.
+model CompensationComponent {
+  id                      String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id               String    @db.Uuid
+  code                    String    @db.VarChar(64)
+  name                    Json
+  /// `base`, `allowance` or `one_time`. `deduction` is deliberately absent: deductions are out of
+  /// scope for Phase 10 (D-1).
+  kind                    String    @db.VarChar(24)
+  calculation_basis       String    @db.VarChar(32)
+  basis_component_id      String?   @db.Uuid
+  /// Integer basis points — 40% is 4000. Never a float.
+  percentage_basis_points Int?
+  /// Stated, never defaulted. `Money.multipliedBy` has no default mode and that is deliberate.
+  rounding_mode           String    @db.VarChar(16)
+  recurrence              String    @db.VarChar(16)
+  payroll_treatment_code  String    @db.VarChar(64)
+  proratable              Boolean
+  eligibility_rule        Json?
+  statutory_source_code   String?   @db.VarChar(64)
+  status                  String    @db.VarChar(24)
+  version_number          Int
+  published_at            DateTime? @db.Timestamptz(6)
+  published_by            String?   @db.VarChar(255)
+  metadata                Json
+  created_at              DateTime  @db.Timestamptz(6)
+  created_by              String    @db.VarChar(255)
+  updated_at              DateTime  @db.Timestamptz(6)
+  updated_by              String    @db.VarChar(255)
+  deleted_at              DateTime? @db.Timestamptz(6)
+  deleted_by              String?   @db.VarChar(255)
+  version                 Int
+
+  @@index([tenant_id, status, kind], map: "compensation_component_status_idx")
+  @@map("compensation_component")
+}
+
+/// Which components a plan version permits, and on what terms.
+model CompensationPlanComponent {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  compensation_plan_id String    @db.Uuid
+  component_id         String    @db.Uuid
+  mandatory            Boolean
+  minimum_minor        BigInt?
+  maximum_minor        BigInt?
+  currency_code        String?   @db.Char(3)
+  currency_exponent    Int?      @db.SmallInt
+  eligibility_rule     Json?
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, compensation_plan_id], map: "compensation_plan_component_plan_idx")
+  @@map("compensation_plan_component")
+}
+
+/// **The authoritative record of recurring entitlement.** Value columns are never rewritten: a
+/// change closes the previous period and inserts a new one. `recorded_at` is the system-time axis
+/// beside the business-time `effective_from`, and it is what makes a retroactive correction
+/// explainable. Overlapping periods for one (employment, component) are refused by a GiST
+/// exclusion constraint.
+model CompensationRecurring {
+  id                      String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id               String    @db.Uuid
+  employment_id           String    @db.Uuid
+  component_id            String    @db.Uuid
+  /// The plan version that governed this record. Recorded, never re-resolved.
+  compensation_plan_id    String    @db.Uuid
+  pay_grade_id            String?   @db.Uuid
+  pay_scale_id            String?   @db.Uuid
+  salary_step_id          String?   @db.Uuid
+  /// Copied at assignment, never joined from a mutable reference table.
+  amount_minor            BigInt
+  currency_code           String    @db.Char(3)
+  currency_exponent       Int       @db.SmallInt
+  percentage_basis_points Int?
+  basis_component_id      String?   @db.Uuid
+  effective_from          DateTime  @db.Date
+  effective_to            DateTime? @db.Date
+  recorded_at             DateTime  @db.Timestamptz(6)
+  recorded_by             String    @db.VarChar(255)
+  source                  String    @db.VarChar(24)
+  source_id               String?   @db.VarChar(128)
+  reason_code             String?   @db.VarChar(64)
+  note                    String?   @db.VarChar(1024)
+  approval_state          String    @db.VarChar(24)
+  approved_at             DateTime? @db.Timestamptz(6)
+  supersedes_id           String?   @db.Uuid
+  metadata                Json
+  created_at              DateTime  @db.Timestamptz(6)
+  created_by              String    @db.VarChar(255)
+  updated_at              DateTime  @db.Timestamptz(6)
+  updated_by              String    @db.VarChar(255)
+  deleted_at              DateTime? @db.Timestamptz(6)
+  deleted_by              String?   @db.VarChar(255)
+  version                 Int
+
+  @@index([tenant_id, employment_id, component_id, effective_from], map: "compensation_recurring_effective_idx")
+  @@index([tenant_id, recorded_at], map: "compensation_recurring_recorded_idx")
+  @@map("compensation_recurring")
+}
+
+/// Bonuses, commissions and awards. No effective period and therefore no overlap rule. Compensation
+/// records that it is owed and when it becomes payable; which period consumes it is Payroll's.
+model CompensationOneTime {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  employment_id        String    @db.Uuid
+  component_id         String    @db.Uuid
+  compensation_plan_id String    @db.Uuid
+  amount_minor         BigInt
+  currency_code        String    @db.Char(3)
+  currency_exponent    Int       @db.SmallInt
+  payable_on           DateTime  @db.Date
+  reason_code          String    @db.VarChar(64)
+  note                 String?   @db.VarChar(1024)
+  source               String    @db.VarChar(24)
+  source_id            String?   @db.VarChar(128)
+  recorded_at          DateTime  @db.Timestamptz(6)
+  recorded_by          String    @db.VarChar(255)
+  approval_state       String    @db.VarChar(24)
+  approved_at          DateTime? @db.Timestamptz(6)
+  metadata             Json
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, employment_id, payable_on], map: "compensation_one_time_period_idx")
+  @@map("compensation_one_time")
+}
+
+/// The reason record beside a compensation change — never a second way to store one. A reason code
+/// and a written note are both required: it is the movement no rule produced.
+model CompensationAdjustment {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  employment_id         String    @db.Uuid
+  component_id          String?   @db.Uuid
+  adjustment_type       String    @db.VarChar(64)
+  previous_amount_minor BigInt?
+  new_amount_minor      BigInt?
+  currency_code         String    @db.Char(3)
+  currency_exponent     Int       @db.SmallInt
+  effective_from        DateTime  @db.Date
+  reason_code           String    @db.VarChar(64)
+  note                  String    @db.VarChar(1024)
+  requested_by          String    @db.VarChar(255)
+  recorded_at           DateTime  @db.Timestamptz(6)
+  approval_state        String    @db.VarChar(24)
+  recurring_id          String?   @db.Uuid
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, employment_id, effective_from], map: "compensation_adjustment_employment_idx")
+  @@map("compensation_adjustment")
+}
+
+/// Inserted and read. A wrong decision is corrected by a reversal naming the one it reverses, never
+/// by an edit. `requested_by` is copied from the subject so the self-approval check constraint is
+/// enforceable — a check constraint cannot reach another table.
+model CompensationApprovalDecision {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  subject_kind         String    @db.VarChar(24)
+  subject_id           String    @db.Uuid
+  sequence             Int       @db.SmallInt
+  decision             String    @db.VarChar(16)
+  /// From the authenticated context. A caller cannot supply it.
+  decided_by           String    @db.VarChar(255)
+  decided_at           DateTime  @db.Timestamptz(6)
+  requested_by         String    @db.VarChar(255)
+  comment              String?   @db.VarChar(1024)
+  reverses_decision_id String?   @db.Uuid
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, subject_kind, subject_id, sequence], map: "compensation_approval_decision_chain_idx")
+  @@map("compensation_approval_decision")
+}
+
+/// Append-only compensation history. The periods answer "what was the salary"; this answers "what
+/// happened, who did it and why" — including the events that changed no value, such as an approval
+/// or a reversal. Full jsonb snapshots rather than deltas, because a delta needs its schema to stay
+/// interpretable years later.
+model CompensationChange {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  employment_id  String    @db.Uuid
+  component_id   String?   @db.Uuid
+  subject_kind   String    @db.VarChar(24)
+  subject_id     String    @db.Uuid
+  change_kind    String    @db.VarChar(32)
+  previous_state Json?
+  new_state      Json?
+  effective_from DateTime? @db.Date
+  recorded_at    DateTime  @db.Timestamptz(6)
+  actor          String    @db.VarChar(255)
+  reason_code    String?   @db.VarChar(64)
+  source         String    @db.VarChar(24)
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, employment_id, recorded_at], map: "compensation_change_employment_idx")
+  @@index([tenant_id, subject_kind, subject_id], map: "compensation_change_subject_idx")
+  @@map("compensation_change")
+}
+
+/// What a bulk load covered, wrote, skipped and failed. `rows_skipped` is the count that
+/// demonstrates idempotency rather than merely claiming it.
+model CompensationImportBatch {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  source         String    @db.VarChar(24)
+  source_label   String?   @db.VarChar(128)
+  submitted_at   DateTime  @db.Timestamptz(6)
+  submitted_by   String    @db.VarChar(255)
+  rows_submitted Int
+  rows_created   Int
+  rows_skipped   Int
+  rows_failed    Int
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, submitted_at], map: "compensation_import_batch_idx")
+  @@map("compensation_import_batch")
+}

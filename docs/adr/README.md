@@ -44,6 +44,9 @@ line; the decision that replaced it is a new record.
 | [0058](0058-attendance-pulls-leave-changes.md)   | Attendance pulls leave changes; Leave never writes to Attendance | Accepted |
 | [0059](0059-the-leave-ledger-is-authoritative.md) | The leave ledger is authoritative; the balance is a projection | Accepted |
 | [0060](0060-leave-ships-no-statutory-content.md) | Leave ships no statutory content, and approval is recorded rather than delegated | Accepted |
+| [0061](0061-money-carries-its-currency-exponent.md) | Money is integer minor units carrying its own currency exponent | Accepted |
+| [0062](0062-compensation-states-entitlement.md)  | Compensation states entitlement; Payroll determines payment | Accepted |
+| [0063](0063-a-compensation-change-supersedes.md) | A compensation change supersedes; a pay grade is not a job grade | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

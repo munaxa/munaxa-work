@@ -29,7 +29,7 @@ them afterwards.
 | Onboarding plan, onboarding instance, onboarding task | `onboarding` | Phase 7 ✅ |
 | Attendance, time event, shift, schedule, roster | `attendance` | Phase 8 ✅ |
 | Leave type, policy, entitlement, ledger, balance, request | `leave` | Phase 9 ✅ |
-| Salary structure, grade, pay element      | `compensation`  | Phase 10      |
+| Compensation plan, salary structure, grade, scale, step, component, recurring and one-time compensation | `compensation` | Phase 10 ✅ |
 | Payroll run, payslip, payroll result      | `payroll`       | Phase 11      |
 | Benefit plan, enrolment                   | `benefits`      | Phase 12      |
 | Goal, review, rating                      | `performance`   | Phase 13      |

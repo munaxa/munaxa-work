@@ -140,6 +140,24 @@ in [`verification/phase-9-plan.md`](verification/phase-9-plan.md); the report, t
 debt register and the production-readiness assessment are in
 [`verification/phase-9-report.md`](verification/phase-9-report.md).
 
+Phase 10 completed on 2026-08-10: Compensation Management — versioned compensation plans, an
+optional four-level salary hierarchy, tenant-configured components, effective-dated recurring and
+one-time compensation, adjustments with a written reason, an append-only history, and the set-based
+contract Payroll will consume. Money is integer minor units carrying its own currency exponent, with
+no `number` anywhere on the path
+([ADR-0061](adr/0061-money-carries-its-currency-exponent.md)). Compensation states entitlement and
+Payroll determines payment, so the contract publishes facts and flags and no computed total — and no
+projection was built, because the authoritative rows answer the payroll-period question set-based
+([ADR-0062](adr/0062-compensation-states-entitlement.md)). A change supersedes rather than rewrites,
+overlap is refused by a GiST exclusion constraint, both time axes are recorded, and a pay grade is
+deliberately not Organization's job grade
+([ADR-0063](adr/0063-a-compensation-change-supersedes.md)). Deductions are excluded from this phase
+entirely: statutory deductions are Payroll's and loan recovery is Phase 10.1's. Nothing statutory
+ships. The planning checkpoint and the approved decisions are in
+[`verification/phase-10-plan.md`](verification/phase-10-plan.md); the report, the carried-forward
+debt register and the production-readiness assessment are in
+[`verification/phase-10-report.md`](verification/phase-10-report.md).
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

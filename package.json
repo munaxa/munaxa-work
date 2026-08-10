@@ -20,6 +20,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "lint": "turbo run lint",
     "measure:attendance": "node scripts/measure-attendance-performance.mjs",
+    "measure:compensation": "node scripts/measure-compensation-performance.mjs",
     "measure:leave": "node scripts/measure-leave-performance.mjs",
     "measure:onboarding": "node scripts/measure-onboarding-performance.mjs",
     "measure:recruitment": "node scripts/measure-recruitment-performance.mjs",
