@@ -33,7 +33,7 @@ import {
   LetterPersonSource,
   LetterSalarySource,
 } from '../letters/letters-sources.js';
-import { upstreamHandlers, type UpstreamFacts } from './phase-twelve-upstream.js';
+import { upstream, upstreamHandlers, type UpstreamFacts } from './phase-twelve-upstream.js';
 import type { Asking } from '../payroll/asking.js';
 
 /**
@@ -65,7 +65,14 @@ export const ADMINISTRATOR = 'user:hr-administrator';
 export const VERIFIER = 'user:hr-verifier';
 export const APPROVER = 'user:hr-approver';
 
-export { EMPLOYMENT_ID, IDENTIFIER_ID, LEGAL_ENTITY_ID, PERSON_ID, UNIT_ID } from './phase-twelve-upstream.js';
+export {
+  EMPLOYMENT_ID,
+  IDENTIFIER_ID,
+  LEGAL_ENTITY_ID,
+  PERSON_ID,
+  UNIT_ID,
+} from './phase-twelve-upstream.js';
+export { upstream } from './phase-twelve-upstream.js';
 export type { UpstreamFacts } from './phase-twelve-upstream.js';
 
 /**
@@ -81,22 +88,6 @@ const permitting = (granted: readonly string[]): PermissionChecker =>
   new GrantAwarePermissionChecker({
     holds: (permission) => Promise.resolve(granted.includes(permission)),
   });
-
-/**
- * The starting facts the four upstream modules publish.
- *
- * Mutable on purpose: a suite changes a salary or an identifier's expiry *here* and asks the
- * modules under test what they now say. That is how the D-1a boundary and the frozen letter
- * snapshot are both proved — one must move with the source, the other must not.
- */
-export const upstream = (): UpstreamFacts => ({
-  personVersion: 1,
-  legalNameEn: 'Layla Haddad',
-  identifierExpiresOn: '2029-05-04',
-  identifierPresent: true,
-  employmentPresent: true,
-  salaryMinor: '1200000',
-});
 
 export interface Harness {
   readonly dispatcher: Dispatcher;

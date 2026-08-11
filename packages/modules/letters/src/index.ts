@@ -52,3 +52,18 @@ export { FixedClock } from './application/letters-test-harness.js';
 export { randomVerificationToken } from './infrastructure/verification-token.js';
 
 export { postgresLettersStores } from './infrastructure/letters-stores.js';
+
+/**
+ * The HTTP edge. Registered by the API app's Letters Nest module; nothing else imports it.
+ *
+ * Route ordering is load-bearing, and the order below is the order to register in:
+ * `LetterTemplateController` owns the literal `letters/templates` prefix, `LetterRequestController`
+ * declares `reconciliation` before its `:letterRequestId` routes, `LetterIssuanceController`
+ * follows it with the remaining `:letterRequestId` routes, and `IssuedLetterController` declares
+ * `verification` before its `:issuedLetterId` route.
+ */
+export { LettersDispatcher } from './api/letters-dispatcher.js';
+export { LetterTemplateController } from './api/template.controller.js';
+export { LetterRequestController } from './api/letter.controller.js';
+export { LetterIssuanceController } from './api/issuance.controller.js';
+export { IssuedLetterController } from './api/issued.controller.js';

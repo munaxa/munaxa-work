@@ -52,3 +52,18 @@ export type {
 export { postgresDocumentsStores } from './infrastructure/documents-stores.js';
 export { inMemoryDocumentsStores } from './application/in-memory-stores.js';
 export { FixedClock } from './application/documents-test-harness.js';
+
+/**
+ * The HTTP edge. Registered by the API app's Documents Nest module; nothing else imports it.
+ *
+ * Route ordering is load-bearing, and the registration order below is the order to use:
+ * `DocumentTypeController` owns the literal `documents/types` prefix, `DocumentController` declares
+ * `reconciliation` before its `:documentId` routes, and `DocumentVersionController` and
+ * `DocumentAccessController` come last because every one of their routes begins with a parameter
+ * segment.
+ */
+export { DocumentsDispatcher } from './api/documents-dispatcher.js';
+export { DocumentTypeController } from './api/document-type.controller.js';
+export { DocumentController } from './api/document.controller.js';
+export { DocumentVersionController } from './api/version.controller.js';
+export { DocumentAccessController } from './api/access.controller.js';

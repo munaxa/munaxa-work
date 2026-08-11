@@ -16,6 +16,8 @@ import { AttendanceModule } from './attendance/attendance.module.js';
 import { LeaveModule } from './leave/leave.module.js';
 import { CompensationModule } from './compensation/compensation.module.js';
 import { PayrollModule } from './payroll/payroll.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
+import { LettersModule } from './letters/letters.module.js';
 import { CorrelationMiddleware } from './observability/correlation.middleware.js';
 import { AuthenticatedTenantGuard } from './tenancy/authenticated-tenant.guard.js';
 import { TenantMiddleware } from './tenancy/tenant.middleware.js';
@@ -42,6 +44,8 @@ import { loggingOptions } from './observability/logging.js';
     LeaveModule,
     CompensationModule,
     PayrollModule,
+    DocumentsModule,
+    LettersModule,
     HealthModule,
   ],
   providers: [

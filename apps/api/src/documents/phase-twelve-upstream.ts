@@ -1,4 +1,10 @@
-import { success, type HandlerFailure, type Query, type QueryHandler, type Result } from '@work/kernel';
+import {
+  success,
+  type HandlerFailure,
+  type Query,
+  type QueryHandler,
+  type Result,
+} from '@work/kernel';
 import { uuidV7 } from '@work/kernel';
 
 /**
@@ -220,3 +226,12 @@ const notFound = (resource: string): Result<never, HandlerFailure> => ({
   error: { kind: 'not_found', resource },
 });
 
+/** The facts the upstream modules start from. Mutated by a suite between reads. */
+export const upstream = (): UpstreamFacts => ({
+  personVersion: 1,
+  legalNameEn: 'Layla Haddad',
+  identifierExpiresOn: '2029-05-04',
+  identifierPresent: true,
+  employmentPresent: true,
+  salaryMinor: '1200000',
+});
