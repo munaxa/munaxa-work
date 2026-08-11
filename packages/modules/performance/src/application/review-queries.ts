@@ -3,6 +3,7 @@ import { bounded, listed, type PageRequest, type Listed } from './performance-qu
 import { boundBy, reviewScopeFor, scopeAdmits } from './authorization.js';
 import { notFound } from './performance-context.js';
 import { PerformancePermissions } from './performance-permissions.js';
+import { divideRounded } from '../domain/scoring.js';
 import { submittedMultiRater } from './scoring.service.js';
 import {
   assessmentView,
@@ -189,13 +190,16 @@ const peerAggregateOf = (
     };
   }
 
-  // Integer arithmetic, like every other score in this module. A mean of hundredths is hundredths.
-  const total = scored.reduce((running, score) => running + score, 0);
+  // A mean of hundredths is hundredths, and it is rounded by the **same rule the engine uses** —
+  // `divideRounded`, on exact integers, half away from zero. `Math.round(total / count)` would agree
+  // for every value this panel can hold, but agreeing by accident is not the same as agreeing: two
+  // rounding rules in one module is how a displayed average comes to differ from a computed one.
+  const total = scored.reduce((running, score) => running + BigInt(score), 0n);
 
   return {
     available: true,
     responseCount: responses.length,
-    averageScore: Math.round(total / scored.length),
+    averageScore: Number(divideRounded(total, BigInt(scored.length))),
     ...(minimumResponses === undefined ? {} : { minimumResponses }),
   };
 };

@@ -40,6 +40,10 @@
     "@work/letters#test": {
       "dependsOn": ["^build", "@work/documents#test"],
       "outputs": ["coverage/**"]
+    },
+    "@work/api#test": {
+      "dependsOn": ["^build", "@work/performance#test"],
+      "outputs": ["coverage/**"]
     }
   },
   "globalPassThroughEnv": ["NODE_EXTRA_CA_CERTS", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"]

@@ -173,6 +173,9 @@ importers:
       '@work/people':
         specifier: workspace:*
         version: link:../../packages/modules/people
+      '@work/performance':
+        specifier: workspace:*
+        version: link:../../packages/modules/performance
       '@work/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
@@ -980,6 +983,9 @@ importers:
       '@work/kernel':
         specifier: workspace:*
         version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
     devDependencies:
       '@munaxa/config-eslint':
         specifier: ^1.0.0

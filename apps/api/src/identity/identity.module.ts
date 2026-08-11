@@ -67,6 +67,7 @@ import {
 import { DeferredPayrollDispatcher, payrollModuleFor } from '../payroll/payroll.composition.js';
 import { documentsModuleFor } from '../documents/documents.composition.js';
 import { lettersModuleFor } from '../letters/letters.composition.js';
+import { performanceModuleFor } from '../performance/performance.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -168,6 +169,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         people,
         documents: documentsModuleFor(unitOfWork, senders.payroll, permissions),
         letters: lettersModuleFor(unitOfWork, senders.payroll, permissions),
+        performance: performanceModuleFor(unitOfWork, senders.payroll, permissions),
       }),
     },
     {
@@ -229,6 +231,13 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // capability it cannot perform: nothing renders a document, so an issued letter carries its
         // content and no artefact (D-15).
         registry.register(permissionAware.letters);
+        // Performance last. It reads Employment, Organization and Documents through their published
+        // queries under bounded service grants, and is read by nobody: Compensation, Learning and
+        // Career pull a rating when they want one. It takes the permission checker as well as the
+        // pipeline's because its reads are scoped by what the caller holds — HR reading the
+        // organization and a manager reading their own reports take different paths through the
+        // same query, and the handler has to ask which one it is holding.
+        registry.register(permissionAware.performance);
         return registry;
       },
     },
@@ -285,6 +294,7 @@ interface PermissionAwareModules {
   readonly people: WorkModule;
   readonly documents: WorkModule;
   readonly letters: WorkModule;
+  readonly performance: WorkModule;
 }
 
 interface DeferredSenders {

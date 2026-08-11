@@ -4325,6 +4325,10 @@ model PerformanceReviewComponentScore {
   /// The sum of the weights that actually participated, in basis points.
   denominator_basis_points Int
   contributed_score        Int?
+  /// The goals or competencies that left this component's denominator, each with its reason.
+  /// Stored rather than derived: the working explains a rating years later, and deriving it from
+  /// rows that may since have changed would defeat the point.
+  excluded_items           Json
   calculated_at            DateTime  @db.Timestamptz(6)
   created_at               DateTime  @db.Timestamptz(6)
   created_by               String    @db.VarChar(255)

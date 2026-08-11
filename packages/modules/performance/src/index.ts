@@ -53,6 +53,15 @@ export type { PerformanceDependencies } from './application/performance-dependen
  * that has no better answer should install it rather than invent one.
  */
 export { documentsUnavailable } from './application/performance-ports.js';
+
+/**
+ * The PostgreSQL stores, for the composition root.
+ *
+ * Exported as a factory rather than as the repository classes: a consumer that could construct one
+ * repository could construct a partial store set, and `PerformanceStores` is the interface the
+ * module actually needs.
+ */
+export { postgresPerformanceStores } from './infrastructure/performance-stores.js';
 export type {
   Clock,
   DocumentReferencePort,

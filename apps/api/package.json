@@ -32,6 +32,7 @@
     "@work/organization": "workspace:*",
     "@work/payroll": "workspace:*",
     "@work/people": "workspace:*",
+    "@work/performance": "workspace:*",
     "@work/persistence": "workspace:*",
     "@work/recruitment": "workspace:*",
     "class-transformer": "^0.5.1",
