@@ -3429,3 +3429,368 @@ model PayrollPaymentInstruction {
   @@index([tenant_id, payroll_run_id, payment_date], map: "payroll_payment_instruction_run_idx")
   @@map("payroll_payment_instruction")
 }
+
+// ================================================================================================
+// Employee documents and letters (Phase 12; the roadmap's 4.1 and 5.1).
+//
+// Documents owns metadata, versions, verification, expiry and a queryable access trail. It holds
+// no bytes: `storage_reference` is opaque and `StoragePort` has no adapter in this repository.
+//
+// Letters owns templates, their immutable versions, requests, and the artefact frozen at issue.
+// Every value in a letter is read from the domain that owns it and frozen; nothing re-reads a
+// source after issue.
+// ================================================================================================
+
+/// What a tenant calls a kind of document. Nothing statutory and nothing country-specific ships;
+/// `country_pack_id` is the extension point a pack would later populate.
+model DocumentType {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  code                  String    @db.VarChar(64)
+  name                  Json
+  /// Which owners this type may attach to. A passport cannot be filed against a legal entity.
+  owner_types           String[]  @db.VarChar(32)
+  expires               Boolean
+  requires_verification Boolean
+  /// `confidential` is invisible without the specific permission, never by employee-record access.
+  confidentiality       String    @db.VarChar(16)
+  employee_visible      Boolean
+  manager_visible       Boolean
+  retention_policy_code String?   @db.VarChar(64)
+  /// Configuration only. Nothing fires a notice: `JobPort` has no adapter.
+  notice_days           Int[]
+  country_pack_id       String?   @db.VarChar(64)
+  country_pack_version  Int?
+  active                Boolean
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@unique([tenant_id, code], map: "document_type_code_idx")
+  @@map("document_type")
+}
+
+/// One document, across every replacement of its file. The identity is stable; the versions are
+/// immutable.
+///
+/// `person_identifier_id` is how a document evidences an identifier People owns. People keeps the
+/// number, the issuing country and the expiry — a document that points at one carries no
+/// `expiry_date` of its own, and a check constraint enforces that there is one authoritative
+/// answer to when an identity document expires (D-1a).
+model Document {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  document_type_id      String    @db.Uuid
+  /// Explicit, never inferred: `person`, `employment` or `legal_entity`.
+  owner_type            String    @db.VarChar(32)
+  owner_id              String    @db.Uuid
+  person_identifier_id  String?   @db.Uuid
+  title                 Json
+  status                String    @db.VarChar(24)
+  confidentiality       String    @db.VarChar(16)
+  issue_date            DateTime? @db.Date
+  expiry_date           DateTime? @db.Date
+  verification_state    String    @db.VarChar(24)
+  /// A denormalization of the newest version. `document_version` remains authoritative.
+  current_version_id    String?   @db.Uuid
+  version_count         Int
+  source                String    @db.VarChar(32)
+  source_reference      String?   @db.VarChar(128)
+  legal_hold            Boolean
+  legal_hold_reason     String?   @db.VarChar(512)
+  retention_policy_code String?   @db.VarChar(64)
+  archived_at           DateTime? @db.Timestamptz(6)
+  archived_by           String?   @db.VarChar(255)
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, owner_type, owner_id], map: "document_owner_idx")
+  @@index([tenant_id, document_type_id], map: "document_type_ref_idx")
+  @@index([tenant_id, expiry_date], map: "document_expiry_idx")
+  @@index([tenant_id, verification_state], map: "document_verification_idx")
+  @@index([tenant_id, person_identifier_id], map: "document_identifier_idx")
+  @@map("document")
+}
+
+/// One version of one document's file. **Insert only** — no repository offers an update or a
+/// remove, and a trigger refuses both at the table.
+///
+/// `storage_reference` is opaque: not a URL, not a path, not a provider key. `hash_verified` says
+/// whether anything ever checked the hash against the bytes, which nothing can while
+/// `StoragePort` has no adapter.
+model DocumentVersion {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  document_id         String    @db.Uuid
+  version_number      Int
+  storage_reference   String    @db.VarChar(128)
+  original_file_name  String    @db.VarChar(255)
+  /// What the client claimed. Never trusted on its own.
+  declared_media_type String    @db.VarChar(128)
+  /// What content inspection found. Null: no inspection infrastructure exists.
+  detected_media_type String?   @db.VarChar(128)
+  size_in_bytes       BigInt
+  content_hash        String    @db.VarChar(128)
+  hash_algorithm      String    @db.VarChar(16)
+  hash_verified       Boolean
+  source              String    @db.VarChar(32)
+  verification_state  String    @db.VarChar(24)
+  superseded_at       DateTime? @db.Timestamptz(6)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@unique([tenant_id, document_id, version_number], map: "document_version_number_idx")
+  @@index([tenant_id, document_id, version_number(sort: Desc)], map: "document_version_document_idx")
+  @@index([tenant_id, content_hash], map: "document_version_hash_idx")
+  @@map("document_version")
+}
+
+/// Who decided a version was acceptable, and why if they refused. Verification attaches to a
+/// **version**: replacing the file returns the document to `unverified` rather than inheriting a
+/// verdict for bytes nobody checked.
+model DocumentVerification {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  document_id         String    @db.Uuid
+  document_version_id String    @db.Uuid
+  decision            String    @db.VarChar(24)
+  decided_by          String    @db.VarChar(255)
+  decided_at          DateTime  @db.Timestamptz(6)
+  reason              String?   @db.VarChar(512)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@unique([tenant_id, document_version_id], map: "document_verification_version_idx")
+  @@index([tenant_id, document_id, decided_at(sort: Desc)], map: "document_verification_document_idx")
+  @@map("document_verification")
+}
+
+/// Who accessed which document, when, and what happened. **Append only and immutable at the
+/// table**, because an access trail that can be rewritten is not an access trail.
+///
+/// Carries no file content, no signed URL and no credential.
+model DocumentAccessEvent {
+  id                  String   @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String   @db.Uuid
+  document_id         String   @db.Uuid
+  document_version_id String?  @db.Uuid
+  action              String   @db.VarChar(32)
+  actor               String   @db.VarChar(255)
+  occurred_at         DateTime @db.Timestamptz(6)
+  correlation_id      String?  @db.Uuid
+  /// A refused attempt is recorded too. Only recording success hides the interesting half.
+  outcome             String    @db.VarChar(16)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  /// Present because every table carries them. Unusable here: a soft delete is an update, and the
+  /// table's trigger refuses every update.
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@index([tenant_id, document_id, occurred_at(sort: Desc)], map: "document_access_event_document_idx")
+  @@index([tenant_id, actor, occurred_at(sort: Desc)], map: "document_access_event_actor_idx")
+  @@map("document_access_event")
+}
+
+/// A letter a tenant may issue. Identity only; the authored content lives in its versions.
+model LetterTemplate {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  code                 String    @db.VarChar(64)
+  name                 Json
+  category             String    @db.VarChar(64)
+  requires_approval    Boolean
+  employee_requestable Boolean
+  current_version_id   String?   @db.Uuid
+  country_pack_id      String?   @db.VarChar(64)
+  country_pack_version Int?
+  active               Boolean
+  metadata             Json
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@unique([tenant_id, code], map: "letter_template_code_idx")
+  @@map("letter_template")
+}
+
+/// One version of a template's authored content, in both languages.
+///
+/// **Immutable once it has issued a letter** — a trigger refuses an update after `first_issued_at`
+/// is set, so a historical letter's stated provenance cannot be changed under it.
+///
+/// `variables` is a declared allow-list of names resolved from published contracts. There is no
+/// expression language and no executable template; an unknown variable fails generation rather
+/// than rendering a blank.
+model LetterTemplateVersion {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  letter_template_id   String    @db.Uuid
+  version_number       Int
+  body                 Json
+  variables            String[]  @db.VarChar(64)
+  /// Which fields this template may expose. Salary requires this **and** the caller's permission.
+  exposed_fields       String[]  @db.VarChar(64)
+  letterhead_reference String?   @db.VarChar(128)
+  requires_signature   Boolean
+  status               String    @db.VarChar(16)
+  first_issued_at      DateTime? @db.Timestamptz(6)
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@unique([tenant_id, letter_template_id, version_number], map: "letter_template_version_number_idx")
+  @@map("letter_template_version")
+}
+
+/// A request for a letter, distinct from what was issued — a request may be refused.
+model LetterRequest {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  letter_template_id         String    @db.Uuid
+  letter_template_version_id String    @db.Uuid
+  employment_id              String    @db.Uuid
+  person_id                  String    @db.Uuid
+  locale                     String    @db.VarChar(8)
+  purpose                    String?   @db.VarChar(512)
+  addressee                  String?   @db.VarChar(255)
+  status                     String    @db.VarChar(24)
+  requested_by               String    @db.VarChar(255)
+  requested_at               DateTime  @db.Timestamptz(6)
+  failure_reason             String?   @db.VarChar(128)
+  metadata                   Json
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@index([tenant_id, employment_id, requested_at(sort: Desc)], map: "letter_request_employment_idx")
+  @@index([tenant_id, status], map: "letter_request_status_idx")
+  @@map("letter_request")
+}
+
+/// The issued letter, frozen at issue.
+///
+/// `substituted_values` is the snapshot: every value the template resolved, beside the template
+/// version that produced them. A salary certificate issued in March still reads March's salary
+/// after April's raise, because nothing re-reads a source after issue.
+///
+/// `document_id` is the rendered artefact and stays null: no renderer exists. The letter's content
+/// is owned and reproducible without one.
+model LetterIssued {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  letter_request_id          String    @db.Uuid
+  letter_template_id         String    @db.Uuid
+  letter_template_version_id String    @db.Uuid
+  employment_id              String    @db.Uuid
+  person_id                  String    @db.Uuid
+  reference_number           String    @db.VarChar(64)
+  /// Unguessable. A third party confirms authenticity with this and sees no employee data.
+  verification_token         String    @db.VarChar(64)
+  locale                     String    @db.VarChar(8)
+  substituted_values         Json
+  source_versions            Json
+  issued_at                  DateTime  @db.Timestamptz(6)
+  issued_by                  String    @db.VarChar(255)
+  signatory                  String?   @db.VarChar(255)
+  signature_required         Boolean
+  /// No `signed` state exists: no signature provider does either.
+  signature_state            String    @db.VarChar(24)
+  document_id                String?   @db.Uuid
+  superseded_by_id           String?   @db.Uuid
+  superseded_at              DateTime? @db.Timestamptz(6)
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@unique([tenant_id, reference_number], map: "letter_issued_reference_idx")
+  @@unique([verification_token], map: "letter_issued_token_idx")
+  @@unique([tenant_id, letter_request_id], map: "letter_issued_request_idx")
+  @@index([tenant_id, employment_id, issued_at(sort: Desc)], map: "letter_issued_employment_idx")
+  @@map("letter_issued")
+}
+
+/// A named human's decision on a letter request. Self-approval is refused by a check constraint,
+/// as in Compensation and Payroll; a wrong decision is reversed, never edited.
+model LetterApprovalDecision {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  letter_request_id String    @db.Uuid
+  sequence          Int       @db.SmallInt
+  decision          String    @db.VarChar(16)
+  requested_by      String    @db.VarChar(255)
+  decided_by        String    @db.VarChar(255)
+  decided_at        DateTime  @db.Timestamptz(6)
+  comment           String?   @db.VarChar(1024)
+  reverses_id       String?   @db.Uuid
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@unique([tenant_id, letter_request_id, sequence], map: "letter_approval_decision_sequence_idx")
+  @@map("letter_approval_decision")
+}
+
+/// The counter letter reference numbers are drawn from, one row per tenant per series. Letters'
+/// own: sharing Employment's or Recruitment's would couple two modules' numbering.
+model LetterNumberSequence {
+  id         String   @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  series_key String    @db.VarChar(64)
+  next_value BigInt
+  created_at DateTime  @db.Timestamptz(6)
+  created_by String    @db.VarChar(255)
+  updated_at DateTime  @db.Timestamptz(6)
+  updated_by String    @db.VarChar(255)
+  /// Carried for uniformity. A counter is never soft deleted.
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.VarChar(255)
+  version    Int
+
+  @@unique([tenant_id, series_key], map: "letter_number_sequence_series_idx")
+  @@map("letter_number_sequence")
+}
