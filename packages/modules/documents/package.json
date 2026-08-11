@@ -2,7 +2,7 @@
   "name": "@work/documents",
   "version": "0.1.0",
   "private": true,
-  "description": "Employee documents — document types, stable document identity, immutable versions, verification, expiry, archive, retention metadata and a queryable access trail. Holds no bytes: storage is a port with no adapter.",
+  "description": "Employee documents \u2014 document types, stable document identity, immutable versions, verification, expiry, archive, retention metadata and a queryable access trail. Holds no bytes: storage is a port with no adapter.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,7 +30,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@work/kernel": "workspace:*"
+    "@work/kernel": "workspace:*",
+    "@work/persistence": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
