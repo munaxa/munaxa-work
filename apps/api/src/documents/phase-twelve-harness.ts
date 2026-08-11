@@ -4,13 +4,11 @@ import {
   Dispatcher,
   GrantAwarePermissionChecker,
   runInContext,
-  success,
   uuidV7,
   type Command,
   type HandlerFailure,
   type PermissionChecker,
   type Query,
-  type QueryHandler,
   type Result,
   type UnitOfWork,
 } from '@work/kernel';
@@ -35,6 +33,7 @@ import {
   LetterPersonSource,
   LetterSalarySource,
 } from '../letters/letters-sources.js';
+import { upstreamHandlers, type UpstreamFacts } from './phase-twelve-upstream.js';
 import type { Asking } from '../payroll/asking.js';
 
 /**
@@ -66,11 +65,8 @@ export const ADMINISTRATOR = 'user:hr-administrator';
 export const VERIFIER = 'user:hr-verifier';
 export const APPROVER = 'user:hr-approver';
 
-export const PERSON_ID = '01900000-0000-7000-8000-00000000a001';
-export const EMPLOYMENT_ID = '01900000-0000-7000-8000-00000000a002';
-export const UNIT_ID = '01900000-0000-7000-8000-00000000a003';
-export const LEGAL_ENTITY_ID = '01900000-0000-7000-8000-00000000a004';
-export const IDENTIFIER_ID = '01900000-0000-7000-8000-00000000a005';
+export { EMPLOYMENT_ID, IDENTIFIER_ID, LEGAL_ENTITY_ID, PERSON_ID, UNIT_ID } from './phase-twelve-upstream.js';
+export type { UpstreamFacts } from './phase-twelve-upstream.js';
 
 /**
  * The caller's own permissions, wrapped exactly as the composition root wraps them.
@@ -87,21 +83,12 @@ const permitting = (granted: readonly string[]): PermissionChecker =>
   });
 
 /**
- * The four upstream modules, as the facts they publish.
+ * The starting facts the four upstream modules publish.
  *
  * Mutable on purpose: a suite changes a salary or an identifier's expiry *here* and asks the
  * modules under test what they now say. That is how the D-1a boundary and the frozen letter
  * snapshot are both proved — one must move with the source, the other must not.
  */
-export interface UpstreamFacts {
-  personVersion: number;
-  legalNameEn: string;
-  identifierExpiresOn: string | undefined;
-  identifierPresent: boolean;
-  employmentPresent: boolean;
-  salaryMinor: string;
-}
-
 export const upstream = (): UpstreamFacts => ({
   personVersion: 1,
   legalNameEn: 'Layla Haddad',
@@ -183,200 +170,6 @@ const register = (
     dispatcher.registerQuery(handler as Parameters<typeof dispatcher.registerQuery>[0]);
   }
 };
-
-/**
- * The four upstream contracts, answered as the real modules answer them.
- *
- * Each declares the permission the real handler declares, so the bounded service grant is genuinely
- * exercised: an adapter whose grant named the wrong permission would be refused here exactly as it
- * would be in production.
- */
-const upstreamHandlers = (facts: UpstreamFacts): readonly QueryHandler<Query, unknown>[] =>
-  [
-    readPerson(facts),
-    readProfile(facts),
-    readEmployment(facts),
-    governingLegalEntity(),
-    compensationPeriod(facts),
-  ] as readonly QueryHandler<Query, unknown>[];
-
-interface WithPersonId extends Query {
-  readonly personId: string;
-}
-
-const readPerson = (facts: UpstreamFacts): QueryHandler<WithPersonId, unknown> => ({
-  queryName: 'people.read-person',
-  permission: 'people.person.read',
-
-  handle: (query) =>
-    Promise.resolve(
-      query.personId === PERSON_ID
-        ? success({
-            personId: PERSON_ID,
-            personNumber: 'P-000001',
-            legalName: { en: facts.legalNameEn, ar: 'ليلى حداد' },
-            status: 'active',
-            asOf: '2026-08-11',
-            metadata: {},
-            version: facts.personVersion,
-          })
-        : notFound('person'),
-    ),
-});
-
-const readProfile = (facts: UpstreamFacts): QueryHandler<WithPersonId, unknown> => ({
-  queryName: 'people.read-profile',
-  permission: 'people.person.read',
-
-  handle: (query) => {
-    if (query.personId !== PERSON_ID) return Promise.resolve(notFound('person'));
-
-    return Promise.resolve(
-      success({
-        person: {
-          personId: PERSON_ID,
-          personNumber: 'P-000001',
-          legalName: { en: facts.legalNameEn, ar: 'ليلى حداد' },
-          status: 'active',
-          asOf: '2026-08-11',
-          metadata: {},
-          version: facts.personVersion,
-        },
-        names: [],
-        // Absent rather than empty when withheld, exactly as People does — and the value is never
-        // present, because Documents' grant does not include `people.identifier.read-value`.
-        ...(facts.identifierPresent
-          ? {
-              identifiers: [
-                {
-                  identifierId: IDENTIFIER_ID,
-                  identifierType: 'passport',
-                  maskedValue: '••••4321',
-                  issuingCountry: 'JO',
-                  issuedOn: '2019-05-04',
-                  ...(facts.identifierExpiresOn === undefined
-                    ? {}
-                    : { expiresOn: facts.identifierExpiresOn }),
-                  isPrimary: true,
-                  withdrawn: false,
-                  version: 1,
-                },
-              ],
-            }
-          : {}),
-        withheld: [],
-      }),
-    );
-  },
-});
-
-interface WithEmploymentId extends Query {
-  readonly employmentId: string;
-}
-
-const readEmployment = (facts: UpstreamFacts): QueryHandler<WithEmploymentId, unknown> => ({
-  queryName: 'employment.read-employment',
-  permission: 'employment.employment.read',
-
-  handle: (query) =>
-    Promise.resolve(
-      query.employmentId === EMPLOYMENT_ID && facts.employmentPresent
-        ? success({
-            employmentId: EMPLOYMENT_ID,
-            employmentNumber: 'E-000001',
-            personId: PERSON_ID,
-            status: 'active',
-            employmentTypeCode: 'permanent',
-            originalHireDate: '2024-03-01',
-            startDate: '2024-03-01',
-            asOf: '2026-08-11',
-            assignment: {
-              assignmentId: uuidV7(),
-              employmentId: EMPLOYMENT_ID,
-              unitId: UNIT_ID,
-              assignmentType: 'primary',
-              fte: 1,
-              effectiveFrom: new Date('2024-03-01T00:00:00Z'),
-              version: 1,
-            },
-            metadata: {},
-            version: 3,
-          })
-        : notFound('employment'),
-    ),
-});
-
-const governingLegalEntity = (): QueryHandler<Query & { unitId: string }, unknown> => ({
-  queryName: 'organization.governing-legal-entity',
-  permission: 'organization.legal-entity.read',
-
-  handle: (query) =>
-    Promise.resolve(
-      success({
-        unitId: query.unitId,
-        asOf: NOW,
-        legalEntity:
-          query.unitId === UNIT_ID
-            ? {
-                id: LEGAL_ENTITY_ID,
-                unitId: UNIT_ID,
-                countryCode: 'JO',
-                registeredName: { en: 'Munaxa LLC', ar: 'مناكسا ذ.م.م' },
-                registrationNumber: 'JO-123456',
-                currencyCode: 'JOD',
-                version: 2,
-              }
-            : undefined,
-        throughUnitIds: [],
-      }),
-    ),
-});
-
-const compensationPeriod = (
-  facts: UpstreamFacts,
-): QueryHandler<Query & { employmentIds: readonly string[] }, unknown> => ({
-  queryName: 'compensation.payroll-period',
-  permission: 'compensation.read',
-
-  handle: (query) =>
-    Promise.resolve(
-      success(
-        query.employmentIds
-          .filter((id) => id === EMPLOYMENT_ID)
-          .map((employmentId) => ({
-            employmentId,
-            periodStart: '2026-08-11',
-            periodEnd: '2026-08-11',
-            currencies: [
-              {
-                currencyCode: 'JOD',
-                currencyExponent: 3,
-                recurring: [
-                  {
-                    componentId: uuidV7(),
-                    componentCode: 'base',
-                    kind: 'recurring',
-                    payrollTreatmentCode: 'basic',
-                    proratable: true,
-                    amount: { amount: facts.salaryMinor, currencyCode: 'JOD', exponent: 3 },
-                    effectiveFrom: '2024-03-01',
-                    partial: false,
-                  },
-                ],
-                oneTime: [],
-              },
-            ],
-            inputsDigest: 'digest',
-            calculationVersion: 1,
-          })),
-      ),
-    ),
-});
-
-const notFound = (resource: string): Result<never, HandlerFailure> => ({
-  ok: false,
-  error: { kind: 'not_found', resource },
-});
 
 /** Sends a command and fails loudly, so a broken step names itself rather than the next one. */
 export const send = async <TResult>(
