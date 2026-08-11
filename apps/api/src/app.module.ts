@@ -9,6 +9,16 @@ import { HealthModule } from './health/health.module.js';
 import { IdentityModule } from './identity/identity.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
 import { PeopleModule } from './people/people.module.js';
+import { EmploymentModule } from './employment/employment.module.js';
+import { RecruitmentModule } from './recruitment/recruitment.module.js';
+import { OnboardingModule } from './onboarding/onboarding.module.js';
+import { AttendanceModule } from './attendance/attendance.module.js';
+import { LeaveModule } from './leave/leave.module.js';
+import { CompensationModule } from './compensation/compensation.module.js';
+import { PayrollModule } from './payroll/payroll.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
+import { LettersModule } from './letters/letters.module.js';
+import { PerformanceModule } from './performance/performance.module.js';
 import { CorrelationMiddleware } from './observability/correlation.middleware.js';
 import { AuthenticatedTenantGuard } from './tenancy/authenticated-tenant.guard.js';
 import { TenantMiddleware } from './tenancy/tenant.middleware.js';
@@ -28,6 +38,16 @@ import { loggingOptions } from './observability/logging.js';
     IdentityModule,
     OrganizationModule,
     PeopleModule,
+    EmploymentModule,
+    RecruitmentModule,
+    OnboardingModule,
+    AttendanceModule,
+    LeaveModule,
+    CompensationModule,
+    PayrollModule,
+    DocumentsModule,
+    LettersModule,
+    PerformanceModule,
     HealthModule,
   ],
   providers: [

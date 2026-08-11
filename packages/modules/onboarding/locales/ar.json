@@ -1,0 +1,123 @@
+{
+  "onboarding": {
+    "rejection": {
+      "code_malformed": "‏\"{field}\" ليس رمزًا صالحًا. استخدم الحروف والأرقام والنقاط والشرطات أو الشرطات السفلية.",
+      "date_malformed": "‏{field} ليس تاريخًا. استخدم الصيغة YYYY-MM-DD.",
+      "text_too_long": "‏{field} أطول من اللازم.",
+      "text_requires_both_languages": "‏{field} مطلوب بالعربية والإنجليزية معًا.",
+      "metadata_entry_too_long": "قيمة البيانات الوصفية \"{key}\" أطول من اللازم.",
+      "document_reference_malformed": "هذا ليس مرجع مستند صالحًا.",
+      "plan_retired": "أُوقفت هذه الخطة، فلم يعد بالإمكان تعديلها أو تطبيقها.",
+      "plan_already_retired": "هذه الخطة موقوفة بالفعل.",
+      "plan_has_no_published_version": "لا توجد نسخة منشورة من هذه الخطة، فلا شيء يمكن تطبيقه.",
+      "plan_version_not_draft": "النسخة المنشورة لا تتغير أبدًا. أنشئ مسودة النسخة التالية بدلًا من ذلك.",
+      "plan_version_not_published": "هذه النسخة لم تُنشر.",
+      "plan_version_has_no_tasks": "نسخة بلا مهام تُنتج عمليات انضمام تنتهي لحظة بدئها.",
+      "plan_version_number_out_of_range": "رقم النسخة هذا غير صالح.",
+      "task_kind_unknown": "هذا ليس نوع مهمة يعرفه هذا المنتج.",
+      "task_sequence_out_of_range": "هذا ليس موضعًا صالحًا في قائمة المهام.",
+      "task_cannot_depend_on_itself": "لا يمكن لمهمة أن تنتظر نفسها.",
+      "document_task_needs_a_type": "مهمة المستند يجب أن تحدد المستند المطلوب.",
+      "document_task_needs_a_reference": "إنهاء مهمة مستند يتطلب مرجع المستند الذي حُفظ.",
+      "owner_kind_unknown": "هذا ليس نوع مالك يمكن أن تُسند إليه مهمة.",
+      "owner_reference_required": "هذا النوع من الملّاك يجب أن يحدد الشخص أو الوحدة صاحبة المهمة.",
+      "role_owner_needs_a_role": "قائمة الدور يجب أن تحدد الدور.",
+      "role_owner_takes_no_reference": "قائمة الدور تخص كل من يشغل الدور، لا شخصًا بعينه.",
+      "resolved_owner_takes_no_reference": "المنضم ومديره يُحدَّدان لكل عملية انضمام، فلا حاجة إلى مرجع هنا.",
+      "due_anchor_unknown": "هذا ليس تاريخًا يمكن للمنتج قياس موعد نهائي منه.",
+      "due_offset_out_of_range": "هذا أبعد عن التاريخ المرجعي مما يمكن أن يكون موعدًا معقولًا.",
+      "onboarding_transition_not_permitted": "لا يمكن لعملية الانضمام أن تنتقل من {from} إلى {to}.",
+      "onboarding_already_in_state": "عملية الانضمام في هذه المرحلة بالفعل.",
+      "onboarding_already_planned": "لهذه العملية خطة بالفعل. لا تُستبدل قائمة المهام بعد تسليمها.",
+      "onboarding_concluded": "انتهت عملية الانضمام هذه، فلا يمكن تسجيل شيء آخر عليها.",
+      "required_tasks_outstanding": "ما زالت هناك مهمة إلزامية لم تُنجز ولم يُعفَ منها، فالعملية غير مكتملة.",
+      "task_transition_not_permitted": "لا يمكن للمهمة أن تنتقل من {from} إلى {to}.",
+      "task_already_in_status": "المهمة في هذه الحالة بالفعل.",
+      "task_concluded": "انتهت هذه المهمة، فلا يمكن تسجيل شيء آخر عليها.",
+      "task_blocked_by_predecessor": "هذه المهمة تنتظر المهمة التي تسبقها."
+    },
+    "conflict": {
+      "plan_code_taken": "توجد خطة بهذا الرمز بالفعل.",
+      "plan_already_has_a_draft": "لهذه الخطة مسودة نسخة بالفعل. انشرها أو احذفها أولًا.",
+      "plan_retired": "أُوقفت هذه الخطة.",
+      "plan_version_not_draft": "تلك النسخة منشورة ولا يمكن تعديلها.",
+      "task_template_code_taken": "توجد مهمة بهذا الرمز في هذه النسخة بالفعل.",
+      "employment_ended": "انتهت هذه الوظيفة، فلا يوجد منضم لتهيئته.",
+      "person_merged": "دُمج سجل هذا الشخص في سجل آخر. استخدم السجل الذي دُمج فيه.",
+      "onboarding_concluded": "انتهت عملية الانضمام هذه.",
+      "onboarding_race_lost": "أنشأ طلب آخر عملية الانضمام هذه أولًا.",
+      "task_belongs_to_somebody_else": "هذه المهمة تخص شخصًا آخر.",
+      "export_too_large": "المحتوى أكبر مما يحمله تصدير واحد. ضيّق النطاق."
+    },
+    "state": {
+      "draft": "مسودة",
+      "preboarding": "قبل اليوم الأول",
+      "in_progress": "جارية",
+      "completed": "مكتملة",
+      "cancelled": "ملغاة"
+    },
+    "taskStatus": {
+      "pending": "للتنفيذ",
+      "blocked": "في الانتظار",
+      "in_progress": "قيد التنفيذ",
+      "done": "منجزة",
+      "waived": "معفاة",
+      "cancelled": "ملغاة"
+    },
+    "taskKind": {
+      "checklist": "قائمة تحقق",
+      "acknowledgement": "إقرار",
+      "document": "مستند",
+      "approval": "اعتماد",
+      "external": "خارجية"
+    },
+    "ownerKind": {
+      "employee": "المنضم",
+      "manager": "مديره",
+      "employment": "شخص محدد",
+      "role": "قائمة دور",
+      "unit": "وحدة"
+    },
+    "planStatus": {
+      "draft": "مسودة",
+      "active": "فعّالة",
+      "retired": "موقوفة"
+    },
+    "versionStatus": {
+      "draft": "مسودة",
+      "published": "منشورة",
+      "superseded": "مستبدلة"
+    },
+    "label": {
+      "onboarding": "الانضمام",
+      "joiners": "المنضمون",
+      "plans": "الخطط",
+      "tasks": "المهام",
+      "reconciliation": "المطابقة",
+      "plannedStart": "بداية مخططة",
+      "progress": "التقدم",
+      "required": "إلزامية",
+      "optional": "اختيارية",
+      "overdue": "متأخرة",
+      "dueOn": "الاستحقاق",
+      "owner": "المسؤول",
+      "state": "الحالة",
+      "plan": "الخطة",
+      "version": "النسخة",
+      "awaiting": "وظائف بلا عملية انضمام",
+      "started": "بدأت",
+      "alreadyStarted": "كانت موجودة",
+      "scanned": "فُحصت",
+      "unavailable": "تعذّر الوصول إلى الواجهة أو رُفض هذا المستخدم. لا يُعرض شيء بدلًا من عرض شيء خاطئ.",
+      "empty": "لا شيء هنا بعد.",
+      "noPlan": "لم تُطبَّق أي خطة، فلا مهام على عملية الانضمام هذه.",
+      "noPlansConfigured": "لم تُهيَّأ أي خطة انضمام. لا يشحن هذا المنتج أي خطة — ما يُطلب من المنضم قرارٌ يخصكم.",
+      "boundaries": "ما لا يملكه الانضمام",
+      "boundaryEmployment": "لا حقائق وظيفية. الحالة والوحدة والوظيفة والمدير والرقم الوظيفي تخص الوظائف والهيكل التنظيمي، وتُقرأ بتاريخ محدد.",
+      "boundaryIdentity": "لا هوية أشخاص. الانضمام لا ينشئ شخصًا ولا وظيفة؛ بل يشير إلى ما أنشأه التعيين.",
+      "boundaryDocuments": "لا مستندات. مهمة المستند تسجّل مرجعًا فقط؛ ولا يُخزَّن هنا أي ملف.",
+      "boundaryMessaging": "لا مراسلات. الانضمام يُصدر أحداثًا، والاتصالات تُسلّم حين تستطيع مخاطبة المستلم.",
+      "eventLimitation": "لا تبدأ عملية الانضمام بحدث وحده. المطابقة هي ما يضمن أن لكل منضم عملية."
+    }
+  }
+}

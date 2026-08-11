@@ -19,16 +19,19 @@ export const DISPATCHER = Symbol('DISPATCHER');
 export const MODULE_REGISTRY = Symbol('MODULE_REGISTRY');
 
 /**
- * A command sender handed its dispatcher after the dispatcher is built.
+ * The three deferred senders, in one provider.
  *
- * Organization's bulk import sends the same commands an administrator would, and the dispatcher
- * that receives them is assembled from a handler list that includes import. This is the seam
- * that breaks the cycle without letting import bypass the application service.
+ * Each module's bulk import sends the same commands an administrator would, and the dispatcher that
+ * receives them is assembled from a handler list that *includes* import — a genuine cycle, closed
+ * by handing each sender its dispatcher the moment one exists. Employment uses its sender for one
+ * thing more: it reaches People and Organization through their published queries rather than their
+ * tables, and those queries are on the same dispatcher.
+ *
+ * They are one token rather than three because the composition root's factories take them together,
+ * and a factory with six parameters is one the standards refuse — correctly: a parameter list that
+ * long is a list somebody eventually passes in the wrong order.
  */
-export const COMMAND_SENDER = Symbol('COMMAND_SENDER');
-
-/** The same seam for People's bulk import, which sends `people.create-person` per row. */
-export const PEOPLE_COMMAND_SENDER = Symbol('PEOPLE_COMMAND_SENDER');
+export const DEFERRED_SENDERS = Symbol('DEFERRED_SENDERS');
 
 /**
  * The permission checker, exposed as a token as well as being wired into the dispatcher.
@@ -48,3 +51,17 @@ export const PERMISSION_CHECKER = Symbol('PERMISSION_CHECKER');
  * the composition root.
  */
 export const PEOPLE_MODULE = Symbol('PEOPLE_MODULE');
+
+/**
+ * Every module that needs the permission checker, assembled together.
+ *
+ * People, Documents and Letters each build their answer from what the caller holds rather than
+ * refusing outright — People redacts a person's sensitive fields, Documents withholds confidential
+ * documents, Letters refuses a salary template to an issuer without the pay permission — so all
+ * three need to *ask*, not merely be checked.
+ *
+ * One token rather than three because the registry factory takes them together, and a factory with
+ * six parameters is one the standards refuse: correctly, because a parameter list that long is a
+ * list somebody eventually passes in the wrong order.
+ */
+export const PERMISSION_AWARE_MODULES = Symbol('PERMISSION_AWARE_MODULES');

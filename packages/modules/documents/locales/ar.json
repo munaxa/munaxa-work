@@ -1,0 +1,108 @@
+{
+  "documents": {
+    "label": {
+      "action": "الإجراء",
+      "actor": "المنفذ",
+      "archive": "أرشفة",
+      "archivedAt": "تاريخ الأرشفة",
+      "audit": "سجل الاطلاع",
+      "categories": "أنواع المستندات",
+      "code": "الرمز",
+      "confidentiality": "السرية",
+      "contentHash": "بصمة المحتوى",
+      "correlation": "مرجع الطلب",
+      "declaredMediaType": "النوع المصرّح به",
+      "document": "المستند",
+      "documents": "المستندات",
+      "download": "تنزيل",
+      "employeeDocuments": "مستندات الموظف",
+      "employeeVisible": "ظاهر للموظف",
+      "expires": "ينتهي",
+      "expiring": "مستندات قاربت الانتهاء",
+      "expiryDate": "تاريخ الانتهاء",
+      "fileName": "اسم الملف",
+      "gregorian": "ميلادي",
+      "hijri": "هجري",
+      "issueDate": "تاريخ الإصدار",
+      "legalHold": "حجز قانوني",
+      "legalHoldReason": "سبب الحجز",
+      "managerVisible": "ظاهر للمدير",
+      "noticeDays": "حدود التنبيه",
+      "outcome": "النتيجة",
+      "owner": "المالك",
+      "ownerType": "نوع المالك",
+      "ownerTypes": "الملاك المسموح بهم",
+      "reconciliation": "المطابقة",
+      "register": "سجل المستندات",
+      "requiresVerification": "يتطلب تحققًا",
+      "restore": "استعادة",
+      "retentionPolicy": "سياسة الحفظ",
+      "reverify": "قائمة التحقق",
+      "size": "الحجم",
+      "source": "المصدر",
+      "status": "الحالة",
+      "title": "العنوان",
+      "type": "نوع المستند",
+      "verificationState": "التحقق",
+      "verify": "تحقق",
+      "version": "الإصدار",
+      "versionCount": "عدد الإصدارات",
+      "versions": "الإصدارات"
+    },
+    "status": {
+      "active": "نشط",
+      "archived": "مؤرشف",
+      "draft": "مسودة",
+      "superseded": "مستبدل"
+    },
+    "verification": {
+      "pending_verification": "بانتظار التحقق",
+      "rejected": "مرفوض",
+      "unverified": "غير محقق",
+      "verified": "محقق"
+    },
+    "confidentiality": {
+      "confidential": "سري",
+      "normal": "عادي"
+    },
+    "expiry": {
+      "expired": "منتهٍ",
+      "expiring_soon": "يقارب الانتهاء",
+      "no_expiry": "بلا انتهاء",
+      "valid": "ساري"
+    },
+    "access": {
+      "archived": "أُرشف",
+      "download_authorized": "أُذن بالتنزيل",
+      "download_refused": "رُفض التنزيل",
+      "metadata_read": "اطلاع",
+      "rejected": "رُفض",
+      "replaced": "استُبدل",
+      "restored": "استُعيد",
+      "verified": "تم التحقق"
+    },
+    "source": {
+      "direct": "مرفوع",
+      "letter": "خطاب مُنشأ",
+      "migration": "مُرحّل",
+      "onboarding": "الالتحاق",
+      "recruitment": "التوظيف"
+    },
+    "finding": {
+      "current_version_missing": "الإصدار الحالي غير موجود",
+      "duplicate_content": "الملف نفسه يظهر أكثر من مرة",
+      "stale_verification": "الإصدار المحقق لم يعد هو الحالي",
+      "versions_without_current": "توجد إصدارات ولا يوجد إصدار حالي"
+    },
+    "notice": {
+      "empty": "لا يوجد ما يُعرض بعد.",
+      "error": "تعذر تحميل هذا.",
+      "expiryFromPeople": "تاريخ الانتهاء محفوظ في سجل هوية الشخص ويُقرأ من هناك.",
+      "loading": "جارٍ التحميل…",
+      "noNotices": "حدود التنبيه إعدادات فقط. لا يُرسل أي تنبيه: لا يوجد مجدول موثق.",
+      "noStorage": "تخزين الملفات غير موثق. تُسجل البيانات الوصفية والإصدارات، ولا يمكن استرجاع الملفات نفسها.",
+      "reconciliationReports": "المطابقة تُبلغ فقط ولا تُغيّر شيئًا.",
+      "sensitiveWithheld": "بعض المستندات غير معروضة لأنها مصنفة سرية."
+    }
+  }
+}

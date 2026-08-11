@@ -5,6 +5,500 @@ and what is still missing.
 
 ---
 
+## Phase 12 — Employee documents and letters
+
+Two modules. Documents says what evidence exists about somebody and who has looked at it. Letters
+says what this employer stated about somebody, and freezes it.
+
+**A document register that records who looked.** Every document has a stable identity and a history
+of versions that are written once and never rewritten — replacing a file adds a version and stamps
+the previous one superseded. Verification attaches to a *version*, so replacing the file returns the
+document to "pending verification": nobody has looked at the new bytes. Every read is recorded, not
+only every download, because "who has been looking at this employee's file" is the question the
+trail exists to answer and recording only downloads would leave a hole in it. Refused attempts are
+recorded too — somebody trying repeatedly to reach a document they may not see is exactly what an
+audit is for. The trail is a queryable table rather than a log, because an unqueryable one cannot
+answer a subject access request.
+
+**Confidential means invisible, not greyed out.** A colleague who may see that an employee exists
+does not see their medical certificate, and does not learn that one was withheld: the count agrees
+with the rows, because "this employee has three documents you may not see" is itself the disclosure.
+Asking for one directly answers "not found" rather than "forbidden", for the same reason. Seeing
+that a document exists, seeing a confidential one, and obtaining the file are three separate
+permissions.
+
+**One answer to when a passport expires.** Where a document evidences an identity document the
+People module already holds, the expiry lives there and this module stores no copy. The screen shows
+People's date and says so. Two stored dates are two things that can disagree.
+
+**Letters a customer writes, not letters this product ships.** An employment certificate, a salary
+certificate, an experience letter and an embassy letter are all templates a tenant authors in both
+languages. A template's variables are declared names looked up in a map — there is no expression
+language and no way for template text to reach code, which is what makes a tenant-authored template
+safe to run against another employee's salary. A variable that cannot be resolved fails the letter
+rather than rendering a blank: a bank letter stating that an employee earns nothing, over the
+employer's name, is worse than no letter.
+
+**An issued letter never changes.** What it said is frozen when it is issued — the template version,
+every substituted value, and which revision of each source they came from. A salary certificate
+issued in March still reads March's salary after April's raise. A correction issues a *new* letter
+that supersedes the original, because somebody may be holding a printed copy of it. A third party
+can confirm a reference is genuine and current without learning the employee's name, employer,
+salary or purpose.
+
+**A letter that states pay needs two permissions**, not one: the template must be allowed to expose
+salary and the person issuing it must be allowed to see one. Otherwise a letter becomes a way to
+read a salary the caller could not read directly.
+
+### Known limitations
+
+Stated here as well as in the report, because a release note that omits them is worse than none:
+
+- **No file is stored, uploaded or downloaded.** There is no object storage in this product yet.
+  Documents records what a file *is* — its name, size, declared type and checksum — and the
+  reference to wherever it lives; asking for the file answers that the capability is unavailable
+  rather than returning a link. Content inspection, malware scanning and checksum verification are
+  absent for the same reason: all three require reading bytes nobody here holds.
+- **No PDF is produced.** A letter has content and no file. There is no renderer in this product.
+- **Nothing is signed.** A letter may record that a signature is required; nothing claims one
+  happened, because there is no signing provider.
+- **No notice is sent when a document is about to expire.** The thresholds are configured and the
+  expiring queue is a screen somebody opens. Nothing scheduled runs in this product yet, and a
+  reminder nobody receives is worse than none promised.
+- **Employees cannot see their own documents or request their own letters.** The permissions exist;
+  the routing from a signed-in person to their employment does not, in any module.
+- **Third-party letter verification needs an account.** The check itself discloses almost nothing
+  and works correctly; the anonymous route in front of it does not exist, because every read in this
+  product resolves a tenant first.
+- **Missing-mandatory-document detection is not built.** Deferred deliberately rather than
+  half-built.
+
+### Tests
+
+1,647, up from 1,447. Two schema defects were found by tests before release and fixed: one trigger
+refused a change the design required, and another permitted one it should not have.
+
+---
+
+## Phase 11 — Payroll
+
+Employment says somebody is employed. Compensation says what they are entitled to receive. Payroll
+says what is actually paid for a period. This is the third of those, and the last module in the
+chain.
+
+**A payslip you can still explain eight months later.** Every run records, per employment, exactly
+what it read: the employment facts, the compensation components, the attendance answer and the
+leave answer, with a digest of each. The figure is then a pure function of that record. By the time
+somebody disputes a payslip the sources have all moved; the snapshot has not, and replaying it
+reproduces the stored figure exactly. Every earning and deduction line carries its own arithmetic —
+the basis, the fraction, the rounding — so a person who disputes a figure can be shown how it was
+reached rather than told the system computed it.
+
+**Finalized means finalized.** Approving a payroll and finalizing one are separate permissions, and
+neither can be exercised by whoever requested the run — the domain refuses it and a database
+constraint refuses it again. Once finalized, the figures are frozen at the table: a trigger rejects
+any update or delete of a frozen row, from any path, including SQL nobody wrote in the application.
+A wrong finalized run is corrected by a reversal that creates new state and leaves the original
+intact. Nothing edits history.
+
+**It notices when it has gone wrong.** After a run is calculated, reconciliation asks every source
+whether it has moved — a pull, not a subscription. A lost event therefore cannot leave a payroll
+quietly wrong: the next reconciliation finds the difference by digest, marks the run stale, and a
+stale run cannot be approved or finalized until it is recalculated. Recalculation is narrow: only
+the employments that actually went stale are recomputed, and it replaces their figures rather than
+adding a second set.
+
+**Nobody is silently skipped.** An employment the run could not calculate becomes a named exception
+with a reason — missing compensation, an unknown leave state, an unreachable dependency, a broken
+eligibility rule — never a result of zero and never an omission. A misconfigured eligibility rule
+blocks finalization rather than quietly producing a smaller payroll. If Organization cannot be
+reached, the run is refused outright: calculating a workforce under no statutory rules because a
+dependency blinked would be silently wrong.
+
+**Money that survives the whole path.** Amounts are integer minor units in a `bigint` carrying their
+own currency exponent, and cross every boundary — including HTTP — as exact decimal strings. A
+salary of 9,007,199,254,740,993 minor units is carried through the API, the application, the
+repository, the column and back unchanged; a JSON number would have quietly returned
+9,007,199,254,740,992. Nothing is totalled across currencies, because there is no exchange rate in
+this product.
+
+**Built for a real workforce.** A hundred-thousand-employee run is about two hundred bounded
+transactions rather than one, driven by repeated calls rather than a request that holds a connection
+open for the duration. A crash resumes from a committed cursor instead of restarting. Measured
+against real PostgreSQL as an unprivileged role with row-level security on, at 500, 10,000 and
+100,000 employees — every figure, including the ones that missed their target first time, is in the
+verification report.
+
+**Not built, and said plainly.** No approved overtime: Attendance publishes *candidate* minutes by
+design, a candidate is not an approved fact, and Payroll will not promote one. No tax, no social
+security, no GOSI, no end-of-service, and no country pack of any kind. No WPS, Mudad or Muqeem. No
+journal posting — the accounting output is balanced lines against opaque tenant codes, prepared in
+Payroll's own table and posted nowhere. No payment execution — the instruction carries an amount, a
+date and a method code, no account identifier of any kind, and the status `prepared` and nothing
+beyond it. No currency conversion. No payslip document: Payroll owns the data, and rendering,
+storage and delivery have no owner yet. No benefits, no loans, no workflow routing, no
+notifications. Each is absent rather than stubbed, and where a classification is reserved for one, a
+test asserts it has no producer.
+
+---
+
+## Phase 10 — Compensation Management
+
+Employment says somebody is employed. Compensation says what they are entitled to receive. Payroll
+says what is actually paid for a period.
+
+**Money that is exact, and stays exact.** Every amount is stored as integer minor units in a
+`bigint`, alongside its currency code *and its currency's number of decimal places*. Two decimals is
+a habit rather than a rule — the Kuwaiti dinar, the Bahraini dinar and the Omani rial all have three
+— and a system that assumed two would be wrong by a factor of ten in three of this product's
+markets. Amounts cross every boundary as decimal strings; there is no path on which one becomes a
+JavaScript number, and a test proves a figure above nine quadrillion minor units survives a database
+round trip unchanged.
+
+**Configured, not shipped.** No basic salary, no housing allowance, no transport allowance, no
+minimum wage, no tax treatment and no statutory progression. Components, plans, grades, scales and
+steps are all things a tenant or a country pack defines. A new tenant sees empty tables, and the
+screen says so.
+
+**A hierarchy nobody is forced into.** Structures, grades, scales and steps are each optional and
+none implies another; a forty-person company assigns a bare amount and configures none of it. Where
+a grade *is* named, it constrains the amount and never supplies one — a system that filled in a
+midpoint would be deciding somebody's salary.
+
+**History you can rely on.** A change closes the previous period and opens a new one; no historical
+value is ever rewritten. An amount taken from a salary step is copied onto the assignment, so
+revising the step next year cannot restate what last year's payroll was run against. Both time axes
+are recorded — when a change took effect, and when the system learned about it — which is what makes
+a back-dated raise distinguishable from one everybody always knew about. Two administrators
+assigning the same allowance concurrently race in the database rather than both succeeding.
+
+**Decisions made by people.** Approving a salary change is a separate permission from making one,
+and self-approval is refused by the domain, by the permission separation and by a database
+constraint. A wrong decision is corrected by a reversal that stays in the record, never by an edit.
+A plan requiring no approval produces no decision row at all, and the chain says so rather than
+naming a system approver.
+
+**The contract Payroll will read.** One query resolves a page of five hundred employments over a
+period in a single statement, publishing amounts per currency, a payroll-treatment code it never
+interprets, and flags saying a component *may* be prorated and a period *is* partial. It publishes
+no gross, no net, no tax and no conversion, and nothing sums across currencies. Payroll will find
+retroactive corrections by asking rather than by being told.
+
+**Not built, and said plainly.** No payroll. No deductions of any kind — statutory deductions belong
+to Payroll and loan recovery to a later phase, and half of one here would have created a second
+owner. No tax, social security, pension or end-of-service. No benefits administration. No currency
+conversion. No country pack, so no statutory behaviour is exercised anywhere. No employee or manager
+self-service.
+
+---
+
+## Phase 9 — Leave & Absence Management
+
+Leave explains authorized absence. Attendance records what happened. Payroll decides what it costs.
+
+**Configured, not shipped.** No leave type, entitlement figure, accrual formula or eligibility
+threshold ships with the product. A tenant configures leave types and versioned policies, and a
+country pack supplies statutory content through stated extension points — an eligibility
+`RuleDefinition`, service bands as data, a Hijri leave year, a gender restriction as a code.
+
+**A balance you can audit.** Every figure is a sum of append-only ledger rows. The stored balance is
+a projection with a digest, reconciled by asking rather than by being told, and a second query
+re-derives the same number from the ledger independently. A cancellation writes a reversal; nothing
+is ever deleted. Every duration is integer minutes.
+
+**Requests, decided by people.** A per-date breakdown makes duration unambiguous and is exactly what
+Attendance reads. Approval is recorded against a named human taken from the authenticated context;
+self-approval is refused by the domain, by the permission separation and by a database constraint.
+A policy requiring no approval produces no decision row at all, and the screen says so rather than
+naming a system approver. Overlapping leave is refused by the database, including two overlapping
+hourly requests on one date.
+
+**Attendance and Leave, agreeing.** Leave counts working days by asking Attendance's new
+`attendance.expected-working-days` read rather than duplicating the schedule engine. Attendance
+learns of a leave change by asking Leave on its own reconciliation run — Leave never writes an
+Attendance row. An attendance day moves from an unexplained absence to leave applied end to end, and
+when Leave cannot be asked the day says the question is open rather than asserting somebody was
+absent without leave.
+
+**Not built, and said plainly.** No employee or manager self-service. No scheduled execution of
+accrual, leave-year closure or carry-over expiry — those are operator commands, because nothing in
+this product runs on a timer. No document verification. No notification delivery. No cross-midnight
+hourly leave.
+
+## Phase 8 — Attendance
+
+**2026-08-11** · [Verification report](verification/phase-8-report.md)
+
+When people actually worked. Thirteen tables, thirty-two endpoints, and four decisions worth reading
+even if nothing else here is.
+
+### A punch is never rewritten
+
+What a reader captured stays exactly as it was captured. There is no way to edit a punch and no way
+to delete one — not a restricted way, no way at all: the table has no update path and the code has no
+method that could.
+
+Corrections still happen, constantly. Somebody forgot to clock out; a reader was offline; two devices
+recorded one arrival. So a correction *adds*: a new punch that supersedes the old one, or, where a
+punch should not count, a correction record that says so and takes it out of the sum. Both are still
+on the screen afterwards — the original time, who asked for the change, why, and who approved it.
+Nobody can approve their own correction, and that holds even for somebody who was granted both
+permissions, because the database refuses it too.
+
+### The system asks what needs recalculating, rather than waiting to be told
+
+Change a rota in June and May's days are affected. This product's internal events are delivered
+at-most-once with nothing that replays a lost one, so an attendance figure that waited for an event
+would sometimes wait forever — and a stale figure looks exactly like a correct one.
+
+Instead, every change that affects a day *marks* that day, in the same breath as the change itself.
+Recalculation takes what is marked and is safe to run as often as you like. And **the number of days
+still waiting is on the dashboard**, because it is the number that reveals a problem, and a number
+somebody can see is a number somebody notices growing.
+
+The same idea protects the punch clocks: send the same punch twice and the second is a success naming
+the first, not an error and not a duplicate. A turnstile with a flaky uplink retries; so does a phone
+flushing a queue after a tunnel; so does a re-run of yesterday's import file. All of them land once.
+
+### Two in the morning is not yesterday
+
+A punch at 02:00 in Riyadh is 23:00 the previous day in UTC. Filing it under the UTC date puts it on
+somebody else's shift and in the wrong pay period, and no arithmetic afterwards fixes it.
+
+So a schedule carries the time zone its hours are written in, and it is required — there is no
+default and no guess. Night shifts end on the following morning rather than 24 hours later. The
+Sunday the clocks go forward is 23 hours long, and nobody is marked an hour absent for it.
+
+### Nothing here decides what your time is worth
+
+Overtime is reported in minutes and labelled a *candidate*. There is no rate anywhere in this module,
+no multiplier and no amount, because what an hour is worth depends on a contract and a jurisdiction —
+neither of which is a question about when somebody arrived.
+
+Nothing statutory ships either: no grace period, no rounding, no late tolerance, no overtime
+threshold. Every one of them starts at zero until a customer configures it, because in several of
+this product's markets those numbers are written in law and belong to a country pack.
+
+When a month is closed, the figures are frozen. A correction afterwards produces the *next* version
+rather than editing the one payroll already read, so what was paid and what is now true are both
+still answerable.
+
+### "We can't tell" is a real answer
+
+There is no leave module yet. A scheduled day nobody worked could be approved leave or could be an
+unexplained absence, and this product has nowhere to look.
+
+So it says so. The day reads *absent, leave cannot yet be checked* — not *absent without leave*,
+which would be an assertion on somebody's record that nothing supports. The adapter that answers
+"nobody can be asked" is the one actually wired in, and there is a test that says so.
+
+### What is not here
+
+No device or biometric integration is verified. A reader reaches this module through an adapter that
+speaks the same normalized command a web client does, and no vendor's SDK is imported anywhere. **No
+raw biometric data is stored** — not a fingerprint, not a face template, not a hash of one.
+
+No work locations, no sites and no geofences. A punch can carry coordinates where a customer enables
+capture, and that is evidence, not a verified place of work: this product has no location model to
+check a coordinate against, and inventing one inside an attendance module would be worse than the
+gap. There is no location trail anywhere, and coordinates appear on no list screen and in no export.
+
+No employee or manager self-service, and no mobile app. The administration screen is read-only, like
+every other module's, and there is no punch button on it.
+
+No notifications and no documents, for the same reason the earlier phases have none.
+
+Public holidays are recorded as rota entries. A real holiday calendar is country data this product
+does not yet hold, and two owners of "is the 23rd a holiday" would give two answers.
+
+---
+
+## Phase 7 — Onboarding
+
+**2026-08-10** · [Verification report](verification/phase-7-report.md)
+
+The induction, from the day somebody is hired to the day they are working. Six tables, twenty-five
+endpoints, and one decision about reliability that is worth reading even if nothing else here is.
+
+### An onboarding is never started by an event alone
+
+The obvious design is that hiring raises an event and onboarding listens for it. This product's event
+delivery is in-process and at-most-once with nothing that replays a lost one — so that design's
+failure is a joiner arriving on their first day with no induction and no record that one was expected.
+
+So the way an onboarding begins is a command that is safe to send twice. Send it again and you get
+back the onboarding that already exists, not a second one and not an error. Two requests arriving at
+the same instant converge on one, because the database — not the application — decides.
+
+And because a command nobody sends starts nothing, there is a list: **the employments that have no
+onboarding**. It is on the screen, and there is an endpoint that starts one for each of them. Running
+it twice creates nothing twice. That list is the guarantee; an event is only ever a shortcut to it.
+
+### Onboarding holds no employment facts
+
+There is no employment status here, no unit, no position, no manager and no employee number — and no
+plan to add them. Completing an induction does not make somebody an employee, and cancelling one does
+not end anybody's employment. The person and the employment are created by hiring; this module could
+not create either if it tried, because the database would refuse the row.
+
+### A published checklist never changes
+
+An administrator improving next quarter's plan drafts a new version of it. The published one stays
+exactly as it was, and every onboarding generated from it keeps the list it was actually given. A year
+later, "what were we asking of joiners last March" has one answer.
+
+Nothing is shipped: no plan, no task, no reason code. What a joiner is asked to do is the customer's
+decision, and in several of this product's markets part of it is written in law.
+
+### What is not here
+
+No document upload. A document task records a *reference* and says which document it wants; no part of
+this product stores a file yet, and the report marks that **not verified** rather than implying
+otherwise. No notifications are delivered, for the same reason recruitment's are not. No approvals
+routing — an approval task records a decision by the person who made it, and Phase 16 will route it
+without changing the task.
+
+No employee self-service screens. The data an employee's own task list needs is published and tested;
+what is missing is the step that turns a signed-in user into their employment, and building a route
+without it would be a route that can close somebody else's task.
+
+Deadlines are calendar days. Which days a customer's week-end falls on is country data this product
+does not yet hold.
+
+---
+
+## Phase 6 — Recruitment
+
+**2026-08-09** · [Verification report](verification/phase-6-report.md)
+
+Hiring, from the authority to hire to the day somebody becomes an employee. Eleven tables, thirty-six
+endpoints, and one decision that changes how modules talk to each other.
+
+### A candidate is not a person, and applying does not create one
+
+Somebody who applies and is never contacted leaves this product no national identifier, no date of
+birth and no nationality — not because a rule forbids reading them, but because there is nowhere to
+put them. A Person appears at hire, once, through the module built to protect that data.
+
+The corollary is a control a recruiter cannot skip: two candidate records cannot resolve to one human
+being, and a create that finds the address already known refuses rather than quietly overwriting the
+record it found.
+
+### Recruiters no longer need permission to edit the person register
+
+Hiring creates a Person and an Employment. Until now, a module reaching another inherited its
+permission check — which would have made every recruiter hold `people.person.manage`.
+
+Instead, the *module* holds the narrow permission for the duration of one operation, under a grant
+that is explicit about what it permits, cannot nest, keeps the acting human's name on every audit
+column, and is written to the log every time it is used. A recruiter holds recruitment permissions
+only, and `recruitment.hire` is held by fewest people.
+
+### Approving a requisition is a real decision by a named person
+
+Nothing here auto-approves. A requisition records who approved it and when, approving is a separate
+permission from raising the request, and a decision is never edited — undoing one writes a new record
+naming the one it reverses. Once hiring has started against a requisition, its approval can no longer
+be unmade.
+
+### A hire that stops half way is visible
+
+Creating the person, creating the employment and closing the application happen in different modules
+and cannot be one transaction. So each step commits what it achieved, the application carries how far
+the hire got, and running the hire again continues from there rather than creating a second person or
+a second employment.
+
+An unfinished hire is one filter away — `?unfinishedHire=true` — rather than something a customer
+discovers. An application never reads *hired* without an employment behind it.
+
+### What is not here
+
+No candidate portal and no public careers pages: every action in this phase is taken by a recruiter.
+No CV parsing, scoring or ranking. No background checks, visas or work permits. No onboarding. No
+document storage — a résumé or an offer letter is a reference into the document store.
+
+Candidate and interviewer notifications are not delivered either, and the report says so rather than
+claiming email works: the notification contract addresses a workforce user, and a candidate is not one.
+
+---
+
+## Phase 5 — Employment
+
+**2026-08-09** · [Verification report](verification/phase-5-report.md)
+
+The workforce. Six tables, sixteen endpoints, and the record every later part of this product will
+read before it does anything: *is this person employed, where do they sit, and who do they report
+to*.
+
+### A person is permanent; a job is not
+
+Somebody is hired, leaves after three years, and comes back. That is **one person and two
+employments**, with two employment numbers and one continuous identity — not a re-created person, and
+not an edited old record. Their original hire date travels to the new employment, so the service
+their entitlements are measured from is not silently reset to zero.
+
+The product refuses to give one person two employments at the same time. Retry a create that already
+succeeded and it fails, by name, rather than quietly producing a second job for one human being.
+
+### The employment number is ours, and it is never reused
+
+`EMP-2026-000123` is generated here — a caller cannot supply one, and no number is ever issued twice,
+even after somebody leaves. That is what stops an archived payslip, a bank file and a government
+submission resolving to the wrong person years later.
+
+**Your own numbers still travel.** A migration brings its legacy employee numbers in a separate
+field, indexed and searchable, without either number pretending to be the other.
+
+### Where somebody worked in March is still where they worked in March
+
+A transfer does not edit a record. It closes the period that was in force and opens a new one, so
+the org chart, the department and the manager are all answerable **as at a date** — this year and
+last. `GET /api/v1/employments/{id}?asOf=2026-03-01` answers with March's placement and March's
+manager, after both have changed twice.
+
+Back-dating works properly. Recording a March transfer for somebody who also moved in June leaves
+three periods, in order, with June intact — not a March record that swallowed the summer.
+
+### A manager is a job, not a name
+
+Reporting lines point at an *employment*. When a manager changes roles or leaves, "who did this
+person report to last year" still answers correctly, because the answer was never their name.
+
+### Ending is deliberate, and separately permitted
+
+Ending an employment needs a date and a reason, is terminal, and is guarded by its own permission —
+somebody who can suspend a colleague cannot dismiss them. The reason is a code you define:
+resignation, dismissal, end of contract and retirement mean different things in different countries,
+and this product commits to none of them.
+
+**This is not offboarding.** Exit interviews, clearance, asset return and final settlement are a
+later phase. What Employment owns is the relationship and its final state, which is what a
+settlement will read.
+
+### Vacancies are real numbers now
+
+Establishment screens have reported `filled: 0` and `vacant = budgeted` since Phase 3, because
+nothing had ever been assigned. Assignments now feed that figure. **Expect vacancy numbers to change
+the day this ships** — they are becoming correct rather than changing.
+
+### What Employment deliberately does not hold
+
+- **Leave status.** Somebody on annual leave is employed. Leave belongs to the Leave phase, and two
+  places holding it would give two answers.
+- **Work location.** A department and a place of work are different things, and this product does not
+  yet model the second. The field is absent and the screen says so, rather than a unit standing in
+  for a site.
+- **Salary, attendance, documents, disciplinary records.** Each has an owner, and none of them is
+  this one.
+
+### Still missing
+
+Nothing here can be used in a browser yet: every endpoint returns 401 until Platform's authentication
+adapter lands, which has been the position since Phase 2. The administration screen reads; every
+change goes through the API. Bulk import is bounded at 2,000 rows and is resumable but not atomic.
+
+---
+
 ## Phase 4 — People master registry
 
 **2026-08-06** · [Verification report](verification/phase-4-report.md)

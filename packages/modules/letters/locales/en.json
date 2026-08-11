@@ -1,0 +1,96 @@
+{
+  "letters": {
+    "label": {
+      "addressee": "Addressee",
+      "approve": "Approve",
+      "approvals": "Approvals",
+      "body": "Body",
+      "cancel": "Cancel",
+      "category": "Category",
+      "code": "Code",
+      "comment": "Comment",
+      "decidedAt": "Decided",
+      "decidedBy": "Decided by",
+      "exposedFields": "Exposed fields",
+      "generated": "Generated letters",
+      "gregorian": "Gregorian",
+      "hijri": "Hijri",
+      "issue": "Issue",
+      "issuedAt": "Issued",
+      "issuedBy": "Issued by",
+      "letterhead": "Letterhead reference",
+      "letters": "Letters",
+      "locale": "Language",
+      "publish": "Publish",
+      "purpose": "Purpose",
+      "reconciliation": "Reconciliation",
+      "reference": "Reference",
+      "register": "Letter register",
+      "reject": "Reject",
+      "request": "Request a letter",
+      "requestedAt": "Requested",
+      "requestedBy": "Requested by",
+      "requests": "Requests",
+      "requiresApproval": "Requires approval",
+      "requiresSignature": "Requires signature",
+      "retire": "Retire",
+      "reverse": "Reverse",
+      "sequence": "Step",
+      "signatory": "Signatory",
+      "signature": "Signature",
+      "status": "Status",
+      "superseded": "Superseded by",
+      "template": "Template",
+      "templates": "Letter templates",
+      "variables": "Variables",
+      "verify": "Verify a letter",
+      "version": "Version",
+      "versions": "Versions"
+    },
+    "status": {
+      "approved": "Approved",
+      "cancelled": "Cancelled",
+      "failed": "Failed",
+      "generated": "Generated",
+      "generating": "Generating",
+      "issued": "Issued",
+      "pending_approval": "Pending approval",
+      "rejected": "Rejected",
+      "requested": "Requested"
+    },
+    "templateStatus": {
+      "draft": "Draft",
+      "published": "Published",
+      "retired": "Retired"
+    },
+    "approval": {
+      "approved": "Approved",
+      "not_required": "Not required",
+      "pending": "Pending",
+      "rejected": "Rejected",
+      "reversed": "Reversed"
+    },
+    "signature": {
+      "declared_signed_externally": "Declared signed outside the system",
+      "not_required": "Not required",
+      "required": "Signature required"
+    },
+    "finding": {
+      "approval_no_longer_stands": "Issued although the approval chain no longer stands",
+      "generation_incomplete": "Generation did not complete",
+      "issued_without_letter": "Marked issued with no letter recorded",
+      "template_version_mismatch": "Issued from a different template version than requested"
+    },
+    "notice": {
+      "empty": "Nothing to show yet.",
+      "error": "This could not be loaded.",
+      "frozen": "What this letter says was frozen when it was issued. Later changes to the source do not alter it.",
+      "issuedIsFinal": "An issued letter is never edited. A correction issues a new letter that supersedes it.",
+      "loading": "Loading…",
+      "noRendering": "Document rendering is not verified. The letter's content is recorded; no file is produced.",
+      "noSignature": "Electronic signing is not verified. A letter may record that a signature is required; nothing here signs one.",
+      "salaryGated": "This template exposes pay. Issuing it needs the salary permission as well as the request permission.",
+      "versionFrozen": "This version has issued a letter and can no longer be edited. Changes go into a new version."
+    }
+  }
+}

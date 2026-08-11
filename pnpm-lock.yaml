@@ -19,6 +19,9 @@ importers:
       '@munaxa/config-typescript':
         specifier: ^1.0.0
         version: 1.0.0
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
       prettier:
         specifier: ^3.4.2
         version: 3.9.6
@@ -37,15 +40,42 @@ importers:
       '@munaxa/ui':
         specifier: ^1.0.0
         version: 1.0.0(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@work/attendance':
+        specifier: workspace:*
+        version: link:../../packages/modules/attendance
+      '@work/compensation':
+        specifier: workspace:*
+        version: link:../../packages/modules/compensation
       '@work/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@work/documents':
+        specifier: workspace:*
+        version: link:../../packages/modules/documents
+      '@work/employment':
+        specifier: workspace:*
+        version: link:../../packages/modules/employment
+      '@work/leave':
+        specifier: workspace:*
+        version: link:../../packages/modules/leave
+      '@work/letters':
+        specifier: workspace:*
+        version: link:../../packages/modules/letters
+      '@work/onboarding':
+        specifier: workspace:*
+        version: link:../../packages/modules/onboarding
       '@work/organization':
         specifier: workspace:*
         version: link:../../packages/modules/organization
+      '@work/payroll':
+        specifier: workspace:*
+        version: link:../../packages/modules/payroll
       '@work/people':
         specifier: workspace:*
         version: link:../../packages/modules/people
+      '@work/recruitment':
+        specifier: workspace:*
+        version: link:../../packages/modules/recruitment
       next:
         specifier: ^15.1.0
         version: 15.5.22(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -104,24 +134,54 @@ importers:
       '@prisma/client':
         specifier: ^6.2.0
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+      '@work/attendance':
+        specifier: workspace:*
+        version: link:../../packages/modules/attendance
+      '@work/compensation':
+        specifier: workspace:*
+        version: link:../../packages/modules/compensation
       '@work/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@work/documents':
+        specifier: workspace:*
+        version: link:../../packages/modules/documents
+      '@work/employment':
+        specifier: workspace:*
+        version: link:../../packages/modules/employment
       '@work/identity':
         specifier: workspace:*
         version: link:../../packages/modules/identity
       '@work/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
+      '@work/leave':
+        specifier: workspace:*
+        version: link:../../packages/modules/leave
+      '@work/letters':
+        specifier: workspace:*
+        version: link:../../packages/modules/letters
+      '@work/onboarding':
+        specifier: workspace:*
+        version: link:../../packages/modules/onboarding
       '@work/organization':
         specifier: workspace:*
         version: link:../../packages/modules/organization
+      '@work/payroll':
+        specifier: workspace:*
+        version: link:../../packages/modules/payroll
       '@work/people':
         specifier: workspace:*
         version: link:../../packages/modules/people
+      '@work/performance':
+        specifier: workspace:*
+        version: link:../../packages/modules/performance
       '@work/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
+      '@work/recruitment':
+        specifier: workspace:*
+        version: link:../../packages/modules/recruitment
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -373,7 +433,353 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
 
+  packages/modules/attendance:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/compensation:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/documents:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/employment:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/organization':
+        specifier: workspace:*
+        version: link:../organization
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
   packages/modules/identity:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/leave:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/letters:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/onboarding:
     dependencies:
       '@nestjs/common':
         specifier: ^11.0.0
@@ -474,7 +880,154 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
 
+  packages/modules/payroll:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
   packages/modules/people:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/performance:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/swagger':
+        specifier: ^11.0.0
+        version: 11.4.6(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/recruitment:
     dependencies:
       '@nestjs/common':
         specifier: ^11.0.0

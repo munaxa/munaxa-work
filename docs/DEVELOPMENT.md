@@ -231,6 +231,14 @@ The migration user must be privileged; the suites create their own unprivileged 
 connect as those, because a test that ran as a superuser would prove nothing about row-level
 security — a superuser bypasses every policy.
 
+**`pnpm test` runs packages one at a time** (`turbo run test --concurrency=1`), and that is not a
+performance oversight. Every module's integration suite shares one database and truncates its own
+tables between tests; run two at once and they delete each other's fixtures. Worse since Phase 5:
+`employment.person_id` is a foreign key to `person`, so People truncating its tables with `cascade`
+while Employment's suite runs would take Employment's rows with it. Each suite already serializes
+its own files (`fileParallelism: false`) for the same reason — this extends the same rule across
+packages. A module's own suite still runs on its own with `pnpm --filter <package> test`.
+
 ## Running the API locally
 
 The API refuses to serve without an authenticated principal, and this repository ships no
