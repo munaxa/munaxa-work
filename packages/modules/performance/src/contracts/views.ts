@@ -104,6 +104,15 @@ export interface GoalCategoryView {
 export interface GoalProgressView {
   readonly goalProgressId: string;
   readonly progressBasisPoints: BasisPoints;
+  /**
+   * The measurement behind the percentage, **as a decimal string**.
+   *
+   * A string because it is a `bigint`: an observed value can exceed 2^53 — a count of transactions,
+   * of bytes, of parts — and `JSON.stringify` of a JavaScript number above that emits a value that
+   * is not the one recorded. A key result whose measurement rounded is a key result nobody can
+   * falsify, which is the opposite of what a measurement is for.
+   */
+  readonly observedValue?: string;
   readonly note?: string;
   readonly evidenceDocumentId?: string;
   readonly recordedAt: string;

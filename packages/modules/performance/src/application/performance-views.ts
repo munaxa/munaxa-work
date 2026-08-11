@@ -157,7 +157,13 @@ export const goalProgressView = (state: GoalProgressState): GoalProgressView => 
   progressBasisPoints: state.progressBasisPoints,
   recordedAt: state.recordedAt.toISOString(),
   recordedBy: state.recordedBy,
-  ...present({ note: state.note, evidenceDocumentId: state.evidenceDocumentId }),
+  // `String(bigint)` and never `Number(bigint)`. The exactness the column and the driver preserve
+  // is only preserved end to end if the view preserves it too.
+  ...present({
+    note: state.note,
+    evidenceDocumentId: state.evidenceDocumentId,
+    observedValue: state.observedValue === undefined ? undefined : String(state.observedValue),
+  }),
 });
 
 export const goalView = (

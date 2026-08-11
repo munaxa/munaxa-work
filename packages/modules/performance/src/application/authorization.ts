@@ -14,20 +14,18 @@ import type { PerformanceDependencies } from './performance-dependencies.js';
  * Three scopes, and the difference between them is the whole of the `read-team` / `read-all` split:
  *
  *   * **`all`** — the caller holds `review.read-all`. HR reading the organization. No bound.
- *   * **`team`** — the caller holds `review.read-team` and names a manager. The reports are
- *     resolved **from Employment's published contract, as of now**, and the query is then bounded
- *     to exactly those employments. A manager who supplies somebody else's manager identifier gets
- *     that manager's reports only if... they cannot: see below.
+ *   * **`team`** — a manager is named by a caller entitled to name one. The reports are resolved
+ *     **from Employment's published contract, as of now**, and the query is then bounded to exactly
+ *     those employments.
  *   * **`none`** — nothing is readable, and the query returns an empty page rather than a refusal.
  *
- * **The manager identifier is not taken from the client.** `read-team` requires the caller to
- * supply the employment they are managing *and* to hold the permission, and the resolution then
- * runs against Employment — but a caller who supplied an arbitrary manager would still receive that
- * manager's reports, which is an IDOR. The honest position is that this is only safe once a
- * principal resolves to an employment, so the manager identifier is accepted **only** alongside
- * `review.read-all` or in a composition where the caller has already been bound to it. Until
- * principal resolution exists, `read-team` without `read-all` resolves against the *caller's own*
- * declared employment and is marked `NOT VERIFIED` in the checkpoint report.
+ * **The manager identifier is a claim, and a claim is not a proof.** A caller who supplied an
+ * arbitrary manager would receive that manager's reports, which is an IDOR — so the identifier is
+ * honoured **only** alongside `review.read-all`, where it narrows a caller who could already read
+ * everything and therefore escalates nothing. A caller holding `read-team` and nothing else reads
+ * **nothing**, whatever they name. That is not a limitation of this function: it is the only
+ * position available until a principal resolves to an employment (ADR-0032), and `read-team` is
+ * marked `NOT VERIFIED` in the checkpoint report rather than shipped as a guess.
  */
 
 export type ReadScope =
@@ -56,12 +54,12 @@ export const reviewScopeFor = async (
     return teamOf(dependencies, request.managerEmploymentId);
   }
   if (await dependencies.permissions.holds(PerformancePermissions.reviewReadTeam)) {
-    // A `read-team` caller must name the manager they are, and nothing can check that claim yet.
-    // Refusing the claim outright is the only position that is not an IDOR, so the scope is empty
-    // and the capability is `NOT VERIFIED` rather than quietly wrong.
-    return request.managerEmploymentId === undefined
-      ? { kind: 'none' }
-      : teamOf(dependencies, request.managerEmploymentId);
+    // **A `read-team` caller reads nothing, whatever they name.** The comment above this line used
+    // to say exactly that while the code did the opposite — it resolved whichever manager the
+    // caller supplied. Over HTTP that is `?managerEmploymentId=<anyone>` and a whole team's
+    // reviews, which is the IDOR this module was written to refuse. Nothing can check the claim
+    // until a principal resolves to an employment, so the claim is not accepted.
+    return { kind: 'none' };
   }
   return { kind: 'none' };
 };
@@ -75,9 +73,9 @@ export const goalScopeFor = async (
     return teamOf(dependencies, request.managerEmploymentId);
   }
   if (await dependencies.permissions.holds(PerformancePermissions.goalReadTeam)) {
-    return request.managerEmploymentId === undefined
-      ? { kind: 'none' }
-      : teamOf(dependencies, request.managerEmploymentId);
+    // Same refusal as `reviewScopeFor`, for the same reason: a supplied manager identifier is a
+    // claim, not a proof, and a goal queue is as disclosing as a review queue.
+    return { kind: 'none' };
   }
   return { kind: 'none' };
 };

@@ -71,3 +71,37 @@ export type {
   OrganizationPort,
   PerformanceStores,
 } from './application/performance-ports.js';
+
+/**
+ * The transport.
+ *
+ * Controllers are exported for the composition root to register; the dispatcher wrapper is what
+ * lets Nest resolve one. **The order the composition root declares them in is load-bearing** — Nest
+ * resolves a route by declaration order, so a controller owning a literal segment must be declared
+ * before one whose route begins with a parameter. `apps/api/src/performance/performance.module.ts`
+ * declares that order and an API test asserts it rather than trusting a comment.
+ */
+export { PerformanceDispatcher } from './api/performance-dispatcher.js';
+export {
+  PerformanceGoalCategoryController,
+  PerformanceRatingScaleController,
+} from './api/configuration.controller.js';
+export { PerformanceFrameworkController } from './api/framework.controller.js';
+export { PerformanceTemplateController } from './api/template.controller.js';
+export { PerformanceCycleController } from './api/cycle.controller.js';
+export { PerformanceEnrolmentController } from './api/enrolment.controller.js';
+export { PerformanceGoalController } from './api/goal.controller.js';
+export { PerformanceGoalProgressController } from './api/goal-progress.controller.js';
+export { PerformanceReviewController } from './api/review.controller.js';
+export { PerformanceReviewLifecycleController } from './api/review-lifecycle.controller.js';
+export {
+  PerformanceAssessmentController,
+  PerformanceAssessmentItemController,
+} from './api/assessment.controller.js';
+export { PerformanceReviewerAssignmentController } from './api/reviewer.controller.js';
+export { PerformanceCalibrationController } from './api/calibration.controller.js';
+export { PerformanceTalentController } from './api/talent.controller.js';
+export {
+  PerformanceFeedbackController,
+  PerformanceReconciliationController,
+} from './api/feedback.controller.js';
