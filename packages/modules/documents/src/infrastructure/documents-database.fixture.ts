@@ -197,6 +197,19 @@ export const openDocumentsFixture = async (role: string): Promise<DocumentsFixtu
     truncate: async () => {
       // `truncate` rather than `delete`: the immutability triggers refuse a delete of a version or
       // an access event, and a table-level truncate is not something a row trigger sees.
+      //
+      // **`cascade` reaches outside this module, and it has to.** `letter_issued.document_id`
+      // references `document`, so PostgreSQL will not truncate `document` without also truncating
+      // the table that references it — and this fixture may not name another module's table in the
+      // list. The consequence is real rather than theoretical: run against the same database while
+      // Letters' integration suites are running, this wipes their rows mid-test. It was found
+      // exactly that way, by an uncached `turbo run test --force` that scheduled both packages
+      // concurrently.
+      //
+      // `turbo.json` therefore orders `@work/letters#test` after `@work/documents#test`. That is
+      // the honest fix: the coupling is in the schema, not in the fixture, and pretending otherwise
+      // would mean either this module reaching into Letters' tables or Letters tolerating rows
+      // vanishing underneath it.
       await admin.query(`truncate ${DOCUMENTS_TABLES.join(', ')} cascade`);
     },
     close: async () => {

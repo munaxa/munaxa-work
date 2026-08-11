@@ -36,6 +36,10 @@
     },
     "prisma:generate": {
       "cache": false
+    },
+    "@work/letters#test": {
+      "dependsOn": ["^build", "@work/documents#test"],
+      "outputs": ["coverage/**"]
     }
   },
   "globalPassThroughEnv": ["NODE_EXTRA_CA_CERTS", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"]

@@ -120,7 +120,21 @@ bank acted on one of them.
 `20260811150000_letter_issued_supersede_once` permits the stamp exactly once, from null to a value.
 Repointing it, clearing it, and every content change and delete are refused.
 
-### 4.3 One test-harness defect, worth recording
+### 4.3 Documents' truncate reached into Letters' table
+
+`letter_issued.document_id` references `document`, so PostgreSQL will not truncate `document`
+without also truncating the table that references it — and Documents' fixture may not name another
+module's table in its list. The consequence is real rather than theoretical: run against the same
+database while Letters' integration suites are running, Documents' `truncate ... cascade` wipes
+Letters' rows mid-test.
+
+Found by an uncached `turbo run test --force`, which schedules both packages concurrently; the
+cached `pnpm verify` had never put them in flight at the same time. `turbo.json` now orders
+`@work/letters#test` after `@work/documents#test`. That is the honest fix: the coupling is in the
+schema rather than in the fixture, and pretending otherwise would mean either Documents reaching
+into Letters' tables or Letters tolerating rows vanishing underneath it.
+
+### 4.4 One test-harness defect, worth recording
 
 The first Phase 12 cross-module harness used a plain `PermissionChecker`, and **every cross-module
 read was refused**. `GrantAwarePermissionChecker` is what makes a bounded service grant mean
@@ -160,6 +174,20 @@ rather than through an authorized, audited download.
 Documents adopts the shared expression **and adds the refusal on its own side**, at the domain and
 at the DTO. Changing the other three modules is a cross-phase refactor this phase does not make.
 The inconsistency is real, is now asserted in a test, and remains theirs to close.
+
+**The integration suites are not safe to run fully concurrently against one database, and this
+predates Phase 12.** Every module's fixture truncates its own tables between tests, and several
+modules share `TEST_DATABASE_URL`. Under `turbo run test --force`, which schedules every package at
+once, `@work/payroll` fails when run alongside `@work/compensation` and `@work/employment`.
+
+**This was verified against the Phase 11 baseline `0807b1d`, with none of Phase 12's code present,
+and reproduces identically there.** Phase 12 neither caused it nor is exempt from it: its own
+instance of the same class — §4.3 — is fixed. The general problem belongs to whatever phase decides
+how the suites share a database, and is recorded here rather than fixed inside a business phase.
+`pnpm verify` passes because turbo's ordinary scheduling does not put every integration suite in
+flight simultaneously; that is a property of the scheduler rather than of the suites, and it is
+worth writing down that the gate's green does not by itself prove the suites are isolated from one
+another.
 
 **The seventh and eighth copies of `row-writer.ts`.** Compensation, Leave, Attendance, Onboarding,
 Recruitment and Payroll each carry a near-copy; Documents and Letters now make eight. A module may
