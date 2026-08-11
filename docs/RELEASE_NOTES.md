@@ -5,6 +5,81 @@ and what is still missing.
 
 ---
 
+## Phase 12 — Employee documents and letters
+
+Two modules. Documents says what evidence exists about somebody and who has looked at it. Letters
+says what this employer stated about somebody, and freezes it.
+
+**A document register that records who looked.** Every document has a stable identity and a history
+of versions that are written once and never rewritten — replacing a file adds a version and stamps
+the previous one superseded. Verification attaches to a *version*, so replacing the file returns the
+document to "pending verification": nobody has looked at the new bytes. Every read is recorded, not
+only every download, because "who has been looking at this employee's file" is the question the
+trail exists to answer and recording only downloads would leave a hole in it. Refused attempts are
+recorded too — somebody trying repeatedly to reach a document they may not see is exactly what an
+audit is for. The trail is a queryable table rather than a log, because an unqueryable one cannot
+answer a subject access request.
+
+**Confidential means invisible, not greyed out.** A colleague who may see that an employee exists
+does not see their medical certificate, and does not learn that one was withheld: the count agrees
+with the rows, because "this employee has three documents you may not see" is itself the disclosure.
+Asking for one directly answers "not found" rather than "forbidden", for the same reason. Seeing
+that a document exists, seeing a confidential one, and obtaining the file are three separate
+permissions.
+
+**One answer to when a passport expires.** Where a document evidences an identity document the
+People module already holds, the expiry lives there and this module stores no copy. The screen shows
+People's date and says so. Two stored dates are two things that can disagree.
+
+**Letters a customer writes, not letters this product ships.** An employment certificate, a salary
+certificate, an experience letter and an embassy letter are all templates a tenant authors in both
+languages. A template's variables are declared names looked up in a map — there is no expression
+language and no way for template text to reach code, which is what makes a tenant-authored template
+safe to run against another employee's salary. A variable that cannot be resolved fails the letter
+rather than rendering a blank: a bank letter stating that an employee earns nothing, over the
+employer's name, is worse than no letter.
+
+**An issued letter never changes.** What it said is frozen when it is issued — the template version,
+every substituted value, and which revision of each source they came from. A salary certificate
+issued in March still reads March's salary after April's raise. A correction issues a *new* letter
+that supersedes the original, because somebody may be holding a printed copy of it. A third party
+can confirm a reference is genuine and current without learning the employee's name, employer,
+salary or purpose.
+
+**A letter that states pay needs two permissions**, not one: the template must be allowed to expose
+salary and the person issuing it must be allowed to see one. Otherwise a letter becomes a way to
+read a salary the caller could not read directly.
+
+### Known limitations
+
+Stated here as well as in the report, because a release note that omits them is worse than none:
+
+- **No file is stored, uploaded or downloaded.** There is no object storage in this product yet.
+  Documents records what a file *is* — its name, size, declared type and checksum — and the
+  reference to wherever it lives; asking for the file answers that the capability is unavailable
+  rather than returning a link. Content inspection, malware scanning and checksum verification are
+  absent for the same reason: all three require reading bytes nobody here holds.
+- **No PDF is produced.** A letter has content and no file. There is no renderer in this product.
+- **Nothing is signed.** A letter may record that a signature is required; nothing claims one
+  happened, because there is no signing provider.
+- **No notice is sent when a document is about to expire.** The thresholds are configured and the
+  expiring queue is a screen somebody opens. Nothing scheduled runs in this product yet, and a
+  reminder nobody receives is worse than none promised.
+- **Employees cannot see their own documents or request their own letters.** The permissions exist;
+  the routing from a signed-in person to their employment does not, in any module.
+- **Third-party letter verification needs an account.** The check itself discloses almost nothing
+  and works correctly; the anonymous route in front of it does not exist, because every read in this
+  product resolves a tenant first.
+- **Missing-mandatory-document detection is not built.** Deferred deliberately rather than
+  half-built.
+
+### Tests
+
+1,647, up from 1,447. Two schema defects were found by tests before release and fixed: one trigger
+refused a change the design required, and another permitted one it should not have.
+
+---
+
 ## Phase 11 — Payroll
 
 Employment says somebody is employed. Compensation says what they are entitled to receive. Payroll

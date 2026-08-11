@@ -94,7 +94,23 @@ introduced (ADR-0066) — +8% on single-row updates, ≈14 µs per row, and with
 bulk. Application-level enforcement remains in place as well; the trigger is the net, not the
 rule.
 
-The bar for the next one is the same: application enforcement alone is insufficient, no
+Phase 12 added four more, and each clears the same bar. `document_version` and
+`document_access_event` are **immutable from the instant they exist** — there is no "finalized"
+moment to wait for, which is what makes a version a version and an access trail an access trail.
+`letter_template_version` freezes the moment it issues a letter, and `letter_issued` freezes at
+issue. All four express a rule about the *old* row, which no check constraint, rule, grant or
+policy can read.
+
+Two of the four were narrowed after the tests found them too broad, and both corrections are worth
+recording because they are the same mistake in opposite directions. `document_version` originally
+refused every update, including the one stamp that says a version is no longer current — as shipped,
+adding a second version to a document was impossible. `letter_issued` originally left the
+supersession pointer unguarded, and unguarded means repointable: somebody could rewrite which letter
+replaced which, long after a bank acted on one of them. A trigger that refuses too much and a
+trigger that refuses too little are both found the same way, by asserting the **permitted** case
+alongside the refusals rather than only the refusals.
+
+The bar for the next one is unchanged: application enforcement alone is insufficient, no
 declarative constraint can express it, the alternatives are compared in an ADR, and the cost is
 measured rather than assumed.
 

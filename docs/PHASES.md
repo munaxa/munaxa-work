@@ -182,6 +182,34 @@ caught, the measured performance at 500, 10,000 and 100,000 employees, the carri
 register and the production-readiness assessment are in
 [`verification/phase-11-report.md`](verification/phase-11-report.md).
 
+Phase 12 completed on 2026-08-11: Employee Documents and Letters — two modules, eleven tables.
+**Documents** holds document types a tenant configures, stable document identities filed against a
+person, an employment or a legal entity, insert-only versions, verification decisions attached to a
+*version*, and a queryable access trail. It holds **no bytes**: `StoragePort` has no adapter in this
+repository, so upload, download, content inspection, malware scanning and hash verification are all
+`NOT VERIFIED` — recorded as absent rather than approximated, and the download authorization answers
+`available: false` rather than fabricating a URL. Where a document evidences a People identifier,
+**People owns the expiry** and Documents stores none of its own; a check constraint refuses a row
+carrying both. Confidentiality is applied in the query rather than after it, so a caller without
+`document.read-sensitive` neither receives a confidential document nor learns how many were
+withheld — a count is itself a disclosure. **Letters** holds tenant-authored templates, immutable
+template versions, requests, named-human approval decisions and issued letters carrying a frozen
+snapshot of every substituted value and the version of each source it came from, so a March salary
+certificate still reads March's salary after April's raise. A variable is a name and substitution is
+a lookup: there is no expression language, no operator and no way for template text to reach code. A
+letter that states pay needs two gates — the template's own allow-list and the issuer's
+`letter.include-salary` — because otherwise a letter is a way to read a salary the caller could not
+read directly. Nothing renders a file and nothing claims a signature: no PDF library and no
+signature provider exist, so an issued letter carries its content and no artefact. Four database
+triggers were added and two were narrowed after the tests found them wrong in opposite directions —
+one refused a stamp the design required, the other left a supersession pointer repointable. Neither
+module publishes or subscribes to an event, so there is no lost-event scenario: every cross-module
+fact is pulled at the moment it is needed. The planning checkpoint and the approved decisions
+D-1…D-29 are in [`verification/phase-12-plan.md`](verification/phase-12-plan.md); the report, the
+two defects the tests caught before the fix, the measured performance at 10,000 and 100,000
+documents, the ten `NOT VERIFIED` capabilities and the carried-forward debt register are in
+[`verification/phase-12-report.md`](verification/phase-12-report.md).
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

@@ -38,8 +38,8 @@ them afterwards.
 | Approval, workflow definition, task       | `workflow`      | Phase 16      |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
-| Document, permit, expiry                  | `documents`     | Phase 4.1     |
-| Letter template, issued letter            | `letters`       | Phase 5.1     |
+| Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |
+| Letter template, template version, letter request, approval decision, issued letter, reference sequence | `letters` | Phase 12 ✅ |
 | Violation, disciplinary action, grievance | `relations`     | Phase 5.2     |
 | Asset, custody assignment                 | `assets`        | Phase 5.3     |
 | Loan, advance, repayment schedule         | `loans`         | Phase 10.1    |
@@ -109,6 +109,19 @@ port Phase 3 declared for it. Organization still counts nothing itself (AD-002).
 A person's **nationality is an input to statutory rules and never a business rule in itself** (00B).
 Nothing in `people` branches on a country code, and a person's country of *employment* comes from
 their legal entity (ADR-0035), never from their passport.
+
+**A document's expiry belongs to whoever owns the thing that expires.** Where a document evidences a
+`person_identifier`, People owns the date and `documents` stores none of its own — a check
+constraint refuses a row carrying both, and the view reports People's date and says whose it is.
+There is exactly one authoritative answer to when a passport expires, and duplicating it into a
+generic document record would produce two that could disagree. A document with no identifier behind
+it — a signed policy acknowledgement, a training certificate — carries its own expiry, because
+nothing else owns one.
+
+**`documents` holds no file content and `letters` renders none.** `storage_reference` is an opaque
+key this module never resolves; an issued letter carries its frozen substituted values and no
+artefact. Both are missing dependencies rather than deferred features, and both are named in
+[`verification/phase-12-report.md`](verification/phase-12-report.md) §5.
 
 ## Rules
 
