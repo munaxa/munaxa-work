@@ -1,9 +1,26 @@
-import {
-  MAX_BASIS_POINTS,
-  type ExclusionReason,
-  type ScoreComponent,
-} from './performance-vocabulary.js';
+import { MAX_BASIS_POINTS, type ExclusionReason } from './performance-vocabulary.js';
 import { accept, refuse, type PerformanceResult } from './performance-rejection.js';
+import type {
+  ComponentOutcome,
+  ExcludedItem,
+  RatingLevelBand,
+  RatingScaleBand,
+  ScoreOutcome,
+  ScoringComponentInput,
+  ScoringItem,
+  ScoringRequest,
+} from './scoring-types.js';
+
+export type {
+  ComponentOutcome,
+  ExcludedItem,
+  RatingLevelBand,
+  RatingScaleBand,
+  ScoreOutcome,
+  ScoringComponentInput,
+  ScoringItem,
+  ScoringRequest,
+} from './scoring-types.js';
 
 /**
  * The scoring engine, and the approved semantics of D-6 in one place.
@@ -40,82 +57,6 @@ import { accept, refuse, type PerformanceResult } from './performance-rejection.
  * to exist in the calculation at all. Scores are integer hundredths; weights are integer basis
  * points; the single division in the whole engine rounds explicitly.
  */
-
-/** One assessed line: a goal that was scored, or a competency that was rated. */
-export interface ScoringItem {
-  /** The goal or competency this line assessed. Used only to report exclusions. */
-  readonly reference: string;
-  /** Hundredths on the review's rating scale. Absent when nothing was scored. */
-  readonly score?: number;
-  /** Basis points. Absent where the framework carries no weights. */
-  readonly weightBasisPoints?: number;
-  /** Present when the line is known not to participate — a cancelled goal, say. */
-  readonly exclusionReason?: ExclusionReason;
-}
-
-export interface ScoringComponentInput {
-  readonly component: ScoreComponent;
-  /** Basis points from the review template. The set across components must total 10,000. */
-  readonly weightBasisPoints: number;
-  /**
-   * Whether the items carry their own weights.
-   *
-   * False for a competency framework that does not declare them, and the aggregate is then the
-   * unweighted mean the third decision asks for.
-   */
-  readonly weighted: boolean;
-  readonly items: readonly ScoringItem[];
-}
-
-export interface RatingLevelBand {
-  readonly ratingLevelId: string;
-  readonly ordinal: number;
-  readonly minimumScore: number;
-  readonly maximumScore: number;
-}
-
-export interface RatingScaleBand {
-  readonly minimumScore: number;
-  readonly maximumScore: number;
-  readonly levels: readonly RatingLevelBand[];
-}
-
-export interface ScoringRequest {
-  readonly components: readonly ScoringComponentInput[];
-  readonly scale: RatingScaleBand;
-}
-
-export interface ExcludedItem {
-  readonly reference: string;
-  readonly reason: ExclusionReason;
-}
-
-export interface ComponentOutcome {
-  readonly component: ScoreComponent;
-  readonly weightBasisPoints: number;
-  readonly included: boolean;
-  /** Hundredths. Present only where the component participated. */
-  readonly score?: number;
-  readonly exclusionReason?: ExclusionReason;
-  /** The weights that actually participated, in basis points. Zero when none did. */
-  readonly denominatorBasisPoints: number;
-  /**
-   * This component's weighted share of the final score, in hundredths.
-   *
-   * It is rounded independently, so the shares may differ from the final score by a hundredth. The
-   * final score is rounded once from the component scores and is the authoritative number; these
-   * are the working, shown so that a rating somebody disagrees with can be talked through.
-   */
-  readonly contributedScore?: number;
-  readonly excludedItems: readonly ExcludedItem[];
-}
-
-export interface ScoreOutcome {
-  /** Hundredths, within the scale's range. */
-  readonly score: number;
-  readonly ratingLevelId: string;
-  readonly components: readonly ComponentOutcome[];
-}
 
 /**
  * The out-of-range invariant, in the one place a score can actually leave the scale.
@@ -272,13 +213,7 @@ const scoreComponent = (
   }
 
   if (gathered.denominator === 0n) {
-    return accept(
-      absent(
-        component,
-        gathered,
-        gathered.excluded.length === 0 ? 'not_applicable' : reasonOf(gathered),
-      ),
-    );
+    return accept(absent(component, gathered, absentReason(component, gathered)));
   }
 
   const score = Number(divideRounded(gathered.numerator, gathered.denominator));
@@ -303,9 +238,24 @@ const scoreComponent = (
 /**
  * Which of the four reasons a component that scored nothing carries.
  *
- * Every line excluded for the same reason reports that reason; a mixture reports `incomplete`,
- * which is what a component with some work done and some not actually is.
+ * Three genuinely different situations, and they must not collapse into one. A component with **no
+ * lines at all** is `missing` — nobody assessed it. A component whose lines were all excluded
+ * carries whatever reason they carried. A component that *was* assessed but whose weights come to
+ * zero is `not_applicable`: the work was done and the arithmetic has nothing to divide by.
+ *
+ * Collapsing the first into the third was a defect this module's application suite found: a review
+ * where the whole competency section was skipped reported that competencies did not apply, which
+ * reads as a configuration choice rather than as work nobody did.
  */
+const absentReason = (
+  component: ScoringComponentInput,
+  gathered: Participating,
+): ExclusionReason => {
+  if (component.items.length === 0) return 'missing';
+  if (gathered.excluded.length > 0) return reasonOf(gathered);
+  return 'not_applicable';
+};
+
 const reasonOf = (gathered: Participating): ExclusionReason => {
   const reasons = new Set(gathered.excluded.map((item) => item.reason));
   const [only] = [...reasons];

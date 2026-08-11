@@ -29,6 +29,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile node_modules/.cache/tsc-typecheck.tsbuildinfo",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@work/kernel": "workspace:*"
+  },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
     "@munaxa/config-typescript": "^1.0.0",

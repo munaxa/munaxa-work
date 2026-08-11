@@ -30,3 +30,35 @@ export * from './domain/calibration.js';
 export * from './domain/talent-placement.js';
 export * from './domain/feedback.js';
 export * from './domain/review-snapshot.js';
+
+export * from './contracts/views.js';
+
+export { performanceModule } from './application/performance-module.js';
+export {
+  ALL_PERFORMANCE_PERMISSIONS,
+  PerformancePermissions,
+  UNROUTED_PERFORMANCE_PERMISSIONS,
+} from './application/performance-permissions.js';
+export type { PerformancePermission } from './application/performance-permissions.js';
+
+export type { PerformanceDependencies } from './application/performance-dependencies.js';
+
+/**
+ * The ports, as types. The composition root implements them against the owning modules' published
+ * queries under bounded service grants (ADR-0043); a concrete adapter exported from here would be
+ * this module deciding how another module is read.
+ *
+ * `documentsUnavailable` is exported as a *value* because it is not an adapter — it is the accurate
+ * statement that nothing resolves a document reference in this repository, and a composition root
+ * that has no better answer should install it rather than invent one.
+ */
+export { documentsUnavailable } from './application/performance-ports.js';
+export type {
+  Clock,
+  DocumentReferencePort,
+  EmploymentFacts,
+  EmploymentPort,
+  NotificationIntentPort,
+  OrganizationPort,
+  PerformanceStores,
+} from './application/performance-ports.js';
