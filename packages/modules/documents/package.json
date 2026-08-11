@@ -30,12 +30,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/swagger": "^11.0.0",
-    "@work/kernel": "workspace:*",
-    "@work/persistence": "workspace:*",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1"
+    "@work/kernel": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
