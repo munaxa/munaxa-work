@@ -51,3 +51,17 @@ export const PERMISSION_CHECKER = Symbol('PERMISSION_CHECKER');
  * the composition root.
  */
 export const PEOPLE_MODULE = Symbol('PEOPLE_MODULE');
+
+/**
+ * Every module that needs the permission checker, assembled together.
+ *
+ * People, Documents and Letters each build their answer from what the caller holds rather than
+ * refusing outright — People redacts a person's sensitive fields, Documents withholds confidential
+ * documents, Letters refuses a salary template to an issuer without the pay permission — so all
+ * three need to *ask*, not merely be checked.
+ *
+ * One token rather than three because the registry factory takes them together, and a factory with
+ * six parameters is one the standards refuse: correctly, because a parameter list that long is a
+ * list somebody eventually passes in the wrong order.
+ */
+export const PERMISSION_AWARE_MODULES = Symbol('PERMISSION_AWARE_MODULES');

@@ -137,6 +137,9 @@ importers:
       '@work/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@work/documents':
+        specifier: workspace:*
+        version: link:../../packages/modules/documents
       '@work/employment':
         specifier: workspace:*
         version: link:../../packages/modules/employment
@@ -149,6 +152,9 @@ importers:
       '@work/leave':
         specifier: workspace:*
         version: link:../../packages/modules/leave
+      '@work/letters':
+        specifier: workspace:*
+        version: link:../../packages/modules/letters
       '@work/onboarding':
         specifier: workspace:*
         version: link:../../packages/modules/onboarding

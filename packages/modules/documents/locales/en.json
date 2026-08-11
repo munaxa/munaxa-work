@@ -1,0 +1,108 @@
+{
+  "documents": {
+    "label": {
+      "action": "Action",
+      "actor": "Actor",
+      "archive": "Archive",
+      "archivedAt": "Archived",
+      "audit": "Access trail",
+      "categories": "Document types",
+      "code": "Code",
+      "confidentiality": "Confidentiality",
+      "contentHash": "Content hash",
+      "correlation": "Request reference",
+      "declaredMediaType": "Declared type",
+      "document": "Document",
+      "documents": "Documents",
+      "download": "Download",
+      "employeeDocuments": "Employee documents",
+      "employeeVisible": "Visible to employee",
+      "expires": "Expires",
+      "expiring": "Expiring documents",
+      "expiryDate": "Expiry",
+      "fileName": "File name",
+      "gregorian": "Gregorian",
+      "hijri": "Hijri",
+      "issueDate": "Issued",
+      "legalHold": "Legal hold",
+      "legalHoldReason": "Reason for hold",
+      "managerVisible": "Visible to manager",
+      "noticeDays": "Notice thresholds",
+      "outcome": "Outcome",
+      "owner": "Owner",
+      "ownerType": "Owner type",
+      "ownerTypes": "Permitted owners",
+      "reconciliation": "Reconciliation",
+      "register": "Document register",
+      "requiresVerification": "Requires verification",
+      "restore": "Restore",
+      "retentionPolicy": "Retention policy",
+      "reverify": "Verification queue",
+      "size": "Size",
+      "source": "Source",
+      "status": "Status",
+      "title": "Title",
+      "type": "Document type",
+      "verificationState": "Verification",
+      "verify": "Verify",
+      "version": "Version",
+      "versionCount": "Versions",
+      "versions": "Versions"
+    },
+    "status": {
+      "active": "Active",
+      "archived": "Archived",
+      "draft": "Draft",
+      "superseded": "Superseded"
+    },
+    "verification": {
+      "pending_verification": "Pending verification",
+      "rejected": "Rejected",
+      "unverified": "Unverified",
+      "verified": "Verified"
+    },
+    "confidentiality": {
+      "confidential": "Confidential",
+      "normal": "Normal"
+    },
+    "expiry": {
+      "expired": "Expired",
+      "expiring_soon": "Expiring soon",
+      "no_expiry": "No expiry",
+      "valid": "Valid"
+    },
+    "access": {
+      "archived": "Archived",
+      "download_authorized": "Download authorized",
+      "download_refused": "Download refused",
+      "metadata_read": "Read",
+      "rejected": "Rejected",
+      "replaced": "Replaced",
+      "restored": "Restored",
+      "verified": "Verified"
+    },
+    "source": {
+      "direct": "Uploaded",
+      "letter": "Generated letter",
+      "migration": "Migrated",
+      "onboarding": "Onboarding",
+      "recruitment": "Recruitment"
+    },
+    "finding": {
+      "current_version_missing": "The current version is missing",
+      "duplicate_content": "The same file appears more than once",
+      "stale_verification": "The verified version is no longer current",
+      "versions_without_current": "Versions exist but none is current"
+    },
+    "notice": {
+      "empty": "Nothing to show yet.",
+      "error": "This could not be loaded.",
+      "expiryFromPeople": "This expiry is held by the person's identifier record and is read from there.",
+      "loading": "Loading…",
+      "noNotices": "Notice thresholds are configuration. Nothing sends a notice: no scheduler is verified.",
+      "noStorage": "File storage is not verified. Metadata and versions are recorded; the files themselves cannot be retrieved.",
+      "reconciliationReports": "Reconciliation reports only. It changes nothing.",
+      "sensitiveWithheld": "Some documents are not shown because they are classified confidential."
+    }
+  }
+}

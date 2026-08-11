@@ -65,6 +65,8 @@ import {
   compensationModuleFor,
 } from '../compensation/compensation.composition.js';
 import { DeferredPayrollDispatcher, payrollModuleFor } from '../payroll/payroll.composition.js';
+import { documentsModuleFor } from '../documents/documents.composition.js';
+import { lettersModuleFor } from '../letters/letters.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -73,6 +75,7 @@ import {
   MEMBERSHIP_DIRECTORY,
   MODULE_REGISTRY,
   PEOPLE_MODULE,
+  PERMISSION_AWARE_MODULES,
   PERMISSION_CHECKER,
 } from './identity.tokens.js';
 import { PlatformPermissionChecker } from './permission-checker.js';
@@ -154,14 +157,34 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         peopleModuleFor(unitOfWork, permissions, environment, logger.logger, senders.people),
     },
     {
+      provide: PERMISSION_AWARE_MODULES,
+      inject: [UNIT_OF_WORK, PERMISSION_CHECKER, DEFERRED_SENDERS, PEOPLE_MODULE],
+      useFactory: (
+        unitOfWork: UnitOfWork,
+        permissions: PermissionChecker,
+        senders: DeferredSenders,
+        people: WorkModule,
+      ): PermissionAwareModules => ({
+        people,
+        documents: documentsModuleFor(unitOfWork, senders.payroll, permissions),
+        letters: lettersModuleFor(unitOfWork, senders.payroll, permissions),
+      }),
+    },
+    {
       provide: MODULE_REGISTRY,
-      inject: [UNIT_OF_WORK, DATABASE_POOL, ENVIRONMENT, DEFERRED_SENDERS, PEOPLE_MODULE],
+      inject: [
+        UNIT_OF_WORK,
+        DATABASE_POOL,
+        ENVIRONMENT,
+        DEFERRED_SENDERS,
+        PERMISSION_AWARE_MODULES,
+      ],
       useFactory: (
         unitOfWork: UnitOfWork,
         pool: Pool,
         environment: Environment,
         senders: DeferredSenders,
-        people: WorkModule,
+        permissionAware: PermissionAwareModules,
       ): ModuleRegistry => {
         const registry = new ModuleRegistry();
 
@@ -178,7 +201,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
             assignmentFilledHeadcount(unitOfWork, postgresEmploymentStores()),
           ),
         );
-        registry.register(people);
+        registry.register(permissionAware.people);
         registry.register(employmentModuleFor(unitOfWork, senders.employment));
         registry.register(recruitmentModuleFor(unitOfWork, senders.recruitment));
         registry.register(onboardingModuleFor(unitOfWork, senders.onboarding));
@@ -195,6 +218,17 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // queries under bounded service grants. Nothing pushes to it: a payroll run pulls what it
         // needs and reconciles by asking again, so a lost event costs nothing (ADR-0064).
         registry.register(payrollModuleFor(unitOfWork, senders.payroll));
+        // Documents and Letters read People, Employment, Organization and Compensation through
+        // their published queries under bounded service grants, and are read by nobody. Both take
+        // the permission checker as well as the pipeline's, because both assemble an answer from
+        // what the caller holds: Documents withholds confidential documents from a caller without
+        // `document.read-sensitive`, and Letters refuses a salary template to an issuer without
+        // `letter.include-salary`.
+        registry.register(permissionAware.documents);
+        // Letters last. It reads the same four modules and, unlike every other module here, has a
+        // capability it cannot perform: nothing renders a document, so an issued letter carries its
+        // content and no artefact (D-15).
+        registry.register(permissionAware.letters);
         return registry;
       },
     },
@@ -247,6 +281,12 @@ export class IdentityModule {}
  * One object rather than four providers, so the factories that need them stay inside the
  * five-parameter budget — a list any longer is one somebody eventually passes in the wrong order.
  */
+interface PermissionAwareModules {
+  readonly people: WorkModule;
+  readonly documents: WorkModule;
+  readonly letters: WorkModule;
+}
+
 interface DeferredSenders {
   readonly organization: DeferredCommandSender;
   readonly people: DeferredPeopleSender;

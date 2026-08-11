@@ -1,0 +1,96 @@
+{
+  "letters": {
+    "label": {
+      "addressee": "الجهة المرسل إليها",
+      "approve": "اعتماد",
+      "approvals": "الاعتمادات",
+      "body": "النص",
+      "cancel": "إلغاء",
+      "category": "التصنيف",
+      "code": "الرمز",
+      "comment": "ملاحظة",
+      "decidedAt": "تاريخ القرار",
+      "decidedBy": "صاحب القرار",
+      "exposedFields": "الحقول المتاحة",
+      "generated": "الخطابات الصادرة",
+      "gregorian": "ميلادي",
+      "hijri": "هجري",
+      "issue": "إصدار",
+      "issuedAt": "تاريخ الإصدار",
+      "issuedBy": "أصدره",
+      "letterhead": "مرجع الترويسة",
+      "letters": "الخطابات",
+      "locale": "اللغة",
+      "publish": "نشر",
+      "purpose": "الغرض",
+      "reconciliation": "المطابقة",
+      "reference": "الرقم المرجعي",
+      "register": "سجل الخطابات",
+      "reject": "رفض",
+      "request": "طلب خطاب",
+      "requestedAt": "تاريخ الطلب",
+      "requestedBy": "مقدم الطلب",
+      "requests": "الطلبات",
+      "requiresApproval": "يتطلب اعتمادًا",
+      "requiresSignature": "يتطلب توقيعًا",
+      "retire": "إيقاف",
+      "reverse": "إلغاء القرار",
+      "sequence": "الخطوة",
+      "signatory": "الموقّع",
+      "signature": "التوقيع",
+      "status": "الحالة",
+      "superseded": "استُبدل بـ",
+      "template": "القالب",
+      "templates": "قوالب الخطابات",
+      "variables": "المتغيرات",
+      "verify": "التحقق من خطاب",
+      "version": "الإصدار",
+      "versions": "الإصدارات"
+    },
+    "status": {
+      "approved": "معتمد",
+      "cancelled": "ملغى",
+      "failed": "أخفق",
+      "generated": "تم الإنشاء",
+      "generating": "قيد الإنشاء",
+      "issued": "صادر",
+      "pending_approval": "بانتظار الاعتماد",
+      "rejected": "مرفوض",
+      "requested": "مطلوب"
+    },
+    "templateStatus": {
+      "draft": "مسودة",
+      "published": "منشور",
+      "retired": "موقوف"
+    },
+    "approval": {
+      "approved": "معتمد",
+      "not_required": "غير مطلوب",
+      "pending": "قيد الانتظار",
+      "rejected": "مرفوض",
+      "reversed": "ملغى"
+    },
+    "signature": {
+      "declared_signed_externally": "أُقر بالتوقيع خارج النظام",
+      "not_required": "غير مطلوب",
+      "required": "التوقيع مطلوب"
+    },
+    "finding": {
+      "approval_no_longer_stands": "صدر رغم أن سلسلة الاعتماد لم تعد قائمة",
+      "generation_incomplete": "لم يكتمل الإنشاء",
+      "issued_without_letter": "مسجل كصادر دون خطاب",
+      "template_version_mismatch": "صدر من إصدار قالب غير المطلوب"
+    },
+    "notice": {
+      "empty": "لا يوجد ما يُعرض بعد.",
+      "error": "تعذر تحميل هذا.",
+      "frozen": "ما ورد في هذا الخطاب جُمّد عند إصداره. التغييرات اللاحقة في المصدر لا تغيّره.",
+      "issuedIsFinal": "الخطاب الصادر لا يُعدّل. التصحيح يصدر خطابًا جديدًا يحل محله.",
+      "loading": "جارٍ التحميل…",
+      "noRendering": "إنشاء الملف غير موثق. يُسجل مضمون الخطاب ولا يُنتج ملف.",
+      "noSignature": "التوقيع الإلكتروني غير موثق. قد يسجل الخطاب أن التوقيع مطلوب، ولا شيء هنا يوقّع.",
+      "salaryGated": "هذا القالب يعرض الراتب. إصداره يتطلب صلاحية الراتب إضافة إلى صلاحية الطلب.",
+      "versionFrozen": "هذا الإصدار أصدر خطابًا ولم يعد قابلًا للتعديل. التغييرات تدخل في إصدار جديد."
+    }
+  }
+}

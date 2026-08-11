@@ -49,5 +49,6 @@ export type {
   StorageAccessPort,
 } from './application/documents-ports.js';
 
+export { postgresDocumentsStores } from './infrastructure/documents-stores.js';
 export { inMemoryDocumentsStores } from './application/in-memory-stores.js';
 export { FixedClock } from './application/documents-test-harness.js';

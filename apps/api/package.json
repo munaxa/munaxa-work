@@ -22,12 +22,15 @@
     "@work/attendance": "workspace:*",
     "@work/compensation": "workspace:*",
     "@work/config": "workspace:*",
+    "@work/documents": "workspace:*",
     "@work/employment": "workspace:*",
     "@work/identity": "workspace:*",
     "@work/kernel": "workspace:*",
     "@work/leave": "workspace:*",
+    "@work/letters": "workspace:*",
     "@work/onboarding": "workspace:*",
     "@work/organization": "workspace:*",
+    "@work/payroll": "workspace:*",
     "@work/people": "workspace:*",
     "@work/persistence": "workspace:*",
     "@work/recruitment": "workspace:*",
@@ -38,8 +41,7 @@
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
-    "@work/payroll": "workspace:*"
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
