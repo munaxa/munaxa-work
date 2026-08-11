@@ -73,6 +73,9 @@ importers:
       '@work/people':
         specifier: workspace:*
         version: link:../../packages/modules/people
+      '@work/performance':
+        specifier: workspace:*
+        version: link:../../packages/modules/performance
       '@work/recruitment':
         specifier: workspace:*
         version: link:../../packages/modules/recruitment
