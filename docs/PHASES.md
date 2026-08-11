@@ -210,6 +210,35 @@ two defects the tests caught before the fix, the measured performance at 10,000 
 documents, the ten `NOT VERIFIED` capabilities and the carried-forward debt register are in
 [`verification/phase-12-report.md`](verification/phase-12-report.md).
 
+Phase 13 completed on 2026-08-11: Performance, Competencies & Goals — one module, twenty-three
+tables. It says what somebody was rated, what that rating was measured against, and why, for as long
+as the record has to answer for itself. **Every score is a whole number of hundredths and every
+weight a whole number of basis points; there is no `numeric` column in the module.** The engine
+computes in `bigint` and its one division rounds explicitly, half away from zero — and a component
+nobody assessed **leaves the denominator with its reason recorded** rather than being scored zero,
+because scoring it zero rates somebody at the bottom of the scale for work nobody looked at
+([ADR-0069](adr/0069-a-score-is-an-integer-and-an-absence-is-not-a-zero.md)). Completing a review
+writes an immutable snapshot of the scale, the levels, the template, the weights, the working and
+the placement, so retiring the scale, retiring the template and moving the employment to a different
+manager in a different unit changes nothing the review says — proven end to end against real
+PostgreSQL ([ADR-0068](adr/0068-a-rating-is-explained-from-a-snapshot.md)). Calibration records a
+second number beside the first and never over it; `calibrate` and `complete` are separate
+permissions, because moving a rating in a meeting and signing a review off are different decisions.
+**Self and peer assessments are recorded, readable and count for nothing** — no weighting was
+approved, so none was invented. **Confidential is not anonymous**: every 360° response is an
+attributed row, and below a template's minimum the aggregate is withheld rather than anonymized.
+D-31 required no change to Employment — `employment.search` already answers which employments report
+to a manager as of a date. Two authorization defects the tests caught are now permanently covered: a
+`read-team` caller who named any manager received that manager's team, and a review's own manager
+became the caller's authorization scope. `read-team` remains `NOT VERIFIED` until a principal
+resolves to an employment, and a `read-team` caller reads nothing whatever they name. The planning
+checkpoint and the approved decisions D-1…D-31 are in
+[`verification/phase-13-plan.md`](verification/phase-13-plan.md); the four layer reports, the nine
+defects with their original failing evidence, the measured performance at 500, 10,000 and 100,000
+employments with two budget misses found and fixed, the nine `NOT VERIFIED` capabilities and the
+carried-forward debt register are in
+[`verification/phase-13-final-report.md`](verification/phase-13-final-report.md).
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

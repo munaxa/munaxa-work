@@ -32,7 +32,7 @@ them afterwards.
 | Compensation plan, salary structure, grade, scale, step, component, recurring and one-time compensation | `compensation` | Phase 10 ✅ |
 | Payroll group, period, run, input snapshot, result, earning and deduction line, exception, adjustment, approval decision, reconciliation, accounting line, payment instruction | `payroll` | Phase 11 ✅ |
 | Benefit plan, enrolment                   | `benefits`      | Phase 12      |
-| Goal, review, rating                      | `performance`   | Phase 13      |
+| Goal, review, rating                      | `performance`   | Phase 13 ✓    |
 | Course, enrolment, certification          | `learning`      | Phase 14      |
 | Career path, succession plan              | `career`        | Phase 15      |
 | Approval, workflow definition, task       | `workflow`      | Phase 16      |

@@ -108,10 +108,20 @@ const goalWeightFindings = (
 ): readonly ReconciliationFinding[] => {
   if (template === undefined || template.goalWeightTotalBasisPoints === 0) return [];
 
+  // **Indexed once, not scanned per review.** This was `goals.filter(...)` inside the loop below,
+  // which is O(reviews x goals): at 10,000 reviews and 30,000 goals that is three hundred million
+  // comparisons, and the benchmark measured it at 10,330ms against a 10,000ms budget. The findings
+  // are identical — same rules, same order — the traversal is not.
+  const byEmployment = new Map<string, GoalState[]>();
+
+  for (const goal of goals) {
+    const key = `${goal.employmentId ?? ''}:${goal.cycleId ?? ''}`;
+
+    byEmployment.set(key, [...(byEmployment.get(key) ?? []), goal]);
+  }
+
   return reviews.flatMap((review): readonly ReconciliationFinding[] => {
-    const mine = goals.filter(
-      (goal) => goal.employmentId === review.employmentId && goal.cycleId === review.cycleId,
-    );
+    const mine = byEmployment.get(`${review.employmentId}:${review.cycleId}`) ?? [];
 
     if (mine.length === 0) {
       return [
@@ -147,9 +157,13 @@ const goalWeightFindings = (
 const placementDriftFindings = (
   reviews: readonly ReviewState[],
   placements: readonly TalentPlacementState[],
-): readonly ReconciliationFinding[] =>
-  placements.flatMap((placement) => {
-    const review = reviews.find((candidate) => candidate.reviewId === placement.reviewId);
+): readonly ReconciliationFinding[] => {
+  // Indexed for the same reason as the goals above: `reviews.find(...)` per placement is a scan of
+  // the whole cycle for every row on the matrix.
+  const byReview = new Map(reviews.map((review) => [review.reviewId, review]));
+
+  return placements.flatMap((placement) => {
+    const review = byReview.get(placement.reviewId);
 
     if (review === undefined || review.finalRatingLevelId === undefined) return [];
     if (!review.calibrated) return [];
@@ -162,3 +176,4 @@ const placementDriftFindings = (
       },
     ];
   });
+};
