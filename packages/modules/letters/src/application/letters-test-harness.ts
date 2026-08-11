@@ -168,7 +168,7 @@ const sourcesFor = (options: HarnessOptions, parts: Parts): LetterSources => {
       field,
       parts[field as keyof Parts],
     ]),
-  ) as LetterSources;
+  );
 };
 
 /** Sends a command and fails loudly, so a broken step names itself rather than the next one. */

@@ -50,3 +50,5 @@ export { FixedClock } from './application/letters-test-harness.js';
  * third-party authenticity check into a public register of who works where.
  */
 export { randomVerificationToken } from './infrastructure/verification-token.js';
+
+export { postgresLettersStores } from './infrastructure/letters-stores.js';

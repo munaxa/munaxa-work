@@ -1,4 +1,12 @@
-import { success, uuidV7, type Command, type CommandHandler, type Transaction } from '@work/kernel';
+import {
+  success,
+  uuidV7,
+  type Command,
+  type CommandHandler,
+  type HandlerFailure,
+  type Result,
+  type Transaction,
+} from '@work/kernel';
 
 import { generate, issueLetter, moveRequestTo } from '../domain/letter-generation.js';
 import type { IssuedLetterState, LetterRequestState } from '../domain/letter-generation.js';
@@ -59,7 +67,7 @@ export const issueLetterHandler = (
     dependencies.unitOfWork.execute(async (transaction) => {
       const found = await resolveRequest(dependencies, transaction, command.letterRequestId);
 
-      if (!found.ok) return found.failure as ReturnType<typeof notFound<LetterIssued>>;
+      if (!found.ok) return found.failure;
 
       const { request, version } = found;
       const permitted = await salaryPermitted(dependencies, version);
@@ -78,7 +86,7 @@ interface Resolved {
 
 interface Unresolved {
   readonly ok: false;
-  readonly failure: ReturnType<typeof notFound<LetterIssued>>;
+  readonly failure: Result<LetterIssued, HandlerFailure>;
 }
 
 /** The request and the template version it named — the version it named, never the current one. */
@@ -130,9 +138,7 @@ const issueFrom = async (
   request: LetterRequestState,
   version: LetterTemplateVersionState,
   command: IssueLetterCommand,
-): Promise<
-  ReturnType<typeof success<LetterIssued>> | ReturnType<typeof notFound<LetterIssued>>
-> => {
+): Promise<Result<LetterIssued, HandlerFailure>> => {
   const generating = moveRequestTo(request, 'generating');
 
   if (!generating.ok) return refusedBy<LetterIssued>(generating.error);

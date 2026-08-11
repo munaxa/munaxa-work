@@ -708,6 +708,9 @@ importers:
       '@work/kernel':
         specifier: workspace:*
         version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
     devDependencies:
       '@munaxa/config-eslint':
         specifier: ^1.0.0

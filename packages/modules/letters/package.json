@@ -2,7 +2,7 @@
   "name": "@work/letters",
   "version": "0.1.0",
   "private": true,
-  "description": "Employee letters — tenant-authored templates, immutable template versions, generation from published contracts, a frozen source snapshot and immutable issuance. Renders nothing: no PDF service exists.",
+  "description": "Employee letters \u2014 tenant-authored templates, immutable template versions, generation from published contracts, a frozen source snapshot and immutable issuance. Renders nothing: no PDF service exists.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
@@ -30,7 +30,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@work/kernel": "workspace:*"
+    "@work/kernel": "workspace:*",
+    "@work/persistence": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
