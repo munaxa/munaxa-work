@@ -3794,3 +3794,695 @@ model LetterNumberSequence {
   @@unique([tenant_id, series_key], map: "letter_number_sequence_series_idx")
   @@map("letter_number_sequence")
 }
+
+// ------------------------------------------------------------------------------------------------
+// Performance management (Phase 13). Goals, competencies, review cycles, assessments, calibration
+// and talent classification.
+//
+// No column here is a floating-point type. Weights are integer basis points, scores are integer
+// hundredths, key-result values are integers carrying their own exponent — the discipline ADR-0061
+// established for money, applied to a number that decides somebody's rating.
+//
+// The word `grade` does not appear: `position.grade` means a job's level and `compensation_pay_grade`
+// means a pay band, so a performance level is a `PerformanceRatingLevel` (D-7).
+// ------------------------------------------------------------------------------------------------
+
+/// The scale a tenant rates against, and the range a calculated score must fall in.
+///
+/// Scores are hundredths, so a 1–5 scale stores 100 and 500. A calculation landing outside the range
+/// fails explicitly rather than clamping: a silently clamped rating is a wrong rating that looks
+/// right. Effective-dated, so changing the scale does not change what last year was rated against.
+model PerformanceRatingScale {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  description    Json?
+  /// Hundredths. The lower bound of a valid calculated score.
+  minimum_score  Int
+  /// Hundredths. The upper bound of a valid calculated score.
+  maximum_score  Int
+  effective_from DateTime  @db.Date
+  effective_to   DateTime? @db.Date
+  active         Boolean
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@unique([tenant_id, code], map: "performance_rating_scale_code_idx")
+  @@map("performance_rating_scale")
+}
+
+/// One band on a scale — "Exceeds expectations" — and the hundredths range that earns it.
+model PerformanceRatingLevel {
+  id                          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                   String    @db.Uuid
+  performance_rating_scale_id String    @db.Uuid
+  code                        String    @db.VarChar(64)
+  name                        Json
+  description                 Json?
+  /// Lowest to highest. What a nine-box placement and a calibration comparison order by.
+  ordinal                     Int       @db.SmallInt
+  minimum_score               Int
+  maximum_score               Int
+  created_at                  DateTime  @db.Timestamptz(6)
+  created_by                  String    @db.VarChar(255)
+  updated_at                  DateTime  @db.Timestamptz(6)
+  updated_by                  String    @db.VarChar(255)
+  deleted_at                  DateTime? @db.Timestamptz(6)
+  deleted_by                  String?   @db.VarChar(255)
+  version                     Int
+
+  @@unique([tenant_id, performance_rating_scale_id, code], map: "performance_rating_level_code_idx")
+  @@unique([tenant_id, performance_rating_scale_id, ordinal], map: "performance_rating_level_ordinal_idx")
+  @@map("performance_rating_level")
+}
+
+/// A named, versioned set of competencies.
+///
+/// `weighted` is D-6's third decision: weights are used only where the framework explicitly carries
+/// them, and none are invented for a framework that does not.
+model PerformanceCompetencyFramework {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  code              String    @db.VarChar(64)
+  /// Part of the identity. Redefining a competency publishes a new version.
+  framework_version Int
+  name              Json
+  description       Json?
+  weighted          Boolean
+  effective_from    DateTime  @db.Date
+  effective_to      DateTime? @db.Date
+  active            Boolean
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@unique([tenant_id, code, framework_version], map: "performance_competency_framework_code_idx")
+  @@map("performance_competency_framework")
+}
+
+/// One competency within a framework: what a manager observed of the job.
+///
+/// Not what a person claims (`person_capability`, Phase 4) and not what they have attained
+/// (Learning, Phase 14). That boundary is the most consequential line in this phase (D-9).
+model PerformanceCompetency {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  framework_id        String    @db.Uuid
+  code                String    @db.VarChar(64)
+  name                Json
+  description         Json?
+  category            String    @db.VarChar(32)
+  /// Null unless the parent framework says it is weighted. No weight is invented.
+  weight_basis_points Int?
+  display_order       Int       @db.SmallInt
+  active              Boolean
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@unique([tenant_id, framework_id, code], map: "performance_competency_code_idx")
+  @@map("performance_competency")
+}
+
+/// A behavioural level on a competency, and the hundredths score demonstrating it earns.
+model PerformanceCompetencyLevel {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  competency_id          String    @db.Uuid
+  ordinal                Int       @db.SmallInt
+  name                   Json
+  behavioural_indicators Json
+  score                  Int
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@unique([tenant_id, competency_id, ordinal], map: "performance_competency_level_ordinal_idx")
+  @@map("performance_competency_level")
+}
+
+/// What a tenant calls a kind of goal. Configuration, and nothing more.
+model PerformanceGoalCategory {
+  id         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  code       String    @db.VarChar(64)
+  name       Json
+  active     Boolean
+  created_at DateTime  @db.Timestamptz(6)
+  created_by String    @db.VarChar(255)
+  updated_at DateTime  @db.Timestamptz(6)
+  updated_by String    @db.VarChar(255)
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.VarChar(255)
+  version    Int
+
+  @@unique([tenant_id, code], map: "performance_goal_category_code_idx")
+  @@map("performance_goal_category")
+}
+
+/// The shape of a review: which scale, which framework, what is required, and what the goals must
+/// weigh in total.
+///
+/// `minimum_peer_responses` withholds an aggregate computed from too few responses. It is a display
+/// rule, not an anonymity guarantee, and nothing here claims otherwise (D-12).
+model PerformanceReviewTemplate {
+  id                             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                      String    @db.Uuid
+  code                           String    @db.VarChar(64)
+  name                           Json
+  description                    Json?
+  rating_scale_id                String    @db.Uuid
+  competency_framework_id        String?   @db.Uuid
+  requires_self_assessment       Boolean
+  requires_peer_assessment       Boolean
+  requires_calibration           Boolean
+  /// D-5's "must total", made tenant-configurable rather than hard-coded at 10,000.
+  goal_weight_total_basis_points Int
+  minimum_peer_responses         Int?      @db.SmallInt
+  active                         Boolean
+  metadata                       Json
+  created_at                     DateTime  @db.Timestamptz(6)
+  created_by                     String    @db.VarChar(255)
+  updated_at                     DateTime  @db.Timestamptz(6)
+  updated_by                     String    @db.VarChar(255)
+  deleted_at                     DateTime? @db.Timestamptz(6)
+  deleted_by                     String?   @db.VarChar(255)
+  version                        Int
+
+  @@unique([tenant_id, code], map: "performance_review_template_code_idx")
+  @@map("performance_review_template")
+}
+
+/// What the final score is made of, and how much each part counts.
+///
+/// Integer basis points, and the set must total 10,000 (D-6). That total is a cross-row invariant no
+/// check constraint can express, so the domain enforces it when a template is defined, the scoring
+/// engine refuses to score without it, and the reconciliation query reports any set that drifted.
+model PerformanceReviewTemplateComponent {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  template_id         String    @db.Uuid
+  component           String    @db.VarChar(24)
+  weight_basis_points Int
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@unique([tenant_id, template_id, component], map: "performance_review_template_component_idx")
+  @@map("performance_review_template_component")
+}
+
+/// One goal, at whichever level of the organization set it.
+///
+/// A goal outlives the cycle that assessed it, which is why `cycle_id` is nullable and a goal is not
+/// a child of a review. `title` and `description` are free text rather than bilingual `Json`: a goal
+/// is written once by one person in the language they were speaking (§17).
+model PerformanceGoal {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  goal_category_id      String?   @db.Uuid
+  /// D-4's explicit parent reference — Organization's shape, at a shallower depth.
+  parent_goal_id        String?   @db.Uuid
+  cycle_id              String?   @db.Uuid
+  scope                 String    @db.VarChar(16)
+  /// Employment's row. No foreign key: a cross-module key does not enforce tenant isolation.
+  employment_id         String?   @db.Uuid
+  organization_unit_id  String?   @db.Uuid
+  title                 String    @db.VarChar(255)
+  description           String?
+  measurement           String    @db.VarChar(24)
+  target_description    String?
+  weight_basis_points   Int
+  status                String    @db.VarChar(16)
+  start_date            DateTime  @db.Date
+  due_date              DateTime  @db.Date
+  progress_basis_points Int
+  approved_at           DateTime? @db.Timestamptz(6)
+  /// A named human. `system:auto-approval` is refused by a check constraint (D-15).
+  approved_by           String?   @db.VarChar(255)
+  closed_at             DateTime? @db.Timestamptz(6)
+  closed_by             String?   @db.VarChar(255)
+  /// Hundredths, at closure. Null while open, and null forever on a cancelled goal (D-6).
+  final_score           Int?
+  closure_reason        String?   @db.VarChar(1024)
+  /// Documents' row identifier and nothing else. No bytes, no metadata copy (D-24).
+  evidence_document_id  String?   @db.Uuid
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, employment_id, due_date(sort: Desc)], map: "performance_goal_employment_idx")
+  @@index([tenant_id, cycle_id, status], map: "performance_goal_cycle_idx")
+  @@index([tenant_id, parent_goal_id], map: "performance_goal_parent_idx")
+  @@map("performance_goal")
+}
+
+/// An objective beneath a goal, in the OKR shape the specification names.
+model PerformanceObjective {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  goal_id       String    @db.Uuid
+  title         String    @db.VarChar(255)
+  description   String?
+  display_order Int       @db.SmallInt
+  status        String    @db.VarChar(16)
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@index([tenant_id, goal_id, display_order], map: "performance_objective_goal_idx")
+  @@map("performance_objective")
+}
+
+/// A measurable result under an objective.
+///
+/// Integers with a shared exponent, exactly as money is: 105 with an exponent of -1 is 10.5. A key
+/// result measured in a floating-point column would drift, and this is a number somebody is held to.
+model PerformanceKeyResult {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  objective_id   String    @db.Uuid
+  title          String    @db.VarChar(255)
+  unit           String?   @db.VarChar(32)
+  start_value    BigInt
+  target_value   BigInt
+  current_value  BigInt
+  value_exponent Int       @db.SmallInt
+  display_order  Int       @db.SmallInt
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, objective_id, display_order], map: "performance_key_result_objective_idx")
+  @@map("performance_key_result")
+}
+
+/// A progress entry. Insert-only: what somebody reported in March is not rewritten in September, and
+/// a trigger refuses the attempt from any path.
+model PerformanceGoalProgress {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  goal_id               String    @db.Uuid
+  key_result_id         String?   @db.Uuid
+  progress_basis_points Int
+  observed_value        BigInt?
+  note                  String?
+  evidence_document_id  String?   @db.Uuid
+  recorded_at           DateTime  @db.Timestamptz(6)
+  recorded_by           String    @db.VarChar(255)
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, goal_id, recorded_at(sort: Desc)], map: "performance_goal_progress_goal_idx")
+  @@map("performance_goal_progress")
+}
+
+/// A scheduled evaluation period. Payroll's period/run pair is the precedent.
+///
+/// The due dates are configuration and **nothing fires them**: `JobPort` has no adapter, so overdue
+/// work is a query somebody runs rather than a sweep that happens (D-22).
+model PerformanceCycle {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  code                   String    @db.VarChar(64)
+  name                   Json
+  review_template_id     String    @db.Uuid
+  kind                   String    @db.VarChar(24)
+  status                 String    @db.VarChar(16)
+  period_start           DateTime  @db.Date
+  period_end             DateTime  @db.Date
+  self_assessment_due    DateTime? @db.Date
+  manager_assessment_due DateTime? @db.Date
+  peer_assessment_due    DateTime? @db.Date
+  calibration_due        DateTime? @db.Date
+  opened_at              DateTime? @db.Timestamptz(6)
+  closed_at              DateTime? @db.Timestamptz(6)
+  closed_by              String?   @db.VarChar(255)
+  cancelled_at           DateTime? @db.Timestamptz(6)
+  cancellation_reason    String?   @db.VarChar(1024)
+  metadata               Json
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@unique([tenant_id, code], map: "performance_cycle_code_idx")
+  @@index([tenant_id, status, period_end(sort: Desc)], map: "performance_cycle_status_idx")
+  @@map("performance_cycle")
+}
+
+/// One employment's review within a cycle. Enrolment and review are the same row.
+///
+/// `calculated_score` is what the scoring engine produced and is **never overwritten**. `final_score`
+/// is what the review is rated at — the calculated score unless a calibration decision overrode it,
+/// and that decision holds both values (D-6).
+model PerformanceReview {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  cycle_id                   String    @db.Uuid
+  employment_id              String    @db.Uuid
+  /// The manager at enrolment. The manager at completion is snapshotted separately (D-13).
+  manager_employment_id      String?   @db.Uuid
+  rating_scale_id            String    @db.Uuid
+  status                     String    @db.VarChar(24)
+  calculated_score           Int?
+  calculated_rating_level_id String?   @db.Uuid
+  final_score                Int?
+  final_rating_level_id      String?   @db.Uuid
+  calibrated                 Boolean
+  scored_at                  DateTime? @db.Timestamptz(6)
+  completed_at               DateTime? @db.Timestamptz(6)
+  /// A named human. `system:auto-approval` is refused by a check constraint.
+  completed_by               String?   @db.VarChar(255)
+  archived_at                DateTime? @db.Timestamptz(6)
+  metadata                   Json
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@unique([tenant_id, cycle_id, employment_id], map: "performance_review_participant_idx")
+  @@index([tenant_id, manager_employment_id, cycle_id, status], map: "performance_review_manager_idx")
+  @@index([tenant_id, employment_id, completed_at(sort: Desc)], map: "performance_review_employment_idx")
+  @@map("performance_review")
+}
+
+/// Who was asked to assess this review, and in what capacity.
+///
+/// 360° is a set of reviewer roles here rather than a parallel system (D-2): a peer, a direct report
+/// and a skip-level manager are three roles on one review, not three feature areas.
+model PerformanceReviewerAssignment {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  review_id              String    @db.Uuid
+  reviewer_employment_id String    @db.Uuid
+  role                   String    @db.VarChar(24)
+  status                 String    @db.VarChar(16)
+  requested_at           DateTime  @db.Timestamptz(6)
+  requested_by           String    @db.VarChar(255)
+  responded_at           DateTime? @db.Timestamptz(6)
+  decline_reason         String?   @db.VarChar(1024)
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@unique([tenant_id, review_id, reviewer_employment_id, role], map: "performance_reviewer_assignment_idx")
+  @@index([tenant_id, reviewer_employment_id, status], map: "performance_reviewer_assignment_reviewer_idx")
+  @@map("performance_reviewer_assignment")
+}
+
+/// One assessor's assessment of one review. Separate rows per assessor and kind, never states of one
+/// record (D-10): a manager cannot overwrite a self-assessment because there is no column to do it
+/// in. Immutable from submission, in the domain, the application and a trigger.
+model PerformanceAssessment {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  review_id              String    @db.Uuid
+  reviewer_assignment_id String?   @db.Uuid
+  /// From the authenticated context at submission, never from a request body.
+  assessor_employment_id String    @db.Uuid
+  assessment_kind        String    @db.VarChar(24)
+  status                 String    @db.VarChar(16)
+  goal_score             Int?
+  competency_score       Int?
+  overall_score          Int?
+  rating_level_id        String?   @db.Uuid
+  overall_comment        String?
+  strengths              String?
+  development_areas      String?
+  submitted_at           DateTime? @db.Timestamptz(6)
+  submitted_by           String?   @db.VarChar(255)
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@unique([tenant_id, review_id, assessor_employment_id, assessment_kind], map: "performance_assessment_assessor_idx")
+  @@index([tenant_id, review_id, assessment_kind], map: "performance_assessment_review_idx")
+  @@map("performance_assessment")
+}
+
+/// One line of an assessment: a goal scored, or a competency rated.
+///
+/// `excluded` and `exclusion_reason` are D-6's fifth decision made into columns. Missing, incomplete
+/// and cancelled work is excluded from the denominator and recorded as excluded, because silently
+/// converting it to a zero would rate somebody down for work nobody assessed.
+model PerformanceAssessmentItem {
+  id                  String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  assessment_id       String    @db.Uuid
+  item_kind           String    @db.VarChar(16)
+  goal_id             String?   @db.Uuid
+  competency_id       String?   @db.Uuid
+  score               Int?
+  rating_level_id     String?   @db.Uuid
+  weight_basis_points Int?
+  comment             String?
+  excluded            Boolean
+  exclusion_reason    String?   @db.VarChar(32)
+  created_at          DateTime  @db.Timestamptz(6)
+  created_by          String    @db.VarChar(255)
+  updated_at          DateTime  @db.Timestamptz(6)
+  updated_by          String    @db.VarChar(255)
+  deleted_at          DateTime? @db.Timestamptz(6)
+  deleted_by          String?   @db.VarChar(255)
+  version             Int
+
+  @@index([tenant_id, assessment_id, goal_id], map: "performance_assessment_item_goal_idx")
+  @@index([tenant_id, assessment_id, competency_id], map: "performance_assessment_item_competency_idx")
+  @@map("performance_assessment_item")
+}
+
+/// What each component of the final score contributed, and the arithmetic that produced it.
+///
+/// A rating somebody disagrees with is a conversation, and a conversation needs the working: the
+/// component weight, its aggregate, the denominator it was divided by, and — where a component did
+/// not participate — the reason it was left out.
+model PerformanceReviewComponentScore {
+  id                       String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  review_id                String    @db.Uuid
+  component                String    @db.VarChar(24)
+  weight_basis_points      Int
+  score                    Int?
+  included                 Boolean
+  exclusion_reason         String?   @db.VarChar(32)
+  /// The sum of the weights that actually participated, in basis points.
+  denominator_basis_points Int
+  contributed_score        Int?
+  calculated_at            DateTime  @db.Timestamptz(6)
+  created_at               DateTime  @db.Timestamptz(6)
+  created_by               String    @db.VarChar(255)
+  updated_at               DateTime  @db.Timestamptz(6)
+  updated_by               String    @db.VarChar(255)
+  deleted_at               DateTime? @db.Timestamptz(6)
+  deleted_by               String?   @db.VarChar(255)
+  version                  Int
+
+  @@unique([tenant_id, review_id, component], map: "performance_review_component_score_idx")
+  @@map("performance_review_component_score")
+}
+
+/// A meeting at which a group of reviews is compared before any of them is completed.
+model PerformanceCalibrationSession {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  cycle_id             String    @db.Uuid
+  code                 String    @db.VarChar(64)
+  name                 Json
+  status               String    @db.VarChar(16)
+  organization_unit_id String?   @db.Uuid
+  scheduled_for        DateTime? @db.Timestamptz(6)
+  facilitator          String?   @db.VarChar(255)
+  opened_at            DateTime? @db.Timestamptz(6)
+  concluded_at         DateTime? @db.Timestamptz(6)
+  concluded_by         String?   @db.VarChar(255)
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@unique([tenant_id, cycle_id, code], map: "performance_calibration_session_code_idx")
+  @@map("performance_calibration_session")
+}
+
+/// What a calibration session decided about one review.
+///
+/// The original score and rating are kept alongside the calibrated ones, with the actor, the moment
+/// and the reason. The calibrated value becomes effective; this row is the immutable record of what
+/// it was before (D-6's seventh decision). A reason is not optional.
+model PerformanceCalibrationDecision {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  calibration_session_id     String    @db.Uuid
+  review_id                  String    @db.Uuid
+  original_score             Int?
+  original_rating_level_id   String?   @db.Uuid
+  calibrated_score           Int
+  calibrated_rating_level_id String    @db.Uuid
+  reason                     String    @db.VarChar(1024)
+  decided_at                 DateTime  @db.Timestamptz(6)
+  decided_by                 String    @db.VarChar(255)
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@unique([tenant_id, calibration_session_id, review_id], map: "performance_calibration_decision_idx")
+  @@index([tenant_id, review_id, decided_at(sort: Desc)], map: "performance_calibration_decision_review_idx")
+  @@map("performance_calibration_decision")
+}
+
+/// The nine-box placement: performance against potential, for one employment in one cycle.
+///
+/// Published as a **recommendation**. It changes no employment, triggers no promotion and writes to
+/// no other module; Career & Succession (Phase 15) may pull it (D-17).
+model PerformanceTalentPlacement {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  cycle_id         String    @db.Uuid
+  review_id        String    @db.Uuid
+  employment_id    String    @db.Uuid
+  /// Derived from the review's rating.
+  performance_band Int       @db.SmallInt
+  /// A human judgement, which is why it carries an assessor and a rationale.
+  potential_band   Int       @db.SmallInt
+  box_code         String    @db.VarChar(16)
+  rationale        String?
+  placed_at        DateTime  @db.Timestamptz(6)
+  placed_by        String    @db.VarChar(255)
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@unique([tenant_id, cycle_id, employment_id], map: "performance_talent_placement_idx")
+  @@index([tenant_id, cycle_id, box_code], map: "performance_talent_placement_box_idx")
+  @@map("performance_talent_placement")
+}
+
+/// Feedback given outside a review.
+///
+/// `performance_feedback`, never a bare `feedback`: Recruitment already owns interview feedback with
+/// its own states and meaning (D-20). Insert-only — withdrawal is a soft delete, which leaves every
+/// word of it in place. There is no `anonymous` visibility, because this table cannot provide one.
+model PerformanceFeedback {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  subject_employment_id String    @db.Uuid
+  author_employment_id  String    @db.Uuid
+  kind                  String    @db.VarChar(24)
+  visibility            String    @db.VarChar(16)
+  body                  String
+  related_goal_id       String?   @db.Uuid
+  related_review_id     String?   @db.Uuid
+  requested_by          String?   @db.VarChar(255)
+  given_at              DateTime  @db.Timestamptz(6)
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, subject_employment_id, given_at(sort: Desc)], map: "performance_feedback_subject_idx")
+  @@index([tenant_id, author_employment_id, given_at(sort: Desc)], map: "performance_feedback_author_idx")
+  @@map("performance_feedback")
+}
+
+/// What a completed review must survive: a manager change, a department move, a competency
+/// redefinition, a rating-scale change, a goal redefinition and a position change.
+///
+/// Written once at completion and immutable afterwards. It holds **no person's name and no pay
+/// figure** — a snapshot is the inputs to a decision, not a copy of the database (ADR-0064).
+model PerformanceReviewSnapshot {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  review_id             String    @db.Uuid
+  /// The manager at completion, which a transfer afterwards does not change (D-13).
+  manager_employment_id String?   @db.Uuid
+  reviewers             Json
+  placement             Json
+  rating_scale          Json
+  competency_framework  Json?
+  goals                 Json
+  component_scores      Json
+  calculation           Json
+  taken_at              DateTime  @db.Timestamptz(6)
+  taken_by              String    @db.VarChar(255)
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@unique([tenant_id, review_id], map: "performance_review_snapshot_review_idx")
+  @@map("performance_review_snapshot")
+}
