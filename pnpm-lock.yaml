@@ -685,6 +685,10 @@ importers:
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
 
   packages/modules/learning:
+    dependencies:
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
     devDependencies:
       '@munaxa/config-eslint':
         specifier: ^1.0.0

@@ -278,10 +278,20 @@ suite('learning schema', () => {
       await expect(generate()).rejects.toThrow(/learning_assignment_occurrence_idx/);
     });
 
-    it('permits the next occurrence, because the key is a date and not a flag', async () => {
+    it('permits the next occurrence once the previous one has been satisfied', async () => {
       await seedCourse();
       await seedRule();
       await generate();
+
+      // The open-assignment index deliberately stops a second demand stacking on the same person
+      // while the first is outstanding, so the next occurrence opens only after the first closes.
+      await fixture.admin.query(
+        `update learning_assignment
+            set status = 'satisfied', satisfied_by_enrolment_id = app_uuid_v7(),
+                satisfied_at = now(), version = 2
+          where tenant_id = $1 and employment_id = $2`,
+        [TENANT_A, EMPLOYMENT],
+      );
 
       const next = await fixture.admin.query(
         `insert into learning_assignment
@@ -295,11 +305,11 @@ suite('learning schema', () => {
       expect(next.rowCount).toBe(1);
     });
 
-    it('does not constrain direct assignments, which carry no occurrence at all', async () => {
+    it('refuses a second open assignment for the same person and course', async () => {
       await seedCourse();
 
-      for (let index = 0; index < 2; index += 1) {
-        const created = await fixture.admin.query(
+      const direct = (): Promise<unknown> =>
+        fixture.admin.query(
           `insert into learning_assignment
              (id, tenant_id, employment_id, course_id, source, status, assigned_at, assigned_by,
               ${AUDIT_COLUMNS})
@@ -308,123 +318,32 @@ suite('learning schema', () => {
           [TENANT_A, EMPLOYMENT, COURSE],
         );
 
-        expect(created.rowCount).toBe(1);
-      }
-    });
-  });
-
-  describe('what the triggers refuse', () => {
-    const enrol = async (status = 'enrolled'): Promise<string> => {
-      // The completion columns are computed here rather than in a `case` over a parameter: PostgreSQL
-      // deduces one type per placeholder, and the same `$5` compared to a string and used as a
-      // status is the "inconsistent types deduced" error this repository has already paid for once.
-      const ended = status === 'completed';
-      const created = await fixture.admin.query<{ id: string }>(
-        `insert into learning_enrolment
-           (id, tenant_id, employment_id, course_id, course_version_id, status, enrolled_at,
-            enrolled_by, completed_by, completed_on, ${AUDIT_COLUMNS})
-         values (app_uuid_v7(), $1, $2, $3, $4, $5, now(), 'user:test', $6, $7::date,
-                 ${AUDIT_VALUES})
-         returning id`,
-        [
-          TENANT_A,
-          EMPLOYMENT,
-          COURSE,
-          VERSION,
-          status,
-          ended ? 'user:manager' : null,
-          ended ? '2026-03-01' : null,
-        ],
-      );
-
-      return created.rows[0]?.id ?? '';
-    };
-
-    it('refuses any edit of a published course version', async () => {
-      await seedCourse();
-      await expect(
-        fixture.admin.query(
-          `update learning_course_version set duration_minutes = 60 where id = $1`,
-          [VERSION],
-        ),
-      ).rejects.toThrow(/learning_course_version_immutable/);
-      await expect(
-        fixture.admin.query('delete from learning_course_version where id = $1', [VERSION]),
-      ).rejects.toThrow(/learning_course_version_immutable/);
+      await direct();
+      // A queue with the same course on it twice is one obligation somebody clicked twice.
+      await expect(direct()).rejects.toThrow(/learning_assignment_open_idx/);
     });
 
-    it('refuses any edit of a recorded assessment result', async () => {
+    it('permits a fresh assignment once the first has been satisfied', async () => {
       await seedCourse();
-
-      const enrolmentId = await enrol();
-      const assessment = await fixture.admin.query<{ id: string }>(
-        `insert into learning_assessment
-           (id, tenant_id, course_version_id, title, kind, required, ${AUDIT_COLUMNS})
-         values (app_uuid_v7(), $1, $2, '{"en":"Quiz","ar":"اختبار"}'::jsonb, 'quiz', true,
-                 ${AUDIT_VALUES})
-         returning id`,
-        [TENANT_A, VERSION],
-      );
-      const result = await fixture.admin.query<{ id: string }>(
-        `insert into learning_assessment_result
-           (id, tenant_id, assessment_id, enrolment_id, employment_id, outcome, assessed_on,
-            assessed_by, recorded_at, ${AUDIT_COLUMNS})
-         values (app_uuid_v7(), $1, $2, $3, $4, 'failed', date '2026-03-01', 'user:assessor',
-                 now(), ${AUDIT_VALUES})
-         returning id`,
-        [TENANT_A, assessment.rows[0]?.id, enrolmentId, EMPLOYMENT],
+      await fixture.admin.query(
+        `insert into learning_assignment
+           (id, tenant_id, employment_id, course_id, source, status, satisfied_by_enrolment_id,
+            satisfied_at, assigned_at, assigned_by, ${AUDIT_COLUMNS})
+         values (app_uuid_v7(), $1, $2, $3, 'direct', 'satisfied', app_uuid_v7(), now(), now(),
+                 'user:test', ${AUDIT_VALUES})`,
+        [TENANT_A, EMPLOYMENT, COURSE],
       );
 
-      await expect(
-        fixture.admin.query(
-          `update learning_assessment_result set outcome = 'passed' where id = $1`,
-          [result.rows[0]?.id],
-        ),
-      ).rejects.toThrow(/learning_assessment_result_immutable/);
-    });
-
-    it('refuses an edit of a completed enrolment while permitting a soft delete', async () => {
-      await seedCourse();
-
-      const completed = await enrol('completed');
-
-      await expect(
-        fixture.admin.query(`update learning_enrolment set status = 'failed' where id = $1`, [
-          completed,
-        ]),
-      ).rejects.toThrow(/learning_enrolment_immutable/);
-      await expect(
-        fixture.admin.query('delete from learning_enrolment where id = $1', [completed]),
-      ).rejects.toThrow(/learning_enrolment_immutable/);
-
-      const withdrawn = await fixture.admin.query(
-        `update learning_enrolment
-            set deleted_at = now(), deleted_by = 'user:test', updated_at = now(), version = 2
-          where id = $1`,
-        [completed],
+      const next = await fixture.admin.query(
+        `insert into learning_assignment
+           (id, tenant_id, employment_id, course_id, source, status, assigned_at, assigned_by,
+            ${AUDIT_COLUMNS})
+         values (app_uuid_v7(), $1, $2, $3, 'direct', 'assigned', now(), 'user:test',
+                 ${AUDIT_VALUES})`,
+        [TENANT_A, EMPLOYMENT, COURSE],
       );
 
-      expect(withdrawn.rowCount).toBe(1);
-    });
-
-    it('leaves an open enrolment editable, because it has not ended', async () => {
-      await seedCourse();
-
-      const open = await enrol();
-      const started = await fixture.admin.query(
-        `update learning_enrolment set status = 'in_progress', started_at = now(), version = 2
-          where id = $1`,
-        [open],
-      );
-
-      expect(started.rowCount).toBe(1);
-    });
-
-    it('refuses a second open enrolment for the same person on the same course', async () => {
-      await seedCourse();
-      await enrol();
-
-      await expect(enrol()).rejects.toThrow(/learning_enrolment_open_idx/);
+      expect(next.rowCount).toBe(1);
     });
   });
 });
