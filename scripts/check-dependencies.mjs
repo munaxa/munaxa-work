@@ -34,6 +34,15 @@ const ENTRY_POINTS = [
   /\/main\.ts$/,
   /\.config\.(ts|mjs)$/,
   /\/app\/.*\.tsx$/, // Next.js routes, discovered by the framework
+  /*
+   * The App Router conventions that are not `.tsx`.
+   *
+   * Next discovers these by filename exactly as it discovers `page.tsx`, so nothing imports them
+   * and nothing should: `manifest.ts` *is* `/manifest.webmanifest`. Named one by one rather than
+   * widening the rule to every `.ts` under `app/`, because a helper module that genuinely nothing
+   * imports is still something this check should catch.
+   */
+  /\/app\/(.*\/)?(route|manifest|sitemap|robots|opengraph-image|twitter-image|icon|apple-icon)\.ts$/,
   /next-env\.d\.ts$/,
 ];
 
@@ -139,7 +148,8 @@ for (const owner of packages) {
   const manifest = JSON.parse(readFileSync(join(owner, 'package.json'), 'utf8'));
   const declared = Object.keys(manifest.dependencies ?? {});
   const used = workspaceImports.get(owner) ?? new Set();
-  const isUsed = (name) => [...used].some((specifier) => specifier === name || specifier.startsWith(`${name}/`));
+  const isUsed = (name) =>
+    [...used].some((specifier) => specifier === name || specifier.startsWith(`${name}/`));
 
   for (const dependency of declared) {
     // Loaded by a framework rather than imported by us: a peer the runtime resolves itself,
