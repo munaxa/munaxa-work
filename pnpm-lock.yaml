@@ -76,6 +76,9 @@ importers:
       '@work/people':
         specifier: workspace:*
         version: link:../../packages/modules/people
+      '@work/performance':
+        specifier: workspace:*
+        version: link:../../packages/modules/performance
       '@work/recruitment':
         specifier: workspace:*
         version: link:../../packages/modules/recruitment
@@ -661,6 +664,43 @@ importers:
       class-validator:
         specifier: ^0.14.1
         version: 0.14.4
+    devDependencies:
+      '@munaxa/config-eslint':
+        specifier: ^1.0.0
+        version: 1.0.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@munaxa/config-typescript':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+      '@work/testing':
+        specifier: workspace:*
+        version: link:../../testing
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
+
+  packages/modules/learning:
+    dependencies:
+      '@work/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      '@work/persistence':
+        specifier: workspace:*
+        version: link:../../persistence
     devDependencies:
       '@munaxa/config-eslint':
         specifier: ^1.0.0

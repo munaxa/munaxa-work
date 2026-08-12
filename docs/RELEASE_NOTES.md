@@ -5,6 +5,78 @@ and what is still missing.
 
 ---
 
+## Phase 13 — Performance, competencies and goals
+
+One module. It says what somebody was rated, what that rating was measured against, and why — for as
+long as the record has to answer for itself.
+
+**A rating that still means the same thing in three years.** Completing a review freezes the scale it
+was measured on, the levels, the template, the component weights, the working behind every number and
+where the work happened. Retire the scale next year, re-tune the weights, move the person to a
+different manager in a different unit: the review reads exactly as it did on the day. That is not a
+display convenience — a performance rating is used in pay, promotion and dismissal decisions, and one
+that changes retroactively is one nobody can defend.
+
+**Nothing is a decimal.** A rating of 3.70 is stored, computed and transmitted as the integer 370;
+40% is 4000 basis points. The engine works in arbitrary-precision integers and rounds once,
+explicitly. A goal's observed measurement — a count of transactions, of parts — travels as a decimal
+string from the database to the browser, because a count above nine quadrillion is not a number
+JavaScript can hold, and a measurement that quietly lost its last digit is a measurement nobody can
+falsify.
+
+**Work nobody assessed is not work rated zero.** A competency section never filled in leaves the
+calculation with its reason recorded — missing, incomplete, cancelled or not applicable — rather than
+dragging somebody to the bottom of the scale for something nobody looked at. The working is kept, so
+a rating can be explained rather than merely reproduced.
+
+**Calibration adds a number; it never replaces one.** A moderated rating carries both the engine's
+figure and the panel's, with a mandatory reason and a named human, and the database refuses an update
+that would change the original. Running the calibration meeting and signing the reviews off are
+separate permissions, so whoever chaired the meeting cannot finalize its outcomes unreviewed.
+
+**Self and peer assessments are recorded, readable, and count for nothing.** No weighting for either
+was ever approved, so none was invented — and no screen or API field implies otherwise.
+
+**Confidential, and we do not say anonymous.** Every 360° response is an attributed row: the table
+records who wrote it and the request is correlated. Below the configured minimum the panel's average
+is withheld — that withholds a number, it does not make anybody anonymous. Telling an employee their
+feedback was anonymous when it is not is a claim this architecture cannot make, and the product says
+so in English and Arabic.
+
+### For somebody operating it
+
+Twenty-three tables, forty-nine endpoints and one Admin workspace in both languages. Measured at 500,
+10,000 and 100,000 employees per tenant against a second tenant of the same size, as an unprivileged
+database role with row-level security on: every read is within budget, the manager's queue answers in
+13 ms at the largest size, and a full reconciliation of a hundred-thousand-person cycle takes seven
+seconds.
+
+Two of those measurements missed their budget first and were fixed rather than re-budgeted:
+reconciliation was comparing every review against every goal (10.3 s → 0.5 s), and the cycle's goal
+list was sorting three hundred thousand rows to return fifty (670 ms → 37 ms, one index added after
+the measurement rather than before it).
+
+### Still missing
+
+Stated here as well as in the report, because a release note that omits them is worse than none:
+
+- **A manager cannot open their own queue.** Nothing in this product can yet establish which
+  employment a signed-in person *is*, so a caller claiming to be a manager cannot be checked. Rather
+  than trust the claim, the product returns nothing and says why.
+- Nobody is notified of anything. The intent to notify is recorded; no transport exists.
+- Nothing happens on a schedule. A cycle opens and closes because somebody opened or closed it.
+- A goal can cite an evidence document, but no file can be uploaded, downloaded or linked — no
+  storage exists anywhere in the product.
+- Objectives and key results have tables and nothing else. No screen mentions them.
+- No one-to-ones, no improvement plans, no career paths, no succession.
+
+### Tests
+
+1,842 across the repository, none skipped, including twenty-three tables proven isolated in both
+directions against real PostgreSQL as a role holding no `BYPASSRLS`.
+
+---
+
 ## Phase 12 — Employee documents and letters
 
 Two modules. Documents says what evidence exists about somebody and who has looked at it. Letters

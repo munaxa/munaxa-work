@@ -30,6 +30,7 @@
     "@work/organization": "workspace:*",
     "@work/payroll": "workspace:*",
     "@work/people": "workspace:*",
+    "@work/performance": "workspace:*",
     "@work/recruitment": "workspace:*",
     "next": "^15.1.0",
     "react": "^19.0.0",

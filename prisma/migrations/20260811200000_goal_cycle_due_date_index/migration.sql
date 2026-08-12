@@ -1,0 +1,30 @@
+-- The goal list for a cycle, ordered the way the query asks for it.
+--
+-- `performance_goal_cycle_idx (tenant_id, cycle_id, status)` answers "which goals are in this
+-- cycle" but carries no `due_date`, so `order by due_date desc limit 50` could not be satisfied
+-- from it. The Phase 13 benchmark measured the consequence at 100,000 employments — 300,000 goals
+-- in one cycle:
+--
+--   Limit (actual time=304.202..304.212 rows=50)
+--     Sort (Sort Key: due_date DESC, top-N heapsort)
+--       Bitmap Heap Scan on performance_goal (rows=300000)   <- every matching row, then sorted
+--
+--   goals by cycle   670.2 ms   MISSED (budget 100ms)
+--
+-- Three hundred thousand rows read and sorted to return fifty. The count in the same call is an
+-- index-only scan at 55ms, so the sort was the whole of the cost.
+--
+-- This index carries **both** ordering columns. The query orders by `due_date desc, id desc` — the
+-- identifier is the tiebreak that makes paging deterministic — and an index covering only the first
+-- of them does not avoid the sort. That was measured too, and it is the reason this definition is
+-- four columns rather than three:
+--
+--   (tenant_id, cycle_id, due_date desc)          still sorted 300,000 rows   691.4 ms
+--   (tenant_id, cycle_id, due_date desc, id desc) ordered index scan            0.17 ms
+--
+-- Added **after** the measurement rather than in anticipation of one (Phase 12 D-21). The sibling
+-- `performance_goal_employment_idx` needs no tiebreak column because it matches a handful of rows
+-- per employment; the cycle-scoped read matches every goal in the cycle, and there the ordering is
+-- the whole cost.
+create index performance_goal_cycle_due_idx
+  on performance_goal (tenant_id, cycle_id, due_date desc, id desc) where deleted_at is null;
