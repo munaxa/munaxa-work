@@ -1,5 +1,6 @@
 import {
   ENROLMENT_TRANSITIONS,
+  isCivilDate,
   isEnrolmentClosed,
   type EnrolmentStatus,
 } from './learning-vocabulary.js';
@@ -41,6 +42,14 @@ export interface EnrolmentState {
   readonly enrolledBy: string;
   readonly startedAt?: Date;
   readonly completedAt?: Date;
+  /**
+   * The civil date the course was completed on.
+   *
+   * Separate from `completedAt` because they answer different questions: the instant is when the
+   * record was written, and the date is the day the person finished — which is what the recurrence
+   * arithmetic reads, and a due date computed from an instant would move with the reader's timezone.
+   */
+  readonly completedOn?: string;
   readonly completedBy?: string;
   readonly outcomeNote?: string;
   readonly version: number;
@@ -85,6 +94,8 @@ const AUTO_APPROVAL = 'system:auto-approval';
 
 export interface CompleteRequest {
   readonly at: Date;
+  /** The civil date they finished. Defaults to nothing: the caller states it, never the clock. */
+  readonly on: string;
   readonly by: string;
   /** Whether the course version this enrolment pins requires a passed assessment. */
   readonly requiresAssessment: boolean;
@@ -114,6 +125,7 @@ export const completeEnrolment = (
   if (!permits(state.status, 'completed')) {
     return refuse('enrolment-transition-refused', { from: state.status, to: 'completed' });
   }
+  if (!isCivilDate(request.on)) return refuse('completion-date-invalid');
   if (request.by === AUTO_APPROVAL) return refuse('completion-not-human');
   if (request.requiresAssessment && !request.hasPassedAssessment) {
     return refuse('completion-requires-assessment');
@@ -123,6 +135,7 @@ export const completeEnrolment = (
     ...state,
     status: 'completed',
     completedAt: request.at,
+    completedOn: request.on,
     completedBy: request.by,
     ...definedOf({ outcomeNote: request.outcomeNote }),
   });

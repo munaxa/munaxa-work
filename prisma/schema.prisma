@@ -4490,3 +4490,351 @@ model PerformanceReviewSnapshot {
   @@unique([tenant_id, review_id], map: "performance_review_snapshot_review_idx")
   @@map("performance_review_snapshot")
 }
+
+// ================================================================================================
+// Learning and development (Phase 14A). Twelve tables: the catalogue and its versions, paths,
+// mandatory rules, assignments, enrolments, assessments and certifications.
+//
+// Two absences are deliberate and worth stating in the schema rather than leaving to be noticed.
+// There is no `expired` and no `overdue` column — both are functions of a date and today, derived
+// on read, because nothing in this repository moves a flag overnight (ADR-0070, ADR-0071). And
+// there is no session, capacity, waitlist or seat: those are Phase 14B, and a column left ready for
+// them would be schema claiming a capability nobody built.
+// ================================================================================================
+
+/// A tenant's own filing for its courses. No rule in this product reads it (AD-003).
+model LearningCourseCategory {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  code        String    @db.VarChar(64)
+  name        Json
+  description Json?
+  metadata    Json
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@map("learning_course_category")
+}
+
+/// A course's stable identity. What it teaches lives in its versions, so an enrolment pinned to one
+/// still names what was completed after somebody rewrites the syllabus.
+model LearningCourse {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  code               String    @db.VarChar(64)
+  name               Json
+  description        Json?
+  category_id        String?   @db.Uuid
+  /// A label for the mode a course was designed for. It schedules nothing in Phase 14A.
+  delivery           String    @db.VarChar(24)
+  status             String    @db.VarChar(16)
+  current_version_id String?   @db.Uuid
+  archived_at        DateTime? @db.Timestamptz(6)
+  archived_by        String?   @db.VarChar(255)
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, status, code], map: "learning_course_status_idx")
+  @@map("learning_course")
+}
+
+/// One version of a course. Insert-only, enforced by a trigger: correcting a course publishes
+/// version 4 rather than rewriting version 3 (AD-004).
+model LearningCourseVersion {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  course_id                  String    @db.Uuid
+  version_number             Int
+  title                      Json
+  objectives                 Json?
+  /// An opaque key. StoragePort has no adapter: no upload, no download, no URL.
+  content_reference          String?   @db.VarChar(1024)
+  duration_minutes           Int?
+  /// The tenant's configuration. It does not say what passing means — nothing here does.
+  requires_assessment        Boolean
+  certification_valid_months Int?
+  published_at               DateTime  @db.Timestamptz(6)
+  published_by               String    @db.VarChar(255)
+  metadata                   Json
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@unique([tenant_id, course_id, version_number], map: "learning_course_version_number_idx")
+  @@index([tenant_id, course_id, version_number(sort: Desc)], map: "learning_course_version_course_idx")
+  @@map("learning_course_version")
+}
+
+/// What a course version asks somebody to demonstrate. A kind, a title, and whether it is required
+/// — no pass mark, no weight, no attempt limit and no total, because none was ever specified.
+model LearningAssessment {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  course_version_id String    @db.Uuid
+  title             Json
+  kind              String    @db.VarChar(24)
+  required          Boolean
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, course_version_id], map: "learning_assessment_version_idx")
+  @@map("learning_assessment")
+}
+
+/// Courses a tenant grouped together. A path recommends; it never certifies (AD-002).
+model LearningPath {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  code        String    @db.VarChar(64)
+  name        Json
+  description Json?
+  /// A label a tenant chose. Nothing in this module branches on it (AD-003).
+  kind        String    @db.VarChar(24)
+  status      String    @db.VarChar(16)
+  archived_at DateTime? @db.Timestamptz(6)
+  archived_by String?   @db.VarChar(255)
+  metadata    Json
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@map("learning_path")
+}
+
+/// One course's place in a path. `sequence` is an order, not a gate: no prerequisite rule exists.
+model LearningPathStep {
+  id         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  path_id    String    @db.Uuid
+  course_id  String    @db.Uuid
+  sequence   Int       @db.SmallInt
+  optional   Boolean
+  metadata   Json
+  created_at DateTime  @db.Timestamptz(6)
+  created_by String    @db.VarChar(255)
+  updated_at DateTime  @db.Timestamptz(6)
+  updated_by String    @db.VarChar(255)
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.VarChar(255)
+  version    Int
+
+  @@map("learning_path_step")
+}
+
+/// What an audience must hold, and how often. Configuration that fires nothing (ADR-0071): the
+/// audience is resolved through Employment's contract when the rule is reconciled, never stored as
+/// a list somebody typed. `recurrence_months` of 0 never repeats.
+model LearningMandatoryRule {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  course_id            String    @db.Uuid
+  name                 Json
+  kind                 String    @db.VarChar(24)
+  audience             String    @db.VarChar(24)
+  /// Organization's row. No foreign key: a cross-module key does not enforce tenant isolation.
+  organization_unit_id String?   @db.Uuid
+  position_id          String?   @db.Uuid
+  effective_from       DateTime  @db.Date
+  recurrence_months    Int       @db.SmallInt
+  due_within_days      Int       @db.SmallInt
+  active               Boolean
+  retired_at           DateTime? @db.Timestamptz(6)
+  retired_by           String?   @db.VarChar(255)
+  metadata             Json
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  @@index([tenant_id, active, course_id], map: "learning_mandatory_rule_active_idx")
+  @@map("learning_mandatory_rule")
+}
+
+/// One person asked to learn one thing by one date. There is no `overdue` status — it is derived
+/// from `due_on` and today. `occurrence_key` is a derived civil date, and the partial unique index
+/// over it is the whole of ADR-0071's idempotency guarantee.
+model LearningAssignment {
+  id                            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                     String    @db.Uuid
+  /// Employment's row. No foreign key, for the reason ADR-0042 settled.
+  employment_id                 String    @db.Uuid
+  course_id                     String    @db.Uuid
+  source                        String    @db.VarChar(24)
+  mandatory_rule_id             String?   @db.Uuid
+  path_id                       String?   @db.Uuid
+  occurrence_key                DateTime? @db.Date
+  status                        String    @db.VarChar(16)
+  due_on                        DateTime? @db.Date
+  assigned_at                   DateTime  @db.Timestamptz(6)
+  assigned_by                   String    @db.VarChar(255)
+  satisfied_by_enrolment_id     String?   @db.Uuid
+  satisfied_by_certification_id String?   @db.Uuid
+  satisfied_at                  DateTime? @db.Timestamptz(6)
+  waived_at                     DateTime? @db.Timestamptz(6)
+  /// A named human. `system:auto-approval` is refused by a check constraint.
+  waived_by                     String?   @db.VarChar(255)
+  waiver_reason                 String?   @db.VarChar(1024)
+  cancelled_at                  DateTime? @db.Timestamptz(6)
+  cancelled_by                  String?   @db.VarChar(255)
+  metadata                      Json
+  created_at                    DateTime  @db.Timestamptz(6)
+  created_by                    String    @db.VarChar(255)
+  updated_at                    DateTime  @db.Timestamptz(6)
+  updated_by                    String    @db.VarChar(255)
+  deleted_at                    DateTime? @db.Timestamptz(6)
+  deleted_by                    String?   @db.VarChar(255)
+  version                       Int
+
+  @@index([tenant_id, employment_id, status, due_on], map: "learning_assignment_employment_idx")
+  @@map("learning_assignment")
+}
+
+/// One employment's participation in one version of one course. Completion is immutable — the
+/// domain refuses the transition and a trigger refuses it again.
+model LearningEnrolment {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  employment_id     String    @db.Uuid
+  course_id         String    @db.Uuid
+  /// Pinned at enrolment. The reason history stays reproducible without a snapshot.
+  course_version_id String    @db.Uuid
+  assignment_id     String?   @db.Uuid
+  status            String    @db.VarChar(16)
+  enrolled_at       DateTime  @db.Timestamptz(6)
+  enrolled_by       String    @db.VarChar(255)
+  started_at        DateTime? @db.Timestamptz(6)
+  completed_at      DateTime? @db.Timestamptz(6)
+  /// A named human. A completion with nobody's name against it cannot be questioned later.
+  completed_by      String?   @db.VarChar(255)
+  /// The civil day they finished — what the recurrence arithmetic reads.
+  completed_on      DateTime? @db.Date
+  outcome_note      String?   @db.VarChar(1024)
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, employment_id, status], map: "learning_enrolment_employment_idx")
+  @@index([tenant_id, course_id, status], map: "learning_enrolment_course_idx")
+  @@map("learning_enrolment")
+}
+
+/// One assessor's record of how one enrolment went. Insert-only by trigger; a later result
+/// supersedes an earlier one by being later.
+model LearningAssessmentResult {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  assessment_id  String    @db.Uuid
+  enrolment_id   String    @db.Uuid
+  employment_id  String    @db.Uuid
+  outcome        String    @db.VarChar(16)
+  /// The tenant's own text, kept verbatim. Nothing in this product reads, compares or totals it.
+  raw_mark       String?   @db.VarChar(32)
+  raw_mark_scale String?   @db.VarChar(255)
+  assessed_on    DateTime  @db.Date
+  assessed_by    String    @db.VarChar(255)
+  notes          String?   @db.VarChar(4000)
+  recorded_at    DateTime  @db.Timestamptz(6)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, enrolment_id, assessed_on(sort: Desc)], map: "learning_assessment_result_enrolment_idx")
+  @@map("learning_assessment_result")
+}
+
+/// What somebody holds, and until when (ADR-0070). There is no `expired` status: `valid_until` is
+/// the only fact and expiry is derived on read. `source` permits a certification with no enrolment
+/// behind it, so recording a licence somebody already held does not fabricate a course they took.
+model LearningCertification {
+  id                          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                   String    @db.Uuid
+  employment_id               String    @db.Uuid
+  enrolment_id                String?   @db.Uuid
+  course_id                   String?   @db.Uuid
+  title                       String    @db.VarChar(255)
+  source                      String    @db.VarChar(24)
+  status                      String    @db.VarChar(16)
+  issued_on                   DateTime  @db.Date
+  valid_until                 DateTime? @db.Date
+  supersedes_certification_id String?   @db.Uuid
+  /// Documents' row identifier and nothing else. No bytes, no copied metadata (ADR-0070).
+  evidence_document_id        String?   @db.Uuid
+  revoked_at                  DateTime? @db.Timestamptz(6)
+  revoked_by                  String?   @db.VarChar(255)
+  revocation_reason           String?   @db.VarChar(1024)
+  issued_by                   String    @db.VarChar(255)
+  metadata                    Json
+  created_at                  DateTime  @db.Timestamptz(6)
+  created_by                  String    @db.VarChar(255)
+  updated_at                  DateTime  @db.Timestamptz(6)
+  updated_by                  String    @db.VarChar(255)
+  deleted_at                  DateTime? @db.Timestamptz(6)
+  deleted_by                  String?   @db.VarChar(255)
+  version                     Int
+
+  @@index([tenant_id, employment_id, status], map: "learning_certification_employment_idx")
+  @@map("learning_certification")
+}
+
+/// Who teaches, as an identity and only as an identity (D-6). An internal instructor is an
+/// employment reference with no copied personal data; an external one is a Learning-owned record,
+/// because a visiting trainer is not an employee and gets no fabricated Person row. Nothing here
+/// schedules anybody — no availability, no calendar, no booking.
+model LearningInstructor {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  employment_id         String?   @db.Uuid
+  external_name         Json?
+  external_organization String?   @db.VarChar(255)
+  external_contact      String?   @db.VarChar(255)
+  active                Boolean
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  @@index([tenant_id, active], map: "learning_instructor_active_idx")
+  @@map("learning_instructor")
+}

@@ -148,6 +148,7 @@ describe('a course version', () => {
 describe('an enrolment', () => {
   const completion = {
     at: AT,
+    on: '2026-03-01',
     by: 'user-manager',
     requiresAssessment: false,
     hasPassedAssessment: false,
@@ -181,6 +182,19 @@ describe('an enrolment', () => {
 
     expect(completed.ok).toBe(false);
     if (!completed.ok) expect(completed.error.reason).toBe('completion-not-human');
+  });
+
+  it('takes the completion day from the caller and refuses one that is not a civil date', () => {
+    const started = startEnrolment(enrolment(), AT);
+
+    if (!started.ok) throw new Error(started.error.reason);
+
+    const wrong = completeEnrolment(started.value, { ...completion, on: '01/03/2026' });
+    const right = completeEnrolment(started.value, completion);
+
+    expect(wrong.ok).toBe(false);
+    expect(right.ok).toBe(true);
+    if (right.ok) expect(right.value.completedOn).toBe('2026-03-01');
   });
 
   it('refuses completion where the tenant required an assessment and none passed', () => {
