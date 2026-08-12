@@ -1,4 +1,14 @@
 import { Pool } from 'pg';
+import {
+  InProcessEventDispatcher,
+  runInContext,
+  uuidV7,
+  type Transaction,
+  type UnitOfWork,
+} from '@work/kernel';
+import { PostgresUnitOfWork } from '@work/persistence';
+
+import { postgresLearningStores } from './learning-stores.js';
 
 /**
  * The database fixture this module's integration suites share.
@@ -108,11 +118,32 @@ const assertSchemaApplied = async (admin: Pool): Promise<void> => {
 export interface LearningFixture {
   readonly admin: Pool;
   readonly application: Pool;
+  readonly unitOfWork: UnitOfWork;
+  readonly stores: ReturnType<typeof postgresLearningStores>;
   /** Runs one statement batch as the unprivileged role, inside the tenant's row-security context. */
   asTenant<TResult>(
     tenantId: string,
     work: (client: PoolLike) => Promise<TResult>,
   ): Promise<TResult>;
+  /** Runs repository work inside a real transaction, as the unprivileged role, for one tenant. */
+  inTenant<TResult>(
+    tenantId: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult>;
+  /** Runs as a *named* actor, for the assertions about who completed and who waived what. */
+  asActor<TResult>(
+    tenantId: string,
+    actor: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult>;
+  /**
+   * A second unit of work on its **own** connection, for the concurrency assertions.
+   *
+   * Two transactions on one pooled connection are the same transaction, so a race written against a
+   * single unit of work proves nothing at all — it proves that a program doing two things in order
+   * does them in order.
+   */
+  onSecondConnection(): UnitOfWork;
   truncate(): Promise<void>;
   close(): Promise<void>;
 }
@@ -136,10 +167,29 @@ export const openLearningFixture = async (role: string): Promise<LearningFixture
   const admin = new Pool({ connectionString: CONNECTION, ...BOUNDS });
   const applicationUrl = await assertAndBuild(admin, role);
   const application = new Pool({ connectionString: applicationUrl, ...BOUNDS });
+  const unitOfWork = new PostgresUnitOfWork(application, new InProcessEventDispatcher());
+  const stores = postgresLearningStores();
+  const secondary: Pool[] = [];
+  const inContext = <TResult>(
+    tenantId: string,
+    actor: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult> =>
+    runInContext({ tenantId, correlationId: uuidV7(), actor }, () => unitOfWork.execute(work));
 
   return {
     admin,
     application,
+    unitOfWork,
+    stores,
+    inTenant: (tenantId, work) => inContext(tenantId, 'user:test', work),
+    asActor: (tenantId, actor, work) => inContext(tenantId, actor, work),
+    onSecondConnection: () => {
+      const pool = new Pool({ connectionString: applicationUrl, ...BOUNDS });
+
+      secondary.push(pool);
+      return new PostgresUnitOfWork(pool, new InProcessEventDispatcher());
+    },
     asTenant: async (tenantId, work) => {
       const client = await application.connect();
 
@@ -172,6 +222,7 @@ export const openLearningFixture = async (role: string): Promise<LearningFixture
     },
     close: async () => {
       try {
+        await Promise.all(secondary.map((pool) => pool.end()));
         await application.end();
         await admin.query(`truncate ${LEARNING_TABLES.join(', ')}`);
       } finally {

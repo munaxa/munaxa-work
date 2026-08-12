@@ -30,7 +30,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@work/kernel": "workspace:*"
+    "@work/kernel": "workspace:*",
+    "@work/persistence": "workspace:*"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
