@@ -93,51 +93,54 @@ export class FakeEmployment implements EmploymentPort {
     return Promise.resolve(this.reachable ? this.known.get(employmentId) : undefined);
   }
 
-  public activeEmployments(_asOf: Date, limit: number, offset: number): Promise<Audience> {
-    return this.page((facts) => facts.active, limit, offset);
+  public activeEmployments(_asOf: Date, size: number, page: number): Promise<Audience> {
+    return this.window((facts) => facts.active, size, page);
   }
 
   public inUnit(
     organizationUnitId: string,
     _asOf: Date,
-    limit: number,
-    offset: number,
+    size: number,
+    page: number,
   ): Promise<Audience> {
-    return this.page(
+    return this.window(
       (facts) => facts.active && facts.organizationUnitId === organizationUnitId,
-      limit,
-      offset,
+      size,
+      page,
     );
   }
 
   public inPosition(
     positionId: string,
     _asOf: Date,
-    limit: number,
-    offset: number,
+    size: number,
+    page: number,
   ): Promise<Audience> {
-    return this.page((facts) => facts.active && facts.positionId === positionId, limit, offset);
+    return this.window((facts) => facts.active && facts.positionId === positionId, size, page);
   }
 
   public directReportsOf(
     managerEmploymentId: string,
     _asOf: Date,
-    limit: number,
+    size: number,
   ): Promise<Audience> {
-    return this.page(
+    return this.window(
       (facts) => facts.active && facts.managerEmploymentId === managerEmploymentId,
-      limit,
-      0,
+      size,
+      1,
     );
   }
 
-  private page(
+  private window(
     matches: (facts: EmploymentFacts) => boolean,
-    limit: number,
-    offset: number,
+    size: number,
+    page: number,
   ): Promise<Audience> {
     if (!this.reachable) return Promise.resolve(undefined);
-    return Promise.resolve([...this.known.values()].filter(matches).slice(offset, offset + limit));
+
+    const offset = (Math.max(1, page) - 1) * size;
+
+    return Promise.resolve([...this.known.values()].filter(matches).slice(offset, offset + size));
   }
 }
 

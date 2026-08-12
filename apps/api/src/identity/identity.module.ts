@@ -68,6 +68,7 @@ import { DeferredPayrollDispatcher, payrollModuleFor } from '../payroll/payroll.
 import { documentsModuleFor } from '../documents/documents.composition.js';
 import { lettersModuleFor } from '../letters/letters.composition.js';
 import { performanceModuleFor } from '../performance/performance.composition.js';
+import { learningModuleFor } from '../learning/learning.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -170,6 +171,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         documents: documentsModuleFor(unitOfWork, senders.payroll, permissions),
         letters: lettersModuleFor(unitOfWork, senders.payroll, permissions),
         performance: performanceModuleFor(unitOfWork, senders.payroll, permissions),
+        learning: learningModuleFor(unitOfWork, senders.payroll, permissions),
       }),
     },
     {
@@ -238,6 +240,13 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // organization and a manager reading their own reports take different paths through the
         // same query, and the handler has to ask which one it is holding.
         registry.register(permissionAware.performance);
+        // Learning last. It reads Employment, Organization and Documents through their published
+        // queries under bounded service grants, and writes to none of them: what somebody attained
+        // is this module's record, and Performance or Career pulls it when it wants one (AD-005).
+        // It takes the permission checker as well as the pipeline's because its reads are scoped by
+        // what the caller holds — and because `assignment.read-team` deliberately resolves to
+        // nothing until the platform can say which employment the caller is (ADR-0032).
+        registry.register(permissionAware.learning);
         return registry;
       },
     },
@@ -295,6 +304,7 @@ interface PermissionAwareModules {
   readonly documents: WorkModule;
   readonly letters: WorkModule;
   readonly performance: WorkModule;
+  readonly learning: WorkModule;
 }
 
 interface DeferredSenders {

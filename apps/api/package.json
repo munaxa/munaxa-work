@@ -26,6 +26,7 @@
     "@work/employment": "workspace:*",
     "@work/identity": "workspace:*",
     "@work/kernel": "workspace:*",
+    "@work/learning": "workspace:*",
     "@work/leave": "workspace:*",
     "@work/letters": "workspace:*",
     "@work/onboarding": "workspace:*",
