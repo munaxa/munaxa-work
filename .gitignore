@@ -66,3 +66,8 @@ school/apps/mobile/*.iml
 
 # Sentry
 .sentryclirc
+
+# Brand artwork, copied out of @munaxa/platform by `munaxa-sync-brand` on predev/prebuild.
+# Generated, never authored: committing a snapshot is how an application keeps serving last
+# quarter's logo after the approved one changed upstream.
+apps/*/public/branding/
