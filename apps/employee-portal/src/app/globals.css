@@ -1,6 +1,20 @@
 @import 'tailwindcss';
 @import '@munaxa/theme/css/work';
 
-/* Tailwind v4 must scan the design system's shipped sources to emit the classes its components
-   use. This points at the installed package — never at a path into another repository. */
-@source '../../../../node_modules/@munaxa/ui';
+/*
+ * Tailwind v4 must scan the design system's shipped sources to emit the classes its components
+ * use. This points at the installed package — never at a path into another repository.
+ *
+ * Two things were wrong with the path it replaces. It named `@munaxa/ui`, which is a
+ * buildless façade — three files that re-export the implementation, and no class names at
+ * all. And it reached for the *workspace root* `node_modules`, where pnpm's strict layout
+ * puts nothing: a package is linked into the `node_modules` of the package that declares
+ * it. Either mistake alone empties the stylesheet.
+ *
+ * The build stayed green the whole time: this is not a type error,
+ * not a lint error and not a test failure, it is a `Card` with no surface and a `Button` with no
+ * fill. It surfaced when `ProductLogo` arrived, because that component's `dark:hidden` and
+ * `sm:block` rules decide which of three images is visible — and with none of them generated,
+ * all three rendered at once.
+ */
+@source '../../node_modules/@munaxa/platform/dist';

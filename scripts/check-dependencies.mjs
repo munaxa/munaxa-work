@@ -146,6 +146,12 @@ for (const owner of packages) {
     // a transport the logger loads by name, a renderer the framework calls. Each is named
     // rather than a wildcard, so a genuinely unused dependency still surfaces.
     const runtimeOnly = [
+      // Used by a build script rather than by a module: its `munaxa-sync-brand` bin copies the
+      // approved product artwork into an application's `public/` on predev and prebuild. The
+      // components come through `@munaxa/ui`, which re-exports it — but a bin is only linked
+      // for a *direct* dependency, so the declaration is load-bearing and dropping it would
+      // leave every application serving no logo at all.
+      '@munaxa/platform',
       'reflect-metadata', // Nest decorators
       'pino-pretty', // resolved by pino via a transport target string
       '@prisma/client', // generated client, imported once a model exists
