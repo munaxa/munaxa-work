@@ -55,6 +55,9 @@ line; the decision that replaced it is a new record.
 | [0069](0069-a-score-is-an-integer-and-an-absence-is-not-a-zero.md) | A score is an integer, and work nobody assessed is excluded rather than scored zero | Accepted |
 | [0070](0070-learning-owns-the-expiry-of-what-it-issues.md) | Learning owns the expiry of what it issues, and validity is derived rather than stored | Accepted |
 | [0071](0071-a-recurring-requirement-is-computed-not-scheduled.md) | A recurring requirement is computed on demand, not scheduled, and its idempotency is an index | Accepted |
+| [0072](0072-a-career-recommendation-is-advisory-and-writes-nothing.md) | A career recommendation is advisory, and Career writes nothing outside itself | Accepted |
+| [0073](0073-a-decision-is-careers-an-observation-stays-where-it-was-made.md) | A decision is Career's; an observation stays where it was made | Accepted |
+| [0074](0074-readiness-is-stated-by-a-person.md) | Readiness is stated by a person, and no formula is invented to replace them | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.
