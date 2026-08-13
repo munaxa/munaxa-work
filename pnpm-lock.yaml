@@ -55,6 +55,9 @@ importers:
       '@work/employment':
         specifier: workspace:*
         version: link:../../packages/modules/employment
+      '@work/learning':
+        specifier: workspace:*
+        version: link:../../packages/modules/learning
       '@work/leave':
         specifier: workspace:*
         version: link:../../packages/modules/leave
