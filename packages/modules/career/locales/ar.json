@@ -1,0 +1,151 @@
+{
+  "career": {
+    "rejection": {
+      "acknowledgement-date-invalid": "يجب أن يكون تاريخ الإقرار يوماً تقويمياً حقيقياً.",
+      "acknowledgement-requires-a-person": "يجب أن يسجّل الإقرار شخص محدد بالاسم.",
+      "already-acknowledged": "سبق لهذا الطرف أن أقرّ بالخطة.",
+      "confirmation-date-invalid": "يجب أن يكون تاريخ التأكيد يوماً تقويمياً حقيقياً.",
+      "confirmation-requires-a-person": "يجب أن يؤكّد الخليفة شخص محدد بالاسم.",
+      "course-item-requires-a-learning-assignment": "يجب أن يذكر بند الدورة تكليف التعلّم الذي يتبعه. التعلّم هو مالك الدورة نفسها.",
+      "decision-requires-a-person": "يجب أن يتخذ القرار بشأن التوصية شخص محدد بالاسم.",
+      "development-item-date-invalid": "يجب أن يكون التاريخ يوماً تقويمياً حقيقياً.",
+      "development-item-target-date-invalid": "يجب أن يكون التاريخ المستهدف يوماً تقويمياً حقيقياً.",
+      "development-item-title-required": "بند التطوير يحتاج إلى عنوان.",
+      "development-item-transition-refused": "لا يمكن لبند التطوير الانتقال من حالته الحالية إلى تلك الحالة.",
+      "development-move-date-invalid": "يجب أن يكون التاريخ يوماً تقويمياً حقيقياً.",
+      "development-plan-closed": "خطة التطوير هذه مغلقة ولا تقبل بنوداً إضافية.",
+      "development-plan-has-no-items": "لا يمكن تفعيل خطة تطوير لا تحتوي على أي بند.",
+      "development-start-date-invalid": "يجب أن يكون تاريخ البدء يوماً تقويمياً حقيقياً.",
+      "development-target-before-start": "التاريخ المستهدف يسبق بداية الخطة.",
+      "development-target-date-invalid": "يجب أن يكون التاريخ المستهدف يوماً تقويمياً حقيقياً.",
+      "development-transition-refused": "لا يمكن لخطة التطوير الانتقال من حالتها الحالية إلى تلك الحالة.",
+      "item-owned-by-learning": "هذا البند يتبع تكليف تعلّم، لذا يُسجَّل تقدّمه في التعلّم وليس هنا.",
+      "membership-already-ended": "انتهت عضوية هذا المجمّع بالفعل.",
+      "membership-ends-before-it-began": "لا يمكن أن تنتهي عضوية المجمّع قبل أن تبدأ.",
+      "membership-from-date-invalid": "يجب أن يكون تاريخ بدء العضوية يوماً تقويمياً حقيقياً.",
+      "membership-to-date-invalid": "يجب أن يكون تاريخ انتهاء العضوية يوماً تقويمياً حقيقياً.",
+      "nomination-date-invalid": "يجب أن يكون تاريخ الترشيح يوماً تقويمياً حقيقياً.",
+      "nomination-requires-a-person": "يجب أن يقوم بالترشيح شخص محدد بالاسم.",
+      "only-a-course-item-references-learning": "بند الدورة وحده هو ما يجوز أن يذكر تكليف تعلّم.",
+      "path-archived": "هذا المسار الوظيفي مؤرشف ولا يمكن تغييره.",
+      "path-effective-period-invalid": "ينتهي سريان المسار الوظيفي قبل أن يبدأ.",
+      "path-has-no-stages": "لا يمكن نشر مسار وظيفي بلا مراحل.",
+      "path-name-required": "المسار الوظيفي يحتاج إلى اسم بالعربية والإنجليزية معاً.",
+      "path-transition-refused": "لا يمكن للمسار الوظيفي الانتقال من حالته الحالية إلى تلك الحالة.",
+      "plan-close-date-invalid": "يجب أن يكون التاريخ يوماً تقويمياً حقيقياً.",
+      "plan-closed": "انتهت هذه الخطة الوظيفية ولا يمكن تعديلها.",
+      "plan-stage-without-path": "لا يمكن ذكر مرحلة وظيفية إلا في خطة تذكر مساراً وظيفياً.",
+      "plan-start-date-invalid": "يجب أن يكون تاريخ البدء يوماً تقويمياً حقيقياً.",
+      "plan-target-before-start": "التاريخ المستهدف يسبق بداية الخطة.",
+      "plan-target-date-invalid": "يجب أن يكون التاريخ المستهدف يوماً تقويمياً حقيقياً.",
+      "plan-transition-refused": "لا يمكن للخطة الوظيفية الانتقال من حالتها الحالية إلى تلك الحالة.",
+      "pool-closed": "مجمّع المواهب هذا مغلق ولا يقبل أحداً جديداً.",
+      "pool-name-required": "مجمّع المواهب يحتاج إلى اسم بالعربية والإنجليزية معاً.",
+      "pool-transition-refused": "لا يمكن لمجمّع المواهب الانتقال من حالته الحالية إلى تلك الحالة.",
+      "readiness-assessed-date-invalid": "يجب أن يكون تاريخ التقييم يوماً تقويمياً حقيقياً.",
+      "readiness-level-already-inactive": "مستوى الجاهزية هذا غير نشط بالفعل.",
+      "readiness-level-name-required": "مستوى الجاهزية يحتاج إلى اسم بالعربية والإنجليزية معاً.",
+      "readiness-level-ordinal-invalid": "يجب أن يكون ترتيب مستوى الجاهزية عدداً صحيحاً بين ١ و١٠٠.",
+      "readiness-requires-a-person": "يجب أن يذكر تقييم الجاهزية شخص محدد بالاسم.",
+      "readiness-subject-required": "يجب أن يذكر تقييم الجاهزية الوظيفة أو خطة التعاقب التي يتعلق بها.",
+      "recommendation-date-invalid": "يجب أن يكون تاريخ التوصية يوماً تقويمياً حقيقياً.",
+      "recommendation-decision-date-invalid": "يجب أن يكون تاريخ القرار يوماً تقويمياً حقيقياً.",
+      "recommendation-expires-before-it-is-made": "ينتهي سريان التوصية في يوم صدورها أو قبله.",
+      "recommendation-requires-a-person": "يجب أن يقدّم التوصية شخص محدد بالاسم.",
+      "recommendation-transition-refused": "سبق البتّ في هذه التوصية.",
+      "recommendation-validity-date-invalid": "يجب أن يكون تاريخ السريان يوماً تقويمياً حقيقياً.",
+      "stage-name-required": "المرحلة الوظيفية تحتاج إلى اسم بالعربية والإنجليزية معاً.",
+      "stage-sequence-invalid": "يجب أن يكون موضع المرحلة عدداً صحيحاً بين ١ و٥٠٠.",
+      "succession-plan-archived": "خطة التعاقب هذه مؤرشفة ولا تقبل ترشيحات إضافية.",
+      "succession-plan-has-no-successors": "لا يمكن تفعيل خطة تعاقب لا يوجد فيها أي مرشّح.",
+      "succession-review-date-invalid": "يجب أن يكون تاريخ المراجعة يوماً تقويمياً حقيقياً.",
+      "succession-transition-refused": "لا يمكن لخطة التعاقب الانتقال من حالتها الحالية إلى تلك الحالة.",
+      "successor-rank-invalid": "يجب أن يكون ترتيب المرشّح عدداً صحيحاً بين ١ و٥٠.",
+      "successor-transition-refused": "لا يمكن للمرشّح الانتقال من حالته الحالية إلى تلك الحالة.",
+      "withdrawal-date-invalid": "يجب أن يكون تاريخ السحب يوماً تقويمياً حقيقياً.",
+      "withdrawal-reason-required": "سحب شخص من قائمة التعاقب يحتاج إلى سبب."
+    },
+    "vocabulary": {
+      "careerPathKind": {
+        "custom": "مخصص",
+        "executive": "تنفيذي",
+        "leadership": "قيادي",
+        "management": "إداري",
+        "specialist": "تخصصي",
+        "technical": "تقني"
+      },
+      "careerPathStatus": {
+        "archived": "مؤرشف",
+        "draft": "مسودة",
+        "published": "منشور"
+      },
+      "careerPlanStatus": {
+        "abandoned": "متوقفة",
+        "achieved": "محقّقة",
+        "active": "نشطة",
+        "archived": "مؤرشفة",
+        "draft": "مسودة"
+      },
+      "developmentCategory": {
+        "education": "التعليم",
+        "experience": "الخبرة",
+        "exposure": "الانكشاف"
+      },
+      "developmentItemKind": {
+        "assessment": "تقييم",
+        "coaching": "تدريب فردي",
+        "course": "دورة",
+        "mentoring": "إرشاد",
+        "project": "مشروع",
+        "stretch_assignment": "مهمة تطويرية"
+      },
+      "developmentItemStatus": {
+        "cancelled": "ملغى",
+        "completed": "مكتمل",
+        "in_progress": "قيد التنفيذ",
+        "planned": "مخطط"
+      },
+      "developmentPlanStatus": {
+        "abandoned": "متوقفة",
+        "active": "نشطة",
+        "completed": "مكتملة",
+        "draft": "مسودة"
+      },
+      "mobilityKind": {
+        "cross_department": "نقل بين الإدارات",
+        "international_assignment": "مهمة دولية",
+        "lateral_move": "نقل أفقي",
+        "promotion": "ترقية",
+        "temporary_assignment": "مهمة مؤقتة"
+      },
+      "mobilityStatus": {
+        "accepted": "مُوافَق عليها",
+        "declined": "مرفوضة",
+        "expired": "منتهية",
+        "proposed": "مقترحة"
+      },
+      "successionPlanStatus": {
+        "active": "نشطة",
+        "archived": "مؤرشفة",
+        "draft": "مسودة"
+      },
+      "successorStatus": {
+        "confirmed": "مؤكَّد",
+        "nominated": "مرشّح",
+        "withdrawn": "مسحوب"
+      },
+      "talentPoolKind": {
+        "custom": "مخصص",
+        "future_manager": "مدراء المستقبل",
+        "graduate": "الخريجون",
+        "high_potential": "أصحاب الإمكانات العالية",
+        "leadership": "القيادات",
+        "technical_expert": "الخبراء التقنيون"
+      },
+      "talentPoolStatus": {
+        "active": "نشط",
+        "closed": "مغلق"
+      }
+    }
+  }
+}
