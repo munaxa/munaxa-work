@@ -1,18 +1,33 @@
 import { Pool } from 'pg';
+import {
+  InProcessEventDispatcher,
+  runInContext,
+  uuidV7,
+  type Transaction,
+  type UnitOfWork,
+} from '@work/kernel';
+import { PostgresUnitOfWork } from '@work/persistence';
+
+import { postgresCareerStores } from './career-stores.js';
 
 /**
  * The database fixture Career's schema suites share.
  *
- * **Raw SQL, deliberately, and no repositories.** There are none yet: this checkpoint delivers the
- * schema and nothing above it. That makes these suites *stronger* rather than weaker for what they
- * check, because every assertion here is about what the database refuses on its own — a policy, a
- * check constraint, a partial unique index, a trigger. A probe that went through a repository would
- * be proving the repository behaves as written; a probe that issues the `insert` itself is proving
- * that no path, including SQL nobody wrote in TypeScript, can produce the state.
+ * **Two ways in, and both are needed.** `asTenant` issues raw SQL; `inTenant` runs the real
+ * repositories inside a real `PostgresUnitOfWork` transaction. They check different things, and
+ * neither substitutes for the other.
+ *
+ * The raw probes assert what the *database* refuses on its own — a policy, a check constraint, a
+ * partial unique index, a trigger. A probe issued through a repository would be proving that the
+ * repository behaves as written; a probe that issues the `insert` itself proves that **no** path can
+ * produce the state, including SQL nobody wrote in TypeScript. The repository path asserts the other
+ * half: that what the application decides survives the round trip through real columns, real types
+ * and real indexes.
  *
  * Two connections, deliberately. `admin` seeds and inspects, as a migration would. `application`
  * connects as a role that owns nothing and cannot bypass row-level security, which is the only
  * configuration under which an isolation assertion means anything.
+ *
  */
 
 export const CONNECTION = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -118,6 +133,28 @@ export type TenantWork<TResult> = (client: PoolLike) => Promise<TResult>;
 export interface CareerFixture {
   readonly admin: Pool;
   readonly application: Pool;
+  /** The real PostgreSQL repositories, over the unprivileged connection. */
+  readonly stores: ReturnType<typeof postgresCareerStores>;
+  readonly unitOfWork: UnitOfWork;
+  /**
+   * Runs repository work inside a real transaction, as the unprivileged role, for one tenant.
+   *
+   * The transaction is the *application's* — `PostgresUnitOfWork` opens it, sets `app.tenant_id`
+   * transaction-locally, and commits or rolls back. No repository below opens one of its own, which
+   * is what makes a two-statement command atomic and what the rollback assertion checks.
+   */
+  inTenant<TResult>(
+    tenantId: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult>;
+  /** The same, as a *named* actor, for the assertions about who confirmed and who assessed what. */
+  asActor<TResult>(
+    tenantId: string,
+    actor: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult>;
+  /** A second unit of work on its **own** connection, for the repository-level race assertions. */
+  secondUnitOfWork(): UnitOfWork;
   /** Runs one statement batch as the unprivileged role, inside the tenant's row-security context. */
   asTenant<TResult>(tenantId: string, work: TenantWork<TResult>): Promise<TResult>;
   /**
@@ -145,10 +182,29 @@ export const openCareerFixture = async (role: string): Promise<CareerFixture> =>
   const applicationUrl = await assertAndBuild(admin, role);
   const application = new Pool({ connectionString: applicationUrl, ...BOUNDS });
   const second = new Pool({ connectionString: applicationUrl, ...BOUNDS });
+  const unitOfWork = new PostgresUnitOfWork(application, new InProcessEventDispatcher());
+  const stores = postgresCareerStores();
+  const secondary: Pool[] = [];
+  const inContext = <TResult>(
+    tenantId: string,
+    actor: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult> =>
+    runInContext({ tenantId, correlationId: uuidV7(), actor }, () => unitOfWork.execute(work));
 
   return {
     admin,
     application,
+    stores,
+    unitOfWork,
+    inTenant: (tenantId, work) => inContext(tenantId, 'user:career-test', work),
+    asActor: (tenantId, actor, work) => inContext(tenantId, actor, work),
+    secondUnitOfWork: () => {
+      const pool = new Pool({ connectionString: applicationUrl, ...BOUNDS });
+
+      secondary.push(pool);
+      return new PostgresUnitOfWork(pool, new InProcessEventDispatcher());
+    },
     asTenant: (tenantId, work) => inTenantOn(application, tenantId, work),
     onSecondConnection: (tenantId, work) => inTenantOn(second, tenantId, work),
     truncate: async () => {
@@ -162,6 +218,7 @@ export const openCareerFixture = async (role: string): Promise<CareerFixture> =>
     },
     close: async () => {
       try {
+        await Promise.all(secondary.map((pool) => pool.end()));
         await second.end();
         await application.end();
         await admin.query(`truncate ${CAREER_TABLES.join(', ')}`);

@@ -16,7 +16,7 @@ import {
   insertPool,
   insertSuccessionPlan,
   insertSuccessor,
-} from './career-rows.js';
+} from './career-fixtures.js';
 
 /**
  * The invariants that are facts about a *set of rows*, arbitrated where they have to be.

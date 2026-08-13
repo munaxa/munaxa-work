@@ -22,7 +22,7 @@ import {
   insertStage,
   insertSuccessionPlan,
   insertSuccessor,
-} from './career-rows.js';
+} from './career-fixtures.js';
 
 /**
  * Tenant isolation across all twelve tables, as an unprivileged role, in both directions.

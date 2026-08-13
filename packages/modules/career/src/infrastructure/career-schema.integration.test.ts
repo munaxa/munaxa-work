@@ -19,7 +19,7 @@ import {
   insertReadinessLevel,
   insertSuccessionPlan,
   insertSuccessor,
-} from './career-rows.js';
+} from './career-fixtures.js';
 
 /**
  * What the schema itself refuses.

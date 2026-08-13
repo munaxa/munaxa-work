@@ -15,7 +15,7 @@ import {
   insertDevelopmentPlan,
   insertPath,
   insertStage,
-} from './career-rows.js';
+} from './career-fixtures.js';
 
 /**
  * The boundaries the schema draws, and the columns it deliberately does not have.

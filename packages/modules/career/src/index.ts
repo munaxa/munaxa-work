@@ -39,3 +39,4 @@ export * from './application/career-dependencies.js';
 export * from './application/career-ports.js';
 export * from './application/in-memory-stores.js';
 export * from './application/career-views.js';
+export * from './infrastructure/career-stores.js';

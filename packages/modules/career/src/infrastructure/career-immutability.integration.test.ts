@@ -8,7 +8,7 @@ import {
   requireDatabaseInCi,
   type CareerFixture,
 } from './career-database.fixture.js';
-import { insertAssessment, insertReadinessLevel } from './career-rows.js';
+import { insertAssessment, insertReadinessLevel } from './career-fixtures.js';
 
 /**
  * A readiness assessment cannot be rewritten (D-14, ADR-0074).
