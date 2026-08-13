@@ -33,7 +33,7 @@ them afterwards.
 | Payroll group, period, run, input snapshot, result, earning and deduction line, exception, adjustment, approval decision, reconciliation, accounting line, payment instruction | `payroll` | Phase 11 ✅ |
 | Benefit plan, enrolment                   | `benefits`      | Phase 12      |
 | Goal, review, rating                      | `performance`   | Phase 13 ✓    |
-| Course, enrolment, certification          | `learning`      | Phase 14      |
+| Course, enrolment, certification          | `learning`      | Phase 14A     |
 | Career path, succession plan              | `career`        | Phase 15      |
 | Approval, workflow definition, task       | `workflow`      | Phase 16      |
 | Message delivery, template, notification  | `communications`| Phase 17      |

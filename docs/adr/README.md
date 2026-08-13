@@ -53,6 +53,8 @@ line; the decision that replaced it is a new record.
 | [0067](0067-payroll-publishes-outputs-and-posts-nothing.md) | Payroll publishes outputs and posts nothing, and an absent capability is named | Accepted |
 | [0068](0068-a-rating-is-explained-from-a-snapshot.md) | A completed rating is explained from a snapshot, never from live configuration | Accepted |
 | [0069](0069-a-score-is-an-integer-and-an-absence-is-not-a-zero.md) | A score is an integer, and work nobody assessed is excluded rather than scored zero | Accepted |
+| [0070](0070-learning-owns-the-expiry-of-what-it-issues.md) | Learning owns the expiry of what it issues, and validity is derived rather than stored | Accepted |
+| [0071](0071-a-recurring-requirement-is-computed-not-scheduled.md) | A recurring requirement is computed on demand, not scheduled, and its idempotency is an index | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

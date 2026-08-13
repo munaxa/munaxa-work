@@ -239,6 +239,33 @@ employments with two budget misses found and fixed, the nine `NOT VERIFIED` capa
 carried-forward debt register are in
 [`verification/phase-13-final-report.md`](verification/phase-13-final-report.md).
 
+Phase 14A completed on 2026-08-13: Learning and Development — one module, twelve tables. It records
+what somebody was asked to do, what they sat, what an assessor observed and what they hold, and it
+**evaluates nobody**: AD-002 says course completion does not imply competency, and no column here
+implies it. **There is no `numeric` column, no `bigint` and no money anywhere in the module** — every
+number is a small schema-constrained integer, and the one freely-typed value is `raw_mark`, a
+`varchar(32)` nothing parses, so `18.50` is stored, returned and rendered as `18.50`. Two answers are
+**computed rather than stored**: whether a certificate is still valid, and whether a requirement is
+overdue. Both are functions of a civil date and the day somebody asked, because `JobPort` has no
+adapter and a flag nothing maintains would show `valid` for a licence that lapsed in March
+([ADR-0070](adr/0070-learning-owns-the-expiry-of-what-it-issues.md)). Recurring training is generated
+by a **bounded, idempotent command an administrator runs**, arbitrated by a partial unique index over
+a derived occurrence day rather than a read-then-write — so a retried run creates nothing and two
+simultaneous runs converge ([ADR-0071](adr/0071-a-recurring-requirement-is-computed-not-scheduled.md)).
+**A dependency that cannot answer is a refusal, never a zero**: if Employment cannot resolve a rule's
+audience, reconciliation refuses rather than reporting that everybody is up to date about an
+organization it never looked at. No scoring formula was invented — the specification defines none, so
+an assessor states an outcome and nothing computes one. Every date is a `YYYY-MM-DD` string from
+column to rendered HTML, with no `Date` anywhere on the path. `read-team`, `read-own` and self-service
+remain `NOT VERIFIED` until a principal resolves to an employment. The planning checkpoint is in
+[`verification/phase-14-plan.md`](verification/phase-14-plan.md); the seven defects with their
+original failing evidence, the measured performance at 500, 10,000 and 100,000 employments with **all
+twenty-five workloads within budget**, the query plans, the nine `NOT VERIFIED` capabilities and the
+carried-forward debt register are in
+[`verification/phase-14a-final-report.md`](verification/phase-14a-final-report.md). **Phase 14B —
+sessions, capacity, waitlists and scheduling — is not started**: no column, no port, no route, no
+screen.
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

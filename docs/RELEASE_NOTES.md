@@ -5,6 +5,62 @@ and what is still missing.
 
 ---
 
+## Phase 14A — Learning and development
+
+One module. It records what somebody was asked to do, what they sat, what an assessor observed, and
+what they hold.
+
+**It evaluates nobody.** Finishing a course is evidence of what somebody was taught, not a judgement
+about how they do their job — those are Performance's record and a different question. Learning
+writes no capability, no rating and no status anywhere outside itself; other modules pull a
+completion or a certification when they want one.
+
+**Nothing expires on a timer, because nothing here runs on one.** Whether a certificate is still
+valid and whether a requirement is overdue are worked out from the dates and the day you asked,
+every time you ask. No background job maintains a flag, so there is no flag to go stale — a forklift
+licence that lapsed in March cannot read `valid` in June. Every screen and every response says which
+day it answered for, so nothing ever says "expiring soon" without saying soon relative to what.
+
+**Recurring training is generated when somebody runs it.** Annual safety training does not appear
+overnight: an administrator generates the next round, one page of the workforce at a time, and the
+command says whether more remain. Running it twice creates nothing the second time, and two people
+running it at once produce one set of requirements rather than two. If the system cannot work out
+who a rule applies to, it refuses — it does not report that everybody is up to date about an
+organization it never looked at.
+
+**A mark is kept exactly as the assessor wrote it.** `18.50` stays `18.50` on the screen, in the
+record and in an export. Nothing in the product calculates with a mark, so nothing rounds one.
+
+**No overall score is calculated from assessments**, and none is displayed. The product records each
+outcome an assessor stated. It does not average them, weight them or turn them into a pass mark,
+because no rule for doing so was ever specified — and a rule invented here would decide who passes
+mandatory safety training.
+
+### Measured
+
+Twenty-five workloads at 500, 10,000 and 100,000 employees, each with a second company's data in the
+same database. All within budget: the compliance queue answers in 22 ms and the expiring-certificate
+queue in 12 ms at 100,000 employees.
+
+### What is still missing
+
+- **Nobody can see their own training record.** The product cannot yet tell which employee a
+  signed-in person is, so "my learning" and a manager's view of their team are not built. Naming an
+  employee in a URL is refused rather than honoured.
+- **No training sessions, seats, capacity or waiting lists.** That is the next increment, and none
+  of it is half-built.
+- **No notification is delivered.** The intent to notify is recorded; nothing sends it.
+- **No course material or certificate file is stored, served or linked.** A document reference is
+  confirmed to exist and nothing more.
+- **The certificate that replaced an earlier one is not shown.** A superseded certificate says it
+  was superseded; the link to its replacement is not carried by the read.
+
+### Tests
+
+2,180, up from 2,014.
+
+---
+
 ## Phase 13 — Performance, competencies and goals
 
 One module. It says what somebody was rated, what that rating was measured against, and why — for as
