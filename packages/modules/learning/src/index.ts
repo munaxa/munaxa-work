@@ -73,3 +73,26 @@ export type {
  * actually needs.
  */
 export { postgresLearningStores } from './infrastructure/learning-stores.js';
+
+/**
+ * The transport: the controllers, and the injectable the composition root binds the dispatcher to.
+ *
+ * The controllers are exported rather than a Nest module, because the module that declares them
+ * lives beside the composition root — the order they are declared in is load-bearing for route
+ * resolution, and that ordering belongs with the application that serves them.
+ */
+export { LearningDispatcher } from './api/learning-dispatcher.js';
+export { LearningCourseCategoryController } from './api/course-category.controller.js';
+export { LearningCourseController } from './api/catalogue.controller.js';
+export {
+  LearningAssessmentController,
+  LearningCourseVersionController,
+} from './api/assessment.controller.js';
+export { LearningPathController } from './api/path.controller.js';
+export { LearningMandatoryRuleController } from './api/mandatory-rule.controller.js';
+export { LearningAssignmentController } from './api/assignment.controller.js';
+export { LearningEnrolmentController } from './api/enrolment.controller.js';
+export { LearningEnrolmentLifecycleController } from './api/enrolment-lifecycle.controller.js';
+export { LearningCertificationController } from './api/certification.controller.js';
+export { LearningInstructorController } from './api/instructor.controller.js';
+export { LearningHistoryController } from './api/history.controller.js';
