@@ -103,6 +103,24 @@ export interface UnitDetail {
 
 export interface ListPositions extends Query {
   readonly queryName: 'organization.list-positions';
+  /**
+   * One exact position identifier.
+   *
+   * Added for Phase 15, so a consumer holding an identifier can confirm it exists in its own tenant
+   * with **one bounded request**. Career stores `position_id` on a succession plan, a career stage
+   * and a mobility recommendation, and had no way to confirm any of them: `status`, `family` and
+   * `term` filter on a status, a family and free text over `code` and `title`, never on `id`. The
+   * alternative was paging the whole catalogue and filtering in the consumer, which is unbounded
+   * work over this module's data and would report a `total` that answered a different question.
+   *
+   * **This does not make critical-position enumeration possible** (D-4 stays `NOT VERIFIED`). It
+   * narrows a result the caller could already obtain with the same `organization.position.read`
+   * permission down to the single row they already named; it adds no way to *discover* positions by
+   * any property, least of all criticality.
+   *
+   * Absent, nothing changes: the same filters, the same page, the same `PagedResult<PositionView>`.
+   */
+  readonly positionId?: string;
   readonly status?: string;
   readonly family?: string;
   readonly term?: string;
@@ -121,6 +139,7 @@ export const listPositionsHandler = (
       const size = Math.min(query.size ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
       const page = Math.max(query.page ?? 1, 1);
       const { items, total } = await dependencies.stores.positions.list(transaction, {
+        ...(query.positionId === undefined ? {} : { positionId: query.positionId }),
         ...(query.status === undefined ? {} : { status: query.status }),
         ...(query.family === undefined ? {} : { family: query.family }),
         ...(query.term === undefined ? {} : { term: query.term }),

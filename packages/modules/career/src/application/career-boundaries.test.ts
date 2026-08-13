@@ -47,14 +47,14 @@ describe('Career recommends and executes nothing', () => {
         positionExists: () => Promise.resolve(false),
         unitExists: () => Promise.resolve(false),
       },
-      learning: { assignmentExists: () => Promise.resolve(false) },
+      learning: { assignmentIsFor: () => Promise.resolve(false) },
       permissions: { holds: () => Promise.resolve(false) },
       clock: { now: () => new Date() },
     };
 
     expect(Object.keys(declared.employment)).toEqual(['factsFor', 'inPosition']);
     expect(Object.keys(declared.organization)).toEqual(['positionExists', 'unitExists']);
-    expect(Object.keys(declared.learning)).toEqual(['assignmentExists']);
+    expect(Object.keys(declared.learning)).toEqual(['assignmentIsFor']);
   });
 
   it('offers no command that names an employment action', () => {

@@ -210,8 +210,10 @@ export interface DevelopmentItemIdentified {
  *
  * A `course` item must name a Learning assignment and only a `course` item may — the domain refuses
  * both mistakes and a check constraint refuses them again. Here the application adds the part
- * neither can know: that the assignment **actually exists in Learning**. Storing an identifier
- * nothing backs would be a reference to a course nobody was ever assigned.
+ * neither can know: that the assignment **exists in Learning and belongs to the person this plan is
+ * for**. The employment comes from the plan rather than the command, so a caller cannot attach
+ * somebody else's course by naming it — and storing an identifier nothing backs would be a
+ * reference to a course nobody was ever assigned.
  *
  * `category` is recorded and counted, never validated (D-12).
  */
@@ -232,7 +234,10 @@ export const addDevelopmentItemHandler = (
 
       const assignment = command.learningAssignmentId;
 
-      if (assignment !== undefined && !(await dependencies.learning.assignmentExists(assignment))) {
+      if (
+        assignment !== undefined &&
+        !(await dependencies.learning.assignmentIsFor(plan.employmentId, assignment))
+      ) {
         return refuseWith<DevelopmentItemIdentified>('learning-assignment-not-found');
       }
 

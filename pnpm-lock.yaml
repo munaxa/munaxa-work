@@ -143,6 +143,9 @@ importers:
       '@work/attendance':
         specifier: workspace:*
         version: link:../../packages/modules/attendance
+      '@work/career':
+        specifier: workspace:*
+        version: link:../../packages/modules/career
       '@work/compensation':
         specifier: workspace:*
         version: link:../../packages/modules/compensation

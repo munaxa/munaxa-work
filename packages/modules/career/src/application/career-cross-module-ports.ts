@@ -96,14 +96,27 @@ export interface OrganizationPort {
 }
 
 /**
- * That a Learning assignment exists, and that it is the one somebody named.
+ * That a Learning assignment exists **and belongs to the person the development plan is for**.
  *
  * A `course` development item stores a `learningAssignmentId` and **no status of its own**
  * (ADR-0073, D-2): whether somebody finished is `learning_enrolment`'s answer, and a second copy
  * here would be the one that goes stale the first time an enrolment was withdrawn. So this port
  * confirms the reference is real at the moment it is written, and returns nothing else — no title,
  * no completion date, no progress, because a field for any of them is where the second copy starts.
+ *
+ * **The question is scoped to an employment, and that is deliberate rather than incidental.** The
+ * plan originally called for `assignmentExists(assignmentId)`, but Learning publishes no
+ * assignment-by-identifier query — `learning.search-assignments` filters on employment, course,
+ * status and due date, never on the assignment's own identifier. `learning.read-history` answers a
+ * *narrower* question with one bounded request: what this employment was assigned. Since a
+ * development item always hangs off a plan that names an employment, asking the narrower question
+ * is both possible and better — it additionally proves the assignment is **that person's**, which
+ * `assignmentExists` could never establish. Attaching somebody else's course to a development plan
+ * is refused as a result, and it would not have been before.
+ *
+ * A tenant-wide search is deliberately **not** how this is answered. "Some assignment with this
+ * identifier exists somewhere" is not the fact a development item needs.
  */
 export interface LearningPort {
-  assignmentExists(assignmentId: string): Promise<boolean>;
+  assignmentIsFor(employmentId: string, assignmentId: string): Promise<boolean>;
 }

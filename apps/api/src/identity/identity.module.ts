@@ -69,6 +69,7 @@ import { documentsModuleFor } from '../documents/documents.composition.js';
 import { lettersModuleFor } from '../letters/letters.composition.js';
 import { performanceModuleFor } from '../performance/performance.composition.js';
 import { learningModuleFor } from '../learning/learning.composition.js';
+import { careerModuleFor } from '../career/career.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -172,6 +173,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         letters: lettersModuleFor(unitOfWork, senders.payroll, permissions),
         performance: performanceModuleFor(unitOfWork, senders.payroll, permissions),
         learning: learningModuleFor(unitOfWork, senders.payroll, permissions),
+        career: careerModuleFor(unitOfWork, senders.payroll, permissions),
       }),
     },
     {
@@ -247,6 +249,13 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // what the caller holds — and because `assignment.read-team` deliberately resolves to
         // nothing until the platform can say which employment the caller is (ADR-0032).
         registry.register(permissionAware.learning);
+        // Career last of all, because it reads the three modules above it and is read by none of
+        // them. Employment, Organization and Learning are consumed through their published queries
+        // under bounded service grants, and Career writes to none of them — nor to Performance,
+        // Compensation or People, for which it declares no adapter at all (ADR-0072). It takes the
+        // permission checker for the same reason Learning does: `plan.read-team` resolves to
+        // nothing until the platform can say which employment the caller is (ADR-0032).
+        registry.register(permissionAware.career);
         return registry;
       },
     },
@@ -305,6 +314,7 @@ interface PermissionAwareModules {
   readonly letters: WorkModule;
   readonly performance: WorkModule;
   readonly learning: WorkModule;
+  readonly career: WorkModule;
 }
 
 interface DeferredSenders {

@@ -144,18 +144,21 @@ export class FakeOrganization implements OrganizationPort {
 /**
  * Learning, answering that an assignment exists.
  *
- * It answers **only** that. There is no completion, no title and no progress on this double, because
- * there is none on the port — Career stores a reference and Learning keeps the status (ADR-0073).
+ * It answers **only** that, and it answers it *per employment* — which is what the port asks and
+ * what `learning.read-history` can establish. There is no completion, no title and no progress on
+ * this double, because there is none on the port: Career stores a reference and Learning keeps the
+ * status (ADR-0073).
  */
 export class FakeLearning implements LearningPort {
-  private readonly assignments = new Set<string>();
+  /** Assignment identifier to the employment Learning says it belongs to. */
+  private readonly assignments = new Map<string, string>();
 
-  public add(assignmentId: string): void {
-    this.assignments.add(assignmentId);
+  public add(assignmentId: string, employmentId: string = EMPLOYMENT): void {
+    this.assignments.set(assignmentId, employmentId);
   }
 
-  public assignmentExists(assignmentId: string): Promise<boolean> {
-    return Promise.resolve(this.assignments.has(assignmentId));
+  public assignmentIsFor(employmentId: string, assignmentId: string): Promise<boolean> {
+    return Promise.resolve(this.assignments.get(assignmentId) === employmentId);
   }
 }
 

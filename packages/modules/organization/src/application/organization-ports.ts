@@ -108,6 +108,8 @@ export interface FinancialCenterStore {
 }
 
 export interface PositionQuery extends Paged {
+  /** One exact identifier. An equality predicate, never a pattern — see `ListPositions`. */
+  readonly positionId?: string;
   readonly status?: string;
   readonly family?: string;
   readonly term?: string;

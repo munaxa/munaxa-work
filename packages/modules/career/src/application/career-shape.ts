@@ -46,7 +46,7 @@ export const shapeDependencies = (): CareerDependencies => ({
     positionExists: () => Promise.resolve(false),
     unitExists: () => Promise.resolve(false),
   },
-  learning: { assignmentExists: () => Promise.resolve(false) },
+  learning: { assignmentIsFor: () => Promise.resolve(false) },
   permissions: { holds: () => Promise.resolve(false) },
   clock: { now: () => new Date('2026-08-13T09:00:00Z') },
 });

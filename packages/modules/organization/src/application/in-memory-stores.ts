@@ -211,6 +211,11 @@ const positionStore = (rows: Table<PositionState>): OrganizationStores['position
     Promise.resolve(
       page(
         matchesStatus(rows.all(), query.status)
+          // Equality on the identifier, mirroring the repository's `id = $7`. A fake that ignored
+          // this filter would be more permissive than the database — it would answer "yes, that
+          // position exists" for any identifier at all, which is precisely the confirmation the
+          // filter was added to provide.
+          .filter((row) => query.positionId === undefined || row.id === query.positionId)
           .filter((row) => query.family === undefined || row.family === query.family)
           .filter((row) => matchesTerm(row.code, [row.title], query.term)),
         query.limit,
