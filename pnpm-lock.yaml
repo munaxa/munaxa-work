@@ -492,10 +492,6 @@ importers:
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.2)
 
   packages/modules/career:
-    dependencies:
-      '@work/kernel':
-        specifier: workspace:*
-        version: link:../../kernel
     devDependencies:
       '@munaxa/config-eslint':
         specifier: ^1.0.0
@@ -506,9 +502,15 @@ importers:
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
       eslint:
         specifier: ^9.17.0
         version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

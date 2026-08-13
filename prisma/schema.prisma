@@ -4838,3 +4838,351 @@ model LearningInstructor {
   @@index([tenant_id, active], map: "learning_instructor_active_idx")
   @@map("learning_instructor")
 }
+
+
+// ---------------------------------------------------------------------------------------------
+// Career & Succession (Phase 15)
+//
+// Career records what an organization *intends* and executes nothing. No model below carries a
+// column through which an employment, position, assignment or salary could change (ADR-0072).
+//
+// Three absences are deliberate and each is a column somebody would reasonably have added: no
+// `criticality` (Organization owns it, AD-004), no potential band or nine-box code (Performance
+// owns it, ADR-0073), and no readiness score or development-mix verdict (readiness is stated by a
+// person and the 70-20-10 rule is NOT VERIFIED, ADR-0074).
+//
+// Every date here is a civil `@db.Date`. `@db.Timestamptz(6)` appears only on audit columns and on
+// `recorded_at`, which genuinely is the instant a row was written.
+//
+// Cross-module identifiers — `employment_id`, `position_id`, `target_unit_id`,
+// `learning_assignment_id` — are plain `@db.Uuid` with no foreign key and no Prisma relation
+// (ADR-0042). A foreign key does not provide tenant isolation: PostgreSQL's referential check runs
+// without consulting a row-level policy.
+// ---------------------------------------------------------------------------------------------
+
+/// A route somebody could follow. Configuration, and the only effective-dated thing in the module.
+model CareerPath {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  code           String    @db.VarChar(64)
+  name           Json
+  description    Json?
+  kind           String    @db.VarChar(24)
+  status         String    @db.VarChar(16)
+  effective_from DateTime  @db.Date
+  effective_to   DateTime? @db.Date
+  archived_at    DateTime? @db.Timestamptz(6)
+  archived_by    String?   @db.VarChar(255)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, status, effective_from], map: "career_path_status_idx")
+  @@map("career_path")
+}
+
+/// A stage along a path. `sequence` is an order, **not a gate** — nothing requires stage two before
+/// stage three, because prerequisites were never specified (D-17). `target_position_id` is
+/// Organization's identifier and nothing else: no title, no grade, no criticality.
+model CareerStage {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  path_id            String    @db.Uuid
+  sequence           Int       @db.SmallInt
+  name               Json
+  target_position_id String?   @db.Uuid
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@map("career_stage")
+}
+
+/// One employment's plan. `path_id` is nullable (D-18): a tenant may plan somebody towards a target
+/// stage without committing to a whole published path. A stage may only be named where a path is.
+model CareerPlan {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  employment_id    String    @db.Uuid
+  path_id          String?   @db.Uuid
+  current_stage_id String?   @db.Uuid
+  target_stage_id  String?   @db.Uuid
+  status           String    @db.VarChar(16)
+  started_on       DateTime  @db.Date
+  target_date      DateTime? @db.Date
+  notes            String?   @db.VarChar(4000)
+  closed_on        DateTime? @db.Date
+  closed_by        String?   @db.VarChar(255)
+  metadata         Json
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@index([tenant_id, employment_id, status], map: "career_plan_employment_idx")
+  @@map("career_plan")
+}
+
+/// A pool a tenant named. **Nothing in this product branches on a pool's kind**, and no column is
+/// derived from Performance's potential band (ADR-0073).
+model CareerTalentPool {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  code        String    @db.VarChar(64)
+  name        Json
+  description Json?
+  kind        String    @db.VarChar(24)
+  status      String    @db.VarChar(16)
+  closed_at   DateTime? @db.Timestamptz(6)
+  closed_by   String?   @db.VarChar(255)
+  metadata    Json
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@map("career_talent_pool")
+}
+
+/// A period somebody was in a pool. **Removal ends the period; it never deletes the row** — a
+/// succession review a year later asks who was invested in and what became of them. Both ends are
+/// inclusive.
+model CareerPoolMembership {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  talent_pool_id String    @db.Uuid
+  employment_id  String    @db.Uuid
+  from_date      DateTime  @db.Date
+  to_date        DateTime? @db.Date
+  added_by       String    @db.VarChar(255)
+  added_reason   String?   @db.VarChar(1024)
+  removed_by     String?   @db.VarChar(255)
+  removed_reason String?   @db.VarChar(1024)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@index([tenant_id, talent_pool_id, from_date], map: "career_pool_membership_pool_idx")
+  @@index([tenant_id, employment_id, from_date], map: "career_pool_membership_employment_idx")
+  @@map("career_pool_membership")
+}
+
+/// A tenant's own ladder. `ordinal` orders the levels least to most ready so a screen can sort them.
+/// **It is not a score and is never published as one** (ADR-0074).
+model CareerReadinessLevel {
+  id         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  code       String    @db.VarChar(64)
+  name       Json
+  ordinal    Int       @db.SmallInt
+  active     Boolean
+  metadata   Json
+  created_at DateTime  @db.Timestamptz(6)
+  created_by String    @db.VarChar(255)
+  updated_at DateTime  @db.Timestamptz(6)
+  updated_by String    @db.VarChar(255)
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.VarChar(255)
+  version    Int
+
+  @@map("career_readiness_level")
+}
+
+/// The plan **for** a position, not a second record of the position (D-3). `position_id` is
+/// Organization's identifier; there is no criticality column. `review_on` is a day somebody chose to
+/// look again — **nothing reminds them**, because `JobPort` has no adapter.
+model CareerSuccessionPlan {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  position_id String    @db.Uuid
+  status      String    @db.VarChar(16)
+  review_on   DateTime? @db.Date
+  notes       String?   @db.VarChar(4000)
+  archived_at DateTime? @db.Timestamptz(6)
+  archived_by String?   @db.VarChar(255)
+  metadata    Json
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@index([tenant_id, status, position_id], map: "career_succession_plan_status_idx")
+  @@map("career_succession_plan")
+}
+
+/// A nomination. `rank` is an order a human put the bench in — **not a score, and nothing computes
+/// it**. Confirmation carries its own actor and day, and `system:auto-approval` is refused by check
+/// constraint. **Withdrawal is a state, never a delete.**
+model CareerSuccessor {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  succession_plan_id String    @db.Uuid
+  employment_id      String    @db.Uuid
+  readiness_level_id String?   @db.Uuid
+  rank               Int?      @db.SmallInt
+  status             String    @db.VarChar(16)
+  nominated_on       DateTime  @db.Date
+  nominated_by       String    @db.VarChar(255)
+  confirmed_on       DateTime? @db.Date
+  confirmed_by       String?   @db.VarChar(255)
+  withdrawn_on       DateTime? @db.Date
+  withdrawn_by       String?   @db.VarChar(255)
+  withdrawal_reason  String?   @db.VarChar(1024)
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, succession_plan_id, status], map: "career_successor_plan_idx")
+  @@index([tenant_id, employment_id, status], map: "career_successor_employment_idx")
+  @@map("career_successor")
+}
+
+/// One person's statement that somebody is at one level, on one day. **Append-only** (D-14): a
+/// trigger refuses every update and delete, because a correction is a new assessment. There is no
+/// score column, no weight and no reference to the inputs a derivation would have used.
+model CareerReadinessAssessment {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  employment_id      String    @db.Uuid
+  readiness_level_id String    @db.Uuid
+  position_id        String?   @db.Uuid
+  succession_plan_id String?   @db.Uuid
+  assessed_on        DateTime  @db.Date
+  assessed_by        String    @db.VarChar(255)
+  rationale          String?   @db.VarChar(4000)
+  recorded_at        DateTime  @db.Timestamptz(6)
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, employment_id, assessed_on(sort: Desc)], map: "career_readiness_assessment_employment_idx")
+  @@map("career_readiness_assessment")
+}
+
+/// **Joint ownership is NOT VERIFIED** (D-9). This product has no principal-to-employment resolution
+/// (ADR-0032), so the columns say what is true: an administrator *recorded* that each party
+/// acknowledged, and the recorder is the authenticated actor. A column named `employee_signed_by`
+/// would claim something the platform cannot deliver.
+model CareerDevelopmentPlan {
+  id                                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                            String    @db.Uuid
+  employment_id                        String    @db.Uuid
+  career_plan_id                       String?   @db.Uuid
+  cycle_label                          String?   @db.VarChar(255)
+  status                               String    @db.VarChar(16)
+  started_on                           DateTime  @db.Date
+  target_date                          DateTime? @db.Date
+  employee_acknowledged_on             DateTime? @db.Date
+  employee_acknowledgement_recorded_by String?   @db.VarChar(255)
+  manager_acknowledged_on              DateTime? @db.Date
+  manager_acknowledgement_recorded_by  String?   @db.VarChar(255)
+  closed_on                            DateTime? @db.Date
+  closed_by                            String?   @db.VarChar(255)
+  metadata                             Json
+  created_at                           DateTime  @db.Timestamptz(6)
+  created_by                           String    @db.VarChar(255)
+  updated_at                           DateTime  @db.Timestamptz(6)
+  updated_by                           String    @db.VarChar(255)
+  deleted_at                           DateTime? @db.Timestamptz(6)
+  deleted_by                           String?   @db.VarChar(255)
+  version                              Int
+
+  @@index([tenant_id, employment_id, status], map: "career_development_plan_employment_idx")
+  @@map("career_development_plan")
+}
+
+/// **A course item is a reference to Learning, and Career keeps no status for it** (ADR-0073).
+/// `learning_assignment_id` is present exactly when `kind = 'course'` and is the whole of what
+/// Career stores about it. `category` is **counted and never validated**: the 70-20-10 model has no
+/// rule attached to it, so there is no target, tolerance or balance verdict here (D-12).
+model CareerDevelopmentItem {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  development_plan_id    String    @db.Uuid
+  category               String    @db.VarChar(16)
+  kind                   String    @db.VarChar(24)
+  title                  String    @db.VarChar(255)
+  learning_assignment_id String?   @db.Uuid
+  target_date            DateTime? @db.Date
+  status                 String    @db.VarChar(16)
+  completed_on           DateTime? @db.Date
+  completed_by           String?   @db.VarChar(255)
+  metadata               Json
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@index([tenant_id, development_plan_id, category], map: "career_development_item_plan_idx")
+  @@map("career_development_item")
+}
+
+/// **A suggestion, and nothing that moves anybody.** `accepted` means a named person agreed the move
+/// is a good idea — no employment changes, no assignment is written, nobody is told (ADR-0072).
+/// There is no `effective_date` and no `assignment_id`, because there is nothing for either to point
+/// at. **`expired` is never stored** (D-13): it is derived from `valid_until` and the day somebody
+/// asked, and a check constraint refuses it as a column value.
+model CareerMobilityRecommendation {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  employment_id      String    @db.Uuid
+  kind               String    @db.VarChar(32)
+  target_position_id String?   @db.Uuid
+  target_unit_id     String?   @db.Uuid
+  rationale          String?   @db.VarChar(4000)
+  status             String    @db.VarChar(16)
+  recommended_on     DateTime  @db.Date
+  recommended_by     String    @db.VarChar(255)
+  valid_until        DateTime? @db.Date
+  decided_on         DateTime? @db.Date
+  decided_by         String?   @db.VarChar(255)
+  decision_note      String?   @db.VarChar(1024)
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@index([tenant_id, employment_id, status], map: "career_mobility_recommendation_employment_idx")
+  @@map("career_mobility_recommendation")
+}

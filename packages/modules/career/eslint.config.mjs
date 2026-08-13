@@ -3,12 +3,19 @@ import base from '@munaxa/config-eslint/base.js';
 import standards from '../../../tooling/eslint/standards.mjs';
 
 /**
- * Career & Succession.
- *
- * No override yet. The exemption Learning carries — `process.env` inside an integration fixture —
- * is added when this module gains one, and not before: a rule relaxed in advance of the code that
- * needs it is a rule nobody notices has been relaxed.
+ * Career & Succession. The integration suites and the fixture they share choose which database to
+ * connect to, which is a harness concern rather than application configuration — the rule confining
+ * `process.env` to `@work/config` exists to stop *business* code branching on the environment, and
+ * no business code lives in either.
  *
  * @type {import('eslint').Linter.Config[]}
  */
-export default [...base, ...standards];
+export default [
+  ...base,
+  ...standards,
+  {
+    name: 'work/career/database-selection',
+    files: ['src/**/*.integration.test.ts', 'src/**/*.fixture.ts'],
+    rules: { 'no-restricted-properties': 'off' },
+  },
+];
