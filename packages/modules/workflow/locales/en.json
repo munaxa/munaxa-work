@@ -1,0 +1,31 @@
+{
+  "workflow": {
+    "rejection": {
+      "authority-not-delegated": "This decision names somebody it acts for, but was not made under a delegation.",
+      "cancellation-reason-required": "Stopping an approval needs a reason.",
+      "decision-not-the-assigned-approver": "This step was not assigned to you.",
+      "decision-requires-a-person": "An approval decision must be made by a named person.",
+      "definition-code-invalid": "A workflow code must be lowercase letters, digits and hyphens.",
+      "definition-name-required": "A workflow needs a name in both English and Arabic.",
+      "definition-retired": "This workflow has been retired and takes no new versions.",
+      "definition-subject-type-invalid": "The subject type must name a module and a subject, such as recruitment.requisition.",
+      "definition-transition-refused": "A workflow cannot move from its current state to that one.",
+      "delegation-names-another-approver": "That delegation is for somebody else's step.",
+      "delegation-not-required": "You are this step's approver and need no delegation to decide it.",
+      "delegation-subject-required": "A delegated decision must name the approver it acts for.",
+      "instance-not-running": "This approval has already finished.",
+      "step-identifiers-mismatched": "The steps and their identifiers do not correspond.",
+      "step-not-awaiting-a-decision": "This step is not the one awaiting a decision.",
+      "step-not-on-this-instance": "That step belongs to a different approval.",
+      "step-name-required": "An approval step needs a name in both English and Arabic.",
+      "step-ordinal-invalid": "A step's position must be a whole number of one or more.",
+      "subject-type-invalid": "The subject type must name a module and a subject.",
+      "version-has-no-steps": "A workflow version with no approval steps cannot be published.",
+      "version-not-editable": "This version has been published and can no longer be changed.",
+      "version-not-published": "Only a published workflow version can start an approval.",
+      "version-number-invalid": "A version number must be a whole number of one or more.",
+      "version-step-order-broken": "The approval steps must be numbered from one with no gaps and no repeats.",
+      "version-transition-refused": "A workflow version cannot move from its current state to that one."
+    }
+  }
+}

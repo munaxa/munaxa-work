@@ -1,0 +1,216 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { cancellationHistory, decisionHistory, startHistory } from './history.js';
+import { decide } from './decision.js';
+import { cancelInstance } from './instance.js';
+import { AT, must, startedInstance } from './workflow-fixtures.js';
+import {
+  APPROVER_KINDS,
+  WORKFLOW_HISTORY_EVENTS,
+  isPositiveWhole,
+  isSubjectType,
+} from './workflow-vocabulary.js';
+
+/**
+ * What this module deliberately does not contain, asserted against the source rather than assumed.
+ *
+ * **Prose is not implementation.** `workflow-vocabulary.ts` has to name `role`, `sla` and `escalate`
+ * in order to explain why none of them exists, so a bare string search over this package would fail
+ * against its own documentation. Comments and string literals are stripped before the search, which
+ * leaves the code — an identifier, a property, a type — and that is what a capability would actually
+ * be written in.
+ */
+const DOMAIN = join(process.cwd(), 'src', 'domain');
+
+/** Source with block comments, line comments and string literals removed. */
+const codeOf = (file: string): string =>
+  readFileSync(join(DOMAIN, file), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``');
+
+const sources = readdirSync(DOMAIN).filter(
+  (file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !file.includes('fixtures'),
+);
+const code = sources.map((file) => codeOf(file)).join('\n');
+
+describe('Phase 16B is not quietly present', () => {
+  /**
+   * Each entry is a capability the plan defers, and a fragment that would appear in the *code* if
+   * it had been built. Deliberately narrow: `sla` rather than `s`, `escalat` rather than `level`,
+   * so an ordinary word cannot trip them.
+   */
+  const deferred: readonly (readonly [string, readonly string[]])[] = [
+    ['SLA and business days', ['sla', 'businessDay', 'workingDay', 'dueAt', 'breach']],
+    ['escalation', ['escalat']],
+    ['scheduling', ['JobPort', 'cron', 'schedule', 'enqueue']],
+    ['tallies and parallel approval', ['quorum', 'threshold', 'majority', 'unanimous', 'tally']],
+    ['conditional branching', ['branch', 'condition', 'expression', 'evaluate']],
+    ['roles and groups', ['roleId', 'groupId', 'approvalGroup', 'permissionHolder']],
+    ['manager routing', ['manager', 'reportsTo', 'employmentId']],
+    ['notification', ['notify', 'notification', 'recipient', 'reminder']],
+    ['analytics', ['analytic', 'aggregate', 'distribution', 'percentile']],
+  ];
+
+  for (const [capability, fragments] of deferred) {
+    it(`has no ${capability} in its code`, () => {
+      const present = fragments.filter((fragment) =>
+        new RegExp(fragment, 'i').test(code.replace(/\s+/g, ' ')),
+      );
+
+      expect(present).toStrictEqual([]);
+    });
+  }
+
+  it('knows exactly one kind of approver', () => {
+    expect([...APPROVER_KINDS]).toStrictEqual(['membership']);
+  });
+
+  it('places no upper bound on the number of steps (AD-004)', () => {
+    expect(isPositiveWhole(1)).toBe(true);
+    expect(isPositiveWhole(2_147_483_000)).toBe(true);
+    expect(isPositiveWhole(0)).toBe(false);
+    expect(isPositiveWhole(1.5)).toBe(false);
+  });
+});
+
+describe('no business vocabulary leaked in (AD-001)', () => {
+  it('names no business module and no business concept', () => {
+    const business = [
+      'leave',
+      'requisition',
+      'payroll',
+      'attendance',
+      'compensation',
+      'onboarding',
+      'salary',
+      'amount',
+      'employee',
+    ];
+    const present = business.filter((word) => new RegExp(`\\b${word}`, 'i').test(code));
+
+    expect(present).toStrictEqual([]);
+  });
+
+  it('validates a subject type by shape alone, holding no list of them', () => {
+    expect(isSubjectType('recruitment.requisition')).toBe(true);
+    expect(isSubjectType('a-module-nobody-has-written.a-subject')).toBe(true);
+    expect(isSubjectType('norealsubject')).toBe(false);
+    expect(isSubjectType('Recruitment.Requisition')).toBe(false);
+  });
+});
+
+describe('history records routing and not business facts', () => {
+  it('has a closed event list with no business word in it', () => {
+    expect([...WORKFLOW_HISTORY_EVENTS]).toStrictEqual([
+      'instance-started',
+      'step-awaiting',
+      'step-approved',
+      'step-rejected',
+      'step-skipped',
+      'instance-completed',
+      'instance-rejected',
+      'instance-cancelled',
+    ]);
+  });
+
+  it('writes the instance and the first assignment when an instance starts', () => {
+    const started = startedInstance(2);
+    const entries = startHistory(started, ['history-1', 'history-2']);
+
+    expect(entries.map((history) => history.event)).toStrictEqual([
+      'instance-started',
+      'step-awaiting',
+    ]);
+    expect(entries[1]?.ordinal).toBe(1);
+    expect(entries[0]?.actorMembershipId).toBe('membership-requester');
+  });
+
+  it('records the delegate and the authority, and carries no comment', () => {
+    const started = startedInstance(1);
+    const first = started.steps[0];
+
+    if (first === undefined) throw new Error('The fixture has no first step.');
+
+    const decided = must(
+      decide(started.instance, first, started.steps, {
+        decisionId: 'd',
+        decision: 'approved',
+        decidedByMembershipId: 'membership-deputy',
+        authority: 'delegated',
+        onBehalfOfMembershipId: first.approverMembershipId,
+        at: AT,
+        comment: 'Agreed, with reservations about the timing.',
+      }),
+      'a delegated approval',
+    );
+    const entries = decisionHistory(decided, ['history-1', 'history-2']);
+
+    expect(entries.map((history) => history.event)).toStrictEqual([
+      'step-approved',
+      'instance-completed',
+    ]);
+    expect(entries[0]?.actorMembershipId).toBe('membership-deputy');
+    expect(entries[0]?.onBehalfOfMembershipId).toBe(first.approverMembershipId);
+    // The comment lives on the decision, where a permission decides who may read it.
+    expect(JSON.stringify(entries)).not.toContain('reservations');
+  });
+
+  it('explains every abandoned step on a rejection', () => {
+    const started = startedInstance(3);
+    const first = started.steps[0];
+
+    if (first === undefined) throw new Error('The fixture has no first step.');
+
+    const decided = must(
+      decide(started.instance, first, started.steps, {
+        decisionId: 'd',
+        decision: 'rejected',
+        decidedByMembershipId: first.approverMembershipId,
+        authority: 'assigned',
+        at: AT,
+      }),
+      'a rejection',
+    );
+    const entries = decisionHistory(decided, ['h1', 'h2', 'h3', 'h4']);
+
+    expect(entries.map((history) => history.event)).toStrictEqual([
+      'step-rejected',
+      'step-skipped',
+      'step-skipped',
+      'instance-rejected',
+    ]);
+  });
+
+  it('drops entries the caller supplied no identifier for rather than inventing one', () => {
+    const started = startedInstance(3);
+    const cancelled = must(
+      cancelInstance(started.instance, started.steps, { by: 'u', reason: 'stopped', at: AT }),
+      'a cancellation',
+    );
+
+    expect(cancellationHistory(cancelled, AT, ['h1', 'h2', 'h3', 'h4'])).toHaveLength(4);
+    expect(cancellationHistory(cancelled, AT, ['h1'])).toHaveLength(1);
+    expect(cancellationHistory(cancelled, AT, [])).toStrictEqual([]);
+  });
+});
+
+describe('a decision is append-only', () => {
+  it('exposes no way to change one', () => {
+    const forbidden = ['amendDecision', 'updateDecision', 'retractDecision', 'deleteDecision'];
+    const present = forbidden.filter((name) => code.includes(name));
+
+    expect(present).toStrictEqual([]);
+  });
+
+  it('exposes no way to set an instance status directly', () => {
+    // Terminal states are reached by deciding a step or cancelling, never assigned by a caller.
+    expect(code).not.toContain('setStatus');
+    expect(code).not.toContain('setInstanceStatus');
+  });
+});

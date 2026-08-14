@@ -1,0 +1,31 @@
+{
+  "workflow": {
+    "rejection": {
+      "authority-not-delegated": "هذا القرار يذكر شخصًا نيابةً عنه، لكنه لم يُتخذ بموجب تفويض.",
+      "cancellation-reason-required": "إيقاف الاعتماد يتطلب سببًا.",
+      "decision-not-the-assigned-approver": "هذه الخطوة ليست مسندة إليك.",
+      "decision-requires-a-person": "يجب أن يتخذ قرار الاعتماد شخص محدد بالاسم.",
+      "definition-code-invalid": "يجب أن يتكون رمز سير العمل من حروف إنجليزية صغيرة وأرقام وشرطات.",
+      "definition-name-required": "يحتاج سير العمل إلى اسم بالعربية والإنجليزية معًا.",
+      "definition-retired": "تم إيقاف سير العمل هذا ولا يقبل إصدارات جديدة.",
+      "definition-subject-type-invalid": "يجب أن يذكر نوع الموضوع الوحدة والموضوع، مثل recruitment.requisition.",
+      "definition-transition-refused": "لا يمكن نقل سير العمل من حالته الحالية إلى تلك الحالة.",
+      "delegation-names-another-approver": "هذا التفويض يخص خطوة شخص آخر.",
+      "delegation-not-required": "أنت معتمد هذه الخطوة ولا تحتاج إلى تفويض لاتخاذ القرار.",
+      "delegation-subject-required": "يجب أن يذكر القرار المُفوَّض المعتمد الذي يتصرف نيابةً عنه.",
+      "instance-not-running": "انتهى هذا الاعتماد بالفعل.",
+      "step-identifiers-mismatched": "الخطوات ومعرفاتها غير متطابقة.",
+      "step-not-awaiting-a-decision": "هذه الخطوة ليست الخطوة التي تنتظر قرارًا.",
+      "step-not-on-this-instance": "تنتمي هذه الخطوة إلى اعتماد آخر.",
+      "step-name-required": "تحتاج خطوة الاعتماد إلى اسم بالعربية والإنجليزية معًا.",
+      "step-ordinal-invalid": "يجب أن يكون ترتيب الخطوة عددًا صحيحًا لا يقل عن واحد.",
+      "subject-type-invalid": "يجب أن يذكر نوع الموضوع الوحدة والموضوع.",
+      "version-has-no-steps": "لا يمكن نشر إصدار سير عمل لا يتضمن خطوات اعتماد.",
+      "version-not-editable": "تم نشر هذا الإصدار ولم يعد قابلاً للتعديل.",
+      "version-not-published": "لا يبدأ الاعتماد إلا من إصدار سير عمل منشور.",
+      "version-number-invalid": "يجب أن يكون رقم الإصدار عددًا صحيحًا لا يقل عن واحد.",
+      "version-step-order-broken": "يجب ترقيم خطوات الاعتماد من واحد دون فجوات ودون تكرار.",
+      "version-transition-refused": "لا يمكن نقل إصدار سير العمل من حالته الحالية إلى تلك الحالة."
+    }
+  }
+}
