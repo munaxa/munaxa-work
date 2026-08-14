@@ -40,7 +40,7 @@ ADRs updated.
 | 13  | Performance                 | [`14_PHASE_13_PERFORMANCE.md`](../work%20prompts/14_PHASE_13_PERFORMANCE.md)                          | Not started |
 | 13.1| Engagement & surveys        | [`14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md`](../work%20prompts/14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md)      | Not started |
 | 14  | Learning                    | [`15_PHASE_14_LEARNING.md`](../work%20prompts/15_PHASE_14_LEARNING.md)                                | Not started |
-| 15  | Career and succession       | [`16_PHASE_15_CAREER_SUCCESSION.md`](../work%20prompts/16_PHASE_15_CAREER_SUCCESSION.md)              | Not started |
+| 15  | Career and succession       | [`16_PHASE_15_CAREER_SUCCESSION.md`](../work%20prompts/16_PHASE_15_CAREER_SUCCESSION.md)              | Complete    |
 | 16  | Workflow                    | [`17_PHASE_16_WORKFLOW.md`](../work%20prompts/17_PHASE_16_WORKFLOW.md)                                | Not started |
 | 17  | Communications              | [`18_PHASE_17_COMMUNICATIONS.md`](../work%20prompts/18_PHASE_17_COMMUNICATIONS.md)                    | Not started |
 | 18  | Employee self service       | [`19_PHASE_18_EMPLOYEE_SELF_SERVICE.md`](../work%20prompts/19_PHASE_18_EMPLOYEE_SELF_SERVICE.md)      | Not started |
@@ -265,6 +265,39 @@ carried-forward debt register are in
 [`verification/phase-14a-final-report.md`](verification/phase-14a-final-report.md). **Phase 14B —
 sessions, capacity, waitlists and scheduling — is not started**: no column, no port, no route, no
 screen.
+
+Phase 15 completed on 2026-08-14: Career, Succession and Development — one module, twelve tables. It
+records the ladders a tenant defines, who is on one, the benches it keeps, what people have been
+judged ready for, what they agreed to do and where somebody suggested they move next — and it
+**recommends and executes nothing**. No employment, position, assignment or salary changes because of
+anything in this module, and there is no port through which one could: every cross-module adapter
+takes `Asking`, which declares `ask` and no `send`, so an adapter that tried to write another
+module's data would not compile
+([ADR-0072](adr/0072-a-career-recommendation-is-advisory-and-writes-nothing.md)). **A decision is
+Career's; an observation stays where it was made** — talent-pool membership is a standing decision an
+organization took, Performance's nine-box placement is an observation of one cycle, and neither
+derives the other
+([ADR-0073](adr/0073-a-decision-is-careers-an-observation-stays-where-it-was-made.md)). **Readiness is
+stated by a person**: the specification defines no formula, so an authorized human states a level with
+a rationale and their name on it, and there is no score, no percentage and no nine-box anywhere in the
+module ([ADR-0074](adr/0074-readiness-is-stated-by-a-person.md)). Assessments are immutable at the
+table — one trigger refuses update and delete, so a correction is a new assessment and `latest` is a
+selection of the most recent statement rather than an average of two. **There is no `numeric`, no
+`double precision`, no `real`, no `bigint` and no `money` column anywhere**: every number is a small
+bounded integer a human chose, and every date is a `YYYY-MM-DD` civil day with no `Date` on the path.
+Two answers are derived on read against a stated day rather than stored — whether a succession review
+is due and whether a mobility recommendation still stands — because `JobPort` has no adapter and a
+flag nothing maintains goes stale. D-4 (critical-position enumeration) and D-5 (nine-box and
+high-potential listing) were **refused and remain `NOT VERIFIED`**; the only change to a completed
+module is the narrow additive `organization.list-positions(positionId?)` exact-identifier lookup,
+which adds no way to discover a position by any property and no `criticality` filter. Sixteen
+capabilities remain `NOT VERIFIED`, none with a placeholder anywhere in the product. The three
+production defects with their original failing evidence, the fourteen test and fixture defects beside
+them, the measured performance at 500, 10,000 and 100,000 employments with **all twenty-six workloads
+within budget**, the query plans, the sixteen `NOT VERIFIED` capabilities and the carried-forward debt
+register are in
+[`verification/phase-15-final-report.md`](verification/phase-15-final-report.md). **Phase 16 —
+workflow — is not started**: no column, no port, no route, no screen.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

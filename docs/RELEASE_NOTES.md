@@ -5,6 +5,75 @@ and what is still missing.
 
 ---
 
+## Phase 15 — Career, succession and development
+
+One module. It records the ladders a company defines, who is on one, the benches it keeps for its
+key posts, what people have been judged ready for, what they agreed to do, and where somebody
+suggested they move next.
+
+**It recommends and executes nothing.** Marking a suggested move as accepted means a human agreed
+with it. Nobody is promoted, transferred, reassigned or paid differently as a result — those are
+other parts of the product, done deliberately by somebody, and this module would not know whether it
+happened. There is no setting that changes this and no path through which it could.
+
+**Nobody is scored.** No readiness percentage, no nine-box, no high-potential rating is calculated
+anywhere. A named person states that somebody is ready or is not, writes down why, and their name
+stays on it. No rule for computing that was ever specified, and a rule invented here would decide
+who gets put forward for a director's post.
+
+**A decision and an observation are kept apart.** Putting somebody in a high-potential pool is a
+standing decision the organization took and revisits deliberately. A performance placement is what
+one review cycle observed. Neither is copied into the other, because the copy is the answer that
+goes stale and the stale answer is the one somebody acts on.
+
+**An assessment cannot be edited or deleted.** A correction is a new assessment recorded beside the
+old one, and the record shows the most recent statement rather than an average of the two. Somebody
+reading a "not ready" a year later can see who said it, when, and what they said before.
+
+**Succession data is treated as the sensitive material it is.** A list of named successors for a
+post is something a colleague can be harmed by, and that colleague is not in the room. Asking for a
+bench you are not allowed to see answers *not found* rather than *forbidden* — confirming that a
+bench exists for a named post is already most of the disclosure. Nominating somebody and recording
+that the organization agrees are separate permissions; so are creating a talent pool and putting a
+named person into it.
+
+**Every day is a day.** A target date, a review date and an expiry are the same calendar day
+wherever the product is opened, and the screens say which day they answered for — so nothing ever
+says "due" or "expired" without saying relative to when.
+
+### Measured
+
+Twenty-six workloads at 500, 10,000 and 100,000 employees, each with a second company's data in the
+same database. All within budget: the slowest read at 100,000 employees is 15 ms against a 100 ms
+budget, and counting the bench for forty posts at once did not get slower as the company grew.
+
+### What is still missing
+
+- **Nobody can see their own career plan.** The product cannot yet tell which employee a signed-in
+  person is, so "my career" and a manager's view of their team are not built. Naming an employee in
+  a URL is a filter, never a way in.
+- **A development plan is not jointly signed.** An administrator records that the employee
+  acknowledged it and that the manager did, with the day and who recorded it. Those are records, not
+  signatures.
+- **Nothing happens on a schedule.** A succession review coming due and a suggested move running out
+  of time are worked out when somebody asks, against the day they asked. Nothing fires and nobody is
+  notified.
+- **No notification is delivered.** This module composes no notification at all.
+- **No critical-position list, and no high-potential list drawn from performance.** Neither is
+  half-built: the first needs a company's positions to be marked critical somewhere, and the second
+  needs a bounded way to ask performance for a page of people. Career answers from the benches and
+  pools it holds itself.
+- **The 70-20-10 development mix is counted, not judged.** The three categories are shown with their
+  counts; no balance rule was ever specified, so the verdict reads `NOT VERIFIED` rather than a
+  number somebody would trust.
+- **No document is stored, served or linked.** A readiness assessment cites no evidence file.
+
+### Tests
+
+2,660, up from 2,180.
+
+---
+
 ## Phase 14A — Learning and development
 
 One module. It records what somebody was asked to do, what they sat, what an assessor observed, and
