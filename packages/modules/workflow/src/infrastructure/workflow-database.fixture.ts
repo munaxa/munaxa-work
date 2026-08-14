@@ -1,13 +1,28 @@
 import { Pool } from 'pg';
+import {
+  InProcessEventDispatcher,
+  runInContext,
+  uuidV7,
+  type Transaction,
+  type UnitOfWork,
+} from '@work/kernel';
+import { PostgresUnitOfWork } from '@work/persistence';
+
+import { postgresWorkflowStores } from './workflow-stores.js';
 
 /**
  * The database fixture Workflow's schema suites share.
  *
- * **Raw SQL only, deliberately.** There are no repositories yet — this is the schema checkpoint —
- * and that is the right way round: these probes assert what the *database* refuses on its own, and a
- * probe issued through a repository would prove only that the repository behaves as written. A probe
- * that issues the `insert` itself proves that **no** path can produce the state, including SQL
- * nobody wrote in TypeScript.
+ * **Two ways in, and both are needed.** `asTenant` issues raw SQL; `inTenant` runs the real
+ * repositories inside a real `PostgresUnitOfWork` transaction. They check different things and
+ * neither substitutes for the other.
+ *
+ * The raw probes assert what the *database* refuses on its own — a policy, a check constraint, a
+ * partial unique index, a trigger. A probe issued through a repository would be proving that the
+ * repository behaves as written; a probe that issues the `insert` itself proves that **no** path can
+ * produce the state, including SQL nobody wrote in TypeScript. The repository path asserts the other
+ * half: that what the application decides survives the round trip through real columns, real types
+ * and real indexes.
  *
  * **Two connections, and the second is not a convenience.** `admin` seeds and inspects, as a
  * migration would. `application` connects as a role that owns nothing and cannot bypass row-level
@@ -65,6 +80,9 @@ export const REQUESTER = '01930000-0000-7000-8000-00000000b004';
 export const CORRELATION = '01930000-0000-7000-8000-00000000c001';
 
 export const SUBJECT_TYPE = 'recruitment.requisition';
+
+/** The membership the repository suites act as, unless a test names another. */
+export const TEST_MEMBER = APPROVER;
 
 /** The audit columns every insert in these suites supplies. Stated once, not per statement. */
 export const AUDIT_COLUMNS = 'created_at, created_by, updated_at, updated_by, version';
@@ -186,6 +204,29 @@ export type TenantWork<TResult> = (client: PoolLike) => Promise<TResult>;
 export interface WorkflowFixture {
   readonly admin: Pool;
   readonly roleName: string;
+  /** The real PostgreSQL repositories, over the unprivileged connection. */
+  readonly stores: ReturnType<typeof postgresWorkflowStores>;
+  readonly unitOfWork: UnitOfWork;
+  /**
+   * Runs repository work inside a real transaction, as the unprivileged role, for one tenant.
+   *
+   * The transaction is the *application's* — `PostgresUnitOfWork` opens it, sets `app.tenant_id`
+   * transaction-locally, and commits or rolls back. No repository below opens one of its own, which
+   * is what makes a multi-write command atomic and what the rollback assertion checks.
+   */
+  inTenant<TResult>(
+    tenantId: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult>;
+  /** The same, as a *named* membership, for the assertions about who decided what. */
+  asMember<TResult>(
+    tenantId: string,
+    actor: string,
+    membershipId: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult>;
+  /** A second unit of work on its **own** connection, for the repository-level race assertions. */
+  secondUnitOfWork(): UnitOfWork;
   /** One statement batch as the unprivileged role, inside the tenant's row-security context. */
   asTenant<TResult>(tenantId: string, work: TenantWork<TResult>): Promise<TResult>;
   /** The same, on a **second** connection, so a race is arbitrated by PostgreSQL and not by Node. */
@@ -201,10 +242,33 @@ export const openWorkflowFixture = async (role: string): Promise<WorkflowFixture
   const applicationUrl = await assertAndBuild(admin, role);
   const application = new Pool({ connectionString: applicationUrl, ...BOUNDS });
   const second = new Pool({ connectionString: applicationUrl, ...BOUNDS });
+  const unitOfWork = new PostgresUnitOfWork(application, new InProcessEventDispatcher());
+  const stores = postgresWorkflowStores();
+  const secondary: Pool[] = [];
+  const inContext = <TResult>(
+    tenantId: string,
+    actor: string,
+    membershipId: string,
+    work: (transaction: Transaction) => Promise<TResult>,
+  ): Promise<TResult> =>
+    runInContext({ tenantId, correlationId: uuidV7(), actor, membershipId }, () =>
+      unitOfWork.execute(work),
+    );
 
   return {
     admin,
     roleName: role,
+    stores,
+    unitOfWork,
+    inTenant: (tenantId, work) => inContext(tenantId, 'user:workflow-test', TEST_MEMBER, work),
+    asMember: (tenantId, actor, membershipId, work) =>
+      inContext(tenantId, actor, membershipId, work),
+    secondUnitOfWork: () => {
+      const pool = new Pool({ connectionString: applicationUrl, ...BOUNDS });
+
+      secondary.push(pool);
+      return new PostgresUnitOfWork(pool, new InProcessEventDispatcher());
+    },
     asTenant: (tenantId, work) => inTenantOn(application, tenantId, work),
     onSecondConnection: (tenantId, work) => inTenantOn(second, tenantId, work),
     withoutTenant: (work) => inTenantOn(application, undefined, work),
@@ -219,6 +283,7 @@ export const openWorkflowFixture = async (role: string): Promise<WorkflowFixture
     },
     close: async () => {
       try {
+        await Promise.all(secondary.map((pool) => pool.end()));
         await second.end();
         await application.end();
         await admin.query(`truncate ${WORKFLOW_TABLES.join(', ')}`);

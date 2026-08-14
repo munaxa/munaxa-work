@@ -39,3 +39,4 @@ export * from './application/workflow-ports.js';
 export * from './application/in-memory-stores.js';
 export * from './application/workflow-views.js';
 export * from './application/workflow-paging.js';
+export * from './infrastructure/workflow-stores.js';
