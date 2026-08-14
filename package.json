@@ -2,7 +2,7 @@
   "name": "munaxa-work",
   "version": "0.1.0",
   "private": true,
-  "description": "Munaxa Work \u2014 an independent Munaxa product repository. Consumes the shared design system from @munaxa/*.",
+  "description": "Munaxa Work — an independent Munaxa product repository. Consumes the shared design system from @munaxa/*.",
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.33.0",
   "engines": {
@@ -20,6 +20,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "lint": "turbo run lint",
     "measure:attendance": "node scripts/measure-attendance-performance.mjs",
+    "measure:career": "node scripts/measure-career-performance.mjs",
     "measure:compensation": "node scripts/measure-compensation-performance.mjs",
     "measure:documents": "node scripts/measure-documents-performance.mjs",
     "measure:leave": "node scripts/measure-leave-performance.mjs",
