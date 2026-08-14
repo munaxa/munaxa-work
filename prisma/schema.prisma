@@ -5186,3 +5186,194 @@ model CareerMobilityRecommendation {
   @@index([tenant_id, employment_id, status], map: "career_mobility_recommendation_employment_idx")
   @@map("career_mobility_recommendation")
 }
+
+// ------------------------------------------------------------------------------------------------
+// Enterprise Workflow & Approvals (Phase 16A)
+//
+// Workflow owns process and owns no business data. A definition names what it decides by an opaque
+// `subject_type` and knows nothing else about it (AD-001); a published version is immutable and an
+// instance copies its steps (AD-003); a decision and a history entry are append-only, refused at the
+// table by a trigger.
+//
+// Absent on purpose: no role or group, no SLA, no escalation, no branching condition, no tally and
+// no `pattern` — in 16A a single approval *is* a one-step sequential approval, so a pattern column
+// would carry two values with identical behaviour.
+// ------------------------------------------------------------------------------------------------
+
+/// A reusable process a tenant configured. `subject_type` is the opaque string a business module
+/// supplies through `ApprovalPort`; its shape is checked and its meaning is not, because a list of
+/// legal values here would be a list of business modules.
+model WorkflowDefinition {
+  id           String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id    String    @db.Uuid
+  code         String    @db.VarChar(64)
+  name         Json
+  description  Json?
+  subject_type String    @db.VarChar(128)
+  status       String    @db.VarChar(16)
+  retired_at   DateTime? @db.Timestamptz(6)
+  retired_by   String?   @db.VarChar(255)
+  metadata     Json
+  created_at   DateTime  @db.Timestamptz(6)
+  created_by   String    @db.VarChar(255)
+  updated_at   DateTime  @db.Timestamptz(6)
+  updated_by   String    @db.VarChar(255)
+  deleted_at   DateTime? @db.Timestamptz(6)
+  deleted_by   String?   @db.VarChar(255)
+  version      Int
+
+  @@index([tenant_id, subject_type, status], map: "workflow_definition_subject_idx")
+  @@map("workflow_definition")
+}
+
+/// A version of a definition, and the row AD-003 is about. Nothing constrains a definition to one
+/// published version: neither the domain nor the approved plan states that rule, and which published
+/// version a new instance uses is the application's selection.
+model WorkflowVersion {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  definition_id  String    @db.Uuid
+  version_number Int
+  status         String    @db.VarChar(16)
+  published_at   DateTime? @db.Timestamptz(6)
+  published_by   String?   @db.VarChar(255)
+  metadata       Json
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  @@map("workflow_version")
+}
+
+/// One step of a version: who is asked, and where in the order. `ordinal` is `Int` rather than a
+/// small integer deliberately — AD-004 forbids a hardcoded approval limit.
+model WorkflowStepTemplate {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  workflow_version_id    String    @db.Uuid
+  ordinal                Int
+  name                   Json
+  approver_kind          String    @db.VarChar(16)
+  approver_membership_id String    @db.Uuid
+  metadata               Json
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@map("workflow_step_template")
+}
+
+/// A running approval. This *is* the specification's Approval Request: its identifier is the
+/// `approvalId` the four reserved `approval_id` columns across Recruitment, Leave, Onboarding and
+/// Attendance are shaped for. `context` is stored for audit and read by nothing in 16A.
+model WorkflowInstance {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  definition_id              String    @db.Uuid
+  workflow_version_id        String    @db.Uuid
+  subject_type               String    @db.VarChar(128)
+  subject_id                 String    @db.VarChar(64)
+  requested_by_membership_id String    @db.Uuid
+  status                     String    @db.VarChar(16)
+  started_at                 DateTime  @db.Timestamptz(6)
+  completed_at               DateTime? @db.Timestamptz(6)
+  cancelled_by               String?   @db.VarChar(255)
+  cancellation_reason        String?   @db.VarChar(1024)
+  correlation_id             String    @db.Uuid
+  context                    Json
+  metadata                   Json
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@index([tenant_id, subject_type, subject_id, status], map: "workflow_instance_subject_idx")
+  @@index([tenant_id, status, started_at, id], map: "workflow_instance_status_idx")
+  @@map("workflow_instance")
+}
+
+/// One step of a running instance, copied from a template at creation. No column references the
+/// template it came from — that is what makes the copy a copy (AD-003).
+model WorkflowStep {
+  id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id              String    @db.Uuid
+  instance_id            String    @db.Uuid
+  ordinal                Int
+  approver_kind          String    @db.VarChar(16)
+  approver_membership_id String    @db.Uuid
+  status                 String    @db.VarChar(16)
+  metadata               Json
+  created_at             DateTime  @db.Timestamptz(6)
+  created_by             String    @db.VarChar(255)
+  updated_at             DateTime  @db.Timestamptz(6)
+  updated_by             String    @db.VarChar(255)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  deleted_by             String?   @db.VarChar(255)
+  version                Int
+
+  @@map("workflow_step")
+}
+
+/// What an approver said, written once and refused every update and delete by a trigger. Two
+/// memberships, never one: the delegate who decided, and the approver whose authority they used.
+model WorkflowDecision {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  instance_id                String    @db.Uuid
+  step_id                    String    @db.Uuid
+  decision                   String    @db.VarChar(16)
+  decided_by_membership_id   String    @db.Uuid
+  authority                  String    @db.VarChar(16)
+  on_behalf_of_membership_id String?   @db.Uuid
+  decided_at                 DateTime  @db.Timestamptz(6)
+  comment                    String?   @db.VarChar(1024)
+  metadata                   Json
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@index([tenant_id, decided_by_membership_id, id], map: "workflow_decision_decider_idx")
+  @@index([tenant_id, instance_id, id], map: "workflow_decision_instance_idx")
+  @@map("workflow_decision")
+}
+
+/// How an instance got where it is: Workflow's audit of routing, never a business fact. Append-only,
+/// and carrying no comment or rationale — those live on the decision, where a permission decides who
+/// may read them.
+model WorkflowHistory {
+  id                         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id                  String    @db.Uuid
+  instance_id                String    @db.Uuid
+  event                      String    @db.VarChar(32)
+  occurred_at                DateTime  @db.Timestamptz(6)
+  step_id                    String?   @db.Uuid
+  ordinal                    Int?
+  actor_membership_id        String?   @db.Uuid
+  on_behalf_of_membership_id String?   @db.Uuid
+  metadata                   Json
+  created_at                 DateTime  @db.Timestamptz(6)
+  created_by                 String    @db.VarChar(255)
+  updated_at                 DateTime  @db.Timestamptz(6)
+  updated_by                 String    @db.VarChar(255)
+  deleted_at                 DateTime? @db.Timestamptz(6)
+  deleted_by                 String?   @db.VarChar(255)
+  version                    Int
+
+  @@index([tenant_id, instance_id, occurred_at, id], map: "workflow_history_instance_idx")
+  @@map("workflow_history")
+}

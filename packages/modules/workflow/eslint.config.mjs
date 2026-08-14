@@ -5,11 +5,19 @@ import standards from '../../../tooling/eslint/standards.mjs';
 /**
  * Enterprise Workflow & Approvals.
  *
- * No exemption is declared. The domain layer this package currently holds is pure functions over
- * immutable state with no environment, no clock and no database in it, so there is nothing for an
- * exemption to be for. An integration fixture that needs one arrives with the checkpoint that needs
- * it, and not before.
+ * The integration suites and the fixture they share choose which database to connect to, which is a
+ * harness concern rather than application configuration — the rule confining `process.env` to
+ * `@work/config` exists to stop *business* code branching on the environment, and no business code
+ * lives in either. The same exemption Career, Learning and Performance carry, for the same reason.
  *
  * @type {import('eslint').Linter.Config[]}
  */
-export default [...base, ...standards];
+export default [
+  ...base,
+  ...standards,
+  {
+    name: 'work/workflow/database-selection',
+    files: ['src/**/*.integration.test.ts', 'src/**/*.fixture.ts'],
+    rules: { 'no-restricted-properties': 'off' },
+  },
+];
