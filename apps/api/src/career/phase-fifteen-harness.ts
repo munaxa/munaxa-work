@@ -21,6 +21,7 @@ import { CareerEmployment, CareerLearning, CareerOrganization } from './career-s
 import {
   NOW,
   TENANT,
+  tenantOfContext,
   upstream,
   upstreamHandlers,
   type UpstreamFacts,
@@ -141,18 +142,6 @@ export const applicationConnection = async (): Promise<string> => {
  * — and adds nothing at all when no grant is open. A plain checker here would refuse every
  * cross-module read, and the suite would be testing a configuration production does not have.
  */
-/**
- * The ambient tenant, or the suite's default.
- *
- * `currentContext()` may be a `SystemContext`, which carries no tenant — the stubs filter on a
- * tenant either way, so the narrowing happens here once rather than at each of the five handlers.
- */
-const tenantOfContext = (): string => {
-  const context = currentContext();
-
-  return context !== undefined && 'tenantId' in context ? context.tenantId : TENANT;
-};
-
 const permitting = (granted: readonly string[]): PermissionChecker =>
   new GrantAwarePermissionChecker({
     holds: (permission) => Promise.resolve(granted.includes(permission)),

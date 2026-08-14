@@ -23,18 +23,18 @@ describe('cross-module table access', () => {
   const ADAPTERS = join(process.cwd(), 'src', 'career');
 
   /**
-   * The production files in this directory — everything that is not the suite's own scaffolding.
+   * The production files in this directory — everything that is not test scaffolding.
    *
-   * The exclusion is by prefix rather than by name, so a *new* production file is audited the day
-   * it is written; and the next assertion pins the resulting set, so the prefix cannot quietly
-   * start swallowing one.
+   * The exclusion is by shape rather than by name, so a *new* production file is audited the day it
+   * is written, and the next assertion pins the resulting set so the rule cannot quietly start
+   * swallowing one. That is what happened when the API layer arrived: `career.module.ts` appeared,
+   * this list failed, and the file was audited rather than assumed harmless.
    */
+  const SCAFFOLDING = /(\.spec\.ts|\.fixture\.ts|-scenario\.ts|-bodies\.ts)$|^phase-fifteen-/;
+
   const sources = (): readonly { readonly name: string; readonly text: string }[] =>
     readdirSync(ADAPTERS)
-      .filter(
-        (name) =>
-          name.endsWith('.ts') && !name.endsWith('.spec.ts') && !name.startsWith('phase-fifteen-'),
-      )
+      .filter((name) => name.endsWith('.ts') && !SCAFFOLDING.test(name))
       .map((name) => ({ name, text: readFileSync(join(ADAPTERS, name), 'utf8') }));
 
   it('audits every production file in the directory', () => {
@@ -42,7 +42,7 @@ describe('cross-module table access', () => {
       sources()
         .map((file) => file.name)
         .sort(),
-    ).toEqual(['career-sources.ts', 'career.composition.ts']);
+    ).toEqual(['career-sources.ts', 'career.composition.ts', 'career.module.ts']);
   });
 
   const withoutComments = (text: string): string =>

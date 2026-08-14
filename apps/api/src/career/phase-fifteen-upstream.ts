@@ -1,4 +1,5 @@
 import {
+  currentContext,
   err,
   pagedResult,
   success,
@@ -229,6 +230,19 @@ export interface UpstreamOptions {
    */
   readonly readsAllLearners: () => boolean;
 }
+
+/**
+ * The ambient tenant, or the suite's default.
+ *
+ * `currentContext()` may be a `SystemContext`, which carries no tenant — the stubs filter on a
+ * tenant either way, so the narrowing happens here once rather than at each of the five handlers,
+ * and both the cross-module harness and the API fixture pass it as their `tenantOf`.
+ */
+export const tenantOfContext = (fallback: string = TENANT): string => {
+  const context = currentContext();
+
+  return context !== undefined && 'tenantId' in context ? context.tenantId : fallback;
+};
 
 const positionHandlers = (
   facts: UpstreamFacts,

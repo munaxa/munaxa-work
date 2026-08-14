@@ -1,6 +1,7 @@
 import {
   CAREER_PATH_TRANSITIONS,
   MAX_STAGE_SEQUENCE,
+  isCivilDate,
   isWholeWithin,
   type CareerPathKind,
   type CareerPathStatus,
@@ -70,6 +71,15 @@ export interface CreatePathRequest {
 
 export const createPath = (request: CreatePathRequest): CareerResult<CareerPathState> => {
   if (!isLocalizedName(request.name)) return refuse('path-name-required');
+  // **Both days are checked before they are compared**, and the comparison alone is not enough. Two
+  // strings order fine whether or not either names a day that exists, so `2026-02-30` would pass
+  // the period rule, reach a `date` column and come back as a driver error — a 500 for what is
+  // plainly a bad request. `isCivilDate` parses and compares the result back to the string, which
+  // is what refuses a February thirtieth rather than rolling it into March.
+  if (!isCivilDate(request.effectiveFrom)) return refuse('path-effective-from-invalid');
+  if (request.effectiveTo !== undefined && !isCivilDate(request.effectiveTo)) {
+    return refuse('path-effective-to-invalid');
+  }
   if (request.effectiveTo !== undefined && request.effectiveTo <= request.effectiveFrom) {
     return refuse('path-effective-period-invalid');
   }

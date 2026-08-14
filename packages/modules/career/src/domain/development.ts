@@ -144,7 +144,16 @@ export const moveDevelopmentPlan = (
   return accept({ ...state, status: request.to, closedOn: request.on, closedBy: request.by });
 };
 
-export type Acknowledger = 'employee' | 'manager';
+/**
+ * The two parties whose acknowledgement a development plan records.
+ *
+ * A runtime list rather than a bare union, because the edge has to reject a third value at the wire
+ * before it becomes a command — and a union alone is gone by then. It names *which party
+ * acknowledged*, which is a fact somebody records; it is never an assertion about who is calling
+ * (D-9), because this repository cannot resolve a principal to an employment.
+ */
+export const ACKNOWLEDGERS = ['employee', 'manager'] as const;
+export type Acknowledger = (typeof ACKNOWLEDGERS)[number];
 
 export interface AcknowledgeRequest {
   readonly by: Acknowledger;

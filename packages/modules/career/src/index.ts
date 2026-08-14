@@ -42,3 +42,17 @@ export * from './application/career-ports.js';
 export * from './application/in-memory-stores.js';
 export * from './application/career-views.js';
 export * from './infrastructure/career-stores.js';
+
+export { CareerDispatcher } from './api/career-dispatcher.js';
+export { CareerPathController } from './api/path.controller.js';
+export { CareerPlanController } from './api/plan.controller.js';
+export { CareerPoolController } from './api/pool.controller.js';
+export { CareerMembershipController } from './api/membership.controller.js';
+export { CareerSuccessionController } from './api/succession.controller.js';
+export { CareerSuccessionLifecycleController } from './api/succession-lifecycle.controller.js';
+export { CareerSuccessorController } from './api/successor.controller.js';
+export { CareerReadinessController } from './api/readiness.controller.js';
+export { CareerDevelopmentController } from './api/development.controller.js';
+export { CareerDevelopmentItemController } from './api/development-item.controller.js';
+export { CareerMobilityController } from './api/mobility.controller.js';
+export { CareerSummaryController } from './api/summary.controller.js';
