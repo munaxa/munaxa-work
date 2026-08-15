@@ -1,9 +1,11 @@
 import type { WorkflowDecisionState } from '../domain/decision.js';
 import type { WorkflowHistoryState } from '../domain/history.js';
 import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instance.js';
+import type { BranchCondition } from '../domain/condition.js';
 import type {
   ApprovalDecisionKind,
   ApproverKind,
+  BranchRule,
   DecisionAuthority,
   WorkflowHistoryEvent,
   WorkflowInstanceStatus,
@@ -102,6 +104,20 @@ export const instanceValues = (state: WorkflowInstanceState, tenantId: string): 
   context: JSON.stringify(state.context),
 });
 
+/**
+ * One step of a running approval, and the four columns Phase 16B added.
+ *
+ * **`approver_membership_id` stays `not null` here**, and that asymmetry with the template is the
+ * group snapshot: a template may name a list, a running step never does, because the group was
+ * expanded into its members before this row existed.
+ *
+ * **`source_group_id` is provenance rather than a reference.** It records which list the person came
+ * from so "why was I asked?" has an answer; it carries no foreign key, so editing or deleting that
+ * list cannot reach an approval already under way.
+ *
+ * `branch_rule`, `quorum` and `condition` are **copies**, taken from the template at the start, which
+ * is what makes a running approval keep the rule it began under when the definition is edited.
+ */
 export interface StepRow {
   readonly id: string;
   readonly instance_id: string;
@@ -109,6 +125,10 @@ export interface StepRow {
   readonly approver_kind: string;
   readonly approver_membership_id: string;
   readonly status: string;
+  readonly source_group_id: string | null;
+  readonly branch_rule: string | null;
+  readonly quorum: number | null;
+  readonly condition: unknown;
   readonly version: number;
 }
 
@@ -120,6 +140,10 @@ export const stepColumns = (alias: string): string =>
     `${alias}.approver_kind`,
     `${alias}.approver_membership_id`,
     `${alias}.status`,
+    `${alias}.source_group_id`,
+    `${alias}.branch_rule`,
+    `${alias}.quorum`,
+    `${alias}.condition`,
     `${alias}.version`,
   ].join(', ');
 
@@ -131,6 +155,16 @@ export const stepState = (row: StepRow): WorkflowStepState => ({
   approverMembershipId: row.approver_membership_id,
   status: row.status as WorkflowStepStatus,
   version: asNumber(row.version),
+  ...presentOf({
+    sourceGroupId: row.source_group_id,
+    branchRule: row.branch_rule as BranchRule | null,
+    quorum: row.quorum === null ? null : asNumber(row.quorum),
+  }),
+  // Separately, because a `jsonb` column arrives parsed rather than as a scalar `presentOf` can pass
+  // through — and because an empty array is a real stored value rather than an absent one.
+  ...(row.condition === null || row.condition === undefined
+    ? {}
+    : { condition: row.condition as readonly BranchCondition[] }),
 });
 
 export const stepValues = (state: WorkflowStepState, tenantId: string): RowValues => ({
@@ -141,6 +175,10 @@ export const stepValues = (state: WorkflowStepState, tenantId: string): RowValue
   approver_kind: state.approverKind,
   approver_membership_id: state.approverMembershipId,
   status: state.status,
+  source_group_id: orNull(state.sourceGroupId),
+  branch_rule: orNull(state.branchRule),
+  quorum: orNull(state.quorum),
+  condition: state.condition === undefined ? null : JSON.stringify(state.condition),
 });
 
 // ------------------------------------------------------------------------------------------------

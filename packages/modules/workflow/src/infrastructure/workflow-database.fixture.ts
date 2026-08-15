@@ -70,19 +70,6 @@ export const WORKFLOW_TABLES = [
   'workflow_approval_group',
 ];
 
-/**
- * The seven a repository maps, which is a different list from the nine the module owns.
- *
- * Phase 16B Checkpoint 3 is schema only: the two group tables exist, carry their policies and hold
- * their invariants, and **no repository reads or writes them yet** — that is Checkpoint 5. The
- * mapper-parity suite compares mappers against the tables that have one, so it uses this list; every
- * suite that asserts a property of the *schema* — isolation, policies, forced row-level security —
- * uses `WORKFLOW_TABLES` and therefore covers all nine.
- */
-export const WORKFLOW_MAPPED_TABLES = WORKFLOW_TABLES.filter(
-  (table) => !table.startsWith('workflow_approval_group'),
-);
-
 /** The two whose rows are written once and never changed. */
 export const APPEND_ONLY_TABLES = ['workflow_decision', 'workflow_history'];
 

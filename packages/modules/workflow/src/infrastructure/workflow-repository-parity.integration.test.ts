@@ -1,13 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  APPROVER,
   CONNECTION,
   openWorkflowFixture,
   requireDatabaseInCi,
-  WORKFLOW_MAPPED_TABLES,
+  WORKFLOW_TABLES,
   type WorkflowFixture,
 } from './workflow-database.fixture.js';
-import { aDefinition, aStartedInstance, anApproval } from './workflow-states.js';
+import {
+  aDefinition,
+  aGroup,
+  aGroupMember,
+  aStartedInstance,
+  anApproval,
+} from './workflow-states.js';
+import { groupColumns, groupValues, memberColumns, memberValues } from './workflow-group-rows.js';
 import {
   TEMPLATE_COLUMNS,
   definitionColumns,
@@ -85,7 +93,7 @@ suite('mapper and schema parity', () => {
       `select table_name, column_name, data_type, is_nullable, column_default
          from information_schema.columns
         where table_schema = 'public' and table_name = any($1::text[])`,
-      [WORKFLOW_MAPPED_TABLES],
+      [WORKFLOW_TABLES],
     );
 
     catalogue = new Map();
@@ -112,6 +120,7 @@ suite('mapper and schema parity', () => {
     const [step] = seed.steps;
     const [entry] = seed.history;
     const [template] = seed.templates;
+    const group = aGroup();
 
     if (step === undefined || entry === undefined || template === undefined) {
       throw new Error('The fixture produced an incomplete approval.');
@@ -156,23 +165,33 @@ suite('mapper and schema parity', () => {
         read: columnsOf(historyColumns('h')),
         written: historyValues(entry, tenantId),
       },
+      {
+        table: 'workflow_approval_group',
+        read: columnsOf(groupColumns('g')),
+        written: groupValues(group, tenantId),
+      },
+      {
+        table: 'workflow_approval_group_member',
+        read: columnsOf(memberColumns('m')),
+        written: memberValues(aGroupMember(group, APPROVER), tenantId),
+      },
     ];
   };
 
   /**
-   * The seven tables a mapper covers, which is deliberately not the nine the module owns.
+   * All nine tables the module owns.
    *
-   * Phase 16B Checkpoint 3 is schema only: `workflow_approval_group` and its member table exist,
-   * carry their policies and hold their invariants, and **no repository reads or writes them yet**
-   * — that is Checkpoint 5. Comparing mappers against all nine would fail for a reason that has
-   * nothing to do with drift, which is the one thing this suite exists to detect.
+   * It was seven for one checkpoint: the two group tables existed with their policies and their
+   * invariants and had no repository, which Checkpoint 4 recorded as a deliberate gap rather than
+   * hiding. Checkpoint 5 closed it, and the list is the whole module again — so a table that
+   * acquires columns without a mapper fails here rather than on its first insert.
    */
-  it('covers every table a repository maps', () => {
+  it('covers all nine tables', () => {
     expect(
       mapped()
         .map((one) => one.table)
         .sort(),
-    ).toEqual([...WORKFLOW_MAPPED_TABLES].sort());
+    ).toEqual([...WORKFLOW_TABLES].sort());
   });
 
   it('reads no column the database does not have', () => {

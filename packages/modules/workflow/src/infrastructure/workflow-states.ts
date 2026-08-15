@@ -10,6 +10,14 @@ import {
   type WorkflowVersionState,
 } from '../domain/definition.js';
 import { startInstance, type StartedInstance, type WorkflowStepState } from '../domain/instance.js';
+import {
+  addApprovalGroupMember,
+  createApprovalGroup,
+  type ApprovalGroupMemberState,
+  type ApprovalGroupState,
+} from '../domain/approval-group.js';
+import type { BranchCondition } from '../domain/condition.js';
+import type { BranchRule } from '../domain/workflow-vocabulary.js';
 import { decide, type DecidedStep } from '../domain/decision.js';
 import { startHistory } from '../domain/history.js';
 import type { WorkflowHistoryState } from '../domain/history.js';
@@ -88,6 +96,67 @@ export const aTemplate = (
       name: NAME,
       approverKind: 'membership',
       approverMembershipId,
+    }),
+  );
+
+/** A named list, built through the domain so a fixture cannot describe a group it would refuse. */
+export const aGroup = (code = aCode('group')): ApprovalGroupState =>
+  accepted(
+    createApprovalGroup({
+      approvalGroupId: uuidV7(),
+      code,
+      name: { en: 'Capital approvers', ar: 'معتمدو النفقات' },
+    }),
+  );
+
+export const aGroupMember = (
+  group: ApprovalGroupState,
+  membershipId: string,
+): ApprovalGroupMemberState =>
+  accepted(
+    addApprovalGroupMember(group, { approvalGroupMemberId: uuidV7(), membershipId, at: NOW }),
+  );
+
+/** How a branch ends, and whether it runs at all. Whatever the case under test needs. */
+export interface BranchOptions {
+  readonly branchRule?: BranchRule;
+  readonly quorum?: number;
+  readonly condition?: readonly BranchCondition[];
+}
+
+/** A template that names a list rather than a person. */
+export const aGroupTemplate = (
+  draft: WorkflowVersionState,
+  ordinal: number,
+  approverGroupId: string,
+  branch: BranchOptions = {},
+): WorkflowStepTemplateState =>
+  accepted(
+    addStep(draft, {
+      stepTemplateId: uuidV7(),
+      ordinal,
+      name: NAME,
+      approverKind: 'group',
+      approverGroupId,
+      ...branch,
+    }),
+  );
+
+/** A template naming a person, with the 16B branch configuration a case needs on it. */
+export const aBranchTemplate = (
+  draft: WorkflowVersionState,
+  ordinal: number,
+  approverMembershipId: string,
+  branch: BranchOptions = {},
+): WorkflowStepTemplateState =>
+  accepted(
+    addStep(draft, {
+      stepTemplateId: uuidV7(),
+      ordinal,
+      name: NAME,
+      approverKind: 'membership',
+      approverMembershipId,
+      ...branch,
     }),
   );
 
