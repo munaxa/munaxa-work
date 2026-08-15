@@ -45,6 +45,7 @@ export const requisitionView = (state: RequisitionState): RequisitionView => ({
   ...(state.hiringManagerEmploymentId === undefined
     ? {}
     : { hiringManagerEmploymentId: state.hiringManagerEmploymentId }),
+  ...(state.approvalId === undefined ? {} : { approvalId: state.approvalId }),
   metadata: state.metadata,
   version: state.version,
 });

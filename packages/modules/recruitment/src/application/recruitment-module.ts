@@ -9,12 +9,11 @@ import {
   anonymizeCandidateHandler,
   recordProfileEntryHandler,
 } from './candidate-record.use-case.js';
+import { createRequisitionHandler, submitRequisitionHandler } from './requisition.use-case.js';
 import {
-  createRequisitionHandler,
   decideRequisitionHandler,
   reverseRequisitionDecisionHandler,
-  submitRequisitionHandler,
-} from './requisition.use-case.js';
+} from './requisition-decision.use-case.js';
 import {
   closeRequisitionHandler,
   openRequisitionHandler,

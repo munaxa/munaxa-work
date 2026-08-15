@@ -37,6 +37,10 @@ const whereClauses = (query: PositionQuery): readonly string[] =>
     query.term === undefined
       ? undefined
       : "(code ilike $4 or title->>'en' ilike $4 or title->>'ar' ilike $4)",
+    // Equality on the primary key, never a pattern: this answers "does this exact identifier
+    // exist in my tenant", and it is the one filter here that cannot be used to discover a
+    // position the caller did not already name.
+    query.positionId === undefined ? undefined : 'id = $7',
   ].filter((clause): clause is string => clause !== undefined);
 
 const filtersFor = (
@@ -51,6 +55,7 @@ const filtersFor = (
     query.term === undefined ? null : `%${query.term}%`,
     query.limit,
     query.offset,
+    query.positionId ?? null,
   ],
 });
 

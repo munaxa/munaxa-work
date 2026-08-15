@@ -54,17 +54,22 @@ export interface EmploymentPort {
   /**
    * The active workforce, for a rule whose audience is everybody.
    *
-   * Bounded by the *port* rather than by the caller's good intentions: `limit` is mandatory and the
+   * Bounded by the *port* rather than by the caller's good intentions: `size` is mandatory and the
    * adapter clamps it. The published `employment.search` query already answers this, so no change
    * to Employment is required.
+   *
+   * **Paged, not offset.** Every published search contract in this repository speaks pages, and an
+   * adapter converting an arbitrary offset into one would be lossy the moment the offset was not a
+   * multiple of the size — it would silently return the wrong window and report success. The port
+   * speaks the shape the contract can express.
    */
-  activeEmployments(asOf: Date, limit: number, offset: number): Promise<Audience>;
+  activeEmployments(asOf: Date, size: number, page: number): Promise<Audience>;
 
   /** The employments in a unit. `employment.search`'s `unitId` filter, narrowed. */
-  inUnit(organizationUnitId: string, asOf: Date, limit: number, offset: number): Promise<Audience>;
+  inUnit(organizationUnitId: string, asOf: Date, size: number, page: number): Promise<Audience>;
 
   /** The employments holding a position. `employment.search`'s `positionId` filter, narrowed. */
-  inPosition(positionId: string, asOf: Date, limit: number, offset: number): Promise<Audience>;
+  inPosition(positionId: string, asOf: Date, size: number, page: number): Promise<Audience>;
 
   /**
    * Which employments report to this manager, as of a date.
@@ -74,7 +79,7 @@ export interface EmploymentPort {
    * once there is a way to know which employment the caller *is*. There is not (ADR-0032), so
    * nothing routes on it yet and the scope resolver says so rather than guessing.
    */
-  directReportsOf(managerEmploymentId: string, asOf: Date, limit: number): Promise<Audience>;
+  directReportsOf(managerEmploymentId: string, asOf: Date, size: number): Promise<Audience>;
 }
 
 /**

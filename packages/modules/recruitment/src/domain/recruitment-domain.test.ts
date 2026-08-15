@@ -214,3 +214,80 @@ describe('an offer', () => {
     expect(isOfferLive('withdrawn')).toBe(false);
   });
 });
+
+/**
+ * The routed-approval identifier: written once, never rewritten.
+ *
+ * The column has been reserved since Phase 6 and nothing wrote it until Workflow arrived. What
+ * matters now is that it records *which* approval authorized this headcount — so a second approval
+ * arriving later is refused rather than allowed to take the record over, because an audit that named
+ * the wrong chain would be worse than one that named none.
+ */
+describe('a requisition decided by a routed approval', () => {
+  const submitted = (): Requisition => {
+    const requisition = aRequisition();
+
+    requisition.submit(ORIGIN, NOW);
+    return requisition;
+  };
+
+  it('records the approval that decided it', () => {
+    const requisition = submitted();
+    const approvalId = uuidV7();
+    const decided = requisition.decide('approved', ORIGIN, NOW, approvalId);
+
+    expect(decided.ok).toBe(true);
+    expect(requisition.status).toBe('approved');
+    expect(requisition.approvalId).toBe(approvalId);
+  });
+
+  it('leaves the identifier absent when nobody routed the decision', () => {
+    const requisition = submitted();
+
+    requisition.decide('approved', ORIGIN, NOW);
+
+    expect(requisition.status).toBe('approved');
+    expect(requisition.approvalId).toBeUndefined();
+  });
+
+  /** A reversal returns it for a fresh decision, and the same approval may decide it again. */
+  it('accepts the same approval again after a reversal', () => {
+    const requisition = submitted();
+    const approvalId = uuidV7();
+
+    requisition.decide('approved', ORIGIN, NOW, approvalId);
+    requisition.reverseDecision(ORIGIN, NOW);
+
+    const again = requisition.decide('rejected', ORIGIN, NOW, approvalId);
+
+    expect(again.ok).toBe(true);
+    expect(requisition.approvalId).toBe(approvalId);
+  });
+
+  it('refuses a different approval once one has already decided it', () => {
+    const requisition = submitted();
+    const first = uuidV7();
+
+    requisition.decide('approved', ORIGIN, NOW, first);
+    requisition.reverseDecision(ORIGIN, NOW);
+
+    const other = requisition.decide('approved', ORIGIN, NOW, uuidV7());
+
+    expect(other.ok).toBe(false);
+    expect(other.ok ? undefined : other.error.reason).toBe(
+      'requisition_already_routed_by_another_approval',
+    );
+    // Untouched: the identifier the first approval wrote still stands.
+    expect(requisition.approvalId).toBe(first);
+  });
+
+  /** And the lifecycle rule still comes first: an unsubmitted requisition is refused, approval or not. */
+  it('still refuses a decision the lifecycle does not allow', () => {
+    const requisition = aRequisition();
+    const decided = requisition.decide('approved', ORIGIN, NOW, uuidV7());
+
+    expect(decided.ok).toBe(false);
+    expect(decided.ok ? undefined : decided.error.reason).toBe('requisition_not_awaiting_decision');
+    expect(requisition.approvalId).toBeUndefined();
+  });
+});

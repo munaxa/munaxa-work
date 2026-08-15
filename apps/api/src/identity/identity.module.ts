@@ -68,6 +68,9 @@ import { DeferredPayrollDispatcher, payrollModuleFor } from '../payroll/payroll.
 import { documentsModuleFor } from '../documents/documents.composition.js';
 import { lettersModuleFor } from '../letters/letters.composition.js';
 import { performanceModuleFor } from '../performance/performance.composition.js';
+import { learningModuleFor } from '../learning/learning.composition.js';
+import { careerModuleFor } from '../career/career.composition.js';
+import { workflowModuleFor } from '../workflow/workflow.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -170,6 +173,9 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         documents: documentsModuleFor(unitOfWork, senders.payroll, permissions),
         letters: lettersModuleFor(unitOfWork, senders.payroll, permissions),
         performance: performanceModuleFor(unitOfWork, senders.payroll, permissions),
+        learning: learningModuleFor(unitOfWork, senders.payroll, permissions),
+        career: careerModuleFor(unitOfWork, senders.payroll, permissions),
+        workflow: workflowModuleFor(unitOfWork, senders.payroll, senders.recruitment, permissions),
       }),
     },
     {
@@ -238,6 +244,28 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // organization and a manager reading their own reports take different paths through the
         // same query, and the handler has to ask which one it is holding.
         registry.register(permissionAware.performance);
+        // Learning last. It reads Employment, Organization and Documents through their published
+        // queries under bounded service grants, and writes to none of them: what somebody attained
+        // is this module's record, and Performance or Career pulls it when it wants one (AD-005).
+        // It takes the permission checker as well as the pipeline's because its reads are scoped by
+        // what the caller holds — and because `assignment.read-team` deliberately resolves to
+        // nothing until the platform can say which employment the caller is (ADR-0032).
+        registry.register(permissionAware.learning);
+        // Career last of all, because it reads the three modules above it and is read by none of
+        // them. Employment, Organization and Learning are consumed through their published queries
+        // under bounded service grants, and Career writes to none of them — nor to Performance,
+        // Compensation or People, for which it declares no adapter at all (ADR-0072). It takes the
+        // permission checker for the same reason Learning does: `plan.read-team` resolves to
+        // nothing until the platform can say which employment the caller is (ADR-0032).
+        registry.register(permissionAware.career);
+        // Workflow last of all, and it reads exactly one module: Identity, for the delegation
+        // register it deliberately does not duplicate (AD-010, D-2). It writes to nothing outside
+        // itself — the seam through which an approval reaches an adopting module is Checkpoint 7 —
+        // and it is read by nobody yet. It takes the permission checker for the same reason
+        // Career and Learning do, and for one they do not: `workflow.approval.read-own` is the
+        // first `read-own` in this repository that actually routes, because an approval is
+        // addressed to a membership and the request has already resolved one (Checkpoint 4).
+        registry.register(permissionAware.workflow);
         return registry;
       },
     },
@@ -295,6 +323,9 @@ interface PermissionAwareModules {
   readonly documents: WorkModule;
   readonly letters: WorkModule;
   readonly performance: WorkModule;
+  readonly learning: WorkModule;
+  readonly career: WorkModule;
+  readonly workflow: WorkModule;
 }
 
 interface DeferredSenders {

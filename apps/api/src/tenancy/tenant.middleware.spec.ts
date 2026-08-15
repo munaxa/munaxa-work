@@ -160,6 +160,102 @@ describe('TenantMiddleware', () => {
     });
   });
 
+  describe('the membership in the execution context', () => {
+    /**
+     * The seam Phase 16A needed, and the reason it is a separate fact from the actor.
+     *
+     * `actor` and `userId` name the **workforce user** — the person. `membershipId` names *that
+     * person in this tenant*, which is the identifier Identity's delegation register is keyed on
+     * (`identity.active-delegations-for` takes a `delegateMembershipId`). Without it in context, an
+     * application handler cannot answer "which approvals are waiting for me" from anything except a
+     * value the caller supplied — and a value the caller supplied is not proof of identity.
+     *
+     * The membership was already resolved here from stored facts; it was simply discarded when the
+     * context was built. Nothing else about the context changed, which the assertions below pin.
+     */
+    const contextFrom = async (
+      middleware: TenantMiddleware,
+      headers: Record<string, string>,
+    ): Promise<Record<string, unknown> | undefined> => {
+      let observed: Record<string, unknown> | undefined;
+
+      await middleware.use(requestWith(headers), response, () => {
+        const context = currentContext();
+
+        observed =
+          context !== undefined && !('system' in context)
+            ? (context as unknown as Record<string, unknown>)
+            : undefined;
+      });
+      return observed;
+    };
+
+    it('carries the membership the directory resolved, which the caller never sent', async () => {
+      const membership = membershipOf(TENANT_A);
+      const middleware = new TenantMiddleware(
+        authenticating(PLATFORM_USER),
+        directoryWith(membership),
+      );
+
+      const context = await contextFrom(middleware, AUTHORIZED);
+
+      expect(context?.['membershipId']).toBe(membership.membershipId);
+      // Not the workforce user, and not the platform account. Three identifiers, three meanings.
+      expect(context?.['membershipId']).not.toBe(membership.workforceUserId);
+      expect(context?.['membershipId']).not.toBe(PLATFORM_USER);
+    });
+
+    it('changes the meaning of no field that was already there', async () => {
+      const membership = membershipOf(TENANT_A);
+      const middleware = new TenantMiddleware(
+        authenticating(PLATFORM_USER),
+        directoryWith(membership),
+      );
+      const request = requestWith(AUTHORIZED);
+      let context: Record<string, unknown> | undefined;
+
+      await middleware.use(request, response, () => {
+        const current = currentContext();
+
+        context =
+          current !== undefined && !('system' in current)
+            ? (current as unknown as Record<string, unknown>)
+            : undefined;
+      });
+
+      expect(context?.['actor']).toBe(`user:${membership.workforceUserId}`);
+      expect(context?.['userId']).toBe(membership.workforceUserId);
+      expect(context?.['tenantId']).toBe(TENANT_A);
+      expect(context?.['correlationId']).toBe(
+        (request as unknown as { correlationId: string }).correlationId,
+      );
+    });
+
+    it('resolves the membership of the tenant the caller selected, not merely the first', async () => {
+      // A person with two memberships has two membership identifiers, and the queue must be the one
+      // for the tenant this request is acting in.
+      const inA = membershipOf(TENANT_A);
+      const inB = membershipOf(TENANT_B);
+      const middleware = new TenantMiddleware(
+        authenticating(PLATFORM_USER),
+        directoryWith(inA, inB),
+      );
+
+      const context = await contextFrom(middleware, { ...AUTHORIZED, [TENANT_HEADER]: TENANT_B });
+
+      expect(context?.['tenantId']).toBe(TENANT_B);
+      expect(context?.['membershipId']).toBe(inB.membershipId);
+    });
+
+    it('establishes no context at all when no membership resolves', async () => {
+      // The failure direction that matters: no membership means no context, so a handler asking
+      // "which approvals are waiting for me" is refused rather than answered for everybody.
+      const middleware = new TenantMiddleware(authenticating(PLATFORM_USER), directoryWith());
+
+      expect(await contextFrom(middleware, AUTHORIZED)).toBeUndefined();
+    });
+  });
+
   describe('what the middleware puts on the request', () => {
     it('exposes the principal and the resolved membership, and nothing the caller sent', async () => {
       const membership = membershipOf(TENANT_A);

@@ -40,7 +40,7 @@ ADRs updated.
 | 13  | Performance                 | [`14_PHASE_13_PERFORMANCE.md`](../work%20prompts/14_PHASE_13_PERFORMANCE.md)                          | Not started |
 | 13.1| Engagement & surveys        | [`14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md`](../work%20prompts/14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md)      | Not started |
 | 14  | Learning                    | [`15_PHASE_14_LEARNING.md`](../work%20prompts/15_PHASE_14_LEARNING.md)                                | Not started |
-| 15  | Career and succession       | [`16_PHASE_15_CAREER_SUCCESSION.md`](../work%20prompts/16_PHASE_15_CAREER_SUCCESSION.md)              | Not started |
+| 15  | Career and succession       | [`16_PHASE_15_CAREER_SUCCESSION.md`](../work%20prompts/16_PHASE_15_CAREER_SUCCESSION.md)              | Complete    |
 | 16  | Workflow                    | [`17_PHASE_16_WORKFLOW.md`](../work%20prompts/17_PHASE_16_WORKFLOW.md)                                | Not started |
 | 17  | Communications              | [`18_PHASE_17_COMMUNICATIONS.md`](../work%20prompts/18_PHASE_17_COMMUNICATIONS.md)                    | Not started |
 | 18  | Employee self service       | [`19_PHASE_18_EMPLOYEE_SELF_SERVICE.md`](../work%20prompts/19_PHASE_18_EMPLOYEE_SELF_SERVICE.md)      | Not started |
@@ -238,6 +238,101 @@ defects with their original failing evidence, the measured performance at 500, 1
 employments with two budget misses found and fixed, the nine `NOT VERIFIED` capabilities and the
 carried-forward debt register are in
 [`verification/phase-13-final-report.md`](verification/phase-13-final-report.md).
+
+Phase 14A completed on 2026-08-13: Learning and Development — one module, twelve tables. It records
+what somebody was asked to do, what they sat, what an assessor observed and what they hold, and it
+**evaluates nobody**: AD-002 says course completion does not imply competency, and no column here
+implies it. **There is no `numeric` column, no `bigint` and no money anywhere in the module** — every
+number is a small schema-constrained integer, and the one freely-typed value is `raw_mark`, a
+`varchar(32)` nothing parses, so `18.50` is stored, returned and rendered as `18.50`. Two answers are
+**computed rather than stored**: whether a certificate is still valid, and whether a requirement is
+overdue. Both are functions of a civil date and the day somebody asked, because `JobPort` has no
+adapter and a flag nothing maintains would show `valid` for a licence that lapsed in March
+([ADR-0070](adr/0070-learning-owns-the-expiry-of-what-it-issues.md)). Recurring training is generated
+by a **bounded, idempotent command an administrator runs**, arbitrated by a partial unique index over
+a derived occurrence day rather than a read-then-write — so a retried run creates nothing and two
+simultaneous runs converge ([ADR-0071](adr/0071-a-recurring-requirement-is-computed-not-scheduled.md)).
+**A dependency that cannot answer is a refusal, never a zero**: if Employment cannot resolve a rule's
+audience, reconciliation refuses rather than reporting that everybody is up to date about an
+organization it never looked at. No scoring formula was invented — the specification defines none, so
+an assessor states an outcome and nothing computes one. Every date is a `YYYY-MM-DD` string from
+column to rendered HTML, with no `Date` anywhere on the path. `read-team`, `read-own` and self-service
+remain `NOT VERIFIED` until a principal resolves to an employment. The planning checkpoint is in
+[`verification/phase-14-plan.md`](verification/phase-14-plan.md); the seven defects with their
+original failing evidence, the measured performance at 500, 10,000 and 100,000 employments with **all
+twenty-five workloads within budget**, the query plans, the nine `NOT VERIFIED` capabilities and the
+carried-forward debt register are in
+[`verification/phase-14a-final-report.md`](verification/phase-14a-final-report.md). **Phase 14B —
+sessions, capacity, waitlists and scheduling — is not started**: no column, no port, no route, no
+screen.
+
+Phase 15 completed on 2026-08-14: Career, Succession and Development — one module, twelve tables. It
+records the ladders a tenant defines, who is on one, the benches it keeps, what people have been
+judged ready for, what they agreed to do and where somebody suggested they move next — and it
+**recommends and executes nothing**. No employment, position, assignment or salary changes because of
+anything in this module, and there is no port through which one could: every cross-module adapter
+takes `Asking`, which declares `ask` and no `send`, so an adapter that tried to write another
+module's data would not compile
+([ADR-0072](adr/0072-a-career-recommendation-is-advisory-and-writes-nothing.md)). **A decision is
+Career's; an observation stays where it was made** — talent-pool membership is a standing decision an
+organization took, Performance's nine-box placement is an observation of one cycle, and neither
+derives the other
+([ADR-0073](adr/0073-a-decision-is-careers-an-observation-stays-where-it-was-made.md)). **Readiness is
+stated by a person**: the specification defines no formula, so an authorized human states a level with
+a rationale and their name on it, and there is no score, no percentage and no nine-box anywhere in the
+module ([ADR-0074](adr/0074-readiness-is-stated-by-a-person.md)). Assessments are immutable at the
+table — one trigger refuses update and delete, so a correction is a new assessment and `latest` is a
+selection of the most recent statement rather than an average of two. **There is no `numeric`, no
+`double precision`, no `real`, no `bigint` and no `money` column anywhere**: every number is a small
+bounded integer a human chose, and every date is a `YYYY-MM-DD` civil day with no `Date` on the path.
+Two answers are derived on read against a stated day rather than stored — whether a succession review
+is due and whether a mobility recommendation still stands — because `JobPort` has no adapter and a
+flag nothing maintains goes stale. D-4 (critical-position enumeration) and D-5 (nine-box and
+high-potential listing) were **refused and remain `NOT VERIFIED`**; the only change to a completed
+module is the narrow additive `organization.list-positions(positionId?)` exact-identifier lookup,
+which adds no way to discover a position by any property and no `criticality` filter. Sixteen
+capabilities remain `NOT VERIFIED`, none with a placeholder anywhere in the product. The three
+production defects with their original failing evidence, the fourteen test and fixture defects beside
+them, the measured performance at 500, 10,000 and 100,000 employments with **all twenty-six workloads
+within budget**, the query plans, the sixteen `NOT VERIFIED` capabilities and the carried-forward debt
+register are in
+[`verification/phase-15-final-report.md`](verification/phase-15-final-report.md).
+
+Phase 16A completed on 2026-08-15: Enterprise Workflow and Approvals — one module, seven tables. It
+records the approval processes a tenant configures, raises an approval about a record another module
+owns, asks one named person at a time to decide it, and writes down who answered, on whose authority
+and when — and it **owns no business data**. An approval is *about* a subject, and the subject is two
+opaque strings Workflow never interprets: there is no foreign key out of the module, no import of
+another module's package, and no shape in which it could learn what a requisition is. **Every chain
+is sequential and one named membership answers each step**: there is no role directory and no group
+directory in this product, no parallel branch, no majority, quorum or first-response, and no
+condition on which a chain forks. **Nothing is scheduled and nothing expires** — `JobPort` still has
+no adapter anywhere, so no approval ages out, no escalation fires, and a delegation is in force only
+if Identity says so *at the instant of the decision*, which is why Workflow keeps no expiry state of
+its own. "The approvals waiting for me" is the **first `read-own` in this repository that is routed
+and enforced**, because an approval is addressed to a membership and a membership is what the request
+resolved before any handler ran; no endpoint, body or command field accepts one, so nobody can aim
+the queue at somebody else. A decision records **two** memberships that never collapse into one — the
+delegate who acted and the approver whose authority was used — and two check constraints make the
+pair impossible to write wrongly. Decisions and timeline entries are **append-only at the table**,
+with two triggers refusing update and delete and no mutation method on either repository. **There is
+no `numeric`, no `real`, no `double precision`, no `bigint`, no `money` and no `date` column
+anywhere**: every number is a small whole one and every moment is an instant. **Recruitment is the
+single adopted business module**, by write, through a seam that was stopped on and approved before it
+was built: Recruitment is asked *first*, so a refusal leaves Workflow with nothing written, and the
+reverse window is closed by reconciling on the approval identifier rather than by claiming an
+atomicity two transactions do not have — there is no outbox, no broker, no worker and no scheduler.
+The kernel's `ApprovalPort` is **unchanged**; Workflow implements it inbound, published and unwired.
+Twenty-two capabilities remain `NOT VERIFIED`, none with a placeholder anywhere in the product, and
+`expired` is declared in the port's vocabulary and never produced. The planning checkpoint is in
+[`verification/phase-16-plan.md`](verification/phase-16-plan.md); the three production defects and
+one UI defect with their original failing evidence, the three fixture defects the closing audit found
+by building a database from the migrations alone, the measured performance at 500, 10,000 and 100,000
+approvals with **all eighteen workloads within budget at every tier**, the query plans, the nine
+verified races, the twenty-two `NOT VERIFIED` capabilities and the carried-forward debt register are
+in [`verification/phase-16a-final-report.md`](verification/phase-16a-final-report.md). **Phase 16B —
+parallel approval, tallies, conditional branching, roles, groups, SLA, escalation and scheduling — is
+not started**: no column, no port, no route, no screen.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

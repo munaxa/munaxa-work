@@ -44,9 +44,10 @@ import type { LearningDependencies } from './learning-dependencies.js';
 export interface ReconcileRequirementsCommand extends Command {
   readonly commandName: 'learning.reconcile-requirements';
   readonly mandatoryRuleId: string;
-  /** How many employments to examine. Clamped; the caller pages through with `offset`. */
+  /** How many employments to examine. Clamped; the caller pages through with `page`. */
   readonly limit?: number;
-  readonly offset?: number;
+  /** One-based, as every published search contract in this repository counts pages. */
+  readonly page?: number;
 }
 
 const DEFAULT_LIMIT = 200;
@@ -67,8 +68,8 @@ export const reconcileRequirementsHandler = (
       if (!rule.active) return refuseWith<ReconciliationView>('reconcile-rule-retired');
 
       const limit = Math.min(MAX_LIMIT, Math.max(1, command.limit ?? DEFAULT_LIMIT));
-      const offset = Math.max(0, command.offset ?? 0);
-      const audience = await audienceOf(dependencies, rule, limit, offset);
+      const page = Math.max(1, command.page ?? 1);
+      const audience = await audienceOf(dependencies, rule, limit, page);
 
       // Undefined is "Employment could not answer", and it is deliberately not an empty audience.
       if (audience === undefined) return refuseWith<ReconciliationView>('employment-unavailable');
@@ -81,18 +82,18 @@ export const reconcileRequirementsHandler = (
 const audienceOf = (
   dependencies: LearningDependencies,
   rule: MandatoryRuleState,
-  limit: number,
-  offset: number,
+  size: number,
+  page: number,
 ): Promise<Audience> => {
   const asOf = dependencies.clock.now();
 
   if (rule.audience === 'organization_unit' && rule.organizationUnitId !== undefined) {
-    return dependencies.employment.inUnit(rule.organizationUnitId, asOf, limit, offset);
+    return dependencies.employment.inUnit(rule.organizationUnitId, asOf, size, page);
   }
   if (rule.audience === 'position' && rule.positionId !== undefined) {
-    return dependencies.employment.inPosition(rule.positionId, asOf, limit, offset);
+    return dependencies.employment.inPosition(rule.positionId, asOf, size, page);
   }
-  return dependencies.employment.activeEmployments(asOf, limit, offset);
+  return dependencies.employment.activeEmployments(asOf, size, page);
 };
 
 /** What one employment's occurrence turned into. Counted by the caller; nothing is mutated. */

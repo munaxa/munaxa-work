@@ -181,3 +181,21 @@ Jordan and its sibling under the Saudi company resolves to Saudi Arabia, in the 
 the same request. When nothing governs the unit the answer is *nothing*, never a default: a
 fallback there would compute somebody's end of service under a country nobody chose and produce a
 number that looks right.
+
+### `organization.list-positions` takes an optional `positionId` (Phase 15)
+
+Career confirms an identifier it already holds — a succession plan's position, a career stage's
+target, a mobility recommendation's destination — and before this filter existed the only way to do
+that was to page the whole catalogue and search it downstream: unbounded work over another module's
+data, done once per command.
+
+The filter is an exact-identifier predicate and nothing else. The response is the same
+`PagedResult<PositionView>`, the permission is the same `organization.position.read`, the tenant
+boundary and the pagination semantics are unchanged, and a caller that omits `positionId` gets
+exactly what it got before.
+
+**It does not authorize D-4.** *"List this tenant's critical positions"* needs a `criticality`
+filter, and there still is not one. Confirming an identifier a caller already holds is strictly
+narrower than what that caller's `organization.position.read` already allowed; discovering which
+positions an organization considers critical is a different question, and it remains unanswerable
+through this contract.

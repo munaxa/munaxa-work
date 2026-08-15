@@ -7,11 +7,10 @@ import {
   type Transaction,
 } from '@work/kernel';
 
-import { Requisition, requisitionDecision } from '../domain/requisition.js';
+import { Requisition } from '../domain/requisition.js';
 import type { Metadata } from '../domain/recruitment-aggregate.js';
 
 import {
-  currentActor,
   currentTenant,
   notFound,
   originOfCurrentRequest,
@@ -137,113 +136,6 @@ export const submitRequisitionHandler = (
         const submitted = requisition.submit(originOfCurrentRequest(), now);
 
         return submitted.ok ? success(undefined) : refusedBy(submitted.error);
-      }),
-    ),
-});
-
-export interface DecideRequisitionCommand extends Command {
-  readonly commandName: 'recruitment.decide-requisition';
-  readonly requisitionId: string;
-  readonly decision: 'approved' | 'rejected';
-  readonly reasonCode?: string;
-  readonly note?: string;
-  readonly expectedVersion: number;
-}
-
-/**
- * The decision.
- *
- * Guarded by `recruitment.requisition.approve`, which the person who raised the request does not
- * automatically hold — separation of duties on the control that commits headcount.
- */
-export const decideRequisitionHandler = (
-  dependencies: RecruitmentDependencies,
-): CommandHandler<DecideRequisitionCommand, RequisitionAffected> => ({
-  commandName: 'recruitment.decide-requisition',
-  permission: RecruitmentPermissions.requisitionApprove,
-
-  handle: async (command) =>
-    dependencies.unitOfWork.execute(async (transaction) =>
-      withRequisition(transaction, dependencies, command, async (requisition, now) => {
-        const decided = requisition.decide(command.decision, originOfCurrentRequest(), now);
-
-        if (!decided.ok) return refusedBy(decided.error);
-
-        await dependencies.stores.decisions.insert(
-          transaction,
-          requisitionDecision(
-            {
-              tenantId: currentTenant(),
-              requisitionId: requisition.id,
-              decision: command.decision,
-              ...(command.reasonCode === undefined ? {} : { reasonCode: command.reasonCode }),
-              ...(command.note === undefined ? {} : { note: command.note }),
-              // The authenticated human, never a value the caller supplied.
-              decidedBy: currentActor(),
-              decidedAt: now,
-            },
-            now,
-          ),
-        );
-        return success(undefined);
-      }),
-    ),
-});
-
-export interface ReverseRequisitionDecisionCommand extends Command {
-  readonly commandName: 'recruitment.reverse-requisition-decision';
-  readonly requisitionId: string;
-  readonly note?: string;
-  readonly expectedVersion: number;
-}
-
-/**
- * Reverses a decision.
- *
- * The correction mechanism, and the only one: the decision that was made stands as a row, and this
- * writes another naming it. That is what "immutable once recorded except through an explicit
- * correction mechanism" means in a schema rather than in a policy document.
- */
-export const reverseRequisitionDecisionHandler = (
-  dependencies: RecruitmentDependencies,
-): CommandHandler<ReverseRequisitionDecisionCommand, RequisitionAffected> => ({
-  commandName: 'recruitment.reverse-requisition-decision',
-  permission: RecruitmentPermissions.requisitionApprove,
-
-  handle: async (command) =>
-    dependencies.unitOfWork.execute(async (transaction) =>
-      withRequisition(transaction, dependencies, command, async (requisition, now) => {
-        const decisions = await dependencies.stores.decisions.forRequisition(
-          transaction,
-          requisition.id,
-        );
-        const latest = [...decisions]
-          .filter((decision) => decision.decision !== 'reversed')
-          .sort((left, right) => left.decidedAt.getTime() - right.decidedAt.getTime())
-          .at(-1);
-
-        if (latest === undefined) return notFound<undefined>('requisition decision');
-
-        const reversed = requisition.reverseDecision(originOfCurrentRequest(), now);
-
-        if (!reversed.ok) return refusedBy(reversed.error);
-
-        await dependencies.stores.decisions.insert(
-          transaction,
-          requisitionDecision(
-            {
-              tenantId: currentTenant(),
-              requisitionId: requisition.id,
-              decision: 'reversed',
-              ...(command.note === undefined ? {} : { note: command.note }),
-              decidedBy: currentActor(),
-              decidedAt: now,
-              reversesId: latest.id,
-            },
-            now,
-          ),
-        );
-        return success(undefined);
       }),
     ),
 });

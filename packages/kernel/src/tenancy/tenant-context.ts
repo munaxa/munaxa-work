@@ -21,6 +21,26 @@ export interface TenantContext {
    *  an audit row whose actor is unknown answers none of the questions audit exists for. */
   readonly actor: string;
   readonly userId?: string;
+  /**
+   * The membership this request resolved to — *this person, in this tenant*.
+   *
+   * Distinct from `userId`, which is the workforce user: a person may hold memberships in several
+   * tenants (AD-005), and the identifier other modules key an *arrangement* on is the membership.
+   * Identity's delegation register is the case that forces the distinction —
+   * `identity.active-delegations-for` takes a `delegateMembershipId` and nothing else answers it.
+   *
+   * Optional, because not every execution context comes from an HTTP request. A reconciliation
+   * command, a migration and every test fixture construct a context directly and have no membership
+   * to name; a required field would have made all of them assert one they do not have. A handler
+   * that needs it therefore has to handle its absence, which is the correct shape — "we do not know
+   * which member you are" is a real state, and the safe answer to it is nothing rather than
+   * everything.
+   *
+   * **Never taken from a request body.** The middleware sets it from the membership it resolved
+   * from stored facts about an authenticated principal; a client-supplied value would let anybody
+   * read anybody's approval queue by changing a field.
+   */
+  readonly membershipId?: string;
   readonly correlationId: string;
 }
 

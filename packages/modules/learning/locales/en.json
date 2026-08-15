@@ -1,11 +1,13 @@
 {
   "learning": {
     "action": {
+      "addStep": "Add course",
       "archive": "Archive",
       "assign": "Assign",
       "cancel": "Cancel",
       "complete": "Complete",
       "deactivate": "Deactivate",
+      "defineAssessment": "Define assessment",
       "enrol": "Enrol",
       "fail": "Record as not passed",
       "issue": "Issue",
@@ -13,9 +15,11 @@
       "reconcile": "Generate requirements",
       "recordResult": "Record result",
       "register": "Register",
+      "removeStep": "Remove course",
       "retire": "Retire",
       "revoke": "Revoke",
       "start": "Start",
+      "update": "Amend description",
       "waive": "Waive",
       "withdraw": "Withdraw"
     },
@@ -27,54 +31,97 @@
       "path_step_sequence_taken": "Another course already occupies that position in this path."
     },
     "label": {
+      "actions": "Actions this state allows",
+      "active": "Active",
+      "activeCertifications": "Certificates held",
       "asOf": "As of",
+      "assessedBy": "Assessed by",
+      "assessedOn": "Assessed on",
+      "assessment": "Assessment",
       "assessments": "Assessments",
+      "assignment": "Requirement",
       "assignments": "Assignments",
       "audience": "Applies to",
       "catalogue": "Course catalogue",
+      "categories": "Course categories",
+      "category": "Category",
       "certifications": "Certifications",
       "code": "Code",
+      "completedBy": "Recorded by",
+      "completedCourses": "Courses completed",
       "completedOn": "Completed on",
       "compliance": "Mandatory training",
       "course": "Course",
+      "courses": "Courses",
+      "current": "Current",
       "delivery": "Delivery",
       "dueOn": "Due",
+      "dueWithin": "Due within (days)",
       "duration": "Duration",
       "effectiveFrom": "Effective from",
+      "employment": "Employment",
       "enrolments": "Enrolments",
       "evidence": "Evidence document",
+      "expired": "Expired",
       "expiring": "Expiring",
+      "externalName": "External name",
+      "generated": "Generated on this page",
+      "history": "Learning history",
       "instructors": "Instructors",
       "issuedBy": "Issued by",
       "issuedOn": "Issued",
+      "kind": "Kind",
+      "learning": "Learning and development",
       "mark": "Mark",
       "occurrence": "Occurrence",
+      "openAssignments": "Open requirements",
       "optional": "Optional",
+      "organization": "Organization",
       "outcome": "Outcome",
       "overdue": "Overdue",
+      "overview": "Overview",
+      "page": "Page",
       "paths": "Learning paths",
+      "pinnedVersion": "Version sat",
+      "publishedVersions": "Published courses",
+      "reconciliation": "Requirement generation",
       "recurrence": "Repeats every",
       "required": "Required",
+      "requiresAssessment": "Assessment required",
+      "results": "Assessment results",
+      "scale": "Out of",
       "sequence": "Position",
       "source": "Source",
       "status": "Status",
       "steps": "Steps",
       "title": "Title",
+      "validMonths": "Certificate valid for (months)",
       "validUntil": "Valid until",
       "validity": "Validity",
       "version": "Version",
+      "versionNumber": "Version",
       "versions": "Versions",
       "waivedBy": "Waived by",
       "waiverReason": "Waiver reason"
     },
     "notice": {
+      "actionsAreUsability": "These are the actions the record’s state allows. The API decides who may perform them; this list is not a permission check.",
+      "countsAreOfThisPage": "Counts marked as such are over the rows on this page. The totals beside each heading are the server’s own.",
       "derivedExpiry": "Validity is calculated from the certificate's own date each time this is read.",
       "derivedOverdue": "Overdue is calculated from the due date each time this is read.",
       "empty": "Nothing to show.",
       "externalInstructor": "An external instructor is recorded here only. No employee record is created for them.",
       "noAggregateScore": "Assessment results are recorded as outcomes. This product calculates no overall score, because none was specified.",
+      "noCategoryListing": "These are the categories used by the courses on this page. This product has no query that lists every category a tenant has.",
+      "noDocumentBytes": "An evidence document is a reference that was confirmed to exist. No file is stored, served or linked here.",
+      "noNotificationDelivery": "An intent to notify is recorded. Nothing in this product delivers it, so no message has been sent.",
+      "noSupersessionLink": "A superseded certificate says so. The certificate that replaced it is not carried by this read.",
       "notScheduled": "Recurring requirements are generated when somebody runs them. Nothing in this product runs them on a schedule.",
-      "selfServiceUnavailable": "Reading your own record is not available: this product cannot yet tell which employment you are."
+      "readTeamUnavailable": "A manager cannot read their own team here: this product cannot yet tell which employment a signed-in person is.",
+      "selfServiceUnavailable": "Reading your own record is not available: this product cannot yet tell which employment you are.",
+      "sequenceIsNotAPrerequisite": "A position is an order, not a gate. Nothing in this product requires one course before another.",
+      "unauthenticated": "Not signed in. This product has no authentication adapter yet, so every business read is refused until one is supplied.",
+      "versionsAreImmutable": "A published version is never edited. A completion describes the version somebody actually sat."
     },
     "rejection": {
       "assessment-date-invalid": "The assessment date must be a calendar date.",
@@ -157,6 +204,10 @@
       "rejected": "Refused"
     },
     "vocabulary": {
+      "answer": {
+        "no": "No",
+        "yes": "Yes"
+      },
       "assessmentKind": {
         "assignment": "Assignment",
         "external_result": "External result",
@@ -234,12 +285,27 @@
         "draft": "Draft",
         "published": "Published"
       },
+      "ruleState": {
+        "active": "Active",
+        "retired": "Retired"
+      },
       "validity": {
         "expired": "Expired",
         "expiring_soon": "Expiring soon",
         "no_expiry": "No expiry",
         "valid": "Valid"
       }
+    },
+    "withheld": {
+      "assignmentClosed": "This requirement is closed. Satisfied, waived and cancelled are all endings.",
+      "certificationRevoked": "This certificate was revoked.",
+      "certificationSuperseded": "This certificate was replaced by a later one.",
+      "courseArchived": "An archived course is final. It is kept so earlier certificates stay explainable.",
+      "enrolmentCompleted": "A completion is a record of what happened and is not edited. A certificate is issued from it.",
+      "enrolmentEnded": "This enrolment ended without a completion.",
+      "pathArchived": "An archived path is final.",
+      "pathEmpty": "A path with no courses cannot be published: anybody would satisfy it by doing nothing.",
+      "ruleRetired": "A retired requirement generates nothing new. What it already asked of people is unchanged."
     }
   }
 }

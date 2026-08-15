@@ -75,11 +75,17 @@ export class TenantMiddleware implements NestMiddleware {
 
     identified.membership = resolution.membership;
 
+    // `membershipId` alongside `userId`, from the membership this request already resolved rather
+    // than from a second lookup. The two are different facts: the workforce user is the person, and
+    // the membership is that person *in this tenant* — which is the identifier Identity's delegation
+    // register is keyed on, and therefore the only one that can answer "which approvals are waiting
+    // for me". It was previously resolved here and discarded one line later.
     const context: ExecutionContext = {
       tenantId: resolution.membership.tenantId,
       correlationId: correlated.correlationId,
       actor: actorFor(resolution.membership),
       userId: resolution.membership.workforceUserId,
+      membershipId: resolution.membership.membershipId,
     };
 
     runInContext(context, () => {

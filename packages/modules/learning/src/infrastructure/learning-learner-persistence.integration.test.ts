@@ -112,7 +112,11 @@ suite('learning learner persistence', () => {
       const version = aCourseVersion(course.courseId);
       const assessment = anAssessment(version.courseVersionId);
       const enrolment = anEnrolment(course.courseId, version.courseVersionId);
-      // 2^53 + 1. A mark that went through `Number` would come back as 9007199254740992.
+      // 2^53 + 1, which a double cannot hold: a mark that went through `Number` would come back as
+      // 9007199254740992. It is deliberately wider than the *domain* permits — twelve integer
+      // digits — because what is under test here is the repository's own guarantee that it parses
+      // nothing at all, including a row an import or an earlier version left in the column. The
+      // application-level equivalent uses a mark a command can actually write.
       const beyondSafe = '9007199254740993';
 
       await inA(async (transaction) => {

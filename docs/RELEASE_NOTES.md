@@ -5,6 +5,185 @@ and what is still missing.
 
 ---
 
+## Phase 16A — Approvals
+
+One module. It records the approval processes a company sets up, raises an approval about a record
+another part of the product owns, asks one named person at a time to decide it, and writes down who
+answered, on whose authority, and when.
+
+**One person at a time, in the order somebody configured.** There is no parallel approval, no
+majority, no quorum and no "first to respond wins". A step names a specific member of staff, and the
+next person is asked only once the one before them has answered. Nothing branches on the value of the
+record being approved.
+
+**A step names a person, not a role or a group.** This product has no role directory and no group
+directory, so there is nothing to route to except a named member. Nothing routes to somebody's
+manager either — the product cannot work out who that is, and guessing would send a director's
+approval to the wrong person.
+
+**Nothing chases anybody.** No approval expires, nothing escalates after a delay, nothing is
+reassigned on a timer, and no email, message or notification is sent when somebody is asked to
+decide. An approval waits until a person acts on it. Nobody should expect this product to remind
+them.
+
+**"Waiting for me" means waiting for me.** The list of approvals waiting on you is worked out from
+who you are signed in as, and there is no way — no setting, no link, no address — to ask for somebody
+else's list instead. A person who cannot be identified is shown nothing rather than everything.
+
+**A stand-in is recorded as themselves.** When a deputy approves something on a director's behalf,
+the record says the deputy approved it *using the director's authority*. It does not say the director
+approved it. A year later, both questions — who decided, and whose authority was it — have their own
+answer. Whether a delegation is in force is checked at the moment of the decision, so an arrangement
+that has ended simply stops working, without anything needing to run overnight to end it.
+
+**A decision cannot be edited or deleted.** Neither can the timeline of who was asked and when. A
+correction is a new record written beside the old one. The timeline records the routing only —
+somebody's written reason for a rejection stays on the decision, where permission decides who may
+read it, rather than appearing in a list anyone with access to the queue can see.
+
+**Recruitment is the first thing it approves.** Approving a hiring request through this module moves
+the request in Recruitment, and Recruitment keeps a note of which approval decided it. If Recruitment
+will not accept the decision — because the request was withdrawn, or somebody had already decided it
+directly — the approval is refused and nothing is recorded on either side. Sending the same approval
+twice settles on one outcome rather than deciding twice.
+
+**Screens.** One read-only administrative screen at `/workflow`, in English and Arabic with the page
+laid out right to left in Arabic. It shows what has been configured, what is running, what is waiting
+on you and what you have decided. It has no buttons: every action is performed by the API, and the
+server decides each one.
+
+**Still missing**, and each stated plainly on the screen rather than left to be discovered: service
+levels and due dates, working-day calculations, escalation, scheduling, parallel and majority
+approvals, conditional routing, role and group approvers, routing to a manager, approvers outside the
+company, notifications, analytics, and employee self-service.
+
+---
+
+## Phase 15 — Career, succession and development
+
+One module. It records the ladders a company defines, who is on one, the benches it keeps for its
+key posts, what people have been judged ready for, what they agreed to do, and where somebody
+suggested they move next.
+
+**It recommends and executes nothing.** Marking a suggested move as accepted means a human agreed
+with it. Nobody is promoted, transferred, reassigned or paid differently as a result — those are
+other parts of the product, done deliberately by somebody, and this module would not know whether it
+happened. There is no setting that changes this and no path through which it could.
+
+**Nobody is scored.** No readiness percentage, no nine-box, no high-potential rating is calculated
+anywhere. A named person states that somebody is ready or is not, writes down why, and their name
+stays on it. No rule for computing that was ever specified, and a rule invented here would decide
+who gets put forward for a director's post.
+
+**A decision and an observation are kept apart.** Putting somebody in a high-potential pool is a
+standing decision the organization took and revisits deliberately. A performance placement is what
+one review cycle observed. Neither is copied into the other, because the copy is the answer that
+goes stale and the stale answer is the one somebody acts on.
+
+**An assessment cannot be edited or deleted.** A correction is a new assessment recorded beside the
+old one, and the record shows the most recent statement rather than an average of the two. Somebody
+reading a "not ready" a year later can see who said it, when, and what they said before.
+
+**Succession data is treated as the sensitive material it is.** A list of named successors for a
+post is something a colleague can be harmed by, and that colleague is not in the room. Asking for a
+bench you are not allowed to see answers *not found* rather than *forbidden* — confirming that a
+bench exists for a named post is already most of the disclosure. Nominating somebody and recording
+that the organization agrees are separate permissions; so are creating a talent pool and putting a
+named person into it.
+
+**Every day is a day.** A target date, a review date and an expiry are the same calendar day
+wherever the product is opened, and the screens say which day they answered for — so nothing ever
+says "due" or "expired" without saying relative to when.
+
+### Measured
+
+Twenty-six workloads at 500, 10,000 and 100,000 employees, each with a second company's data in the
+same database. All within budget: the slowest read at 100,000 employees is 15 ms against a 100 ms
+budget, and counting the bench for forty posts at once did not get slower as the company grew.
+
+### What is still missing
+
+- **Nobody can see their own career plan.** The product cannot yet tell which employee a signed-in
+  person is, so "my career" and a manager's view of their team are not built. Naming an employee in
+  a URL is a filter, never a way in.
+- **A development plan is not jointly signed.** An administrator records that the employee
+  acknowledged it and that the manager did, with the day and who recorded it. Those are records, not
+  signatures.
+- **Nothing happens on a schedule.** A succession review coming due and a suggested move running out
+  of time are worked out when somebody asks, against the day they asked. Nothing fires and nobody is
+  notified.
+- **No notification is delivered.** This module composes no notification at all.
+- **No critical-position list, and no high-potential list drawn from performance.** Neither is
+  half-built: the first needs a company's positions to be marked critical somewhere, and the second
+  needs a bounded way to ask performance for a page of people. Career answers from the benches and
+  pools it holds itself.
+- **The 70-20-10 development mix is counted, not judged.** The three categories are shown with their
+  counts; no balance rule was ever specified, so the verdict reads `NOT VERIFIED` rather than a
+  number somebody would trust.
+- **No document is stored, served or linked.** A readiness assessment cites no evidence file.
+
+### Tests
+
+2,660, up from 2,180.
+
+---
+
+## Phase 14A — Learning and development
+
+One module. It records what somebody was asked to do, what they sat, what an assessor observed, and
+what they hold.
+
+**It evaluates nobody.** Finishing a course is evidence of what somebody was taught, not a judgement
+about how they do their job — those are Performance's record and a different question. Learning
+writes no capability, no rating and no status anywhere outside itself; other modules pull a
+completion or a certification when they want one.
+
+**Nothing expires on a timer, because nothing here runs on one.** Whether a certificate is still
+valid and whether a requirement is overdue are worked out from the dates and the day you asked,
+every time you ask. No background job maintains a flag, so there is no flag to go stale — a forklift
+licence that lapsed in March cannot read `valid` in June. Every screen and every response says which
+day it answered for, so nothing ever says "expiring soon" without saying soon relative to what.
+
+**Recurring training is generated when somebody runs it.** Annual safety training does not appear
+overnight: an administrator generates the next round, one page of the workforce at a time, and the
+command says whether more remain. Running it twice creates nothing the second time, and two people
+running it at once produce one set of requirements rather than two. If the system cannot work out
+who a rule applies to, it refuses — it does not report that everybody is up to date about an
+organization it never looked at.
+
+**A mark is kept exactly as the assessor wrote it.** `18.50` stays `18.50` on the screen, in the
+record and in an export. Nothing in the product calculates with a mark, so nothing rounds one.
+
+**No overall score is calculated from assessments**, and none is displayed. The product records each
+outcome an assessor stated. It does not average them, weight them or turn them into a pass mark,
+because no rule for doing so was ever specified — and a rule invented here would decide who passes
+mandatory safety training.
+
+### Measured
+
+Twenty-five workloads at 500, 10,000 and 100,000 employees, each with a second company's data in the
+same database. All within budget: the compliance queue answers in 22 ms and the expiring-certificate
+queue in 12 ms at 100,000 employees.
+
+### What is still missing
+
+- **Nobody can see their own training record.** The product cannot yet tell which employee a
+  signed-in person is, so "my learning" and a manager's view of their team are not built. Naming an
+  employee in a URL is refused rather than honoured.
+- **No training sessions, seats, capacity or waiting lists.** That is the next increment, and none
+  of it is half-built.
+- **No notification is delivered.** The intent to notify is recorded; nothing sends it.
+- **No course material or certificate file is stored, served or linked.** A document reference is
+  confirmed to exist and nothing more.
+- **The certificate that replaced an earlier one is not shown.** A superseded certificate says it
+  was superseded; the link to its replacement is not carried by the read.
+
+### Tests
+
+2,180, up from 2,014.
+
+---
+
 ## Phase 13 — Performance, competencies and goals
 
 One module. It says what somebody was rated, what that rating was measured against, and why — for as
