@@ -89,7 +89,20 @@ suite('what the database arbitrates about configuration and versions', () => {
       expect(outcomes.distinct).toBe('accepted');
     });
 
-    it('refuses two steps at the same ordinal in one version, and permits the next ordinal', async () => {
+    /**
+     * **This assertion was inverted in Phase 16B, and inverted rather than deleted.**
+     *
+     * 16A refused two templates at one ordinal, and that was right while an ordinal was a position.
+     * An ordinal is now a *branch* — the set of templates asked at the same moment — so two rows
+     * sharing one is how an administrator configures parallel approval, and the old index refused the
+     * feature rather than a mistake.
+     *
+     * What is still arbitrated by the database is written below it: a version number, a definition
+     * code. What moved to the domain is **contiguity**, checked once at publication by
+     * `ordinalsAreContiguous` over the *distinct* ordinals — a thing no partial index can express and
+     * never could.
+     */
+    it('permits two steps at the same ordinal in one version, because that is a branch', async () => {
       const outcomes = await fixture.asTenant(TENANT_A, async (client) => {
         const seeded = await seedDefinition(client, TENANT_A);
         const add = (ordinal: number): Promise<string> =>
@@ -102,11 +115,12 @@ suite('what the database arbitrates about configuration and versions', () => {
             [TENANT_A, seeded.workflowVersionId, ordinal, SECOND_APPROVER],
           );
 
-        return { duplicate: await add(1), next: await add(2) };
+        return { alongside: await add(1), next: await add(2), zero: await add(0) };
       });
 
-      expect(outcomes.duplicate).toContain('workflow_step_template_ordinal_idx');
-      expect(outcomes.next).toBe('accepted');
+      expect([outcomes.alongside, outcomes.next]).toStrictEqual(['accepted', 'accepted']);
+      // Bounded below and not above, unchanged: a branch is still numbered from one.
+      expect(outcomes.zero).toContain('workflow_step_template_ordinal_check');
     });
 
     it('refuses a duplicate version number and permits the next', async () => {

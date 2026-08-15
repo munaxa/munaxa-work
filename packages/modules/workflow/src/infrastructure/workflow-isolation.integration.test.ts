@@ -10,7 +10,7 @@ import {
   type PoolLike,
   type WorkflowFixture,
 } from './workflow-database.fixture.js';
-import { seedDecision, seedHistory, seedInstance } from './workflow-seed.js';
+import { seedApprovalGroup, seedDecision, seedHistory, seedInstance } from './workflow-seed.js';
 
 /**
  * Tenant isolation, proved by trying rather than by reading the policy.
@@ -54,20 +54,22 @@ suite('Workflow tenant isolation', () => {
 
   beforeEach(async () => {
     await fixture.truncate();
-    inA = await fixture.asTenant(TENANT_A, async (client) => {
-      const seeded = await seedInstance(client, TENANT_A);
+    // Both tenants at the same volume, on all nine tables — the two approval-group tables included,
+    // because a table nobody seeded reads as isolated whatever the policy says.
+    const seedTenant = async (
+      tenantId: string,
+    ): Promise<Awaited<ReturnType<typeof seedInstance>>> =>
+      fixture.asTenant(tenantId, async (client) => {
+        const seeded = await seedInstance(client, tenantId);
 
-      await seedDecision(client, TENANT_A, seeded);
-      await seedHistory(client, TENANT_A, seeded.instanceId);
-      return seeded;
-    });
-    inB = await fixture.asTenant(TENANT_B, async (client) => {
-      const seeded = await seedInstance(client, TENANT_B);
+        await seedDecision(client, tenantId, seeded);
+        await seedHistory(client, tenantId, seeded.instanceId);
+        await seedApprovalGroup(client, tenantId);
+        return seeded;
+      });
 
-      await seedDecision(client, TENANT_B, seeded);
-      await seedHistory(client, TENANT_B, seeded.instanceId);
-      return seeded;
-    });
+    inA = await seedTenant(TENANT_A);
+    inB = await seedTenant(TENANT_B);
   });
 
   it('shows each tenant its own rows on every table, and only those', async () => {
@@ -210,7 +212,7 @@ suite('Workflow tenant isolation', () => {
     }
   });
 
-  it('has row-level security enabled and forced on all seven tables', async () => {
+  it('has row-level security enabled and forced on all nine tables', async () => {
     const { rows } = await fixture.admin.query<{
       relname: string;
       relrowsecurity: boolean;

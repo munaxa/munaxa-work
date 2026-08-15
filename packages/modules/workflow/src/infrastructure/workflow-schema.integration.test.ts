@@ -42,7 +42,7 @@ suite('the Workflow schema', () => {
     await fixture.truncate();
   });
 
-  it('has exactly the seven tables this module owns', async () => {
+  it('has exactly the nine tables this module owns', async () => {
     const { rows } = await fixture.admin.query<{ table_name: string }>(
       `select table_name from information_schema.tables
         where table_schema = 'public' and table_name like 'workflow%' order by table_name`,
@@ -167,26 +167,46 @@ suite('the Workflow schema', () => {
       'workflow_decision_decider_idx',
       'workflow_decision_instance_idx',
       'workflow_history_instance_idx',
+      'workflow_approval_group_code_idx',
+      'workflow_approval_group_member_idx',
+      'workflow_approval_group_member_group_idx',
     ];
 
     expect(expected.filter((index) => named[index] === undefined)).toStrictEqual([]);
 
-    // The seven that arbitrate an invariant are unique, and every one is partial: a unique index
-    // over soft-deleted rows would refuse a code a tenant had already discarded.
+    /**
+     * The six that arbitrate an invariant are unique, and every one is partial: a unique index over
+     * soft-deleted rows would refuse a code a tenant had already discarded.
+     *
+     * **Two left this list in 16B, and neither was weakened by accident.** `workflow_step_ordinal_idx`
+     * and `workflow_step_awaiting_idx` were unique while a branch could only hold one step; a branch
+     * *is* several steps sharing an ordinal, so their uniqueness now refuses the ordinary case of the
+     * feature rather than an illegal state. They are asserted below to be present, partial and **not**
+     * unique, which is a positive assertion about the new invariant rather than a silent deletion.
+     */
     const unique = [
       'workflow_definition_code_idx',
       'workflow_version_number_idx',
-      'workflow_step_template_ordinal_idx',
       'workflow_instance_open_subject_idx',
-      'workflow_step_ordinal_idx',
-      'workflow_step_awaiting_idx',
       'workflow_decision_step_idx',
+      'workflow_approval_group_code_idx',
+      'workflow_approval_group_member_idx',
     ];
 
     for (const index of unique) {
       expect([index, named[index]?.includes('UNIQUE')]).toStrictEqual([index, true]);
       expect([index, named[index]?.includes('WHERE')]).toStrictEqual([index, true]);
     }
+
+    // An ordinal is a branch, and a branch is asked all at once. Both of these must stay ordinary
+    // indexes: a unique one on either would make a parallel branch unrepresentable.
+    for (const index of ['workflow_step_ordinal_idx', 'workflow_step_awaiting_idx']) {
+      expect([index, named[index]?.includes('UNIQUE')]).toStrictEqual([index, false]);
+      expect([index, named[index]?.includes('WHERE')]).toStrictEqual([index, true]);
+    }
+    // The step template's is the same rule one level up: two templates at one ordinal is how an
+    // administrator configures a parallel branch in the first place.
+    expect(named['workflow_step_template_ordinal_idx']?.includes('UNIQUE')).toBe(false);
     // The two queue-shaped reads are partial on the open state, so they stay the size of the work.
     // PostgreSQL renders the predicate with its own casts — `(status)::text = 'awaiting'::text` —
     // so the assertion is on the state named in the WHERE clause rather than on the exact spelling.
@@ -219,9 +239,14 @@ suite('the Workflow schema', () => {
     );
 
     expect(rows.filter((row) => !row.parent.startsWith('workflow_'))).toStrictEqual([]);
-    // Nine, and every one of them inside Workflow. Delegation in particular is Identity's: a
-    // decision stores the membership it acted for as a value, never as a reference (AD-010).
-    expect(rows).toHaveLength(9);
+    // Eleven, and every one of them inside Workflow. Delegation in particular is Identity's: a
+    // decision stores the membership it acted for as a value, never as a reference (AD-010) — and so
+    // does a group member, which names a membership and does not reference one.
+    //
+    // `information_schema.constraint_column_usage` yields one row per referenced column, so the two
+    // 16B keys are composite and appear twice each: nine single-column keys plus two columns apiece.
+    expect(rows).toHaveLength(13);
+    expect(rows.filter((row) => row.name.endsWith('_group_fk'))).toHaveLength(4);
   });
 
   it('refuses a subject type that names no module, in both places it appears', async () => {

@@ -5249,8 +5249,56 @@ model WorkflowVersion {
   @@map("workflow_version")
 }
 
+/// A named list of memberships a tenant maintains (Phase 16B). Not a directory: no query behind it,
+/// no nesting, no inheritance, no role semantics — and no lifecycle, which is why there is no
+/// `status` column. Resolved into individual steps when an instance starts, and never read again.
+model WorkflowApprovalGroup {
+  id         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  code       String    @db.VarChar(64)
+  name       Json
+  metadata   Json
+  created_at DateTime  @db.Timestamptz(6)
+  created_by String    @db.VarChar(255)
+  updated_at DateTime  @db.Timestamptz(6)
+  updated_by String    @db.VarChar(255)
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.VarChar(255)
+  version    Int
+
+  /// Not a second identity — `id` is already unique. It exists so a child row's foreign key can name
+  /// `(id, tenant_id)` and be structurally unable to reach a group in another tenant.
+  @@unique([id, tenant_id], map: "workflow_approval_group_tenant_key")
+  @@map("workflow_approval_group")
+}
+
+/// One membership's place in one group. `membership_id` is Identity's identifier held as a value,
+/// with no foreign key (ADR-0042); the group reference is composite so it carries the tenant.
+model WorkflowApprovalGroupMember {
+  id                String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  approval_group_id String    @db.Uuid
+  membership_id     String    @db.Uuid
+  added_at          DateTime  @db.Timestamptz(6)
+  metadata          Json
+  created_at        DateTime  @db.Timestamptz(6)
+  created_by        String    @db.VarChar(255)
+  updated_at        DateTime  @db.Timestamptz(6)
+  updated_by        String    @db.VarChar(255)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  deleted_by        String?   @db.VarChar(255)
+  version           Int
+
+  @@index([tenant_id, approval_group_id, membership_id], map: "workflow_approval_group_member_group_idx")
+  @@map("workflow_approval_group_member")
+}
+
 /// One step of a version: who is asked, and where in the order. `ordinal` is `Int` rather than a
 /// small integer deliberately — AD-004 forbids a hardcoded approval limit.
+///
+/// Since Phase 16B an ordinal is a **branch** rather than a position: several templates may share
+/// one, and all of them are asked at the same moment. `approver_kind` decides which of the two
+/// approver columns is present, and exactly one is.
 model WorkflowStepTemplate {
   id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
   tenant_id              String    @db.Uuid
@@ -5258,7 +5306,11 @@ model WorkflowStepTemplate {
   ordinal                Int
   name                   Json
   approver_kind          String    @db.VarChar(16)
-  approver_membership_id String    @db.Uuid
+  approver_membership_id String?   @db.Uuid
+  approver_group_id      String?   @db.Uuid
+  branch_rule            String?   @db.VarChar(16)
+  quorum                 Int?
+  condition              Json?
   metadata               Json
   created_at             DateTime  @db.Timestamptz(6)
   created_by             String    @db.VarChar(255)
@@ -5305,6 +5357,11 @@ model WorkflowInstance {
 
 /// One step of a running instance, copied from a template at creation. No column references the
 /// template it came from — that is what makes the copy a copy (AD-003).
+///
+/// `approver_kind` is always `membership` here, and that is the point of the group snapshot: a
+/// template may name a group, a running step never does. `source_group_id` records which list the
+/// person came from and is **provenance rather than a reference** — no foreign key, so editing a
+/// group cannot reach an approval already under way.
 model WorkflowStep {
   id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
   tenant_id              String    @db.Uuid
@@ -5313,6 +5370,10 @@ model WorkflowStep {
   approver_kind          String    @db.VarChar(16)
   approver_membership_id String    @db.Uuid
   status                 String    @db.VarChar(16)
+  source_group_id        String?   @db.Uuid
+  branch_rule            String?   @db.VarChar(16)
+  quorum                 Int?
+  condition              Json?
   metadata               Json
   created_at             DateTime  @db.Timestamptz(6)
   created_by             String    @db.VarChar(255)

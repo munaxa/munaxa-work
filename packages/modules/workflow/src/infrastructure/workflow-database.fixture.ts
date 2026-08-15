@@ -52,7 +52,12 @@ export const requireDatabaseInCi = (suite: string): void => {
 export const TENANT_A = '01930000-0000-7000-8000-0000000055ee';
 export const TENANT_B = '01930000-0000-7000-8000-0000000066ff';
 
-/** The seven tables this module owns, most dependent first, for truncation between tests. */
+/**
+ * The nine tables this module owns, most dependent first, for truncation between tests.
+ *
+ * Seven since 16A and two since 16B: an approval group and its members. They come last because
+ * `workflow_step_template` now names a group, so the group is the least dependent thing here.
+ */
 export const WORKFLOW_TABLES = [
   'workflow_history',
   'workflow_decision',
@@ -61,7 +66,22 @@ export const WORKFLOW_TABLES = [
   'workflow_step_template',
   'workflow_version',
   'workflow_definition',
+  'workflow_approval_group_member',
+  'workflow_approval_group',
 ];
+
+/**
+ * The seven a repository maps, which is a different list from the nine the module owns.
+ *
+ * Phase 16B Checkpoint 3 is schema only: the two group tables exist, carry their policies and hold
+ * their invariants, and **no repository reads or writes them yet** — that is Checkpoint 5. The
+ * mapper-parity suite compares mappers against the tables that have one, so it uses this list; every
+ * suite that asserts a property of the *schema* — isolation, policies, forced row-level security —
+ * uses `WORKFLOW_TABLES` and therefore covers all nine.
+ */
+export const WORKFLOW_MAPPED_TABLES = WORKFLOW_TABLES.filter(
+  (table) => !table.startsWith('workflow_approval_group'),
+);
 
 /** The two whose rows are written once and never changed. */
 export const APPEND_ONLY_TABLES = ['workflow_decision', 'workflow_history'];

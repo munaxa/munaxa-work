@@ -4,6 +4,7 @@ import {
   AUDIT_VALUES,
   CORRELATION,
   REQUESTER,
+  SECOND_APPROVER,
   SUBJECT_TYPE,
   type PoolLike,
 } from './workflow-database.fixture.js';
@@ -80,8 +81,9 @@ export const seedDefinition = async (
 /**
  * A running instance with its steps copied from the templates.
  *
- * The first step is `awaiting` and the rest are `pending`, which is the state `startInstance`
- * produces — and the state `workflow_step_awaiting_idx` permits exactly one of.
+ * The first step is `awaiting` and the rest are `pending`: a sequential chain, which is what every
+ * process configured under 16A is and what `startInstance` still produces from distinct ordinals.
+ * `seedBranchInstance` below is its parallel counterpart.
  */
 export const seedInstance = async (
   client: PoolLike,
@@ -119,6 +121,92 @@ export const seedInstance = async (
           ${AUDIT_COLUMNS})
        values ($1, $2, $3, 'membership', $4, $5, ${AUDIT_VALUES}) returning id`,
       [tenantId, instanceId, index + 1, approver, index === 0 ? 'awaiting' : 'pending'],
+    );
+
+    stepIds.push(idOf(step.rows));
+  }
+  return { ...definition, instanceId, stepIds };
+};
+
+export interface SeededGroup {
+  readonly approvalGroupId: string;
+  readonly memberIds: readonly string[];
+}
+
+/**
+ * A group and the memberships on its list.
+ *
+ * Written the way an administrator will: a list is named first and filled afterwards, which is why
+ * an empty `members` is a legal seed rather than a broken one. What is refused is *using* an empty
+ * group, and that is the domain's rule at instance start rather than the table's.
+ */
+export const seedApprovalGroup = async (
+  client: PoolLike,
+  tenantId: string,
+  members: readonly string[] = [APPROVER, SECOND_APPROVER],
+  code = 'capital-approvers',
+): Promise<SeededGroup> => {
+  const group = await client.query<{ id: string }>(
+    `insert into workflow_approval_group (tenant_id, code, name, ${AUDIT_COLUMNS})
+     values ($1, $2, ${NAME}, ${AUDIT_VALUES}) returning id`,
+    [tenantId, code],
+  );
+  const approvalGroupId = idOf(group.rows);
+  const memberIds: string[] = [];
+
+  for (const membershipId of members) {
+    const member = await client.query<{ id: string }>(
+      `insert into workflow_approval_group_member
+         (tenant_id, approval_group_id, membership_id, added_at, ${AUDIT_COLUMNS})
+       values ($1, $2, $3, now(), ${AUDIT_VALUES}) returning id`,
+      [tenantId, approvalGroupId, membershipId],
+    );
+
+    memberIds.push(idOf(member.rows));
+  }
+  return { approvalGroupId, memberIds };
+};
+
+/**
+ * An instance whose steps form **one parallel branch**: every step at ordinal 1, all awaiting.
+ *
+ * This is the state 16A's two replaced indexes made unrepresentable, so it is seeded through the
+ * real columns rather than asserted about: if either index were still unique, nothing below would
+ * reach its assertion.
+ */
+export const seedBranchInstance = async (
+  client: PoolLike,
+  tenantId: string,
+  approvers: readonly string[] = [APPROVER, SECOND_APPROVER],
+  subjectId = 'requisition-branch',
+): Promise<SeededInstance> => {
+  const definition = await seedDefinition(client, tenantId, approvers, `approval-${subjectId}`);
+  const instance = await client.query<{ id: string }>(
+    `insert into workflow_instance
+       (tenant_id, definition_id, workflow_version_id, subject_type, subject_id,
+        requested_by_membership_id, status, started_at, correlation_id, context, ${AUDIT_COLUMNS})
+     values ($1, $2, $3, $4, $5, $6, 'running', now(), $7, '{"amount":50000}'::jsonb,
+             ${AUDIT_VALUES}) returning id`,
+    [
+      tenantId,
+      definition.definitionId,
+      definition.workflowVersionId,
+      SUBJECT_TYPE,
+      subjectId,
+      REQUESTER,
+      CORRELATION,
+    ],
+  );
+  const instanceId = idOf(instance.rows);
+  const stepIds: string[] = [];
+
+  for (const approver of approvers) {
+    const step = await client.query<{ id: string }>(
+      `insert into workflow_step
+         (tenant_id, instance_id, ordinal, approver_kind, approver_membership_id, status,
+          branch_rule, ${AUDIT_COLUMNS})
+       values ($1, $2, 1, 'membership', $3, 'awaiting', 'majority', ${AUDIT_VALUES}) returning id`,
+      [tenantId, instanceId, approver],
     );
 
     stepIds.push(idOf(step.rows));

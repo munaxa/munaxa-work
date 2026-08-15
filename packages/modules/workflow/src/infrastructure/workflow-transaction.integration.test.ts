@@ -131,14 +131,17 @@ suite('Workflow transaction semantics', () => {
         const instanceId = await startInstance(client, seeded, 'requisition-rolled-back');
 
         await addStep(client, instanceId, 1, 'awaiting', APPROVER);
-        // The failure a real command hits: a second step written as `awaiting` before the first
-        // left it. `workflow_step_awaiting_idx` refuses, and everything above must disappear.
-        await addStep(client, instanceId, 2, 'awaiting', SECOND_APPROVER);
+        // A real constraint, hit by a later statement. It used to be `workflow_step_awaiting_idx`,
+        // which refused a second awaiting step — Phase 16B asks a whole branch at once, so that is
+        // now the ordinary case rather than a failure and would no longer refuse anything. The
+        // ordinal bound is the nearest thing a defective start could still hit: a step numbered from
+        // zero. What the suite is about is the rollback, and it needs a refusal, not a particular one.
+        await addStep(client, instanceId, 0, 'pending', SECOND_APPROVER);
         return 'accepted';
       })
       .catch((error: unknown) => (error instanceof Error ? error.message : 'unknown'));
 
-    expect(failure).toContain('workflow_step_awaiting_idx');
+    expect(failure).toContain('workflow_step_ordinal_check');
 
     // Not "the instance is gone" — *nothing* is. The definition and version written first are as
     // absent as the step that failed, which is what atomic means and what a partial rollback would

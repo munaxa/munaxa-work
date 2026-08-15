@@ -173,8 +173,14 @@ suite('repository uniqueness', () => {
     });
   });
 
-  describe('a step-template ordinal, once per version', () => {
-    it('refuses a second template at the same ordinal', async () => {
+  describe('a step-template ordinal, which is a branch rather than a position', () => {
+    /**
+     * **Inverted in Phase 16B rather than removed.** 16A refused a second template at one ordinal,
+     * and that was right while an ordinal was a position. A branch is the set of templates sharing an
+     * ordinal, so a second one there is how parallel approval is configured. Contiguity of the
+     * *distinct* ordinals is still checked, by `ordinalsAreContiguous`, at publication.
+     */
+    it('permits a second template at the same ordinal, which is what a branch is', async () => {
       const definition = aDefinition();
       const draft = aDraft(definition);
 
@@ -188,7 +194,7 @@ suite('repository uniqueness', () => {
         inA((transaction) =>
           fixture.stores.versions.insertTemplate(transaction, aTemplate(draft, 1, SECOND_APPROVER)),
         ),
-      ).rejects.toThrow(/workflow_step_template_ordinal_idx/);
+      ).resolves.not.toThrow();
     });
 
     it('permits the same ordinal on a different version of the same definition', async () => {
@@ -260,27 +266,29 @@ suite('repository uniqueness', () => {
     });
   });
 
-  describe('one step per ordinal, and one step awaiting', () => {
-    it('refuses a second step at the same ordinal on one instance', async () => {
+  describe('a branch of steps, and the one thing about it that is still unique', () => {
+    it('permits a second step at the same ordinal on one instance', async () => {
       const seed = aStartedInstance([APPROVER]);
 
       await writeStarted(TENANT_A, seed);
 
-      const clash = { ...stepAt(seed, 0), stepId: uuidV7(), status: 'pending' as const };
+      const alongside = { ...stepAt(seed, 0), stepId: uuidV7(), status: 'pending' as const };
 
       await expect(
-        inA((transaction) => fixture.stores.steps.insert(transaction, clash)),
-      ).rejects.toThrow(/workflow_step_ordinal_idx/);
+        inA((transaction) => fixture.stores.steps.insert(transaction, alongside)),
+      ).resolves.not.toThrow();
     });
 
     /**
-     * **Two steps of one approval cannot await a decision at the same time.**
+     * **Two steps of one approval awaiting a decision together is the feature, not a defect.**
      *
-     * This is sequential approval expressed as a property of the data rather than of whatever code
-     * happens to walk it, and it is the index that cannot be deferred: the decided step must leave
-     * `awaiting` before the next one enters, in that order, inside the same transaction.
+     * 16A expressed sequential approval as a property of the data, with a partial unique index that
+     * refused the second awaiting step. Phase 16B asks every step of a branch at once, so the index
+     * was widened; what remains arbitrated by the database is one decision per step, asserted below.
+     * The ordering rule the old index forced — decided step out before the next one in — is no longer
+     * a constraint of the schema, and the repository no longer has to write in that order.
      */
-    it('refuses a second step becoming awaiting on the same instance', async () => {
+    it('permits a second step becoming awaiting on the same instance', async () => {
       const seed = aStartedInstance([APPROVER, SECOND_APPROVER]);
 
       await writeStarted(TENANT_A, seed);
@@ -291,7 +299,7 @@ suite('repository uniqueness', () => {
         inA((transaction) =>
           fixture.stores.steps.update(transaction, { ...next, status: 'awaiting' }, next.version),
         ),
-      ).rejects.toThrow(/workflow_step_awaiting_idx/);
+      ).resolves.not.toThrow();
     });
 
     /** And permits it in the order a decision actually happens: the first leaves, then the next enters. */

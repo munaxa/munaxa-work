@@ -36,16 +36,12 @@ const suite = CONNECTION === undefined ? describe.skip : describe;
 
 requireDatabaseInCi("Workflow's schema boundary suite");
 
-const MIGRATION = join(
-  process.cwd(),
-  '..',
-  '..',
-  '..',
-  'prisma',
-  'migrations',
-  '20260814100000_workflow',
-  'migration.sql',
-);
+const migrationAt = (directory: string): string =>
+  join(process.cwd(), '..', '..', '..', 'prisma', 'migrations', directory, 'migration.sql');
+
+/** Phase 16A's, and the routing migration Phase 16B Checkpoint 3 adds beside it. */
+const ROUTING_MIGRATION = migrationAt('20260815100000_workflow_routing');
+const MIGRATIONS = [migrationAt('20260814100000_workflow'), ROUTING_MIGRATION];
 
 suite('what the Workflow schema deliberately does not contain', () => {
   let fixture: WorkflowFixture;
@@ -75,16 +71,18 @@ suite('what the Workflow schema deliberately does not contain', () => {
      * cannot trip one.
      */
     const deferred: readonly (readonly [string, readonly string[]])[] = [
-      ['a role or group directory', ['role', 'group', 'directory']],
+      ['a role directory', ['role', 'directory']],
       [
         'SLA and business days',
         ['sla', 'due_at', 'due_on', 'business_day', 'working_day', 'breach'],
       ],
       ['escalation', ['escalat']],
       ['scheduling', ['cron', 'schedule', 'run_at', 'next_run', 'job_']],
-      ['a parallel tally', ['quorum', 'threshold', 'majority', 'unanimous', 'tally', 'vote']],
+      // A tally is **derived** from the decisions that exist. A stored count would be a second
+      // source of truth that disagrees with `workflow_decision` the moment two approvers commit at
+      // once, and the decision table is the one an auditor reads.
+      ['a stored tally', ['threshold', 'tally', 'vote', 'approvals_count', 'weight', 'percent']],
       ['an approval pattern', ['pattern']],
-      ['conditional branching', ['branch', 'condition', 'expression', 'predicate']],
       ['manager routing', ['manager', 'reports_to', 'employment_id']],
       ['notification', ['notif', 'notified', 'recipient', 'reminder', 'email', 'sent_at']],
       ['analytics', ['analytic', 'percentile', 'aggregate', 'histogram']],
@@ -101,52 +99,103 @@ suite('what the Workflow schema deliberately does not contain', () => {
     }
   });
 
-  it('names those capabilities in the migration’s prose, which is where they belong', () => {
+  it('names those capabilities in the migrations’ prose, which is where they belong', () => {
     // The complement of the assertion above, and the reason it had to be written against columns.
-    // If this ever fails, the migration stopped explaining itself.
-    const sql = readFileSync(MIGRATION, 'utf8');
-    const explained = ['role', 'sla', 'escalation', 'pattern', 'branching'];
+    // If this ever fails, the migrations stopped explaining themselves.
+    const sql = MIGRATIONS.map((path) => readFileSync(path, 'utf8')).join('\n');
+    const explained = ['role', 'sla', 'escalation', 'pattern', 'tally'];
 
     for (const word of explained) {
       expect([word, new RegExp(`--[^\\n]*${word}`, 'i').test(sql)]).toStrictEqual([word, true]);
     }
   });
 
-  it('is one migration, and it is additive — no drop, truncate or delete', () => {
-    const sql = readFileSync(MIGRATION, 'utf8')
+  it('destroys nothing, in either migration', () => {
+    const sql = MIGRATIONS.map((path) => readFileSync(path, 'utf8'))
+      .join('\n')
       .replace(/--[^\n]*/g, ' ')
       .toLowerCase();
+    /**
+     * **Destructive means "a row that existed can no longer be read", and nothing here is.**
+     *
+     * `drop constraint`, `drop index` and `drop not null` are not on this list, and that is a
+     * deliberate distinction rather than an omission: Phase 16B replaces one check constraint and
+     * two unique indexes with strictly **wider** ones, and widening is the single shape of change
+     * that cannot invalidate a row that was legal before. The next test pins exactly which objects
+     * are dropped, so a `drop` that was not one of those three fails rather than passing under this
+     * looser rule.
+     */
     const destructive = [
       'drop table',
       'drop column',
-      'drop constraint',
+      'drop schema',
+      'drop database',
       'truncate',
       'delete from',
-      'alter column',
       'rename',
     ];
 
     expect(destructive.filter((statement) => sql.includes(statement))).toStrictEqual([]);
-    // `drop policy if exists` inside `app_protect_table` is the foundation's, not this migration's.
+    // A type change is the other way a column loses data. Matched as a phrase rather than by the
+    // bare word `using`, which appears in every policy and in both immutability triggers.
+    expect(/alter column \w+ (set data )?type/.test(sql)).toBe(false);
+    // `drop policy if exists` inside `app_protect_table` is the foundation's, not a migration's.
     expect(sql.includes('drop policy')).toBe(false);
   });
 
-  it('touches no table belonging to another module', () => {
-    const sql = readFileSync(MIGRATION, 'utf8').replace(/--[^\n]*/g, ' ');
-    const created = [...sql.matchAll(/create table (\w+)/g)].map((match) => match[1] ?? '');
-    const altered = [...sql.matchAll(/alter table (\w+)/g)].map((match) => match[1] ?? '');
+  it('drops exactly the four objects Phase 16B replaces, and replaces every one of them', () => {
+    const sql = readFileSync(ROUTING_MIGRATION, 'utf8').replace(/--[^\n]*/g, ' ');
+    const dropped = [...sql.matchAll(/drop (constraint|index) (\w+)/g)].map(
+      (match) => `${match[1] ?? ''}:${match[2] ?? ''}`,
+    );
 
-    expect(created.sort()).toStrictEqual([...WORKFLOW_TABLES].sort());
-    expect(altered).toStrictEqual([]);
+    expect(dropped.sort()).toStrictEqual([
+      'constraint:workflow_step_template_approver_kind_check',
+      'index:workflow_step_awaiting_idx',
+      'index:workflow_step_ordinal_idx',
+      'index:workflow_step_template_ordinal_idx',
+    ]);
+    // The only column ever altered, and it is a loosening: a `group` template names no person, so
+    // `approver_membership_id` stops being mandatory — and the coherence constraint that replaces it
+    // is stricter per row than `not null` was.
+    expect(
+      [...sql.matchAll(/alter column (\w+) ([a-z ]+)/g)].map((match) => match[0].trim()),
+    ).toStrictEqual(['alter column approver_membership_id drop not null']);
+    // Every dropped object is recreated in the same file, so nothing the schema had disappears.
+    for (const name of [
+      'workflow_step_template_approver_kind_check',
+      'workflow_step_ordinal_idx',
+      'workflow_step_template_ordinal_idx',
+      'workflow_step_awaiting_idx',
+    ]) {
+      expect([
+        name,
+        sql.includes(`create index ${name}`) || sql.includes(`add constraint ${name}`),
+      ]).toStrictEqual([name, true]);
+    }
   });
 
-  it('adds exactly one migration directory, alongside the twenty that came before', () => {
+  it('touches no table belonging to another module', () => {
+    const sql = MIGRATIONS.map((path) => readFileSync(path, 'utf8'))
+      .join('\n')
+      .replace(/--[^\n]*/g, ' ');
+    const created = [...sql.matchAll(/create table (\w+)/g)].map((match) => match[1] ?? '');
+    const altered = [
+      ...new Set([...sql.matchAll(/alter table (\w+)/g)].map((match) => match[1] ?? '')),
+    ];
+
+    expect(created.sort()).toStrictEqual([...WORKFLOW_TABLES].sort());
+    // Phase 16B alters two of its own, and nothing else in the database.
+    expect(altered.sort()).toStrictEqual(['workflow_step', 'workflow_step_template']);
+  });
+
+  it('adds exactly one migration directory, alongside the twenty-one that came before', () => {
     const directories = readdirSync(join(process.cwd(), '..', '..', '..', 'prisma', 'migrations'))
       .filter((entry) => /^\d{14}_/.test(entry))
       .sort();
 
-    expect(directories.at(-1)).toBe('20260814100000_workflow');
-    expect(directories.filter((entry) => entry.includes('workflow'))).toHaveLength(1);
+    expect(directories.at(-1)).toBe('20260815100000_workflow_routing');
+    expect(directories.filter((entry) => entry.includes('workflow'))).toHaveLength(2);
   });
 
   describe('the indexes the engine is designed around are reachable', () => {
@@ -266,8 +315,11 @@ suite('what the Workflow schema deliberately does not contain', () => {
       );
 
       expect(rows.filter((row) => !row.valid)).toStrictEqual([]);
-      // Seven primary keys plus the seven partial unique indexes the invariants rest on.
-      expect(rows).toHaveLength(14);
+      // Nine primary keys, the six partial unique indexes the invariants rest on, and the group's
+      // `(id, tenant_id)` key that lets a child reference carry a tenant. Two fewer partial ones than
+      // 16A had: an ordinal and an awaiting step stopped being unique when a branch became several
+      // steps, and `workflow-parallel.integration.test.ts` asserts what they permit instead.
+      expect(rows).toHaveLength(16);
     });
   });
 });

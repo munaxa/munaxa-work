@@ -4,7 +4,7 @@ import {
   CONNECTION,
   openWorkflowFixture,
   requireDatabaseInCi,
-  WORKFLOW_TABLES,
+  WORKFLOW_MAPPED_TABLES,
   type WorkflowFixture,
 } from './workflow-database.fixture.js';
 import { aDefinition, aStartedInstance, anApproval } from './workflow-states.js';
@@ -38,8 +38,8 @@ import type { RowValues } from './row-writer.js';
  * recorded at the end of this file went unnoticed through two checkpoints.
  *
  * So this suite compares what the mappers name against `information_schema`, in both directions, for
- * all seven tables. It reads the catalogue rather than a copy of the migration, because the
- * catalogue is what the application will actually meet.
+ * every table a mapper covers. It reads the catalogue rather than a copy of the migration, because
+ * the catalogue is what the application will actually meet.
  */
 
 const suite = CONNECTION === undefined ? describe.skip : describe;
@@ -85,7 +85,7 @@ suite('mapper and schema parity', () => {
       `select table_name, column_name, data_type, is_nullable, column_default
          from information_schema.columns
         where table_schema = 'public' and table_name = any($1::text[])`,
-      [WORKFLOW_TABLES],
+      [WORKFLOW_MAPPED_TABLES],
     );
 
     catalogue = new Map();
@@ -159,12 +159,20 @@ suite('mapper and schema parity', () => {
     ];
   };
 
-  it('covers all seven tables', () => {
+  /**
+   * The seven tables a mapper covers, which is deliberately not the nine the module owns.
+   *
+   * Phase 16B Checkpoint 3 is schema only: `workflow_approval_group` and its member table exist,
+   * carry their policies and hold their invariants, and **no repository reads or writes them yet**
+   * — that is Checkpoint 5. Comparing mappers against all nine would fail for a reason that has
+   * nothing to do with drift, which is the one thing this suite exists to detect.
+   */
+  it('covers every table a repository maps', () => {
     expect(
       mapped()
         .map((one) => one.table)
         .sort(),
-    ).toEqual([...WORKFLOW_TABLES].sort());
+    ).toEqual([...WORKFLOW_MAPPED_TABLES].sort());
   });
 
   it('reads no column the database does not have', () => {

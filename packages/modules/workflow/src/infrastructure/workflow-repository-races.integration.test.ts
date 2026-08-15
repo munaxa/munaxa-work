@@ -98,7 +98,16 @@ suite('repository races', () => {
       expect(outcome.second).toBe('duplicate:workflow_version_number_idx');
     });
 
-    it('lets one step template take an ordinal and refuses the other', async () => {
+    /**
+     * **This race changed direction in Phase 16B, and it is kept for that reason.**
+     *
+     * Under 16A an ordinal was a position and the second writer lost to
+     * `workflow_step_template_ordinal_idx`. An ordinal is now a *branch*, so two administrators
+     * adding an approver to the same branch at the same instant are both doing the intended thing and
+     * both must be recorded. Asserting that positively is what proves the index was widened rather
+     * than that the race stopped being run.
+     */
+    it('lets two writers put two approvers on one branch at the same instant', async () => {
       const definition = aDefinition();
       const draft = aDraft(definition);
 
@@ -113,8 +122,7 @@ suite('repository races', () => {
           fixture.stores.versions.insertTemplate(transaction, aTemplate(draft, 3, SECOND_APPROVER)),
       );
 
-      expect(outcome.first).toBe('committed');
-      expect(outcome.second).toBe('duplicate:workflow_step_template_ordinal_idx');
+      expect([outcome.first, outcome.second]).toStrictEqual(['committed', 'committed']);
     });
 
     /**
@@ -144,7 +152,12 @@ suite('repository races', () => {
       expect(outcome.second).toBe('duplicate:workflow_instance_open_subject_idx');
     });
 
-    it('lets one step take an ordinal on an instance and refuses the other', async () => {
+    /**
+     * The running counterpart, and it changed direction with its template. Two steps of one instance
+     * at one ordinal *are* a branch: both writers are recorded, and the invariant that still settles
+     * a race — one decision per step — is asserted two tests below.
+     */
+    it('lets two steps take one ordinal on an instance, because that is a branch', async () => {
       const seed = aStartedInstance([APPROVER]);
 
       await commit(async (transaction) => {
@@ -167,18 +180,17 @@ suite('repository races', () => {
         (transaction) => fixture.stores.steps.insert(transaction, extra()),
       );
 
-      expect(outcome.first).toBe('committed');
-      expect(outcome.second).toBe('duplicate:workflow_step_ordinal_idx');
+      expect([outcome.first, outcome.second]).toStrictEqual(['committed', 'committed']);
     });
 
     /**
-     * **Two steps of one approval cannot become current at the same instant.**
+     * **Two steps of one approval becoming current at the same instant is now the feature.**
      *
-     * The index that carries sequential approval, under the condition it exists for. Both racers move
-     * a different step into `awaiting`; one of them has to lose, or an approval would be asking two
-     * people for a decision it will only record one of.
+     * 16A refused the second: one step awaited a decision and the index enforced it. Phase 16B asks
+     * every step of a branch at once, so both racers must succeed — an approval asking two people is
+     * exactly what a parallel branch is, and it will record a decision from each of them.
      */
-    it('lets one step become awaiting and refuses the simultaneous other', async () => {
+    it('lets two steps of one branch become awaiting at the same instant', async () => {
       const seed = aStartedInstance([APPROVER, SECOND_APPROVER, APPROVER]);
       const decided = anApproval(seed);
       const next = stepAt(seed, 1);
@@ -202,8 +214,7 @@ suite('repository races', () => {
           fixture.stores.steps.update(transaction, { ...last, status: 'awaiting' }, last.version),
       );
 
-      expect(outcome.first).toBe('committed');
-      expect(outcome.second).toBe('duplicate:workflow_step_awaiting_idx');
+      expect([outcome.first, outcome.second]).toStrictEqual(['committed', 'committed']);
     });
 
     /** And one decision per step, when the approver's second click arrives on another connection. */

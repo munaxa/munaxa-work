@@ -146,22 +146,42 @@ suite('what the database arbitrates', () => {
     });
   });
 
-  describe('exactly one step awaits a decision', () => {
-    it('refuses a second awaiting step on one instance', async () => {
-      const refusal = await fixture.asTenant(TENANT_A, async (client) => {
+  describe('a branch awaits a decision, and a branch may be several steps', () => {
+    /**
+     * **The invariant this block asserted was replaced in Phase 16B, not dropped.**
+     *
+     * 16A held "at most one step of an instance is awaiting" in a partial unique index, and that was
+     * exactly right while a branch could only hold one step. A branch is now the set of steps sharing
+     * an ordinal, and every one of them is asked at once — so the old index refused the ordinary case
+     * of parallel approval.
+     *
+     * What replaces it is asserted here as a **positive** property, and the reason the replacement is
+     * not another unique index is worth stating where somebody will look for it: "at most one
+     * *ordinal* among an instance's awaiting steps" is a condition on a set, and no unique index can
+     * express one. A trigger could read the other rows, but a read-then-write check inside the
+     * database is still a read-then-write check — under read-committed two transactions each see the
+     * other's pre-image and both commit. So the branch invariant lives in `chooseBranch`, and what
+     * the database still arbitrates is the thing it can: one decision per step.
+     */
+    it('permits every step of one branch to await a decision at once', async () => {
+      const outcome = await fixture.asTenant(TENANT_A, async (client) => {
         const seeded = await seedInstance(client, TENANT_A, [APPROVER, SECOND_APPROVER]);
 
+        await client.query(`update workflow_step set ordinal = 1 where id = $1`, [
+          seeded.stepIds[1],
+        ]);
         return probe(client, `update workflow_step set status = 'awaiting' where id = $1`, [
           seeded.stepIds[1],
         ]);
       });
 
-      expect(refusal).toContain('workflow_step_awaiting_idx');
+      expect(outcome).toBe('accepted');
     });
 
     it('permits advancing when the decided step leaves awaiting first', async () => {
-      // The order the index forces, stated as a test so the repository that writes it later finds
-      // the rule here rather than by failing: a partial unique index cannot be deferred.
+      // The sequential chain, unchanged: a version whose ordinals are all distinct produces branches
+      // of one and behaves exactly as it did before, which is why every process configured under 16A
+      // keeps running the same way.
       const outcome = await fixture.asTenant(TENANT_A, async (client) => {
         const seeded = await seedInstance(client, TENANT_A, [APPROVER, SECOND_APPROVER]);
 
