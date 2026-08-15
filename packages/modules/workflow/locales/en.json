@@ -7,6 +7,73 @@
       "workflow_step_template_ordinal_taken": "Another step already occupies that position in this version.",
       "workflow_version_number_idx": "That version number already exists for this workflow."
     },
+    "label": {
+      "workflow": "Approvals",
+      "overview": "Overview",
+      "definitions": "Workflows",
+      "versions": "Versions",
+      "steps": "Approval chain",
+      "instances": "Approvals",
+      "instanceSteps": "This approval’s chain",
+      "pending": "Waiting for you",
+      "decided": "Decided by you",
+      "approvalStatus": "Approval status",
+      "history": "Timeline",
+      "statusNotices": "What this product does not do",
+      "page": "Page",
+      "detail": "Detail",
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "subjectType": "Subject type",
+      "subjectId": "Subject",
+      "status": "Status",
+      "state": "State",
+      "version": "Row version",
+      "versionNumber": "Version",
+      "publishedOn": "Published",
+      "retiredOn": "Retired",
+      "stepCount": "Steps",
+      "ordinal": "Position",
+      "approver": "Approver asked",
+      "approverKind": "Approver kind",
+      "definitionCode": "Workflow",
+      "instanceId": "Approval",
+      "definitionId": "Workflow",
+      "workflowVersionId": "Version",
+      "requestedBy": "Raised by",
+      "startedOn": "Started",
+      "completedOn": "Ended",
+      "stepId": "Step",
+      "decision": "Decision",
+      "decidedBy": "Decided by",
+      "authority": "Authority",
+      "onBehalfOf": "Acting for",
+      "decidedOn": "Decided",
+      "comment": "Comment",
+      "event": "Event",
+      "occurredOn": "When",
+      "actor": "Who",
+      "approvalId": "Approval",
+      "definitionsTotal": "Workflows",
+      "instancesTotal": "Approvals",
+      "runningTotal": "Running now",
+      "pendingTotal": "Waiting for you",
+      "decidedTotal": "Decided by you",
+      "publishedSteps": "Published chain"
+    },
+    "notice": {
+      "empty": "Nothing to show.",
+      "failed": "The approvals service did not answer. This is not an empty tenant.",
+      "detailIsFirstRow": "The detail below is the first row of the listing above, read once.",
+      "identifiersNotNames": "Members, subjects and records are shown by identifier. Resolving one to a person’s name belongs to another module and is not read here.",
+      "actionsAreApi": "This screen reads only. Raising, deciding, cancelling, publishing and retiring are operations of the approvals API, and the server decides each one.",
+      "queueIsAmbient": "“Waiting for you” is resolved from the signed-in request. This screen never asks for somebody else’s queue, and there is no field through which it could.",
+      "approverIsConfigured": "The approver on a step is the member configured to be asked. It is not the person reading this screen.",
+      "commentOnDecision": "A rejection comment stays on the decision, where a permission decides who may read it. It is never moved into the timeline.",
+      "historyIsRouting": "The timeline records routing only — who was asked, who answered, and when. A business outcome belongs to the module that owns the record.",
+      "subjectIsOpaque": "A subject type and a subject identifier are the owning module’s own values. Approvals stores them and interprets neither."
+    },
     "rejection": {
       "authority-not-delegated": "This decision names somebody it acts for, but was not made under a delegation.",
       "cancellation-reason-required": "Stopping an approval needs a reason.",
@@ -43,6 +110,77 @@
       "version-number-invalid": "A version number must be a whole number of one or more.",
       "version-step-order-broken": "The approval steps must be numbered from one with no gaps and no repeats.",
       "version-transition-refused": "A workflow version cannot move from its current state to that one."
+    },
+    "vocabulary": {
+      "definitionStatus": {
+        "active": "Active",
+        "retired": "Retired"
+      },
+      "versionStatus": {
+        "draft": "Draft",
+        "published": "Published",
+        "archived": "Archived"
+      },
+      "instanceStatus": {
+        "running": "Running",
+        "completed": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "stepStatus": {
+        "pending": "Not yet reached",
+        "awaiting": "Awaiting a decision",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "skipped": "Skipped"
+      },
+      "decision": {
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "authority": {
+        "assigned": "Their own",
+        "delegated": "Delegated"
+      },
+      "approvalState": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "expired": "Expired"
+      },
+      "approverKind": {
+        "membership": "A named member"
+      },
+      "historyEvent": {
+        "instance-started": "Approval raised",
+        "step-awaiting": "Asked to decide",
+        "step-approved": "Step approved",
+        "step-rejected": "Step rejected",
+        "step-skipped": "Step skipped",
+        "instance-completed": "Approval completed",
+        "instance-rejected": "Approval rejected",
+        "instance-cancelled": "Approval cancelled"
+      }
+    },
+    "withheld": {
+      "sla": "No approval has a service level, a due time or an age. Nothing is measured against one.",
+      "businessDays": "Nothing is calculated in business days. Approvals holds no calendar and no working-time rule.",
+      "escalation": "Nothing escalates. There is no reassignment after a delay and no next approver on a timer.",
+      "scheduling": "Nothing is scheduled. No approval is advanced, closed or reviewed by a background job.",
+      "approvalExpiry": "No approval expires. `expired` is declared in the approval vocabulary and this phase never produces it.",
+      "delegationExpiry": "A delegation is not expired automatically. Whether one is in force is answered when a decision is made.",
+      "parallelApproval": "Every chain is sequential. There is no parallel branch and no simultaneous approver.",
+      "tally": "There is no majority, unanimous, quorum or first-response rule. One named member answers each step.",
+      "conditionalBranching": "There is no conditional routing. A chain does not branch on the value of the record it is about.",
+      "roles": "There is no role directory. A step names a member, never a role.",
+      "groups": "There is no group directory. A step names a member, never a group.",
+      "managerRouting": "Managers are not resolved. Nothing here routes to somebody’s manager or reads a reporting line.",
+      "externalApprovers": "There is no external approver. Everybody asked is a member of this tenant.",
+      "notificationDelivery": "Nothing is delivered. No email, message or push notification is sent when somebody is asked to decide.",
+      "analytics": "There are no approval analytics. No success rate, average time, bottleneck or compliance figure is calculated anywhere.",
+      "asynchronousCallbacks": "There is no asynchronous callback. A decision reaches the module that raised the approval inside the approver’s own request.",
+      "outbox": "There is no outbox and no message broker. Nothing is queued for later delivery."
     }
   }
 }

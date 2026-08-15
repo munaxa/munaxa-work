@@ -30,6 +30,7 @@
     "@work/people": "workspace:*",
     "@work/performance": "workspace:*",
     "@work/recruitment": "workspace:*",
+    "@work/workflow": "workspace:*",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
