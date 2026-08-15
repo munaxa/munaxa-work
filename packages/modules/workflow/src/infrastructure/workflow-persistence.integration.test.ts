@@ -16,12 +16,10 @@ import {
   LATER,
   NOW,
   aDefinition,
-  aDelegatedApproval,
   aDraft,
   aPublishedDefinition,
   aPublishedVersionOf,
   aStartedInstance,
-  aTemplate,
   accepted,
   anApproval,
 } from './workflow-states.js';
@@ -38,6 +36,12 @@ import {
  * are **not evidence** for SQL types, indexes, triggers or policies. Only a suite that talks to
  * PostgreSQL is.
  */
+
+/** A description in both first-class languages, with Arabic that is not ASCII. */
+const DESCRIPTION = {
+  en: 'Raised whenever a requisition is opened',
+  ar: 'يُرفع عند فتح طلب توظيف',
+};
 
 const suite = CONNECTION === undefined ? describe.skip : describe;
 
@@ -97,16 +101,8 @@ suite('workflow persistence', () => {
   };
 
   describe('definitions', () => {
-    /**
-     * **No description is set here, and its absence is a finding rather than an oversight.**
-     *
-     * `workflow_definition.description` is a `jsonb` column and the domain's `description` is a plain
-     * `string`, so writing one raises `invalid input syntax for type json`. Resolving that means
-     * changing either Checkpoint 3's schema or Checkpoint 2's domain, and this checkpoint is
-     * authorized to change neither — so it is reported rather than papered over here.
-     */
     it('round-trips a definition, optional columns and all', async () => {
-      const definition = aDefinition();
+      const definition = aDefinition({ description: DESCRIPTION });
       const read = await inA(async (transaction) => {
         await fixture.stores.definitions.insert(transaction, definition);
         return fixture.stores.definitions.byId(transaction, definition.definitionId);
@@ -361,159 +357,6 @@ suite('workflow persistence', () => {
 
       expect(queue.total).toBe(0);
       expect(queue.items).toEqual([]);
-    });
-  });
-
-  describe('decisions and history', () => {
-    it('round-trips an assigned decision and reads it back for the instance', async () => {
-      const started = aStartedInstance([APPROVER]);
-      const decided = anApproval(started, { comment: 'Headcount was already budgeted' });
-      const read = await inA(async (transaction) => {
-        await writeStarted(transaction, started);
-        await fixture.stores.decisions.insert(transaction, decided.decision);
-        return fixture.stores.decisions.forInstance(transaction, started.instance.instanceId);
-      });
-
-      expect(read).toEqual([decided.decision]);
-      expect(read[0]?.authority).toBe('assigned');
-      expect(Object.keys(read[0] ?? {})).not.toContain('onBehalfOfMembershipId');
-      expect(read[0]?.decidedAt.getTime()).toBe(LATER.getTime());
-    });
-
-    /**
-     * A delegated decision keeps **both** memberships, in the columns that mean them.
-     *
-     * The deputy is who decided; the approver is whose authority was used. A schema that collapsed
-     * them, or a mapper that read one into the other, would put a name in the audit trail against an
-     * act that person did not perform.
-     */
-    it('keeps the delegate and the delegator apart across the round trip', async () => {
-      const started = aStartedInstance([APPROVER]);
-      const decided = aDelegatedApproval(started);
-      const read = await inA(async (transaction) => {
-        await writeStarted(transaction, started);
-        await fixture.stores.decisions.insert(transaction, decided.decision);
-        return fixture.stores.decisions.forInstance(transaction, started.instance.instanceId);
-      });
-
-      expect(read[0]).toEqual(decided.decision);
-      expect(read[0]?.authority).toBe('delegated');
-      expect(read[0]?.decidedByMembershipId).not.toBe(read[0]?.onBehalfOfMembershipId);
-      expect(read[0]?.onBehalfOfMembershipId).toBe(APPROVER);
-    });
-
-    /** And the queue's other half: what one membership decided is keyed on who *acted*. */
-    it('lists a delegated decision for the delegate and not for the delegator', async () => {
-      const started = aStartedInstance([APPROVER]);
-      const decided = aDelegatedApproval(started);
-      const lists = await inA(async (transaction) => {
-        await writeStarted(transaction, started);
-        await fixture.stores.decisions.insert(transaction, decided.decision);
-        return {
-          deputy: await fixture.stores.decisions.decidedBy(
-            transaction,
-            decided.decision.decidedByMembershipId,
-            { limit: 10, offset: 0 },
-          ),
-          approver: await fixture.stores.decisions.decidedBy(transaction, APPROVER, {
-            limit: 10,
-            offset: 0,
-          }),
-        };
-      });
-
-      expect(lists.deputy.total).toBe(1);
-      expect(lists.approver.total).toBe(0);
-    });
-
-    it('round-trips a timeline oldest first, with the instance-level entry carrying no step', async () => {
-      const started = aStartedInstance([APPROVER]);
-      const page = await inA(async (transaction) => {
-        await writeStarted(transaction, started);
-        return fixture.stores.history.forInstance(transaction, started.instance.instanceId, {
-          limit: 10,
-          offset: 0,
-        });
-      });
-
-      expect(page.total).toBe(2);
-      expect(page.items.map((entry) => entry.event)).toEqual(['instance-started', 'step-awaiting']);
-      expect(Object.keys(page.items[0] ?? {})).not.toContain('stepId');
-      expect(page.items[1]?.ordinal).toBe(1);
-      expect(page.items[0]?.occurredAt.getTime()).toBe(NOW.getTime());
-    });
-  });
-
-  describe('exactness', () => {
-    /**
-     * A large ordinal survives as itself.
-     *
-     * AD-004 forbids a hardcoded approval limit, so the ordinals are `integer` rather than
-     * `smallint`. `2147483000` is inside `integer` and far outside `smallint`, and it is also past
-     * the point where a `real` column would start rounding — so a column silently declared as either
-     * would fail here rather than in a tenant's fifty-thousandth step.
-     */
-    it('round-trips a step-template ordinal far past a smallint without rounding', async () => {
-      const definition = aDefinition();
-      const draft = aDraft(definition);
-      const large = aTemplate(draft, 2_147_483_000);
-      const modest = aTemplate(draft, 100_000);
-      const read = await inA(async (transaction) => {
-        await fixture.stores.definitions.insert(transaction, definition);
-        await fixture.stores.versions.insert(transaction, draft);
-        await fixture.stores.versions.insertTemplate(transaction, large);
-        await fixture.stores.versions.insertTemplate(transaction, modest);
-        return fixture.stores.versions.templatesFor(transaction, draft.workflowVersionId);
-      });
-
-      expect(read.map((template) => template.ordinal)).toEqual([100_000, 2_147_483_000]);
-      expect(read.every((template) => Number.isInteger(template.ordinal))).toBe(true);
-      expect(read[1]?.ordinal).toBe(2_147_483_000);
-    });
-
-    it('round-trips a version number of the same size', async () => {
-      const definition = aDefinition();
-      const draft = aDraft(definition, 2_147_483_000);
-      const read = await inA(async (transaction) => {
-        await fixture.stores.definitions.insert(transaction, definition);
-        await fixture.stores.versions.insert(transaction, draft);
-        return {
-          version: await fixture.stores.versions.byId(transaction, draft.workflowVersionId),
-          next: await fixture.stores.versions.nextNumberFor(transaction, definition.definitionId),
-        };
-      });
-
-      expect(read.version?.versionNumber).toBe(2_147_483_000);
-      expect(read.next).toBe(2_147_483_001);
-      expect(Number.isInteger(read.next)).toBe(true);
-    });
-
-    /**
-     * Two instants five minutes and five hundred milliseconds apart stay that far apart.
-     *
-     * `timestamptz` keeps microseconds and the driver hands back a `Date`; nothing on this path
-     * constructs a `Date` from a string or from a local midnight, because there is no civil date in
-     * this module. A truncating column or a reinterpreting mapper would collapse the difference.
-     */
-    it('preserves the distance between two instants across the round trip', async () => {
-      const started = aStartedInstance([APPROVER]);
-      const decided = anApproval(started);
-      const read = await inA(async (transaction) => {
-        await writeStarted(transaction, started);
-        await fixture.stores.decisions.insert(transaction, decided.decision);
-        return {
-          instance: await fixture.stores.instances.byId(transaction, started.instance.instanceId),
-          decisions: await fixture.stores.decisions.forInstance(
-            transaction,
-            started.instance.instanceId,
-          ),
-        };
-      });
-      const startedAt = read.instance?.startedAt.getTime() ?? 0;
-      const decidedAt = read.decisions[0]?.decidedAt.getTime() ?? 0;
-
-      expect(decidedAt - startedAt).toBe(LATER.getTime() - NOW.getTime());
-      expect(decidedAt - startedAt).toBe(300_500);
     });
   });
 });

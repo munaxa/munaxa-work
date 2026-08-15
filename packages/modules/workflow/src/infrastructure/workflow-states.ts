@@ -14,6 +14,7 @@ import { decide, type DecidedStep } from '../domain/decision.js';
 import { startHistory } from '../domain/history.js';
 import type { WorkflowHistoryState } from '../domain/history.js';
 import type { WorkflowResult } from '../domain/workflow-rejection.js';
+import type { LocalizedName } from '../domain/workflow-vocabulary.js';
 import { APPROVER, DEPUTY, REQUESTER, SUBJECT_TYPE } from './workflow-database.fixture.js';
 
 /**
@@ -57,7 +58,7 @@ export const aCode = (prefix = 'approval'): string => {
 };
 
 export const aDefinition = (
-  overrides: { code?: string; subjectType?: string; description?: string } = {},
+  overrides: { code?: string; subjectType?: string; description?: LocalizedName } = {},
 ): WorkflowDefinitionState =>
   accepted(
     createDefinition({

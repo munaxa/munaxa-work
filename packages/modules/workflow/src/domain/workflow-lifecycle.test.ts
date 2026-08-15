@@ -39,6 +39,60 @@ describe('a workflow definition', () => {
     );
   });
 
+  /**
+   * A description is optional, and a description that is present is a description in both languages.
+   *
+   * The column has always been `jsonb`; Checkpoint 6 brought the domain to it, matching the `name`
+   * beside it. "Optional" and "unchecked" are different things: `{ en: 'Hiring', ar: '' }` is not a
+   * bilingual description, and letting it through would put a blank on the Arabic screen of a
+   * definition that looks complete in English.
+   */
+  it('accepts a definition with no description at all', () => {
+    const made = createDefinition({
+      definitionId: 'd',
+      code: 'ok',
+      name: NAME,
+      subjectType: 'a.b',
+    });
+
+    expect(made.ok).toBe(true);
+    expect(made.ok && 'description' in made.value).toBe(false);
+  });
+
+  it('accepts a description written in both languages, and keeps both', () => {
+    const description = { en: 'Raised for a requisition', ar: 'يُرفع لطلب توظيف' };
+    const made = createDefinition({
+      definitionId: 'd',
+      code: 'ok',
+      name: NAME,
+      subjectType: 'a.b',
+      description,
+    });
+
+    expect(made.ok && made.value.description).toEqual(description);
+  });
+
+  it('refuses a description missing a language, or blank in one', () => {
+    const request = { definitionId: 'd', code: 'ok', name: NAME, subjectType: 'a.b' };
+
+    expect(reasonOf(createDefinition({ ...request, description: { en: 'Hiring', ar: '' } }))).toBe(
+      'definition-description-invalid',
+    );
+    expect(reasonOf(createDefinition({ ...request, description: { en: '  ', ar: 'توظيف' } }))).toBe(
+      'definition-description-invalid',
+    );
+    expect(
+      reasonOf(
+        createDefinition({
+          ...request,
+          // A caller sending the pre-Checkpoint-6 shape: a plain string where a localized value
+          // belongs. It reaches the domain as an object with neither language.
+          description: 'Raised for a requisition' as unknown as { en: string; ar: string },
+        }),
+      ),
+    ).toBe('definition-description-invalid');
+  });
+
   it('accepts a dotted subject type without holding any list of them', () => {
     // The point of the assertion: a subject type from a module Workflow has never heard of is
     // accepted on shape alone. A list of legal values here would be a list of business modules.

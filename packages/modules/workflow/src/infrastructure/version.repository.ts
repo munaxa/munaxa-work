@@ -12,7 +12,7 @@ import {
   versionValues,
   type TemplateRow,
   type VersionRow,
-} from './workflow-rows.js';
+} from './workflow-config-rows.js';
 import { asNumber, insertRow, mutable, pageOf, predicateFor } from './row-writer.js';
 
 /**

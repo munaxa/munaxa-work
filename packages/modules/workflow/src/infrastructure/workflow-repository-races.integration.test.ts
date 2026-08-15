@@ -1,16 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import {
-  ConcurrencyException,
-  runInContext,
-  uuidV7,
-  type Transaction,
-  type UnitOfWork,
-} from '@work/kernel';
+import { ConcurrencyException, uuidV7, type Transaction, type UnitOfWork } from '@work/kernel';
 
 import {
   CONNECTION,
   TENANT_A,
-  TEST_MEMBER,
   openWorkflowFixture,
   requireDatabaseInCi,
   APPROVER,
@@ -26,6 +19,7 @@ import {
   anApproval,
   stepAt,
 } from './workflow-states.js';
+import { racingOn, type Racing } from './workflow-race.fixture.js';
 
 /**
  * What happens when two people act at the same instant.
@@ -49,31 +43,15 @@ const suite = CONNECTION === undefined ? describe.skip : describe;
 
 requireDatabaseInCi('The Workflow repository race suite');
 
-/** What a transaction did, in terms a reader can act on. */
-type Outcome = string;
-
-const outcomeOf = async (attempt: Promise<unknown>): Promise<Outcome> => {
-  try {
-    await attempt;
-    return 'committed';
-  } catch (error: unknown) {
-    if (error instanceof ConcurrencyException) return 'stale-version';
-
-    const failure = error as { code?: string; constraint?: string; message?: string };
-
-    if (failure.code === '23505') return `duplicate:${failure.constraint ?? 'unnamed'}`;
-    if (failure.code === '40001') return 'serialization-failure';
-    return `other:${failure.code ?? failure.message ?? 'unknown'}`;
-  }
-};
-
 suite('repository races', () => {
   let fixture: WorkflowFixture;
   let second: UnitOfWork;
+  let racing: Racing;
 
   beforeAll(async () => {
     fixture = await openWorkflowFixture('workflow_repo_races_role');
     second = fixture.secondUnitOfWork();
+    racing = racingOn(fixture, second);
   });
 
   afterAll(async () => {
@@ -87,55 +65,8 @@ suite('repository races', () => {
   const inA = <TResult>(work: (transaction: Transaction) => Promise<TResult>): Promise<TResult> =>
     fixture.inTenant(TENANT_A, work);
 
-  /** The same tenant, on the **other** connection. */
-  const onSecond = <TResult>(
-    work: (transaction: Transaction) => Promise<TResult>,
-  ): Promise<TResult> =>
-    runInContext(
-      {
-        tenantId: TENANT_A,
-        correlationId: uuidV7(),
-        actor: 'user:workflow-second',
-        membershipId: TEST_MEMBER,
-      },
-      () => second.execute(work),
-    );
-
-  /**
-   * Two transactions, overlapping, both writing.
-   *
-   * The first writes and then waits. The second's transaction is opened and reaches its own write
-   * while the first is still uncommitted — the point at which PostgreSQL takes over: the second
-   * blocks on the index entry or the row lock, and is released, one way or the other, by the first's
-   * commit.
-   */
-  const race = async (
-    first: (transaction: Transaction) => Promise<void>,
-    challenger: (transaction: Transaction) => Promise<void>,
-  ): Promise<{ readonly first: Outcome; readonly second: Outcome }> => {
-    let written = (): void => undefined;
-    let opened = (): void => undefined;
-    const hasWritten = new Promise<void>((resolve) => {
-      written = resolve;
-    });
-    const isOpen = new Promise<void>((resolve) => {
-      opened = resolve;
-    });
-    const firstRun = inA(async (transaction) => {
-      await first(transaction);
-      written();
-      await isOpen;
-    });
-
-    await hasWritten;
-
-    const secondRun = onSecond(async (transaction) => {
-      opened();
-      await challenger(transaction);
-    });
-
-    return { first: await outcomeOf(firstRun), second: await outcomeOf(secondRun) };
-  };
+  /** Two transactions, overlapping, both writing. See `workflow-race.fixture.ts`. */
+  const race: Racing['race'] = (first, challenger) => racing.race(first, challenger);
 
   /** Rows both racers need to exist and be committed before they start. */
   const commit = (work: (transaction: Transaction) => Promise<void>): Promise<void> => inA(work);

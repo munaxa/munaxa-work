@@ -18,7 +18,7 @@ import {
   stepValues,
   type InstanceRow,
   type StepRow,
-} from './workflow-rows.js';
+} from './workflow-record-rows.js';
 import { insertRow, mutable, pageOf, predicateFor, type Filter } from './row-writer.js';
 
 /**

@@ -13,6 +13,7 @@
       "decision-not-the-assigned-approver": "This step was not assigned to you.",
       "decision-requires-a-person": "An approval decision must be made by a named person.",
       "definition-code-invalid": "A workflow code must be lowercase letters, digits and hyphens.",
+      "definition-description-invalid": "A workflow description must be written in both English and Arabic.",
       "definition-has-no-published-version": "This workflow has no published version, so no approval can start from it.",
       "definition-name-required": "A workflow needs a name in both English and Arabic.",
       "definition-retired": "This workflow has been retired and takes no new versions.",

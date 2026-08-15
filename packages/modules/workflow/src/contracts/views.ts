@@ -3,6 +3,7 @@ import type {
   ApprovalStateName,
   ApproverKind,
   DecisionAuthority,
+  LocalizedName,
   WorkflowDefinitionStatus,
   WorkflowHistoryEvent,
   WorkflowInstanceStatus,
@@ -43,7 +44,7 @@ export interface WorkflowDefinitionView {
   readonly definitionId: string;
   readonly code: string;
   readonly name: LocalizedTextView;
-  readonly description?: string;
+  readonly description?: LocalizedName;
   /** What a business module calls the thing being decided. Opaque, and never interpreted here. */
   readonly subjectType: string;
   readonly status: WorkflowDefinitionStatus;

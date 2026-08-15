@@ -197,6 +197,9 @@ importers:
       '@work/recruitment':
         specifier: workspace:*
         version: link:../../packages/modules/recruitment
+      '@work/workflow':
+        specifier: workspace:*
+        version: link:../../packages/modules/workflow
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1

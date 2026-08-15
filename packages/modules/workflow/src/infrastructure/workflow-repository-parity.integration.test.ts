@@ -10,20 +10,22 @@ import {
 import { aDefinition, aStartedInstance, anApproval } from './workflow-states.js';
 import {
   TEMPLATE_COLUMNS,
-  decisionColumns,
-  decisionValues,
   definitionColumns,
   definitionValues,
+  templateValues,
+  versionColumns,
+  versionValues,
+} from './workflow-config-rows.js';
+import {
+  decisionColumns,
+  decisionValues,
   historyColumns,
   historyValues,
   instanceColumns,
   instanceValues,
   stepColumns,
   stepValues,
-  templateValues,
-  versionColumns,
-  versionValues,
-} from './workflow-rows.js';
+} from './workflow-record-rows.js';
 import type { RowValues } from './row-writer.js';
 
 /**
@@ -120,7 +122,7 @@ suite('mapper and schema parity', () => {
         read: columnsOf(definitionColumns('d')),
         // With a description, because a null column would say nothing about the type behind it.
         written: definitionValues(
-          aDefinition({ description: 'Raised whenever a requisition is opened' }),
+          aDefinition({ description: { en: 'Raised for a requisition', ar: 'يُرفع لطلب توظيف' } }),
           tenantId,
         ),
       },
@@ -217,19 +219,17 @@ suite('mapper and schema parity', () => {
   });
 
   /**
-   * **Every `jsonb` column is written as JSON — with exactly one exception, recorded rather than
-   * hidden.**
+   * **Every `jsonb` column is written as JSON, with no exception.**
    *
-   * `workflow_definition.description` is `jsonb` in Checkpoint 3's schema while the domain's
-   * `description` is a plain `string`, so writing one raises `invalid input syntax for type json`.
-   * Resolving that means changing either the schema or the domain, and Checkpoint 5 is authorized to
-   * change neither — so the divergence is asserted here **exactly**, as a set of one. A second
-   * divergence, or this one silently disappearing, fails this test.
-   *
-   * Every other localized column in the repository — a definition's name, a step template's name, an
-   * instance's context — goes through `JSON.stringify`, which is why they round-trip.
+   * Checkpoint 5 reported one: `workflow_definition.description` was `jsonb` in the schema while the
+   * domain declared a plain `string`, so writing one raised `invalid input syntax for type json`.
+   * Checkpoint 6 resolved it by bringing the domain to the schema — `description?: LocalizedName`,
+   * matching the `name` beside it and Career's, Learning's and Onboarding's descriptions — and the
+   * column was not touched. The expected set is now empty, which is what makes this test a
+   * regression lock rather than a record of a defect: a column written as anything other than JSON
+   * shows up here by name.
    */
-  it('writes JSON into every jsonb column but the one known divergence', () => {
+  it('writes JSON into every jsonb column', () => {
     const divergent = mapped().flatMap((one) =>
       Object.entries(one.written)
         .filter(([column]) => catalogue.get(one.table)?.get(column)?.type === 'jsonb')
@@ -237,7 +237,7 @@ suite('mapper and schema parity', () => {
         .map(([column]) => `${one.table}.${column}`),
     );
 
-    expect(divergent).toEqual(['workflow_definition.description']);
+    expect(divergent).toEqual([]);
   });
 
   /** And nothing in this module stores a civil date: every temporal column is an instant. */

@@ -70,6 +70,7 @@ import { lettersModuleFor } from '../letters/letters.composition.js';
 import { performanceModuleFor } from '../performance/performance.composition.js';
 import { learningModuleFor } from '../learning/learning.composition.js';
 import { careerModuleFor } from '../career/career.composition.js';
+import { workflowModuleFor } from '../workflow/workflow.composition.js';
 
 import {
   AUTHENTICATION_PORT,
@@ -174,6 +175,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         performance: performanceModuleFor(unitOfWork, senders.payroll, permissions),
         learning: learningModuleFor(unitOfWork, senders.payroll, permissions),
         career: careerModuleFor(unitOfWork, senders.payroll, permissions),
+        workflow: workflowModuleFor(unitOfWork, senders.payroll, permissions),
       }),
     },
     {
@@ -256,6 +258,14 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // permission checker for the same reason Learning does: `plan.read-team` resolves to
         // nothing until the platform can say which employment the caller is (ADR-0032).
         registry.register(permissionAware.career);
+        // Workflow last of all, and it reads exactly one module: Identity, for the delegation
+        // register it deliberately does not duplicate (AD-010, D-2). It writes to nothing outside
+        // itself — the seam through which an approval reaches an adopting module is Checkpoint 7 —
+        // and it is read by nobody yet. It takes the permission checker for the same reason
+        // Career and Learning do, and for one they do not: `workflow.approval.read-own` is the
+        // first `read-own` in this repository that actually routes, because an approval is
+        // addressed to a membership and the request has already resolved one (Checkpoint 4).
+        registry.register(permissionAware.workflow);
         return registry;
       },
     },
@@ -315,6 +325,7 @@ interface PermissionAwareModules {
   readonly performance: WorkModule;
   readonly learning: WorkModule;
   readonly career: WorkModule;
+  readonly workflow: WorkModule;
 }
 
 interface DeferredSenders {

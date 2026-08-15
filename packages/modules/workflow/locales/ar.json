@@ -13,6 +13,7 @@
       "decision-not-the-assigned-approver": "هذه الخطوة ليست مسندة إليك.",
       "decision-requires-a-person": "يجب أن يتخذ قرار الاعتماد شخص محدد بالاسم.",
       "definition-code-invalid": "يجب أن يتكون رمز سير العمل من حروف إنجليزية صغيرة وأرقام وشرطات.",
+      "definition-description-invalid": "يجب كتابة وصف سير العمل باللغتين الإنجليزية والعربية.",
       "definition-has-no-published-version": "لا يوجد إصدار منشور لسير العمل هذا، لذا لا يمكن بدء أي اعتماد منه.",
       "definition-name-required": "يحتاج سير العمل إلى اسم بالعربية والإنجليزية معًا.",
       "definition-retired": "تم إيقاف سير العمل هذا ولا يقبل إصدارات جديدة.",

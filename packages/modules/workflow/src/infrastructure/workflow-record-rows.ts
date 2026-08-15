@@ -1,176 +1,31 @@
 import type { WorkflowDecisionState } from '../domain/decision.js';
-import type {
-  WorkflowDefinitionState,
-  WorkflowStepTemplateState,
-  WorkflowVersionState,
-} from '../domain/definition.js';
 import type { WorkflowHistoryState } from '../domain/history.js';
 import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instance.js';
 import type {
   ApprovalDecisionKind,
   ApproverKind,
   DecisionAuthority,
-  LocalizedName,
-  WorkflowDefinitionStatus,
   WorkflowHistoryEvent,
   WorkflowInstanceStatus,
   WorkflowStepStatus,
-  WorkflowVersionStatus,
 } from '../domain/workflow-vocabulary.js';
 import { asNumber, orNull, presentOf, type RowValues } from './row-writer.js';
 
 /**
- * Every Workflow row, and the mapping in both directions.
+ * The rows an approval produces while it runs: the instance, its steps, the decisions approvers
+ * made, and the timeline of how it got where it is.
  *
- * **No `Date` is constructed or reinterpreted here.** Every temporal column in this module is a
- * `timestamptz`, which the driver hands back as a `Date` holding an absolute instant; the mapper
- * passes it through untouched in both directions. There is no `to_char`, no local-midnight parse and
- * no timezone arithmetic on this path, because there is no civil date in this module to lose a day
- * from — a request, a decision and a step becoming current are moments. The application's views turn
- * an instant into an ISO string at the boundary, which is the one place that conversion happens.
+ * **Nothing here is localized and nothing here is a civil date.** A running approval carries no
+ * tenant-authored text — the names live on the version it copied from — and every temporal column is
+ * a `timestamptz` the driver hands back as a `Date`, passed through untouched in both directions.
  *
- * **Every number is integral and `asNumber` is applied only to columns PostgreSQL already
- * guarantees.** A version number, a step ordinal and the optimistic `version` column. The ordinals
- * are `integer` rather than `smallint` deliberately (AD-004), so an ordinal far past 32,767
- * round-trips exactly — asserted in the exactness suite rather than assumed.
+ * **`context` is `jsonb` and is passed through as an object.** It is the requesting module's own
+ * payload, stored for audit and read by nothing in Phase 16A.
  *
- * **`context` and `metadata` are `jsonb` and are passed through as objects.** Neither is read by
- * anything in Phase 16A; `context` is the requesting module's own payload, kept for audit.
+ * **The last two tables are append-only**, and the shape of this file says so: there is no
+ * `decisionUpdateValues` and no `historyUpdateValues` beside the two insert mappers, because a
+ * trigger refuses every update and delete and the repositories offer no method that could issue one.
  */
-
-const localized = (value: unknown): LocalizedName => value as LocalizedName;
-
-// ------------------------------------------------------------------------------------------------
-// Definitions
-// ------------------------------------------------------------------------------------------------
-
-export interface DefinitionRow {
-  readonly id: string;
-  readonly code: string;
-  readonly name: unknown;
-  readonly description: string | null;
-  readonly subject_type: string;
-  readonly status: string;
-  readonly retired_at: Date | null;
-  readonly retired_by: string | null;
-  readonly version: number;
-}
-
-export const definitionColumns = (alias: string): string =>
-  [
-    `${alias}.id`,
-    `${alias}.code`,
-    `${alias}.name`,
-    `${alias}.description`,
-    `${alias}.subject_type`,
-    `${alias}.status`,
-    `${alias}.retired_at`,
-    `${alias}.retired_by`,
-    `${alias}.version`,
-  ].join(', ');
-
-export const definitionState = (row: DefinitionRow): WorkflowDefinitionState => ({
-  definitionId: row.id,
-  code: row.code,
-  name: localized(row.name),
-  subjectType: row.subject_type,
-  status: row.status as WorkflowDefinitionStatus,
-  version: asNumber(row.version),
-  ...presentOf({
-    description: row.description,
-    retiredAt: row.retired_at,
-    retiredBy: row.retired_by,
-  }),
-});
-
-export const definitionValues = (state: WorkflowDefinitionState, tenantId: string): RowValues => ({
-  id: state.definitionId,
-  tenant_id: tenantId,
-  code: state.code,
-  name: JSON.stringify(state.name),
-  description: orNull(state.description),
-  subject_type: state.subjectType,
-  status: state.status,
-  retired_at: orNull(state.retiredAt),
-  retired_by: orNull(state.retiredBy),
-});
-
-// ------------------------------------------------------------------------------------------------
-// Versions and their step templates
-// ------------------------------------------------------------------------------------------------
-
-export interface VersionRow {
-  readonly id: string;
-  readonly definition_id: string;
-  readonly version_number: number;
-  readonly status: string;
-  readonly published_at: Date | null;
-  readonly published_by: string | null;
-  readonly version: number;
-}
-
-export const versionColumns = (alias: string): string =>
-  [
-    `${alias}.id`,
-    `${alias}.definition_id`,
-    `${alias}.version_number`,
-    `${alias}.status`,
-    `${alias}.published_at`,
-    `${alias}.published_by`,
-    `${alias}.version`,
-  ].join(', ');
-
-export const versionState = (row: VersionRow): WorkflowVersionState => ({
-  workflowVersionId: row.id,
-  definitionId: row.definition_id,
-  versionNumber: asNumber(row.version_number),
-  status: row.status as WorkflowVersionStatus,
-  version: asNumber(row.version),
-  ...presentOf({ publishedAt: row.published_at, publishedBy: row.published_by }),
-});
-
-export const versionValues = (state: WorkflowVersionState, tenantId: string): RowValues => ({
-  id: state.workflowVersionId,
-  tenant_id: tenantId,
-  definition_id: state.definitionId,
-  version_number: state.versionNumber,
-  status: state.status,
-  published_at: orNull(state.publishedAt),
-  published_by: orNull(state.publishedBy),
-});
-
-export interface TemplateRow {
-  readonly id: string;
-  readonly workflow_version_id: string;
-  readonly ordinal: number;
-  readonly name: unknown;
-  readonly approver_kind: string;
-  readonly approver_membership_id: string;
-  readonly version: number;
-}
-
-export const TEMPLATE_COLUMNS =
-  'id, workflow_version_id, ordinal, name, approver_kind, approver_membership_id, version';
-
-export const templateState = (row: TemplateRow): WorkflowStepTemplateState => ({
-  stepTemplateId: row.id,
-  workflowVersionId: row.workflow_version_id,
-  ordinal: asNumber(row.ordinal),
-  name: localized(row.name),
-  approverKind: row.approver_kind as ApproverKind,
-  approverMembershipId: row.approver_membership_id,
-  version: asNumber(row.version),
-});
-
-export const templateValues = (state: WorkflowStepTemplateState, tenantId: string): RowValues => ({
-  id: state.stepTemplateId,
-  tenant_id: tenantId,
-  workflow_version_id: state.workflowVersionId,
-  ordinal: state.ordinal,
-  name: JSON.stringify(state.name),
-  approver_kind: state.approverKind,
-  approver_membership_id: state.approverMembershipId,
-});
 
 // ------------------------------------------------------------------------------------------------
 // Instances and steps

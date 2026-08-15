@@ -48,7 +48,15 @@ export interface WorkflowDefinitionState {
   /** What a business module calls the thing being decided. Opaque here, and never interpreted. */
   readonly subjectType: string;
   readonly status: WorkflowDefinitionStatus;
-  readonly description?: string;
+  /**
+   * A tenant-authored explanation of the process, in both first-class languages.
+   *
+   * `LocalizedName` rather than a plain string, matching the `name` beside it and Career's, Learning's
+   * and Onboarding's descriptions: this product renders tenant text and never translates it, so a
+   * single-language description would be a screen in the wrong language for half the organization.
+   * The column has always been `jsonb`; this is the domain saying the same thing.
+   */
+  readonly description?: LocalizedName;
   readonly retiredAt?: Date;
   readonly retiredBy?: string;
   readonly version: number;
@@ -88,7 +96,7 @@ export interface CreateDefinitionRequest {
   readonly code: string;
   readonly name: LocalizedName;
   readonly subjectType: string;
-  readonly description?: string;
+  readonly description?: LocalizedName;
 }
 
 export const createDefinition = (
@@ -97,6 +105,12 @@ export const createDefinition = (
   if (!isCode(request.code)) return refuse('definition-code-invalid');
   if (!isLocalizedName(request.name)) return refuse('definition-name-required');
   if (!isSubjectType(request.subjectType)) return refuse('definition-subject-type-invalid');
+  // Optional, but not therefore unchecked: a description that is present must be a description in
+  // both languages. `isLocalizedName` refuses a missing language and a blank one alike, which is
+  // what stops `{ en: 'Hiring', ar: '' }` from reaching a `jsonb` column and rendering as nothing.
+  if (request.description !== undefined && !isLocalizedName(request.description)) {
+    return refuse('definition-description-invalid');
+  }
 
   return accept({
     definitionId: request.definitionId,

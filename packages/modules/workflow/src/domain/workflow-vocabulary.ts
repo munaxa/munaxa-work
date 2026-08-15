@@ -274,8 +274,21 @@ export interface LocalizedName {
   readonly ar: string;
 }
 
+/**
+ * Whether a value really is bilingual text a tenant wrote.
+ *
+ * **The types of the two fields are checked, not assumed.** This guard's whole job is to be handed
+ * something that may not be a `LocalizedName` — a JSON body reaching the edge, a caller still
+ * sending the shape from before a field became localized — and `value.en.trim()` on an absent or
+ * non-string `en` throws where a refusal belongs. A `TypeError` at the edge becomes a 500, which
+ * tells an administrator the product is broken rather than that their input was.
+ */
 export const isLocalizedName = (value: LocalizedName | undefined): boolean =>
-  value !== undefined && value.en.trim().length > 0 && value.ar.trim().length > 0;
+  value !== undefined &&
+  typeof value.en === 'string' &&
+  typeof value.ar === 'string' &&
+  value.en.trim().length > 0 &&
+  value.ar.trim().length > 0;
 
 /**
  * The actor no decision in this module accepts.

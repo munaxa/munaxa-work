@@ -13,7 +13,7 @@ import {
   definitionState,
   definitionValues,
   type DefinitionRow,
-} from './workflow-rows.js';
+} from './workflow-config-rows.js';
 import { insertRow, mutable, pageOf, predicateFor, type Filter } from './row-writer.js';
 
 /**

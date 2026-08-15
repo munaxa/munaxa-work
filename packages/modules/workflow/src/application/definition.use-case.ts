@@ -35,7 +35,7 @@ export interface CreateDefinitionCommand extends Command {
   readonly code: string;
   readonly name: LocalizedName;
   readonly subjectType: string;
-  readonly description?: string;
+  readonly description?: LocalizedName;
 }
 
 export interface DefinitionCreated {

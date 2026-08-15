@@ -12,7 +12,7 @@ import {
   historyValues,
   type DecisionRow,
   type HistoryRow,
-} from './workflow-rows.js';
+} from './workflow-record-rows.js';
 import { insertRow, pageOf } from './row-writer.js';
 
 /**
