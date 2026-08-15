@@ -14,6 +14,7 @@ import {
   type Query,
   type Result,
   type ServiceElevation,
+  type WorkModule,
 } from '@work/kernel';
 import {
   ConfiguredTenantSettings,
@@ -24,6 +25,10 @@ import {
 import { ALL_WORKFLOW_PERMISSIONS } from '@work/workflow';
 import { PostgresUnitOfWork } from '@work/persistence';
 
+import {
+  DeferredRecruitmentSender,
+  recruitmentModuleFor,
+} from '../recruitment/recruitment.composition.js';
 import { workflowModuleFor } from './workflow.composition.js';
 import {
   ADMIN_ACTOR,
@@ -31,7 +36,9 @@ import {
   TENANT_A,
   seedIdentityWorld,
 } from './workflow-cross-module-world.js';
+import { CONNECTION, OWNER_TABLES, TABLES } from './workflow-cross-module-role.fixture.js';
 import type { Asking } from '../payroll/asking.js';
+import type { Sending } from './sending.js';
 
 /**
  * The wiring Phase 16A's cross-module suite runs against.
@@ -60,18 +67,13 @@ import type { Asking } from '../payroll/asking.js';
  * timer here or in production — an expired arrangement simply is not in Identity's answer.
  */
 
-export const CONNECTION = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-
-export const requireDatabaseInCi = (suite: string): void => {
-  if (CONNECTION === undefined && process.env.CI !== undefined) {
-    throw new Error(`${suite} requires a database. Set TEST_DATABASE_URL. Refusing to skip in CI.`);
-  }
-};
-
-// ------------------------------------------------------------------------------------------------
-// The world both tenants are set up in
-// ------------------------------------------------------------------------------------------------
-
+export {
+  APPLICATION_ROLE,
+  CONNECTION,
+  applicationConnection,
+  requireDatabaseInCi,
+  roleIsUnprivileged,
+} from './workflow-cross-module-role.fixture.js';
 export {
   ADMIN_ACTOR,
   APPROVER,
@@ -89,93 +91,9 @@ export {
   SUBJECT_TYPE,
   TENANT_A,
   TENANT_B,
+  UNADOPTED,
   seedIdentityWorld,
 } from './workflow-cross-module-world.js';
-
-/**
- * The tables the harness truncates between tests, most dependent first.
- *
- * `delegation` is Identity's and is on this list because the suite writes delegations into it: the
- * cross-module fact under test is a row in another module's table, read back through that module's
- * own published query.
- */
-const TABLES = [
-  'workflow_history',
-  'workflow_decision',
-  'workflow_step',
-  'workflow_instance',
-  'workflow_step_template',
-  'workflow_version',
-  'workflow_definition',
-  'delegation',
-];
-
-/**
- * Identity's own rows, seeded as the **owner** rather than as the application role.
- *
- * `workforce_user`'s policy admits a user only when a membership already points at it, and
- * `tenant_membership` is forced-RLS as well, so the unprivileged role cannot bootstrap the two of
- * them — correctly, because in production they are created by Identity's own commands.
- *
- * Setting up another module's world as the owner is fixture work; it is not where a security claim
- * is made. **Every assertion in the suites runs through the application role**, whose `rolsuper` and
- * `rolbypassrls` are checked before any isolation result is believed.
- */
-const IDENTITY_TABLES = ['delegation', 'tenant_membership', 'workforce_user'];
-
-/**
- * A role that owns nothing, holds no `BYPASSRLS`, and is not a superuser.
- *
- * The database this suite runs against belongs to `work`, which **is** a superuser — and a superuser
- * bypasses every row-level security policy there is. Connecting as one would mean the tenant
- * assertions were proving only that the SQL filters on a tenant, and reporting that row-level
- * security holds without ever having given it the chance to refuse. The suite asserts `rolsuper` and
- * `rolbypassrls` are both false before relying on a single security result.
- */
-export const APPLICATION_ROLE = 'workflow_cross_module';
-
-export const applicationConnection = async (): Promise<string> => {
-  if (CONNECTION === undefined) throw new Error('Set TEST_DATABASE_URL.');
-
-  const admin = new Pool({ connectionString: CONNECTION, connectionTimeoutMillis: 15_000 });
-
-  try {
-    await admin.query(
-      `do $$ begin
-         if not exists (select 1 from pg_roles where rolname = '${APPLICATION_ROLE}') then
-           create role ${APPLICATION_ROLE} login nosuperuser password 'fixture';
-         end if;
-       end $$`,
-    );
-    await admin.query(
-      `grant select, insert, update, delete, truncate on ${TABLES.join(', ')} to ${APPLICATION_ROLE}`,
-    );
-    // Read-only on the two Identity tables the delegation query joins nothing to but reads through:
-    // Workflow never writes to Identity, and the role it runs as could not if it tried.
-    await admin.query(`grant select on tenant_membership, workforce_user to ${APPLICATION_ROLE}`);
-
-    const url = new URL(CONNECTION);
-
-    url.username = APPLICATION_ROLE;
-    url.password = 'fixture';
-    return url.toString();
-  } finally {
-    await admin.end();
-  }
-};
-
-/** Whether the role the suite is connected as can actually be refused by a policy. */
-export const roleIsUnprivileged = async (
-  pool: Pool,
-): Promise<{ readonly rolsuper: boolean; readonly rolbypassrls: boolean }> => {
-  const { rows } = await pool.query<{ rolsuper: boolean; rolbypassrls: boolean }>(
-    `select rolsuper, rolbypassrls from pg_roles where rolname = current_user`,
-  );
-  const row = rows[0];
-
-  if (row === undefined) throw new Error('The connected role has no row in pg_roles.');
-  return row;
-};
 
 export interface WorkflowCrossModuleHarness {
   readonly dispatcher: Dispatcher;
@@ -213,6 +131,11 @@ export interface HarnessOptions {
    * module that answers `identity.active-delegations-for` is not there.
    */
   readonly withoutIdentity?: boolean;
+  /**
+   * Leaves Recruitment off the dispatcher — the adopting module being unavailable, in the production
+   * composition rather than behind a stub.
+   */
+  readonly withoutRecruitment?: boolean;
 }
 
 /** Raw SQL on the harness's pool, inside one tenant's row-security context. */
@@ -265,7 +188,7 @@ const register = (
   dispatcher: Dispatcher,
   unitOfWork: PostgresUnitOfWork,
   permissions: PermissionChecker,
-  withIdentity: boolean,
+  present: { readonly identity: boolean; readonly recruitment: boolean },
 ): void => {
   const identity = identityModule({
     unitOfWork,
@@ -274,15 +197,30 @@ const register = (
     clock: systemClock,
   });
 
-  if (withIdentity) {
-    for (const handler of identity.queries ?? []) dispatcher.registerQuery(handler);
-  }
+  if (present.identity) attach(dispatcher, identity);
+
+  // Recruitment's real module, on the same dispatcher: `recruitment.decide-requisition` runs its own
+  // handler, its own aggregate and its own repository against the real tables under its own policy.
+  // The seam under test is a command going into a module, so a stub here would test nothing.
+  const recruitmentSender = new DeferredRecruitmentSender();
+  const recruitment = recruitmentModuleFor(unitOfWork, recruitmentSender);
+
+  recruitmentSender.attach(dispatcher);
+
+  if (present.recruitment) attach(dispatcher, recruitment);
 
   const asking: Asking = { ask: (query) => dispatcher.ask(query) };
-  const workflow = workflowModuleFor(unitOfWork, asking, permissions);
+  const sending: Sending = {
+    ask: (query) => dispatcher.ask(query),
+    send: (command) => dispatcher.send(command),
+  };
+  attach(dispatcher, workflowModuleFor(unitOfWork, asking, sending, permissions));
+};
 
-  for (const handler of workflow.commands ?? []) dispatcher.registerCommand(handler);
-  for (const handler of workflow.queries ?? []) dispatcher.registerQuery(handler);
+/** Every handler a module declares, on the dispatcher. */
+const attach = (dispatcher: Dispatcher, module: WorkModule): void => {
+  for (const handler of module.commands ?? []) dispatcher.registerCommand(handler);
+  for (const handler of module.queries ?? []) dispatcher.registerQuery(handler);
 };
 
 export const harnessFor = (options: HarnessOptions = {}): WorkflowCrossModuleHarness => {
@@ -302,7 +240,10 @@ export const harnessFor = (options: HarnessOptions = {}): WorkflowCrossModuleHar
   // The owner connection, for setting up Identity's world only. No assertion is made through it.
   const admin = new Pool({ connectionString: CONNECTION, max: 2, connectionTimeoutMillis: 15_000 });
 
-  register(dispatcher, unitOfWork, permissions, options.withoutIdentity !== true);
+  register(dispatcher, unitOfWork, permissions, {
+    identity: options.withoutIdentity !== true,
+    recruitment: options.withoutRecruitment !== true,
+  });
 
   return {
     dispatcher,
@@ -321,12 +262,12 @@ export const harnessFor = (options: HarnessOptions = {}): WorkflowCrossModuleHar
       ),
     truncate: async () => {
       await pool.query(`truncate ${TABLES.join(', ')}`);
-      await admin.query(`truncate ${IDENTITY_TABLES.join(', ')} cascade`);
+      await admin.query(`truncate ${OWNER_TABLES.join(', ')} cascade`);
       await seedIdentityWorld(admin);
     },
     close: async () => {
       await pool.query(`truncate ${TABLES.join(', ')}`);
-      await admin.query(`truncate ${IDENTITY_TABLES.join(', ')} cascade`);
+      await admin.query(`truncate ${OWNER_TABLES.join(', ')} cascade`);
       await admin.end();
       await pool.end();
     },

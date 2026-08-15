@@ -13,6 +13,7 @@ import {
   harnessFor,
   requireDatabaseInCi,
   type WorkflowCrossModuleHarness,
+  UNADOPTED,
 } from './workflow-cross-module-harness.js';
 import { seedDelegation, startApproval } from './workflow-cross-module-seed.js';
 
@@ -60,7 +61,11 @@ suite('workflow across tenants', () => {
     tenantId: string,
     subjectId = 'requisition-1',
   ): Promise<{ instanceId: string }> =>
-    startApproval(harness, tenantId, { subjectId, code: `approval-${subjectId}` });
+    startApproval(harness, tenantId, {
+      subjectId,
+      code: `approval-${subjectId}`,
+      subjectType: UNADOPTED,
+    });
 
   const decideAs = (
     tenantId: string,
@@ -107,11 +112,13 @@ suite('workflow across tenants', () => {
         approver: B_APPROVER,
         subjectId: 'requisition-a',
         code: 'approval-requisition-a',
+        subjectType: UNADOPTED,
       });
       const inB = await startApproval(harness, TENANT_B, {
         approver: B_APPROVER,
         subjectId: 'requisition-b',
         code: 'approval-requisition-b',
+        subjectType: UNADOPTED,
       });
 
       // The delegation is real, current, correctly scoped — and it exists only in tenant B.
@@ -135,6 +142,7 @@ suite('workflow across tenants', () => {
         approver: B_APPROVER,
         subjectId: 'requisition-b',
         code: 'approval-requisition-b',
+        subjectType: UNADOPTED,
       });
 
       await decideAs(TENANT_A, APPROVER, inA.instanceId);
@@ -161,6 +169,7 @@ suite('workflow across tenants', () => {
         approver: B_APPROVER,
         subjectId: 'requisition-b',
         code: 'approval-requisition-b',
+        subjectType: UNADOPTED,
       });
 
       const page = await askIn<{ total: number }>(TENANT_A, APPROVER, {
@@ -179,6 +188,7 @@ suite('workflow across tenants', () => {
         approver: B_APPROVER,
         subjectId: 'requisition-b',
         code: 'approval-requisition-b',
+        subjectType: UNADOPTED,
       });
 
       const queue = await askIn<{ total: number }>(TENANT_B, B_APPROVER, {
@@ -224,6 +234,7 @@ suite('workflow across tenants', () => {
       const started = await startApproval(deaf, TENANT_A, {
         subjectId: 'requisition-deaf',
         code: 'approval-requisition-deaf',
+        subjectType: UNADOPTED,
       });
 
       await seedDelegation(deaf, TENANT_A);
@@ -267,6 +278,7 @@ suite('workflow across tenants', () => {
       const started = await startApproval(deaf, TENANT_A, {
         subjectId: 'requisition-own',
         code: 'approval-requisition-own',
+        subjectType: UNADOPTED,
       });
       const outcome = await deaf.inTenant(TENANT_A, APPROVER, () =>
         deaf.dispatcher.send({

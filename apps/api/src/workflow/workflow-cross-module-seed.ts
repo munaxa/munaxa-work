@@ -1,6 +1,9 @@
+import { uuidV7 } from '@work/kernel';
+
 import {
   APPROVER,
   AUDIT,
+  AUDIT_COLUMNS,
   DECIDE_SCOPE,
   DEPUTY,
   REQUESTER,
@@ -90,10 +93,17 @@ export interface StartedApproval {
 export const startApproval = async (
   harness: WorkflowCrossModuleHarness,
   tenantId: string,
-  options: { readonly approver?: string; readonly subjectId?: string; readonly code?: string } = {},
+  options: {
+    readonly approver?: string;
+    readonly subjectId?: string;
+    readonly code?: string;
+    /** A subject type no adapter owns, for proving the unadopted path. Defaults to a requisition. */
+    readonly subjectType?: string;
+  } = {},
 ): Promise<StartedApproval> => {
   const approver = options.approver ?? APPROVER;
   const code = options.code ?? 'requisition-approval';
+  const subjectType = options.subjectType ?? SUBJECT_TYPE;
 
   return harness.inTenant(tenantId, REQUESTER, async () => {
     const definition = await send<{ definitionId: string }>(harness, {
@@ -101,7 +111,7 @@ export const startApproval = async (
       code,
       name: { en: 'Requisition approval', ar: 'اعتماد طلب التوظيف' },
       description: { en: 'Raised for a requisition', ar: 'يُرفع لطلب توظيف' },
-      subjectType: SUBJECT_TYPE,
+      subjectType,
     });
     const version = await send<{ workflowVersionId: string; versionNumber: number }>(harness, {
       commandName: 'workflow.draft-version',
@@ -124,11 +134,146 @@ export const startApproval = async (
     const instance = await send<{ instanceId: string }>(harness, {
       commandName: 'workflow.start-instance',
       definitionId: definition.definitionId,
-      subjectType: SUBJECT_TYPE,
+      subjectType,
       subjectId: options.subjectId ?? 'requisition-1',
       context: { headcount: 2 },
     });
 
     return { definitionId: definition.definitionId, instanceId: instance.instanceId };
   });
+};
+
+// ------------------------------------------------------------------------------------------------
+// The adopting module's own record
+// ------------------------------------------------------------------------------------------------
+
+export interface SeededRequisition {
+  readonly requisitionId: string;
+}
+
+let sequence = 0;
+
+/**
+ * A requisition waiting for a decision, written straight into Recruitment's table.
+ *
+ * Written rather than commanded because reaching `pending_approval` through Recruitment's own
+ * commands needs a position, a unit and an employment from three other modules, none of which is
+ * what this seam is about. **The row goes in through the real columns, constraints and policy**, and
+ * everything the suites then do to it — read it, decide it, reconcile against it — goes through
+ * Recruitment's own published contracts and its own aggregate.
+ *
+ * `approvalId` is left null unless a suite is deliberately setting up the "already decided" cases,
+ * which is the state every requisition in this repository is in today: nothing has ever written that
+ * column.
+ */
+export const seedRequisition = async (
+  harness: WorkflowCrossModuleHarness,
+  tenantId: string,
+  seed: {
+    readonly status?: string;
+    readonly approvalId?: string;
+    readonly requisitionId?: string;
+  } = {},
+): Promise<SeededRequisition> => {
+  const requisitionId = seed.requisitionId ?? uuidV7();
+
+  sequence += 1;
+
+  const client = await harness.pool.connect();
+
+  try {
+    await client.query('begin');
+    await client.query(`select set_config('app.tenant_id', $1, true)`, [tenantId]);
+    await client.query(
+      `insert into recruitment_requisition
+         (id, tenant_id, requisition_number, status, position_id, unit_id, headcount_requested,
+          headcount_filled, reason_code, requested_by_employment_id, approval_id, metadata,
+          ${AUDIT_COLUMNS})
+       values ($1, $2, $3, $4, $5, $6, 1, 0, 'growth', $7, $8, '{}'::jsonb, ${AUDIT})`,
+      [
+        requisitionId,
+        tenantId,
+        `REQ-2026-${String(sequence).padStart(6, '0')}`,
+        seed.status ?? 'pending_approval',
+        uuidV7(),
+        uuidV7(),
+        uuidV7(),
+        seed.approvalId ?? null,
+      ],
+    );
+    await client.query('commit');
+  } catch (error: unknown) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+  return { requisitionId };
+};
+
+/** What Recruitment currently holds, read straight from its table for an assertion. */
+export const requisitionRow = async (
+  harness: WorkflowCrossModuleHarness,
+  tenantId: string,
+  requisitionId: string,
+): Promise<{ readonly status: string; readonly approval_id: string | null } | undefined> => {
+  const rows = await harness.rowsIn<{ status: string; approval_id: string | null }>(
+    tenantId,
+    `select status, approval_id from recruitment_requisition where id = $1`,
+    [requisitionId],
+  );
+
+  return rows[0];
+};
+
+/** The decision rows Recruitment wrote — the evidence a headcount audit reads. */
+export const requisitionDecisions = (
+  harness: WorkflowCrossModuleHarness,
+  tenantId: string,
+  requisitionId: string,
+): Promise<{ readonly decision: string; readonly decided_by: string }[]> =>
+  harness.rowsIn<{ decision: string; decided_by: string }>(
+    tenantId,
+    `select decision, decided_by from recruitment_requisition_decision where requisition_id = $1`,
+    [requisitionId],
+  );
+
+/**
+ * Puts a requisition into a state a prior decision would have left it in.
+ *
+ * Used to set up the "already decided" cases — including the one a failed Workflow commit leaves
+ * behind, where Recruitment carries the approval and Workflow has no record of it. There is no
+ * command that produces that state, because it is a *partial* outcome rather than an act.
+ *
+ * **Inside a tenant context**, because the application role cannot bypass row-level security: a write
+ * issued without `app.tenant_id` set matches no row, and a fixture that did so would silently change
+ * nothing and leave every assertion after it testing the wrong world.
+ */
+export const decidedAlready = async (
+  harness: WorkflowCrossModuleHarness,
+  tenantId: string,
+  requisitionId: string,
+  state: { readonly status: string; readonly approvalId?: string },
+): Promise<void> => {
+  const client = await harness.pool.connect();
+
+  try {
+    await client.query('begin');
+    await client.query(`select set_config('app.tenant_id', $1, true)`, [tenantId]);
+
+    const written = await client.query(
+      `update recruitment_requisition
+          set status = $1, approval_id = $2, version = version + 1, updated_at = now()
+        where id = $3`,
+      [state.status, state.approvalId ?? null, requisitionId],
+    );
+
+    if (written.rowCount !== 1) throw new Error('The fixture updated no requisition.');
+    await client.query('commit');
+  } catch (error: unknown) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 };

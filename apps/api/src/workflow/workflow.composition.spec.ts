@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 
 import { workflowModuleFor } from './workflow.composition.js';
 import type { Asking } from '../payroll/asking.js';
+import type { Sending } from './sending.js';
 
 /**
  * How Workflow is assembled in production, and the things about the assembly that break quietly.
@@ -48,12 +49,19 @@ describe('workflow composition', () => {
   const composed = (): ReturnType<typeof workflowModuleFor> => {
     const pool = new Pool({ connectionString: 'postgresql://unused:unused@127.0.0.1:1/unused' });
     const asking: Asking = { ask: () => Promise.reject(new Error('not called')) };
+    const sending: Sending = {
+      ask: () => Promise.reject(new Error('not called')),
+      send: () => Promise.reject(new Error('not called')),
+    };
 
     // Nothing connects: constructing the module registers handlers and touches no socket. The pool
     // exists because `PostgresUnitOfWork` takes one, and it is never used.
-    return workflowModuleFor(new PostgresUnitOfWork(pool, new InProcessEventDispatcher()), asking, {
-      holds: () => Promise.resolve(true),
-    });
+    return workflowModuleFor(
+      new PostgresUnitOfWork(pool, new InProcessEventDispatcher()),
+      asking,
+      sending,
+      { holds: () => Promise.resolve(true) },
+    );
   };
 
   it('registers the whole application surface and nothing more', () => {
@@ -82,71 +90,100 @@ describe('workflow composition', () => {
   });
 
   /**
-   * **The real stores and the real adapter, named in the composition and nowhere replaced.**
+   * **The real stores and both real adapters, named in the composition and nowhere replaced.**
    *
-   * `postgresWorkflowStores()` returns the whole `WorkflowStores` interface rather than a partial,
-   * so a missing repository is a compile error — but nothing stops a composition from importing
-   * `inMemoryWorkflowStores` instead, which is exactly the substitution this asserts against.
+   * `postgresWorkflowStores()` returns the whole `WorkflowStores` interface rather than a partial, so
+   * a missing repository is a compile error — but nothing stops a composition from importing
+   * `inMemoryWorkflowStores`, or from handing the module a decision port that always says yes. Both
+   * substitutions would leave every type satisfied and the product approving things nobody decided.
    */
-  it('composes real repositories and the real delegation adapter', () => {
+  it('composes real repositories and both real adapters', () => {
     const source = codeOf('workflow.composition.ts');
 
     expect(source).toContain('postgresWorkflowStores()');
-    expect(source).toContain('new WorkflowDelegations(dispatcher)');
+    expect(source).toContain('new WorkflowDelegations(reader)');
+    expect(source).toContain('new RecruitmentDecisions(writer)');
     expect(source).not.toContain('inMemory');
     expect(source).not.toContain('AutoApproving');
     expect(source).not.toContain('Recording');
   });
 
   /**
-   * The adapter takes `Asking`, not the dispatcher.
+   * **Two capabilities, and which adapter gets which is a type rather than a convention.**
    *
-   * A parameter that could `send` would be authority Workflow has no use for in 16A: it writes
-   * nothing outside itself until Checkpoint 7, and the type of this parameter is part of how that is
-   * structurally true rather than merely intended.
+   * The delegation adapter reads Identity and takes `Asking`: reading a delegation register must
+   * never be able to write to it, and there is no `send` on the object it holds. Only the adapter
+   * that applies a terminal decision takes `Sending`. A single dispatcher parameter shared by both
+   * would make "Workflow writes into exactly one place" a claim nobody could check.
    */
-  it('gives the adapter a read-only capability', () => {
+  it('separates the reading capability from the writing one', () => {
     const composition = codeOf('workflow.composition.ts');
-    const adapter = codeOf('workflow-sources.ts');
+    const delegations = codeOf('workflow-sources.ts');
+    const decisions = codeOf('recruitment-decisions.ts');
 
-    expect(composition).toContain('dispatcher: Asking');
+    expect(composition).toContain('reader: Asking');
+    expect(composition).toContain('writer: Sending');
     expect(composition).not.toContain('Dispatcher');
-    expect(adapter).toContain('private readonly dispatcher: Asking');
-    expect(adapter).not.toContain('.send(');
+
+    expect(delegations).toContain('private readonly dispatcher: Asking');
+    expect(delegations).not.toContain('.send(');
+
+    expect(decisions).toContain('private readonly dispatcher: Sending');
   });
 
   /**
-   * **The exact grant set: one permission, in one grant, for one query.**
+   * **The exact grant set: three permissions, in three grants, across two adapters.**
    *
-   * Counted from the source rather than asserted as a sentence. A second `runWithServiceGrant`, a
-   * second permission inside the existing one, a wildcard or a prefix all show up here.
+   * One to read Identity's delegations, and two — read and approve — for the one module Workflow
+   * writes into. Counted from source rather than asserted as a sentence, because a fourth grant, a
+   * widened `permits`, a wildcard or a prefix is exactly the change that would pass every behavioural
+   * test in this repository.
    */
-  it('holds exactly one cross-module grant, of exactly one permission', () => {
-    const source = codeOf('workflow-sources.ts');
-    const grants = source.match(/runWithServiceGrant\(/g) ?? [];
-    const permits = source.match(/permits: \[[^\]]*\]/g) ?? [];
+  it('holds exactly three cross-module grants, of exactly three permissions', () => {
+    const delegations = codeOf('workflow-sources.ts');
+    const decisions = codeOf('recruitment-decisions.ts');
+    const both = `${delegations}\n${decisions}`;
+    const grants = both.match(/runWithServiceGrant\(/g) ?? [];
+    const permits = both.match(/permits: \[[^\]]*\]/g) ?? [];
 
-    expect(grants).toHaveLength(1);
-    expect(permits).toEqual(['permits: [DELEGATION_READ]']);
-    expect(source).toContain("const DELEGATION_READ = 'identity.delegation.read';");
-    // No wildcard, no prefix, and no second permission constant to reach for.
-    expect(source).not.toMatch(/'[a-z]+\.\*'/);
-    expect(source).not.toMatch(/permits: \[[^\]]*,/);
+    expect(grants).toHaveLength(3);
+    expect(permits).toEqual([
+      'permits: [DELEGATION_READ]',
+      'permits: [REQUISITION_READ]',
+      'permits: [REQUISITION_APPROVE]',
+    ]);
+    expect(delegations).toContain("const DELEGATION_READ = 'identity.delegation.read';");
+    expect(decisions).toContain("const REQUISITION_READ = 'recruitment.requisition.read';");
+    expect(decisions).toContain("const REQUISITION_APPROVE = 'recruitment.requisition.approve';");
+    // No wildcard, no prefix, and no grant permitting two things at once.
+    expect(both).not.toMatch(/'[a-z]+\.\*'/);
+    expect(both).not.toMatch(/permits: \[[^\]]*,/);
   });
 
-  /** One query, named in full, and no other module's contract mentioned anywhere. */
-  it('consumes exactly one published contract', () => {
-    const source = codeOf('workflow-sources.ts');
-    // Distinct, because the name appears twice by design: once declaring the query's type and once
-    // in the literal sent. Two occurrences of one name is the shape; two names would not be.
-    const queries = [...new Set(source.match(/queryName: '[a-z.-]+'/g) ?? [])];
+  /** Three published contracts in total, each named in full, and nothing else reachable. */
+  it('consumes exactly three published contracts', () => {
+    const delegations = codeOf('workflow-sources.ts');
+    const decisions = codeOf('recruitment-decisions.ts');
+    const names = (source: string): readonly string[] => [
+      ...new Set(source.match(/(?:queryName|commandName): '[a-z.-]+'/g) ?? []),
+    ];
 
-    expect(queries).toEqual(["queryName: 'identity.active-delegations-for'"]);
-    expect(source).not.toContain('identity.list-memberships');
-    expect(source).not.toContain('identity.search-members');
-    expect(source).not.toContain('recruitment.');
-    expect(source).not.toContain('employment.');
-    expect(source).not.toContain('organization.');
+    expect(names(delegations)).toEqual(["queryName: 'identity.active-delegations-for'"]);
+    expect([...names(decisions)].sort()).toEqual([
+      "commandName: 'recruitment.decide-requisition'",
+      "queryName: 'recruitment.read-requisition'",
+    ]);
+    // The broad reads that would answer the same questions less honestly.
+    for (const forbidden of [
+      'identity.list-memberships',
+      'identity.search-members',
+      'recruitment.search-requisitions',
+      'recruitment.search-candidates',
+      'employment.',
+      'organization.',
+    ]) {
+      expect(`${delegations}\n${decisions}`).not.toContain(forbidden);
+    }
   });
 
   /** And it is wired into the one composition root the product has, rather than a second one. */
@@ -156,32 +193,85 @@ describe('workflow composition', () => {
     expect(module).toContain(
       "import { workflowModuleFor } from '../workflow/workflow.composition.js'",
     );
-    expect(module).toContain(
-      'workflow: workflowModuleFor(unitOfWork, senders.payroll, permissions)',
-    );
+    expect(module).toContain('senders.recruitment, permissions)');
     expect(module).toContain('registry.register(permissionAware.workflow)');
   });
 
   /**
-   * Nothing here anticipates Checkpoint 7.
+   * **Two seams, pointing in opposite directions, and neither is the other.**
    *
-   * The write seam into an adopting module is the only place a Phase 16 defect could corrupt a
-   * completed module, and a path to it that exists before the checkpoint meant to prove it is a path
-   * that ships unproven.
+   * `WorkflowApprovals` implements the kernel's `ApprovalPort` — a business module asking Workflow to
+   * route a decision. `RecruitmentDecisions` implements Workflow's own `BusinessDecisionPort` — a
+   * decided approval reaching the module that asked. The kernel interface has no method for the
+   * second, which is why there are two files and not one.
    */
-  it('implements no approval port and reaches no adopting module', () => {
-    const files = ['workflow.composition.ts', 'workflow-sources.ts'];
+  it('implements the kernel port inbound and Workflow’s own port outbound', () => {
+    const inbound = codeOf('workflow-approvals.ts');
+    const outbound = codeOf('recruitment-decisions.ts');
 
-    for (const file of files) {
+    expect(inbound).toContain('implements ApprovalPort');
+    expect(inbound).toMatch(/public async request\(/);
+    expect(inbound).toMatch(/public async status\(/);
+    expect(inbound).toMatch(/public async cancel\(/);
+
+    expect(outbound).toContain('implements BusinessDecisionPort');
+    expect(outbound).not.toContain('implements ApprovalPort');
+  });
+
+  /**
+   * The kernel's port is untouched.
+   *
+   * D-8 approved implementing it as written. Adding an outbound method to it would have changed a
+   * contract five completed modules already depend on, which is why the return path is Workflow's own
+   * port instead.
+   */
+  it('leaves the kernel approval port exactly as it was', () => {
+    const port = readFileSync(
+      join(process.cwd(), '..', '..', 'packages', 'kernel', 'src', 'ports', 'approval.ts'),
+      'utf8',
+    );
+    const methods = port
+      .slice(port.indexOf('export interface ApprovalPort'))
+      .split('}')[0]
+      ?.match(/^\s{2}(\w+)\(/gm)
+      ?.map((line) => line.trim().replace('(', ''));
+
+    expect(methods).toEqual(['request', 'status', 'cancel']);
+  });
+
+  /**
+   * Nothing in this folder reaches another module's internals, and nothing acquires a 16B capability.
+   *
+   * The write seam is the one place Workflow can corrupt a completed module, so the audit is
+   * structural: no Prisma, no repository, no SQL, no entity, and none of the machinery this phase
+   * refused.
+   */
+  it('reaches Recruitment only through its published contracts', () => {
+    for (const file of [
+      'workflow.composition.ts',
+      'workflow-sources.ts',
+      'recruitment-decisions.ts',
+      'workflow-approvals.ts',
+    ]) {
       const source = codeOf(file);
 
-      expect(source).not.toContain('ApprovalPort');
-      expect(source).not.toContain('approval_id');
-      expect(source).not.toContain('recruitmentModule');
-      expect(source).not.toContain('JobPort');
-      expect(source).not.toContain('NotificationPort');
-      expect(source).not.toContain('StoragePort');
-      expect(source).not.toContain('SearchPort');
+      for (const forbidden of [
+        'PrismaClient',
+        'prisma',
+        'postgresRecruitmentStores',
+        'Repository',
+        'select ',
+        'insert into',
+        'JobPort',
+        'NotificationPort',
+        'StoragePort',
+        'SearchPort',
+        'outbox',
+        'setTimeout',
+        'setInterval',
+      ]) {
+        expect([file, source.includes(forbidden)]).toEqual([file, false]);
+      }
     }
   });
 });

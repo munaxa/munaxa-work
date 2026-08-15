@@ -48,6 +48,17 @@ export const SUBJECT_TYPE = 'recruitment.requisition';
 /** The instant every decision in the suite is made at, and every delegation period is set around. */
 export const NOW = new Date('2026-08-15T09:00:00.000Z');
 
+/**
+ * A subject type **no adapter owns**, for suites that are not about the seam.
+ *
+ * A terminal decision about a `recruitment.requisition` is carried into Recruitment, so a delegation
+ * or tenancy suite using one would depend on a requisition existing and on Recruitment's own
+ * lifecycle — two things it is not asking about. `leave.request` is a real subject type nothing
+ * routes, so the decision completes inside Workflow and each assertion stays about the one question
+ * its test came for. The seam itself is proved in its own suites.
+ */
+export const UNADOPTED = 'leave.request';
+
 /** Workflow's own permission name — the scope a delegation must carry to be honoured here. */
 export const DECIDE_SCOPE = 'workflow.approval.decide';
 

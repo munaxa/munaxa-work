@@ -182,6 +182,94 @@ export interface WorkflowStores {
 }
 
 // ------------------------------------------------------------------------------------------------
+// The one outbound write
+// ------------------------------------------------------------------------------------------------
+
+/**
+ * A terminal Workflow approval, as the module that asked for it needs to hear about it.
+ *
+ * Four fields and no fifth. The subject is the opaque pair the requesting module supplied and
+ * Workflow never interpreted; `approvalId` is the Workflow instance's own identifier, because the
+ * approval **is** the instance and inventing a second identifier would create a fact nobody owns;
+ * and the outcome is the one thing Workflow actually decided.
+ *
+ * **No step, no approver, no comment, no chain.** Who was asked and who answered is Workflow's
+ * record, and handing it across the seam would let a business module start reasoning about approval
+ * chains it does not own — which is the second source of truth AD-001 exists to prevent.
+ */
+export interface TerminalApproval {
+  readonly subjectType: string;
+  readonly subjectId: string;
+  /** The Workflow instance. An opaque value on the other side — never a foreign key (ADR-0042). */
+  readonly approvalId: string;
+  readonly outcome: 'approved' | 'rejected';
+}
+
+/**
+ * What the adopting module did with it.
+ *
+ * `applied` — the module accepted the decision and moved.
+ * `converged` — this same approval had already been applied; nothing changed and nothing needed to.
+ * `not-adopted` — no module here routes this subject type, which is the ordinary case for the ten
+ * modules that have not adopted Workflow. Not a failure.
+ * `refused` — the module's own rules said no.
+ *
+ * **`reason` is a Workflow rejection key, not the module's own**, and that is a real limitation
+ * stated rather than hidden: a refusal crossing this seam lands in Workflow's catalogue namespace, so
+ * Recruitment's `requisition_not_awaiting_decision` cannot be re-rendered here without Workflow
+ * publishing another module's message keys. The adapter therefore picks from the closed set in
+ * `WORKFLOW_REFUSALS_FROM_A_SUBJECT` — which distinguishes the four outcomes that mean different
+ * things to a person reading the refusal — and the module's own wording stays where it is owned.
+ */
+export type ApprovalDelivery =
+  | { readonly kind: 'applied' }
+  | { readonly kind: 'converged' }
+  | { readonly kind: 'not-adopted' }
+  | { readonly kind: 'refused'; readonly reason: string };
+
+/**
+ * The seam through which a terminal decision reaches the module that asked for it.
+ *
+ * **This is not the kernel's `ApprovalPort` and does not replace it.** That port is the inbound
+ * direction — a business module asking Workflow to route a decision — and Workflow implements it
+ * unchanged (D-8). This is the return path, and the kernel port has no method for it: its own answer
+ * is an event, and D-9 refused event-carried correctness because delivery here is in-process and
+ * at-most-once with no outbox. So the decision travels **synchronously, inside the approver's own
+ * request**, and this one method is the whole of that path.
+ *
+ * **One method, and deliberately nothing else.** No `send`, no command name, no module name, no
+ * query, no repository, no transaction and no entity. An adapter implements it for the subject types
+ * its module owns and answers `not-adopted` for every other, so Workflow never learns which module
+ * is on the other end — the property AD-001 turns on, and the reason there is no registry keyed by
+ * module here.
+ *
+ * **The adapter decides nothing about the business.** It carries the decision to the owning module's
+ * own published command and carries that module's answer back. Whether the transition is legal is
+ * the owning module's question, asked and answered on its own side.
+ */
+export interface BusinessDecisionPort {
+  apply(approval: TerminalApproval): Promise<ApprovalDelivery>;
+}
+
+/**
+ * The refusals a subject's own module can produce, in Workflow's words.
+ *
+ * Four, and each is a different sentence to the person who pressed approve. *Its rules refused* is
+ * the ordinary business outcome. *Another approval already decided it* and *it was decided outside
+ * Workflow* are the two ways an approval arrives too late, and they are kept apart because the first
+ * means a routed chain got there first and the second means a person did — which are different
+ * questions for whoever investigates. *The subject is not there* is neither.
+ */
+export const WORKFLOW_REFUSALS_FROM_A_SUBJECT = [
+  'subject-refused-the-decision',
+  'subject-decided-by-another-approval',
+  'subject-decided-outside-workflow',
+  'subject-not-found',
+] as const;
+
+export type SubjectRefusal = (typeof WORKFLOW_REFUSALS_FROM_A_SUBJECT)[number];
+
+// ------------------------------------------------------------------------------------------------
 // The one cross-module read
 // ------------------------------------------------------------------------------------------------
 

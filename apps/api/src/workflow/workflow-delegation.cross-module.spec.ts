@@ -12,6 +12,7 @@ import {
   requireDatabaseInCi,
   roleIsUnprivileged,
   type WorkflowCrossModuleHarness,
+  UNADOPTED,
 } from './workflow-cross-module-harness.js';
 import { seedDelegation, startApproval } from './workflow-cross-module-seed.js';
 
@@ -67,7 +68,11 @@ suite('workflow delegation, across modules', () => {
     tenantId: string,
     subjectId = 'requisition-1',
   ): Promise<{ instanceId: string }> =>
-    startApproval(harness, tenantId, { subjectId, code: `approval-${subjectId}` });
+    startApproval(harness, tenantId, {
+      subjectId,
+      code: `approval-${subjectId}`,
+      subjectType: UNADOPTED,
+    });
 
   /** A decision attempt by a named membership, on the caller's own request. */
   const decideAs = (

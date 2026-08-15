@@ -29,6 +29,19 @@ import type { WorkflowDependencies } from './workflow-dependencies.js';
  * **Two identities are recorded and never collapsed.** The delegate is the actor; the assigned
  * approver is the authority. Writing the delegator into the actor column would make the record say a
  * director approved something their deputy approved, and that record is what an auditor reads.
+ *
+ * **A terminal decision reaches the requesting module before Workflow records anything.** The order
+ * is deliberate and it is the whole of the seam's honesty: the owning module is asked first, and only
+ * if it accepts does Workflow write its decision and commit. A module that refuses leaves no Workflow
+ * decision row, no history entry and no completed instance — so there is no state in which Workflow
+ * claims an approval succeeded while the module that owns the subject says it did not (D-9).
+ *
+ * The two writes are **not** in one transaction and this file does not pretend they are: every
+ * `UnitOfWork.execute` takes its own connection, so the module commits on its own before Workflow
+ * does. The window that leaves — the module committed, Workflow's commit then failed — is closed by
+ * reconciliation rather than by a guarantee that does not exist: the retry finds the module already
+ * carrying *this* approval identifier and converges. There is no outbox, no retry worker and no
+ * scheduler anywhere in this path.
  */
 
 export interface DecideStepCommand extends Command {
@@ -84,6 +97,10 @@ export const decideStepHandler = (
 
       if (!decided.ok) return refusedBy(decided.error);
 
+      const delivered = await deliver(dependencies, instance, decided.value);
+
+      if (delivered !== undefined) return refuseWith(delivered);
+
       await persistDecision(dependencies, transaction, decided.value, command.expectedVersion);
       return success({
         decisionId: decided.value.decision.decisionId,
@@ -117,6 +134,43 @@ const authorityOf = async (
   );
 
   return acting ? 'delegated' : undefined;
+};
+
+/**
+ * Tells the module that asked for this approval that it has ended, and reports its refusal if it has
+ * one.
+ *
+ * **Only for a terminal decision.** An approval that has moved on to its next step has decided
+ * nothing the requesting module can act on, and telling it so would have the module apply a
+ * transition halfway through a chain.
+ *
+ * Returns `undefined` when Workflow may proceed — the module applied the decision, had already
+ * applied *this* approval, or does not route this subject type at all — and a refusal reason when it
+ * may not. That reason is one of the four in `WORKFLOW_REFUSALS_FROM_A_SUBJECT`: Workflow does not
+ * know *why* a requisition could not be approved and does not invent a sentence for it — it says
+ * which kind of refusal happened and leaves the module's own wording where it is owned.
+ */
+const deliver = async (
+  dependencies: WorkflowDependencies,
+  instance: {
+    readonly subjectType: string;
+    readonly subjectId: string;
+    readonly instanceId: string;
+  },
+  decided: DecidedStep,
+): Promise<string | undefined> => {
+  if (decided.instance.status === 'running') return undefined;
+
+  const outcome = decided.instance.status === 'completed' ? 'approved' : 'rejected';
+  const delivery = await dependencies.businessDecision.apply({
+    subjectType: instance.subjectType,
+    subjectId: instance.subjectId,
+    // The approval **is** the instance. A second identifier would be a fact with no owner.
+    approvalId: instance.instanceId,
+    outcome,
+  });
+
+  return delivery.kind === 'refused' ? delivery.reason : undefined;
 };
 
 /**

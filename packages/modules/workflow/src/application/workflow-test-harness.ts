@@ -12,7 +12,14 @@ import { InMemoryUnitOfWork } from '@work/testing';
 import { inMemoryWorkflowStores } from './in-memory-stores.js';
 import { workflowModule } from './workflow-module.js';
 import { ALL_WORKFLOW_PERMISSIONS } from './workflow-permissions.js';
-import type { Clock, DelegationGrant, DelegationPort } from './workflow-ports.js';
+import type {
+  ApprovalDelivery,
+  BusinessDecisionPort,
+  Clock,
+  DelegationGrant,
+  DelegationPort,
+  TerminalApproval,
+} from './workflow-ports.js';
 
 /**
  * The harness the application suites run against: the real module, the real dispatcher, the real
@@ -123,10 +130,37 @@ export class FakeDelegation implements DelegationPort {
   }
 }
 
+/**
+ * The adopting module, for the application suites.
+ *
+ * **It records and refuses, and it never pretends to be a database.** What the application layer has
+ * to be right about is the *order*: the owning module is asked before Workflow writes anything, and a
+ * refusal from it leaves no decision row. Whether a requisition may legally move is Recruitment's
+ * question, proved against the real module in the cross-module suites.
+ *
+ * The default answer is `not-adopted`, which is the honest default: ten of the eleven modules that
+ * could route approvals have not adopted Workflow, and their subjects reach this seam and go no
+ * further.
+ */
+export class FakeBusinessDecisions implements BusinessDecisionPort {
+  public readonly delivered: TerminalApproval[] = [];
+  private answer: ApprovalDelivery = { kind: 'not-adopted' };
+
+  public answers(delivery: ApprovalDelivery): void {
+    this.answer = delivery;
+  }
+
+  public apply(approval: TerminalApproval): Promise<ApprovalDelivery> {
+    this.delivered.push(approval);
+    return Promise.resolve(this.answer);
+  }
+}
+
 export interface Harness {
   readonly dispatcher: Dispatcher;
   readonly clock: FixedClock;
   readonly delegation: FakeDelegation;
+  readonly business: FakeBusinessDecisions;
   readonly stores: ReturnType<typeof inMemoryWorkflowStores>;
   /** Runs work as a named membership, in this harness's tenant. */
   as<TResult>(membershipId: string, work: () => Promise<TResult>): Promise<TResult>;
@@ -152,12 +186,14 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
   const dispatcher = new Dispatcher(permissions);
   const clock = new FixedClock(NOW);
   const delegation = new FakeDelegation();
+  const business = new FakeBusinessDecisions();
   const stores = inMemoryWorkflowStores();
   const tenantId = options.tenantId ?? TENANT;
   const module = workflowModule({
     unitOfWork: new InMemoryUnitOfWork(tenantId),
     stores,
     delegation,
+    businessDecision: business,
     permissions,
     clock,
   });
@@ -186,6 +222,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     dispatcher,
     clock,
     delegation,
+    business,
     stores,
     as: (membershipId, work) => run(tenantId, membershipId, work),
     withoutMembership: (work) => run(tenantId, undefined, work),

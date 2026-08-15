@@ -49,6 +49,14 @@ export interface RequisitionView {
   readonly targetStartDate?: string;
   readonly requestedByEmploymentId: string;
   readonly hiringManagerEmploymentId?: string;
+  /**
+   * The routed approval that decided this requisition, when one did.
+   *
+   * Published so a consumer can tell "decided by approval X" from "decided by a person in this
+   * module" — the distinction an approval engine needs before it converges a repeated delivery, and
+   * the one a headcount audit needs to trace authority. Absent while Recruitment decides directly.
+   */
+  readonly approvalId?: string;
   readonly metadata: Metadata;
   readonly version: number;
 }

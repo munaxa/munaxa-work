@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { workflowModule } from './workflow-module.js';
+import type { ApprovalDelivery } from './workflow-ports.js';
 import { inMemoryWorkflowStores } from './in-memory-stores.js';
 import { ALL_WORKFLOW_PERMISSIONS, DELEGABLE_SCOPES } from './workflow-permissions.js';
 import { FakeDelegation, FixedClock, NOW } from './workflow-test-harness.js';
@@ -52,6 +53,9 @@ const dependencies = {
   },
   stores: inMemoryWorkflowStores(),
   delegation: new FakeDelegation(),
+  businessDecision: {
+    apply: (): Promise<ApprovalDelivery> => Promise.resolve({ kind: 'not-adopted' }),
+  },
   permissions: { holds: () => Promise.resolve(true) },
   clock: new FixedClock(NOW),
 };
@@ -94,18 +98,56 @@ describe('nothing deferred to Phase 16B is reachable', () => {
     expect(registered).toHaveLength(17);
   });
 
+  /**
+   * Six dependencies, and the list is the capability surface.
+   *
+   * The unit of work, the stores, Identity's delegation read, the permission checker, a clock — and,
+   * since Checkpoint 7, the one outbound seam through which a terminal decision reaches the module
+   * that asked for it. A seventh would be the beginning of a capability this phase refuses, and the
+   * names below are the ones that would announce it: a scheduler, a notifier, a blob store, an index,
+   * a role directory.
+   *
+   * `businessDecision` is checked by name rather than by pattern because "approval" appears in it
+   * only in the honest sense — it carries an approval that has already been decided — while the
+   * forbidden list is about capabilities Workflow must not acquire.
+   */
   it('offers no port through which any of it could be called', () => {
-    // Five dependencies: the unit of work, the stores, Identity's delegation read, the permission
-    // checker and a clock. A sixth would be the beginning of a capability this phase refuses.
     expect(Object.keys(dependencies).sort()).toStrictEqual([
+      'businessDecision',
       'clock',
       'delegation',
       'permissions',
       'stores',
       'unitOfWork',
     ]);
-    for (const forbidden of ['job', 'notification', 'storage', 'search', 'approval', 'directory']) {
+    for (const forbidden of ['job', 'notification', 'storage', 'search', 'directory', 'outbox']) {
       expect(Object.keys(dependencies).join(' ').toLowerCase()).not.toContain(forbidden);
+    }
+  });
+
+  /**
+   * And the outbound seam is one method wide.
+   *
+   * The prohibition it carries is structural rather than documentary: a port with `send`, a command
+   * name or a module name on it would be a generic dispatcher wearing a narrow name, and every
+   * subsequent cross-module capability would arrive through it without another decision.
+   */
+  it('gives the outbound decision seam exactly one method and no dispatcher', () => {
+    const port = dependencies.businessDecision;
+    const prototype: unknown = Object.getPrototypeOf(port);
+    // A literal's prototype is `Object.prototype`, whose members are not this port's surface; a
+    // class instance's is the class, whose members are.
+    const declared =
+      prototype === Object.prototype || prototype === null
+        ? []
+        : Object.getOwnPropertyNames(prototype);
+    const methods = [...new Set([...Object.keys(port), ...declared])].filter(
+      (name) => name !== 'constructor',
+    );
+
+    expect(methods).toStrictEqual(['apply']);
+    for (const forbidden of ['send', 'ask', 'dispatch', 'publish', 'emit', 'execute']) {
+      expect(methods).not.toContain(forbidden);
     }
   });
 

@@ -124,6 +124,19 @@ export class Requisition extends RecruitmentAggregate {
     return this.state.status;
   }
 
+  /**
+   * The routed approval that decided this requisition, when one did.
+   *
+   * Absent while Recruitment decides directly, which is still the ordinary case: Workflow adoption is
+   * per tenant and per definition, and a requisition nobody routed carries nothing here. The
+   * distinction matters at the seam — "decided by approval X" and "decided by a person in this
+   * module" are different facts, and only the first may converge when the same approval arrives
+   * twice.
+   */
+  public get approvalId(): string | undefined {
+    return this.state.approvalId;
+  }
+
   public get positionId(): string {
     return this.state.positionId;
   }
@@ -163,14 +176,27 @@ export class Requisition extends RecruitmentAggregate {
     decision: 'approved' | 'rejected',
     origin: EventOrigin,
     occurredAt: Date,
+    approvalId?: string,
   ): RecruitmentResult<RequisitionStatus> {
     if (this.state.status !== 'pending_approval') {
       return refuse('requisition_not_awaiting_decision', { status: this.state.status });
+    }
+    // An identifier already here belongs to an approval that has already run. Overwriting it would
+    // rewrite which routed approval authorized this headcount, and the audit would then name the
+    // wrong one — so the second approval is refused rather than allowed to take the record over.
+    if (
+      approvalId !== undefined &&
+      this.state.approvalId !== undefined &&
+      this.state.approvalId !== approvalId
+    ) {
+      return refuse('requisition_already_routed_by_another_approval');
     }
 
     const moved = this.moveTo(decision);
 
     if (!moved.ok) return moved;
+
+    if (approvalId !== undefined) this.state = { ...this.state, approvalId };
 
     this.raise(
       RecruitmentEvents.requisitionDecided,
@@ -362,33 +388,4 @@ const checkedRequisitionCodes = (
   });
 };
 
-/**
- * The evidence of a decision: who decided, what they decided, when, and what it reverses.
- *
- * A plain shape rather than an aggregate, because nothing about a recorded decision can
- * subsequently change — there is nothing for an aggregate to protect. Modelling it as one would
- * suggest otherwise.
- */
-export interface RequisitionDecisionState {
-  readonly id: string;
-  readonly tenantId: string;
-  readonly requisitionId: string;
-  readonly decision: 'approved' | 'rejected' | 'reversed';
-  readonly reasonCode?: string;
-  readonly note?: string;
-  /** Taken from the authenticated context. A caller cannot supply it. */
-  readonly decidedBy: string;
-  readonly decidedAt: Date;
-  /** The decision this one reverses. Set only on a reversal. */
-  readonly reversesId?: string;
-  readonly version: number;
-}
-
-export const requisitionDecision = (
-  request: Omit<RequisitionDecisionState, 'id' | 'version'>,
-  recordedAt: Date,
-): RequisitionDecisionState => ({
-  id: uuidV7(recordedAt.getTime()),
-  ...request,
-  version: 0,
-});
+export { requisitionDecision, type RequisitionDecisionState } from './requisition-decision.js';

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { workflowModule } from './workflow-module.js';
+import type { ApprovalDelivery } from './workflow-ports.js';
 import { inMemoryWorkflowStores } from './in-memory-stores.js';
 import { ALL_WORKFLOW_PERMISSIONS, WorkflowPermissions } from './workflow-permissions.js';
 import {
@@ -36,6 +37,9 @@ const dependenciesFor = (granted: readonly string[]) => ({
   },
   stores: inMemoryWorkflowStores(),
   delegation: new FakeDelegation(),
+  businessDecision: {
+    apply: (): Promise<ApprovalDelivery> => Promise.resolve({ kind: 'not-adopted' }),
+  },
   permissions: { holds: (permission: string) => Promise.resolve(granted.includes(permission)) },
   clock: new FixedClock(NOW),
 });

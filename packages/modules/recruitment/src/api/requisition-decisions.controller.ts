@@ -8,11 +8,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import type { SubmitRequisitionCommand } from '../application/requisition.use-case.js';
 import type {
   DecideRequisitionCommand,
   ReverseRequisitionDecisionCommand,
-  SubmitRequisitionCommand,
-} from '../application/requisition.use-case.js';
+} from '../application/requisition-decision.use-case.js';
 import type {
   CloseRequisitionCommand,
   OpenRequisitionCommand,
