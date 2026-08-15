@@ -184,10 +184,13 @@ export const cancelInstanceHandler = (
         cancelled.value.instance,
         command.expectedVersion,
       );
+      // The membership, not the audit actor: the timeline's actor column is a membership, and the
+      // instance's `cancelled_by` is the authenticated request's actor. Two identities, two columns.
       for (const entry of cancellationHistory(
         cancelled.value,
         at,
         cancelled.value.skipped.map(() => uuidV7()).concat(uuidV7()),
+        currentMembership(),
       )) {
         await dependencies.stores.history.insert(transaction, entry);
       }

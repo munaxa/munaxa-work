@@ -40,3 +40,9 @@ export * from './application/in-memory-stores.js';
 export * from './application/workflow-views.js';
 export * from './application/workflow-paging.js';
 export * from './infrastructure/workflow-stores.js';
+
+export { WorkflowDispatcher } from './api/workflow-dispatcher.js';
+export { WorkflowDefinitionController } from './api/definition.controller.js';
+export { WorkflowVersionController } from './api/version.controller.js';
+export { WorkflowInstanceController } from './api/instance.controller.js';
+export { WorkflowApprovalController } from './api/approval.controller.js';

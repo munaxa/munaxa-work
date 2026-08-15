@@ -156,11 +156,24 @@ export const decisionHistory = (
   return withIdentifiers(events, historyIds);
 };
 
-/** The entries a cancellation produces: every abandoned step, then the instance itself. */
+/**
+ * The entries a cancellation produces: every abandoned step, then the instance itself.
+ *
+ * **The acting membership is passed in rather than read from `cancelledBy`.** Those are two
+ * different identities and the schema types them differently: `cancelled_by` is the audit actor —
+ * `user:<workforceUserId>`, a `varchar` — while `actor_membership_id` is a membership, a `uuid`.
+ * Reading one into the other produced a row PostgreSQL refused outright, which is the defect this
+ * signature exists to make unrepresentable.
+ *
+ * It is optional because a context that resolved no membership is a real case — a reconciliation
+ * command, a migration — and an entry with no actor is honest there. The column is nullable for
+ * exactly that reason.
+ */
 export const cancellationHistory = (
   cancelled: CancelledInstance,
   at: Date,
   historyIds: readonly string[],
+  actorMembershipId?: string,
 ): readonly WorkflowHistoryState[] => {
   const instanceId = cancelled.instance.instanceId;
   const events: EntryRequest[] = cancelled.skipped.map((step) => ({
@@ -177,7 +190,7 @@ export const cancellationHistory = (
     instanceId,
     event: 'instance-cancelled',
     occurredAt: at,
-    ...definedOf({ actorMembershipId: cancelled.instance.cancelledBy }),
+    ...definedOf({ actorMembershipId }),
   });
   return withIdentifiers(events, historyIds);
 };

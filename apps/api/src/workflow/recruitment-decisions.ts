@@ -85,6 +85,12 @@ const refused = (reason: string): ApprovalDelivery => ({ kind: 'refused', reason
  * decision somebody else made.
  */
 const reconcile = (view: RequisitionView, approval: TerminalApproval): ApprovalDelivery => {
+  // **Not awaiting is not the same as decided.** A draft, a cancelled or a closed requisition has no
+  // decision to reconcile against, and answering "it was decided outside Workflow" about one would
+  // name a decision nobody made. Only the two terminal outcomes are a decision.
+  if (view.status !== 'approved' && view.status !== 'rejected') {
+    return refused('subject-refused-the-decision');
+  }
   if (view.approvalId === approval.approvalId) {
     return view.status === approval.outcome ? converged : refused('subject-refused-the-decision');
   }

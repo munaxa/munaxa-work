@@ -21,6 +21,7 @@ import { LettersModule } from './letters/letters.module.js';
 import { PerformanceModule } from './performance/performance.module.js';
 import { CareerModule } from './career/career.module.js';
 import { LearningModule } from './learning/learning.module.js';
+import { WorkflowModule } from './workflow/workflow.module.js';
 import { CorrelationMiddleware } from './observability/correlation.middleware.js';
 import { AuthenticatedTenantGuard } from './tenancy/authenticated-tenant.guard.js';
 import { TenantMiddleware } from './tenancy/tenant.middleware.js';
@@ -52,6 +53,7 @@ import { loggingOptions } from './observability/logging.js';
     PerformanceModule,
     LearningModule,
     CareerModule,
+    WorkflowModule,
     HealthModule,
   ],
   providers: [
