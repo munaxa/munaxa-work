@@ -1,5 +1,6 @@
 import type { Transaction } from '@work/kernel';
 
+import type { ApprovalGroupMemberState, ApprovalGroupState } from '../domain/approval-group.js';
 import type { WorkflowDecisionState } from '../domain/decision.js';
 import type {
   WorkflowDefinitionState,
@@ -23,11 +24,15 @@ import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instanc
  * bound. There is no unbounded query in this module.
  *
  * **What is absent is as deliberate as what is here.** There is no `JobPort` — nothing in Workflow
- * runs when nobody is asking, so escalation and SLA are Phase 16B. There is no notification port —
- * the specification's own Non Goals exclude it. There is no role or group directory, no manager
- * resolution and no external approver port: an approver is a membership, named individually, and the
- * repository has promised never to build a role engine. Each would be a port with no use case behind
- * it, which is how a deferred capability acquires an implementation path.
+ * runs when nobody is asking, so escalation and SLA stay deferred. There is no notification port —
+ * the specification's own Non Goals exclude it. There is no role directory, no manager resolution
+ * and no external approver port. Each would be a port with no use case behind it, which is how a
+ * deferred capability acquires an implementation path.
+ *
+ * `ApprovalGroupStore` is **not** the exception to that. A directory answers "who holds role X" by
+ * evaluating a question about people against facts somebody else owns; this store reads a list a
+ * tenant wrote down, in Workflow's own tables, with no query behind it and no membership resolved
+ * through Identity. That distinction is the whole reason a group is allowed to exist at all.
  */
 
 export interface Paged {
@@ -172,6 +177,50 @@ export interface HistoryStore {
   insert(transaction: Transaction, state: WorkflowHistoryState): Promise<void>;
 }
 
+// ------------------------------------------------------------------------------------------------
+// Approval groups
+// ------------------------------------------------------------------------------------------------
+
+/**
+ * A named list of memberships, and the members on it.
+ *
+ * **`membersOfAll` takes every group at once, and that is the point of its existence.** Starting an
+ * approval must resolve every group the version names, and a per-group read would make the cost of
+ * raising one grow with how many groups a process happens to use. One read, whatever the shape of
+ * the process — the same rule every other bounded read in this module keeps.
+ *
+ * There is no `search` over members and no "which groups is this person in": neither has a use case,
+ * and the second is the first question a directory answers.
+ */
+export interface ApprovalGroupStore {
+  byId(transaction: Transaction, id: string): Promise<ApprovalGroupState | undefined>;
+  byCode(transaction: Transaction, code: string): Promise<ApprovalGroupState | undefined>;
+  search(transaction: Transaction, paged: Paged): Promise<Page<ApprovalGroupState>>;
+  insert(transaction: Transaction, state: ApprovalGroupState): Promise<void>;
+  membersOf(
+    transaction: Transaction,
+    approvalGroupId: string,
+  ): Promise<readonly ApprovalGroupMemberState[]>;
+  /** Every member of every named group, in one read. See above. */
+  membersOfAll(
+    transaction: Transaction,
+    approvalGroupIds: readonly string[],
+  ): Promise<readonly ApprovalGroupMemberState[]>;
+  insertMember(transaction: Transaction, state: ApprovalGroupMemberState): Promise<void>;
+  memberById(
+    transaction: Transaction,
+    approvalGroupMemberId: string,
+  ): Promise<ApprovalGroupMemberState | undefined>;
+  /**
+   * Taking somebody off a list.
+   *
+   * A group is **not** an append-only fact — unlike a decision and a history entry, which have no
+   * removal here at all — because a list of who approves is a thing an organization edits. What it
+   * cannot do is reach an approval already running: those steps were snapshotted at the start.
+   */
+  removeMember(transaction: Transaction, approvalGroupMemberId: string): Promise<void>;
+}
+
 export interface WorkflowStores {
   readonly definitions: DefinitionStore;
   readonly versions: VersionStore;
@@ -179,6 +228,7 @@ export interface WorkflowStores {
   readonly steps: StepStore;
   readonly decisions: DecisionStore;
   readonly history: HistoryStore;
+  readonly groups: ApprovalGroupStore;
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -59,7 +59,16 @@ describe('a workflow definition and its versions', () => {
     expect(second.versionNumber).toBe(2);
   });
 
-  it('refuses a step on a published version, and a duplicate ordinal on a draft', async () => {
+  /**
+   * **The second half of this test was inverted in Phase 16B rather than removed.**
+   *
+   * 16A refused a second step at one ordinal, and that was right while an ordinal was a position. An
+   * ordinal is now a *branch* — the set of approvers asked at the same moment — so a second step
+   * there is how parallel approval is configured, and the refusal would have refused the feature.
+   * What is still refused is editing a version that has been published, which is AD-003 and did not
+   * move.
+   */
+  it('refuses a step on a published version, and takes a second step at one ordinal on a draft', async () => {
     const process = await publishedProcess(harness);
     const late = await attempt(harness, {
       commandName: 'workflow.add-step',
@@ -84,7 +93,10 @@ describe('a workflow definition and its versions', () => {
     };
 
     await send(harness, step);
-    expect(failureOf(await attempt(harness, step))).toBe('workflow_step_template_ordinal_taken');
+    // A second approver at ordinal 1: two people asked at once, which is a branch.
+    expect(
+      failureOf(await attempt(harness, { ...step, approverMembershipId: SECOND_APPROVER })),
+    ).toBe(undefined);
   });
 
   it('refuses to publish an empty version or a gapped order', async () => {

@@ -1,7 +1,10 @@
 import { success, type Query, type QueryHandler, type Transaction } from '@work/kernel';
 
-import { awaitingStep } from '../domain/instance.js';
+import { awaitingSteps, type WorkflowStepState } from '../domain/instance.js';
+import { branchAt, branchOf, branchOrdinals, tallyOf, type BranchVote } from '../domain/branch.js';
+import type { WorkflowDecisionState } from '../domain/decision.js';
 import type {
+  BranchTallyView,
   WorkflowDefinitionDetailView,
   WorkflowDefinitionView,
   WorkflowInstanceDetailView,
@@ -15,6 +18,7 @@ import {
   asDefinitionView,
   asInstanceView,
   asStepView,
+  asTallyView,
   asTemplateView,
   asVersionView,
 } from './workflow-views.js';
@@ -209,13 +213,59 @@ export const readInstanceHandler = (
         transaction,
         query.instanceId,
       );
-      const awaiting = awaitingStep(steps);
+      const open = awaitingSteps(steps);
+      const [first] = open;
 
       return success({
         instance: asInstanceView(instance),
         steps: [...steps].sort((left, right) => left.ordinal - right.ordinal).map(asStepView),
         decisions: decisions.map(asDecisionView),
-        ...(awaiting === undefined ? {} : { awaiting: asStepView(awaiting) }),
+        awaitingSteps: open.map(asStepView),
+        tallies: talliesOf(steps, decisions),
+        // The first of them, for the shape 16A published. A branch of four has four, and
+        // `awaitingSteps` above is where a caller sees all of them.
+        ...(first === undefined ? {} : { awaiting: asStepView(first) }),
       });
     }),
 });
+
+/**
+ * How every branch of an approval stands, computed from the decisions that exist.
+ *
+ * **Nothing is stored and nothing is recomputed here.** The arithmetic is `tallyOf`'s — the same
+ * function a decision is evaluated against — and this walks the branches and hands it the votes
+ * belonging to each. A second implementation of the threshold, even one that agreed today, would be
+ * the second place the rule lived, and this rule decides who is approved.
+ *
+ * The denominator is the branch's **assigned** approvers: every step of that ordinal, including the
+ * people who have not answered. That is what makes a branch of five where one person replied read as
+ * one of five rather than as one of one.
+ */
+const talliesOf = (
+  steps: readonly WorkflowStepState[],
+  decisions: readonly WorkflowDecisionState[],
+): readonly BranchTallyView[] => {
+  const voteOf = new Map(
+    decisions.map((decision) => [
+      decision.stepId,
+      {
+        stepId: decision.stepId,
+        decision: decision.decision,
+        decidedAt: decision.decidedAt,
+      },
+    ]),
+  );
+
+  return branchOrdinals(steps).map((ordinal) => {
+    const branch = branchAt(steps, ordinal);
+    const votes = branch
+      .map((step) => voteOf.get(step.stepId))
+      .filter((vote): vote is BranchVote => vote !== undefined);
+    const [first] = branch;
+
+    return asTallyView(
+      ordinal,
+      tallyOf(first === undefined ? { rule: 'unanimous' } : branchOf(first), branch.length, votes),
+    );
+  });
+};

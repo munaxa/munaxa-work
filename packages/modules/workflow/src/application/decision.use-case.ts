@@ -2,10 +2,14 @@ import { success, uuidV7, type Command, type CommandHandler, type Transaction } 
 
 import { decide, type DecideRequest, type DecidedStep } from '../domain/decision.js';
 import { decisionHistory } from '../domain/history.js';
-import { awaitingStep } from '../domain/instance.js';
+import { awaitingSteps } from '../domain/instance.js';
+import type { BranchVote } from '../domain/branch.js';
 import type { ApprovalDecisionKind } from '../domain/workflow-vocabulary.js';
+import type { BranchTallyView } from '../contracts/views.js';
 import { currentMembership, notFound, refuseWith, refusedBy } from './workflow-context.js';
-import { DELEGABLE_SCOPES, WorkflowPermissions } from './workflow-permissions.js';
+import { WorkflowPermissions } from './workflow-permissions.js';
+import { stepsFor } from './decision-authority.js';
+import { asTallyView } from './workflow-views.js';
 import type { WorkflowDependencies } from './workflow-dependencies.js';
 
 /**
@@ -50,13 +54,28 @@ export interface DecideStepCommand extends Command {
   readonly decision: ApprovalDecisionKind;
   readonly comment?: string;
   readonly expectedVersion: number;
+  /**
+   * Which of the caller's own awaiting steps this answers. Optional, and **not an identity**.
+   *
+   * A caller who is asked once — every 16A approval, and every parallel branch a person appears in
+   * once — never sends it: the step is resolved from their membership, as it always was. It exists
+   * for the case a branch asks the same person twice, which a version naming somebody individually
+   * *and* through a group at one ordinal produces. Naming a step somebody else was asked to decide
+   * is refused exactly as it would be without this field: authority is still resolved from the
+   * membership on the request and from nothing the command carried.
+   */
+  readonly stepId?: string;
 }
 
 export interface StepDecided {
   readonly decisionId: string;
   readonly instanceStatus: string;
-  /** The step now awaiting a decision, when the approval continues. Absent once it has ended. */
+  /** The first step now awaiting a decision, when the approval continues. The 16A shape, kept. */
   readonly awaitingStepId?: string;
+  /** Every step now awaiting one. A branch of four opens four; the singular above is the first. */
+  readonly awaitingStepIds: readonly string[];
+  /** How this branch stood once the decision was counted. The domain's, mapped field for field. */
+  readonly tally: BranchTallyView;
 }
 
 export const decideStepHandler = (
@@ -76,14 +95,15 @@ export const decideStepHandler = (
       if (instance === undefined) return notFound('workflow-instance');
 
       const steps = await dependencies.stores.steps.forInstance(transaction, command.instanceId);
-      const step = awaitingStep(steps);
+      const open = awaitingSteps(steps);
 
-      if (step === undefined) return refuseWith('instance-has-no-awaiting-step');
+      if (open.length === 0) return refuseWith('instance-has-no-awaiting-step');
 
-      const authority = await authorityOf(dependencies, caller, step.approverMembershipId);
+      const mine = await stepsFor(dependencies, caller, open, command.stepId);
 
-      if (authority === undefined) return refuseWith('decision-not-the-assigned-approver');
+      if (!mine.ok) return refusedBy(mine.error);
 
+      const { step, authority } = mine.value;
       const request: DecideRequest = {
         decisionId: uuidV7(),
         decision: command.decision,
@@ -93,7 +113,14 @@ export const decideStepHandler = (
         ...(authority === 'delegated' ? { onBehalfOfMembershipId: step.approverMembershipId } : {}),
         ...(command.comment === undefined ? {} : { comment: command.comment }),
       };
-      const decided = decide(instance, step, steps, request);
+      // Every decision already recorded on this approval. The domain narrows them to the branch it
+      // is tallying — passing a subset here would make the caller responsible for arithmetic that
+      // decides who is approved.
+      const recorded = await dependencies.stores.decisions.forInstance(
+        transaction,
+        command.instanceId,
+      );
+      const decided = decide(instance, step, steps, request, recorded.map(asVote));
 
       if (!decided.ok) return refusedBy(decided.error);
 
@@ -105,8 +132,10 @@ export const decideStepHandler = (
       return success({
         decisionId: decided.value.decision.decisionId,
         instanceStatus: decided.value.instance.status,
+        awaitingStepIds: decided.value.next.map((following) => following.stepId),
+        tally: asTallyView(step.ordinal, decided.value.tally),
         // The first step of the branch that opened, kept for the shape 16A published. A branch of
-        // several has several, and the instance detail read is where a caller sees all of them.
+        // several has several, which is what `awaitingStepIds` is for.
         ...(decided.value.next[0] === undefined
           ? {}
           : { awaitingStepId: decided.value.next[0].stepId }),
@@ -114,31 +143,16 @@ export const decideStepHandler = (
     }),
 });
 
-/**
- * On whose authority this caller may decide this step, or nothing.
- *
- * `assigned` when they are the approver. `delegated` when Identity says they are acting for that
- * approver *now*, under a scope Workflow honours. `undefined` when neither — which the caller sees
- * as a refusal rather than as a not-found, because they already hold the instance identifier and
- * telling them the step is not theirs discloses nothing they did not send.
- */
-const authorityOf = async (
-  dependencies: WorkflowDependencies,
-  caller: string,
-  approver: string,
-): Promise<'assigned' | 'delegated' | undefined> => {
-  if (caller === approver) return 'assigned';
-
-  const grants = await dependencies.delegation.activeFor(caller, dependencies.clock.now());
-  const acting = grants.some(
-    (grant) =>
-      grant.delegatorMembershipId === approver &&
-      grant.delegateMembershipId === caller &&
-      DELEGABLE_SCOPES.includes(grant.scope),
-  );
-
-  return acting ? 'delegated' : undefined;
-};
+/** A recorded decision, as the vote the tally counts. */
+const asVote = (decision: {
+  readonly stepId: string;
+  readonly decision: ApprovalDecisionKind;
+  readonly decidedAt: Date;
+}): BranchVote => ({
+  stepId: decision.stepId,
+  decision: decision.decision,
+  decidedAt: decision.decidedAt,
+});
 
 /**
  * Tells the module that asked for this approval that it has ended, and reports its refusal if it has
@@ -178,12 +192,14 @@ const deliver = async (
 };
 
 /**
- * The writes a decision makes, in the order the indexes require.
+ * The writes a decision makes.
  *
- * The decided step leaves `awaiting` **before** the next one enters it. `workflow_step_awaiting_idx`
- * is a partial unique index and cannot be deferred, so the reverse order momentarily holds two
- * awaiting rows on one instance and PostgreSQL refuses it. Checkpoint 3 stated the rule in a comment
- * and asserted it in a test; this is the code that has to obey it.
+ * 16A wrote the decided step out of `awaiting` before the next one entered it, because
+ * `workflow_step_awaiting_idx` refused a second awaiting row and a partial unique index cannot be
+ * deferred. Checkpoint 3 widened that index — a branch is asked all at once — so the ordering is no
+ * longer a constraint of the schema. It is kept anyway: the decided step first, then what follows,
+ * so no intermediate state shows an approval whose next branch is open while the step that opened
+ * it still reads as waiting on somebody.
  */
 const persistDecision = async (
   dependencies: WorkflowDependencies,
@@ -209,9 +225,12 @@ const persistDecision = async (
       expectedInstanceVersion,
     );
   }
+  // One entry for the decision, one per step of the branch that opened, one per step skipped, and
+  // one more if the approval ended. A branch of four opens four queue entries and the timeline has
+  // to say so.
   const entries = decisionHistory(
     decided,
-    Array.from({ length: 2 + decided.skipped.length }, () => uuidV7()),
+    Array.from({ length: 2 + decided.next.length + decided.skipped.length }, () => uuidV7()),
   );
 
   for (const entry of entries) await dependencies.stores.history.insert(transaction, entry);

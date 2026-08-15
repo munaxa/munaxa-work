@@ -11,14 +11,20 @@ import type { Page, Paged } from './workflow-ports.js';
  * a stale write testable before any database exists.
  *
  * **A fake more permissive than the database hides the defects these suites exist to find**, so
- * every partial unique index Checkpoint 3 created is enforced here too: one running approval per
- * subject, exactly one awaiting step per instance, one decision per step, one definition per code,
- * one version number per definition, one ordinal per version and one per instance.
+ * every partial unique index the schema has is enforced here too: one running approval per subject,
+ * one decision per step, one definition per code, one version number per definition, one group code
+ * per tenant and one membership per group.
  *
- * **A fake stricter than the database is just as wrong**, and the partial-ness is where that bites.
- * A *full* unique index on the subject would refuse a second approval after the first was rejected —
- * which the schema deliberately permits, and which is how a corrected request is raised. Each
- * predicate below mirrors its index's `where` clause exactly.
+ * **A fake stricter than the database is just as wrong**, and Phase 16B is where that bit. Three
+ * rules were dropped from these stores because the schema dropped them: an ordinal is now a branch,
+ * so several templates and several steps share one, and every step of the open branch is `awaiting`
+ * at once. A fake still refusing those would have refused the feature while every schema test said
+ * it was permitted — and the suites resting on it would have been about a database nobody has.
+ *
+ * The partial-ness matters for the rules that remain. A *full* unique index on the subject would
+ * refuse a second approval after the first was rejected — which the schema deliberately permits, and
+ * which is how a corrected request is raised. Each predicate below mirrors its index's `where`
+ * clause exactly.
  *
  * **What these stores do not prove**, stated rather than implied by a green suite: they are a single
  * process with no concurrency, so they demonstrate the *rule* and not the *race*. Two callers

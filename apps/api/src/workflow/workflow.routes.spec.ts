@@ -259,12 +259,19 @@ suite('the Workflow API surface', () => {
     expect(new Set(prefixes).size).toBe(4);
   });
 
-  /** Seven permissions, and the API introduces none of its own. */
-  it('introduces no permission beyond the seven the application declares', () => {
+  /**
+   * Nine permissions, and the API introduces none of its own.
+   *
+   * Seven since 16A and two since Phase 16B's application layer — `workflow.group.read` and
+   * `workflow.group.manage`. **Neither has a route yet**: the group controllers are Checkpoint 6, so
+   * the two permissions are composed and enforced by their handlers while being unreachable over
+   * HTTP. That is why this counts the application's permissions rather than the controllers'.
+   */
+  it('introduces no permission beyond the nine the application declares', () => {
     const sources = CONTROLLER_FILES.map(codeOf).join('\n');
     const mentioned = sources.match(/'workflow\.[a-z.-]+'/g) ?? [];
 
-    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(7);
+    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(9);
     // Controllers name commands and queries, never permissions: the handler declares the permission
     // and the pipeline enforces it, so a route cannot quietly widen or narrow one.
     for (const name of mentioned) {

@@ -1,3 +1,5 @@
+import type { ApprovalGroupMemberState, ApprovalGroupState } from '../domain/approval-group.js';
+import type { BranchTally } from '../domain/branch.js';
 import type { WorkflowDecisionState } from '../domain/decision.js';
 import type {
   WorkflowDefinitionState,
@@ -7,6 +9,9 @@ import type {
 import type { WorkflowHistoryState } from '../domain/history.js';
 import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instance.js';
 import type {
+  ApprovalGroupMemberView,
+  ApprovalGroupView,
+  BranchTallyView,
   PendingApprovalView,
   WorkflowDecisionView,
   WorkflowDefinitionView,
@@ -70,7 +75,45 @@ export const asTemplateView = (state: WorkflowStepTemplateState): WorkflowStepTe
   ...definedOf({
     approverMembershipId: state.approverMembershipId,
     approverGroupId: state.approverGroupId,
+    branchRule: state.branchRule,
+    quorum: state.quorum,
+    condition: state.condition,
   }),
+});
+
+export const asGroupView = (state: ApprovalGroupState): ApprovalGroupView => ({
+  approvalGroupId: state.approvalGroupId,
+  code: state.code,
+  name: state.name,
+  version: state.version,
+});
+
+export const asGroupMemberView = (state: ApprovalGroupMemberState): ApprovalGroupMemberView => ({
+  approvalGroupMemberId: state.approvalGroupMemberId,
+  approvalGroupId: state.approvalGroupId,
+  membershipId: state.membershipId,
+  addedOn: at(state.addedAt),
+});
+
+/**
+ * How one branch stands, from the domain's own tally.
+ *
+ * Field for field, with no arithmetic of its own: the ordinal is the branch it describes, and every
+ * other number comes from `tallyOf`. A mapper that recomputed any of them would be the second place
+ * the rule lived — and the tally is exactly the rule that decides who is approved.
+ */
+export const asTallyView = (ordinal: number, tally: BranchTally): BranchTallyView => ({
+  ordinal,
+  rule: tally.rule,
+  assigned: tally.assigned,
+  approvals: tally.approvals,
+  rejections: tally.rejections,
+  responses: tally.responses,
+  outstanding: tally.outstanding,
+  threshold: tally.threshold,
+  quorum: tally.quorum,
+  quorumMet: tally.quorumMet,
+  outcome: tally.outcome,
 });
 
 export const asInstanceView = (state: WorkflowInstanceState): WorkflowInstanceView => ({
@@ -96,6 +139,12 @@ export const asStepView = (state: WorkflowStepState): WorkflowStepView => ({
   approverMembershipId: state.approverMembershipId,
   status: state.status,
   version: state.version,
+  ...definedOf({
+    sourceGroupId: state.sourceGroupId,
+    branchRule: state.branchRule,
+    quorum: state.quorum,
+    condition: state.condition,
+  }),
 });
 
 /**

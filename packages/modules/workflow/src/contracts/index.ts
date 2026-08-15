@@ -12,6 +12,9 @@ export type {
   ApprovalDecisionKind,
   ApprovalStateName,
   ApproverKind,
+  BranchOutcome,
+  BranchRule,
+  ConditionOperator,
   DecisionAuthority,
   WorkflowDefinitionStatus,
   WorkflowHistoryEvent,
@@ -30,6 +33,9 @@ export {
   APPROVAL_DECISIONS,
   APPROVAL_STATES,
   APPROVER_KINDS,
+  BRANCH_OUTCOMES,
+  BRANCH_RULES,
+  CONDITION_OPERATORS,
   DECISION_AUTHORITIES,
   WORKFLOW_HISTORY_EVENTS,
   WORKFLOW_INSTANCE_STATUSES,
@@ -38,8 +44,13 @@ export {
 } from '../domain/workflow-vocabulary.js';
 
 export type {
+  ApprovalGroupDetailView,
+  ApprovalGroupMemberView,
+  ApprovalGroupView,
   ApprovalStatusView,
   ApprovalStepView,
+  BranchConditionView,
+  BranchTallyView,
   LocalizedTextView,
   PendingApprovalView,
   WorkflowDecisionView,

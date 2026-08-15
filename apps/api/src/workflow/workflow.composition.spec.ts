@@ -68,10 +68,14 @@ describe('workflow composition', () => {
     const workflow = composed();
 
     expect(workflow.name).toBe('workflow');
-    expect(workflow.commands ?? []).toHaveLength(9);
-    expect(workflow.queries ?? []).toHaveLength(8);
+    // Nine and eight in 16A; twelve and ten since Phase 16B's application layer added three group
+    // commands and two group reads. **Five of them have no HTTP route yet** — the API surface is
+    // Checkpoint 6 — so this counts what is *composed*, and `workflow.routes.spec.ts` counts what is
+    // reachable over HTTP. The two numbers differing is the honest state of a half-built phase.
+    expect(workflow.commands ?? []).toHaveLength(12);
+    expect(workflow.queries ?? []).toHaveLength(10);
     expect(workflow.permissions).toEqual(ALL_WORKFLOW_PERMISSIONS);
-    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(7);
+    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(9);
   });
 
   /** Every handler declares one permission, and none of them is a wildcard or a prefix. */
@@ -81,7 +85,7 @@ describe('workflow composition', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(17);
+    expect(declared).toHaveLength(22);
     for (const permission of declared) {
       expect(ALL_WORKFLOW_PERMISSIONS).toContain(permission);
       expect(permission).not.toContain('*');

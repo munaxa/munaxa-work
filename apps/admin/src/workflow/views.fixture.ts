@@ -7,6 +7,7 @@ import type {
   WorkflowHistoryView,
   WorkflowInstanceDetailView,
   WorkflowInstanceView,
+  WorkflowStepView,
 } from '@work/workflow/contracts';
 
 /**
@@ -131,15 +132,49 @@ export const anInstanceDetail = (): WorkflowInstanceDetailView => ({
     },
   ],
   decisions: [aDirectDecision()],
-  awaiting: {
-    stepId: '01930000-0000-7000-8000-000000000092',
-    instanceId: INSTANCE_ID,
-    ordinal: 2,
-    approverKind: 'membership',
-    approverMembershipId: DEPUTY,
-    status: 'awaiting',
-    version: 1,
-  },
+  // A sequential chain: branches of one, so the plural and the singular agree and every tally has a
+  // denominator of one. The Admin screens are Checkpoint 7's; this fixture carries the fields the
+  // contract now has so the existing screens keep compiling against the whole view.
+  awaitingSteps: [awaitingStep()],
+  awaiting: awaitingStep(),
+  tallies: [
+    {
+      ordinal: 1,
+      rule: 'unanimous',
+      assigned: 1,
+      approvals: 1,
+      rejections: 0,
+      responses: 1,
+      outstanding: 0,
+      threshold: 1,
+      quorum: 1,
+      quorumMet: true,
+      outcome: 'approved',
+    },
+    {
+      ordinal: 2,
+      rule: 'unanimous',
+      assigned: 1,
+      approvals: 0,
+      rejections: 0,
+      responses: 0,
+      outstanding: 1,
+      threshold: 1,
+      quorum: 1,
+      quorumMet: false,
+      outcome: 'awaiting',
+    },
+  ],
+});
+
+const awaitingStep = (): WorkflowStepView => ({
+  stepId: '01930000-0000-7000-8000-000000000092',
+  instanceId: INSTANCE_ID,
+  ordinal: 2,
+  approverKind: 'membership',
+  approverMembershipId: DEPUTY,
+  status: 'awaiting',
+  version: 1,
 });
 
 /** A decision somebody made on their own step: an actor, and no authority beyond their own. */

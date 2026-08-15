@@ -47,9 +47,11 @@ const dependenciesFor = (granted: readonly string[]) => ({
 describe('every Workflow handler declares a permission', () => {
   const module = workflowModule(dependenciesFor(ALL_WORKFLOW_PERMISSIONS));
 
-  it('registers nine commands and eight queries, each with one', () => {
-    expect(module.commands).toHaveLength(9);
-    expect(module.queries).toHaveLength(8);
+  it('registers twelve commands and ten queries, each with one', () => {
+    // Nine and eight in 16A; Phase 16B adds three group commands and two group reads. Counted here
+    // so a handler that arrives without a permission — or without a decision behind it — fails.
+    expect(module.commands).toHaveLength(12);
+    expect(module.queries).toHaveLength(10);
 
     const declared = [
       ...(module.commands ?? []).map((handler) => handler.permission),
@@ -65,13 +67,16 @@ describe('every Workflow handler declares a permission', () => {
     }
   });
 
-  it('publishes exactly the seven permissions it declares, and no more', () => {
+  it('publishes exactly the nine permissions it declares, and no more', () => {
+    // The two Phase 16B adds are the two the plan authorized, and nothing else came with them.
     expect([...ALL_WORKFLOW_PERMISSIONS].sort()).toStrictEqual(
       [
         'workflow.approval.decide',
         'workflow.approval.read-own',
         'workflow.definition.manage',
         'workflow.definition.read',
+        'workflow.group.manage',
+        'workflow.group.read',
         'workflow.instance.cancel',
         'workflow.instance.read',
         'workflow.instance.start',
@@ -80,10 +85,25 @@ describe('every Workflow handler declares a permission', () => {
     expect(module.permissions).toStrictEqual(ALL_WORKFLOW_PERMISSIONS);
   });
 
-  it('names no role, group or manager permission', () => {
+  /**
+   * **`group` left this list in Phase 16B and `role` did not**, which is the distinction the whole
+   * capability rests on.
+   *
+   * A Workflow group is a list of memberships a tenant wrote down, in this module's own tables, with
+   * no query behind it. A role is a directory — a question about people, answered from facts
+   * somebody else owns — and ADR-0001 places that with Platform. `manager` and `team` stay refused
+   * for the same reason: both need to resolve the caller's *employment*, which no principal here
+   * does.
+   */
+  it('names no role, manager or team permission', () => {
     for (const permission of ALL_WORKFLOW_PERMISSIONS) {
-      expect(permission).not.toMatch(/role|group|manager|team/i);
+      expect(permission).not.toMatch(/role|manager|team/i);
     }
+    // And the two group permissions are separate grants rather than one: reading who approves and
+    // changing who approves are different risks.
+    expect(
+      [...ALL_WORKFLOW_PERMISSIONS].filter((permission) => /group/.test(permission)),
+    ).toHaveLength(2);
   });
 });
 
@@ -156,6 +176,28 @@ describe('holding every other permission opens nothing', () => {
       WorkflowPermissions.instanceCancel,
       { commandName: 'workflow.cancel-instance', instanceId: 'i', reason: 'x', expectedVersion: 1 },
     ],
+    // The three group commands carry `group.manage`, and holding `definition.manage` opens none of
+    // them: whoever may edit a list changes who approves, which is a separate authority from
+    // writing the process.
+    [
+      'workflow.create-approval-group',
+      WorkflowPermissions.groupManage,
+      {
+        commandName: 'workflow.create-approval-group',
+        code: 'capital-approvers',
+        name: { en: 'x', ar: 'x' },
+      },
+    ],
+    [
+      'workflow.add-group-member',
+      WorkflowPermissions.groupManage,
+      { commandName: 'workflow.add-group-member', approvalGroupId: 'g', membershipId: APPROVER },
+    ],
+    [
+      'workflow.remove-group-member',
+      WorkflowPermissions.groupManage,
+      { commandName: 'workflow.remove-group-member', approvalGroupMemberId: 'm' },
+    ],
   ];
 
   for (const [name, required, command] of attempts) {
@@ -209,6 +251,18 @@ describe('holding every other permission opens nothing', () => {
       'workflow.decided-approvals',
       WorkflowPermissions.approvalReadOwn,
       { queryName: 'workflow.decided-approvals' },
+    ],
+    // And reading a group is its own grant: holding `group.manage` does not imply it, nor the
+    // reverse. Two capabilities, two permissions.
+    [
+      'workflow.search-approval-groups',
+      WorkflowPermissions.groupRead,
+      { queryName: 'workflow.search-approval-groups' },
+    ],
+    [
+      'workflow.read-approval-group',
+      WorkflowPermissions.groupRead,
+      { queryName: 'workflow.read-approval-group', approvalGroupId: 'g' },
     ],
   ];
 

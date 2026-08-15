@@ -16,6 +16,7 @@ import {
   paged,
   refuseDuplicate,
 } from './in-memory-tables.js';
+import { approvalGroupStore } from './in-memory-groups.js';
 import type {
   DefinitionFilters,
   InstanceFilters,
@@ -35,13 +36,21 @@ import type {
  * | ----------------------------------------- | ---------------------------------------- |
  * | `workflow_definition_code_idx`            | `insert` on definitions                  |
  * | `workflow_version_number_idx`             | `insert` on versions                     |
- * | `workflow_step_template_ordinal_idx`      | `insertTemplate`                         |
  * | `workflow_instance_open_subject_idx`      | `insert` on instances                    |
- * | `workflow_step_ordinal_idx`               | `insert` on steps                        |
- * | `workflow_step_awaiting_idx`              | `insert` and `update` on steps           |
  * | `workflow_decision_step_idx`              | `insert` on decisions                    |
  * | `workflow_decision_no_mutation`           | no update, no remove on decisions        |
  * | `workflow_history_no_mutation`            | no update, no remove on history          |
+ *
+ * The two approval-group indexes are next door, in `in-memory-groups.ts`, with the store they
+ * belong to.
+ *
+ * **Three rules left this table in Phase 16B and none of them was forgotten.**
+ * `workflow_step_template_ordinal_idx`, `workflow_step_ordinal_idx` and
+ * `workflow_step_awaiting_idx` stopped being unique when a branch became *the set of steps sharing
+ * an ordinal*: several templates at one ordinal is how a parallel branch is configured, and several
+ * awaiting steps is what it looks like while it runs. A fake that kept refusing them would be
+ * stricter than PostgreSQL — which is exactly as wrong as one that is more permissive, and worse in
+ * this case, because it would refuse the feature while every schema test said it was allowed.
  *
  * The tenant is not modelled: `InMemoryUnitOfWork` runs one tenant at a time, and row-level security
  * is the database's guarantee rather than a rule a Map can imitate. Cross-tenant isolation is
@@ -71,6 +80,7 @@ export const inMemoryWorkflowStores = (): WorkflowStores => {
     steps: stepStore(steps),
     decisions: decisionStore(),
     history: historyStore(),
+    groups: approvalGroupStore(),
   };
 };
 
@@ -182,14 +192,8 @@ const templateRows = (): Pick<WorkflowStores['versions'], 'templatesFor' | 'inse
           .filter((held) => held.workflowVersionId === workflowVersionId)
           .sort((left, right) => left.ordinal - right.ordinal),
       ),
+    // No ordinal guard: since Phase 16B several templates may share one, and that is a branch.
     insertTemplate: (_transaction: Transaction, state: WorkflowStepTemplateState) => {
-      refuseDuplicate(
-        'workflow_step_template_ordinal_idx',
-        [...templates.values()].some(
-          (held) =>
-            held.workflowVersionId === state.workflowVersionId && held.ordinal === state.ordinal,
-        ),
-      );
       templates.set(state.stepTemplateId, state);
       return Promise.resolve();
     },
@@ -251,11 +255,13 @@ const instanceStore = (
 });
 
 /**
- * The step store, which is the one that needs its instance's siblings.
+ * The step store.
  *
- * `workflow_step_awaiting_idx` is a fact about a *set* — at most one awaiting step per instance —
- * so both `insert` and `update` have to look at the other steps of the same approval. That is why
- * this factory takes the map rather than owning it privately.
+ * **It enforces nothing about ordinals or awaiting steps, and that is the 16B change.** Both of
+ * those were partial unique indexes in 16A and both were widened in Checkpoint 3: an ordinal is a
+ * branch, so several steps share one, and every step of the open branch is `awaiting` at once. What
+ * remains a fact about a *set* — one decision per step — is enforced by the decision store, where
+ * the index actually is.
  */
 const stepStore = (steps: Map<string, WorkflowStepState>): WorkflowStores['steps'] => {
   const stepsOf = (instanceId: string): readonly WorkflowStepState[] =>
@@ -283,15 +289,6 @@ const stepStore = (steps: Map<string, WorkflowStepState>): WorkflowStores['steps
         ),
       ),
     insert: (_transaction: Transaction, state: WorkflowStepState) => {
-      refuseDuplicate(
-        'workflow_step_ordinal_idx',
-        stepsOf(state.instanceId).some((held) => held.ordinal === state.ordinal),
-      );
-      refuseDuplicate(
-        'workflow_step_awaiting_idx',
-        state.status === 'awaiting' &&
-          stepsOf(state.instanceId).some((held) => held.status === 'awaiting'),
-      );
       steps.set(state.stepId, state);
       return Promise.resolve();
     },
@@ -299,16 +296,6 @@ const stepStore = (steps: Map<string, WorkflowStepState>): WorkflowStores['steps
       const held = heldOr('workflow_step', steps.get(state.stepId));
 
       expectVersion('workflow_step', held, expected);
-      // The same non-deferrable rule the index enforces: a step may only enter `awaiting` when no
-      // other step of its instance is already there. This is what makes the write order in
-      // `decision.use-case.ts` a requirement rather than a preference.
-      refuseDuplicate(
-        'workflow_step_awaiting_idx',
-        state.status === 'awaiting' &&
-          stepsOf(state.instanceId).some(
-            (other) => other.stepId !== state.stepId && other.status === 'awaiting',
-          ),
-      );
       steps.set(state.stepId, bumped(state));
       return Promise.resolve();
     },

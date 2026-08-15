@@ -17,6 +17,16 @@
  * on their behalf are different capabilities. Holding every other Workflow permission does not open
  * `decide`, which the authorization suite asserts one permission at a time.
  *
+ * **`group.manage` is not implied by `definition.manage`**, and that separation is a security
+ * position rather than tidiness. Whoever may edit an approval group can change who approves — a
+ * group named on a published version routes every approval started from it — so the capability to
+ * write the *process* and the capability to write the *people* are two grants. It mirrors
+ * `instance.cancel` standing apart from `instance.start`.
+ *
+ * **A group is a list, not a directory**, which is why `group.read` is a Workflow permission at all.
+ * It reads rows this module owns; it resolves nothing through Identity and answers no question about
+ * who holds a role.
+ *
  * **`approval.read-own` is routed and enforced**, which makes it the first `read-own` in this
  * repository that is not `NOT VERIFIED`. Career, Learning, Performance, Leave, Payroll, Attendance,
  * Compensation and Documents all declare one and route it nowhere, because a plan or a payslip is
@@ -44,6 +54,11 @@ export const WorkflowPermissions = {
   approvalDecide: 'workflow.approval.decide',
   /** The caller's own queue, resolved from the membership on the request and from nothing else. */
   approvalReadOwn: 'workflow.approval.read-own',
+
+  /** Reading the approval groups a tenant keeps, and who is on them. */
+  groupRead: 'workflow.group.read',
+  /** Naming a list, and changing who is on it. Never implied by `definition.manage`. */
+  groupManage: 'workflow.group.manage',
 } as const;
 
 export type WorkflowPermission = (typeof WorkflowPermissions)[keyof typeof WorkflowPermissions];

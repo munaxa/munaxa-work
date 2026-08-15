@@ -175,11 +175,18 @@ export const decide = (
     }),
   };
   const decided: WorkflowStepState = { ...step, status: request.decision };
-  // The branch as it stands *including* this decision. The caller passes the votes already recorded;
-  // this one is added here so a tally is never computed from a half-written branch.
+  // The branch as it stands *including* this decision. The caller passes every vote recorded on the
+  // instance; this one is added here so a tally is never computed from a half-written branch.
+  //
+  // **The votes are narrowed to this branch before they are counted**, and that narrowing is the
+  // domain's rather than the caller's. An instance that has already approved two earlier branches
+  // carries two votes that have nothing to do with this one, and counting them would approve a
+  // majority of five on its third response instead of its third *approval* — a caller passing
+  // exactly the right subset would be the only thing standing between that and a wrong outcome.
   const branch = branchAt(steps, step.ordinal);
+  const inBranch = new Set(branch.map((other) => other.stepId));
   const tally = tallyOf(branchOf(step), branch.length, [
-    ...votes.filter((vote) => vote.stepId !== step.stepId),
+    ...votes.filter((vote) => inBranch.has(vote.stepId) && vote.stepId !== step.stepId),
     { stepId: step.stepId, decision: request.decision, decidedAt: request.at },
   ]);
 

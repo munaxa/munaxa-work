@@ -1,6 +1,9 @@
 import { success, uuidV7, type Command, type CommandHandler, type Transaction } from '@work/kernel';
 
 import { cancelInstance, startInstance, type StartedInstance } from '../domain/instance.js';
+import { membersOf } from '../domain/approval-group.js';
+import { plannedStepCount, type GroupSnapshot } from '../domain/branch-plan.js';
+import type { WorkflowStepTemplateState } from '../domain/definition.js';
 import { cancellationHistory, startHistory } from '../domain/history.js';
 import {
   currentActor,
@@ -93,6 +96,7 @@ export const startInstanceHandler = (
         transaction,
         version.workflowVersionId,
       );
+      const groups = await snapshotGroups(dependencies, transaction, templates);
       const started = startInstance(version, templates, {
         instanceId: uuidV7(),
         subjectType: command.subjectType,
@@ -101,7 +105,10 @@ export const startInstanceHandler = (
         correlationId: currentCorrelation(),
         context: command.context ?? {},
         at: dependencies.clock.now(),
-        stepIds: templates.map(() => uuidV7()),
+        // One identifier per **planned** step, not per template: a group of four expands to four
+        // steps, and the count is the plan's rather than the configuration's.
+        stepIds: Array.from({ length: plannedStepCount(templates, groups) }, () => uuidV7()),
+        groups,
       });
 
       if (!started.ok) return refusedBy(started.error);
@@ -112,13 +119,58 @@ export const startInstanceHandler = (
 });
 
 /**
- * The writes a start makes, in the order the indexes require.
+ * Every group the version names, as its membership stands **right now**.
  *
- * The instance first, because every step and every history entry references it. The steps next, and
- * **the awaiting one last** — `workflow_step_awaiting_idx` cannot be deferred, so a start that wrote
- * the first step before the others would be fine here and a defect the moment a later change
- * reordered them. Writing the pending ones first makes the invariant hold at every intermediate
- * point rather than only at the end.
+ * This is the snapshot, and this function is the only moment it is taken. `membersOfAll` reads every
+ * group in one call rather than one per group, so raising an approval costs the same whether the
+ * process names one list or five. From here the group is irrelevant to this approval: the members
+ * are copied onto its steps, and editing, emptying or deleting the list afterwards changes nothing
+ * about who was asked (AD-003, applied to the one thing that could otherwise move underneath a live
+ * approval).
+ *
+ * `membersOf` supplies the order and the de-duplication: a person on a list twice is asked once and
+ * counted once, and two instances started from one group produce their steps in the same sequence.
+ *
+ * A group named by a template that no longer exists resolves to **nothing here**, deliberately — the
+ * domain refuses the start with `branch-group-unresolved`, which is a refusal a caller can act on,
+ * rather than this function silently omitting an approver.
+ */
+const snapshotGroups = async (
+  dependencies: WorkflowDependencies,
+  transaction: Transaction,
+  templates: readonly WorkflowStepTemplateState[],
+): Promise<readonly GroupSnapshot[]> => {
+  const named = [
+    ...new Set(
+      templates
+        .map((template) => template.approverGroupId)
+        .filter((groupId): groupId is string => groupId !== undefined),
+    ),
+  ];
+
+  if (named.length === 0) return [];
+
+  const members = await dependencies.stores.groups.membersOfAll(transaction, named);
+
+  return named.map((approvalGroupId) => ({
+    approvalGroupId,
+    members: membersOf(members.filter((member) => member.approvalGroupId === approvalGroupId)),
+  }));
+};
+
+/**
+ * The writes a start makes.
+ *
+ * The instance first, because every step and every history entry references it. The steps then, in
+ * one pass: 16A wrote the pending ones before the awaiting one because
+ * `workflow_step_awaiting_idx` refused a second awaiting row and could not be deferred. That index
+ * was widened in Checkpoint 3 — a branch is asked all at once — so the ordering constraint is gone
+ * and writing in plan order is now both simpler and honest about what the schema requires.
+ *
+ * The history identifiers are sized for the entries a start can actually produce: one for the
+ * instance, one per step that opened or was skipped, and one more for an instance that completed
+ * because every branch was gated out. Surplus identifiers are dropped by `startHistory` rather than
+ * turning into entries.
  */
 const persistStart = async (
   dependencies: WorkflowDependencies,
@@ -127,13 +179,13 @@ const persistStart = async (
 ): Promise<void> => {
   await dependencies.stores.instances.insert(transaction, started.instance);
 
-  for (const step of started.steps.filter((candidate) => candidate.status !== 'awaiting')) {
+  for (const step of started.steps) {
     await dependencies.stores.steps.insert(transaction, step);
   }
-  for (const step of started.steps.filter((candidate) => candidate.status === 'awaiting')) {
-    await dependencies.stores.steps.insert(transaction, step);
-  }
-  for (const entry of startHistory(started, [uuidV7(), uuidV7()])) {
+  for (const entry of startHistory(
+    started,
+    Array.from({ length: started.steps.length + 2 }, () => uuidV7()),
+  )) {
     await dependencies.stores.history.insert(transaction, entry);
   }
 };

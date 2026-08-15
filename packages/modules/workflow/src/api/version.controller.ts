@@ -8,10 +8,10 @@ import {
 } from '@nestjs/swagger';
 
 import type {
-  AddStepCommand,
   ArchiveVersionCommand,
   PublishVersionCommand,
 } from '../application/definition.use-case.js';
+import type { AddStepCommand } from '../application/step.use-case.js';
 
 import { AddStepBody, VersionedBody } from './workflow.dto.js';
 import { WorkflowDispatcher } from './workflow-dispatcher.js';

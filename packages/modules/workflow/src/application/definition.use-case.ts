@@ -1,7 +1,6 @@
 import { success, uuidV7, type Command, type CommandHandler } from '@work/kernel';
 
 import {
-  addStep,
   archiveVersion,
   createDefinition,
   draftVersion,
@@ -16,7 +15,11 @@ import type { WorkflowDependencies } from './workflow-dependencies.js';
 /**
  * The configuration a tenant writes: a process, its versions, and the steps along one.
  *
- * **Six named commands and no `changeStatus`.** Publishing a version and archiving one are different
+ * **Five named commands here and no `changeStatus`.** Adding a step is the sixth and lives next
+ * door, in `step.use-case.ts`: it is the one command that reaches outside a version — a step may
+ * name an approval group — and it grew its own file when it grew that dependency.
+ *
+ * **No `changeStatus`.** Publishing a version and archiving one are different
  * acts with different consequences, and a generic status mutation would let a caller assign either
  * by sending a string — including states the domain has no transition into.
  *
@@ -154,63 +157,6 @@ export const draftVersionHandler = (
         workflowVersionId: drafted.value.workflowVersionId,
         versionNumber: drafted.value.versionNumber,
       });
-    }),
-});
-
-export interface AddStepCommand extends Command {
-  readonly commandName: 'workflow.add-step';
-  readonly workflowVersionId: string;
-  readonly ordinal: number;
-  readonly name: LocalizedName;
-  readonly approverMembershipId: string;
-}
-
-/**
- * Adding a step to a draft.
- *
- * **`approverKind` is not a command field.** One kind exists in Phase 16A and the handler states it,
- * so a caller cannot name `role` or `group` and get a refusal that reads like a typo rather than a
- * capability this product does not have (D-3, D-4).
- *
- * Ordinal uniqueness within a version is the index's; the store reports the collision and this maps
- * it to a conflict rather than pre-checking a fact two administrators could pass at once.
- */
-export const addStepHandler = (
-  dependencies: WorkflowDependencies,
-): CommandHandler<AddStepCommand, { readonly stepTemplateId: string }> => ({
-  commandName: 'workflow.add-step',
-  permission: WorkflowPermissions.definitionManage,
-
-  handle: async (command) =>
-    dependencies.unitOfWork.execute(async (transaction) => {
-      const version = await dependencies.stores.versions.byId(
-        transaction,
-        command.workflowVersionId,
-      );
-
-      if (version === undefined) return notFound('workflow-version');
-
-      const added = addStep(version, {
-        stepTemplateId: uuidV7(),
-        ordinal: command.ordinal,
-        name: command.name,
-        approverKind: 'membership',
-        approverMembershipId: command.approverMembershipId,
-      });
-
-      if (!added.ok) return refusedBy(added.error);
-
-      const existing = await dependencies.stores.versions.templatesFor(
-        transaction,
-        command.workflowVersionId,
-      );
-
-      if (existing.some((template) => template.ordinal === command.ordinal)) {
-        return conflicted('workflow_step_template_ordinal_taken');
-      }
-
-      await dependencies.stores.versions.insertTemplate(transaction, added.value);
-      return success({ stepTemplateId: added.value.stepTemplateId });
     }),
 });
 

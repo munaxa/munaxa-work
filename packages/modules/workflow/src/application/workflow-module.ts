@@ -1,14 +1,20 @@
 import type { Command, CommandHandler, Query, QueryHandler, WorkModule } from '@work/kernel';
 
 import {
-  addStepHandler,
   archiveVersionHandler,
   createDefinitionHandler,
   draftVersionHandler,
   publishVersionHandler,
   retireDefinitionHandler,
 } from './definition.use-case.js';
+import { addStepHandler } from './step.use-case.js';
 import { cancelInstanceHandler, startInstanceHandler } from './instance.use-case.js';
+import {
+  addGroupMemberHandler,
+  createApprovalGroupHandler,
+  removeGroupMemberHandler,
+} from './approval-group.use-case.js';
+import { readApprovalGroupHandler, searchApprovalGroupsHandler } from './group-queries.js';
 import { decideStepHandler } from './decision.use-case.js';
 import {
   readDefinitionHandler,
@@ -26,7 +32,7 @@ import { ALL_WORKFLOW_PERMISSIONS, WorkflowPermissions } from './workflow-permis
 import type { WorkflowDependencies } from './workflow-dependencies.js';
 
 /**
- * Workflow's module declaration: nine commands, eight queries, two navigation entries.
+ * Workflow's module declaration: twelve commands, ten queries, two navigation entries.
  *
  * Registered on the same dispatcher as every other module. **Nothing here subscribes to an event.**
  * Dispatch is post-commit, in-process and at-most-once with no outbox, so a module whose correctness
@@ -45,7 +51,8 @@ import type { WorkflowDependencies } from './workflow-dependencies.js';
  *
  * **Two navigation entries and no third.** A queue and an administrator's list of approvals. There is
  * no "my team" entry, because there is no team query — resolving one needs the caller's employment
- * (D-14).
+ * (D-14). Approval groups are configuration reached from the definitions screen rather than a
+ * destination of their own, so they add no entry either.
  */
 export const workflowModule = (dependencies: WorkflowDependencies): WorkModule => ({
   name: 'workflow',
@@ -86,6 +93,10 @@ const commandsOf = (
     publishVersionHandler(dependencies),
     archiveVersionHandler(dependencies),
 
+    createApprovalGroupHandler(dependencies),
+    addGroupMemberHandler(dependencies),
+    removeGroupMemberHandler(dependencies),
+
     startInstanceHandler(dependencies),
     decideStepHandler(dependencies),
     cancelInstanceHandler(dependencies),
@@ -97,6 +108,9 @@ const queriesOf = (dependencies: WorkflowDependencies): readonly QueryHandler<Qu
     readDefinitionHandler(dependencies),
     searchInstancesHandler(dependencies),
     readInstanceHandler(dependencies),
+
+    searchApprovalGroupsHandler(dependencies),
+    readApprovalGroupHandler(dependencies),
 
     pendingApprovalsHandler(dependencies),
     decidedApprovalsHandler(dependencies),

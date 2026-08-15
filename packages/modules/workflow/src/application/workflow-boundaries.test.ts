@@ -96,9 +96,9 @@ describe('nothing deferred to Phase 16C is reachable', () => {
     );
 
     expect(offending).toStrictEqual([]);
-    // Still exactly seventeen: Checkpoint 2 is the domain, and no handler was added. The group
-    // commands and queries arrive with the application layer in Checkpoint 4.
-    expect(registered).toHaveLength(17);
+    // Twenty-two: seventeen from 16A, plus the three group commands and two group reads Checkpoint 4
+    // added. Counted so a handler nobody decided on fails here rather than shipping.
+    expect(registered).toHaveLength(22);
   });
 
   /**
@@ -220,6 +220,7 @@ describe('the boundaries this module keeps', () => {
     expect(Object.keys(inMemoryWorkflowStores()).sort()).toStrictEqual([
       'decisions',
       'definitions',
+      'groups',
       'history',
       'instances',
       'steps',
@@ -236,10 +237,11 @@ describe('the boundaries this module keeps', () => {
   });
 
   it('declares no permission for a capability it does not have', () => {
+    // `group` is no longer among them: Workflow owns an explicit list of memberships, and the two
+    // permissions that read and edit one are routed to real handlers. `role`, `manager` and `team`
+    // still are — each needs a directory or an employment resolution this repository does not have.
     expect(
-      [...ALL_WORKFLOW_PERMISSIONS].filter((permission) =>
-        /team|manager|role|group/i.test(permission),
-      ),
+      [...ALL_WORKFLOW_PERMISSIONS].filter((permission) => /team|manager|role/i.test(permission)),
     ).toStrictEqual([]);
     // Every declared permission is routed — unlike every other module's `read-own`.
     const declared = new Set([
