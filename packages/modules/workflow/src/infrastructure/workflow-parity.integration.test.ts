@@ -87,7 +87,19 @@ suite('domain and schema parity', () => {
     ['workflow_step_status_check', WORKFLOW_STEP_STATUSES],
     ['workflow_decision_kind_check', APPROVAL_DECISIONS],
     ['workflow_decision_authority_check', DECISION_AUTHORITIES],
-    ['workflow_step_approver_kind_check', APPROVER_KINDS],
+    /**
+     * **The two approver-kind constraints are deliberately different, and that is the design.**
+     *
+     * A *template* may name either kind: a person, or a group. A *step* of a running instance never
+     * names a group, because the group was resolved into its members before the row existed — so at
+     * the moment somebody is actually asked there is only ever a person, and the step's constraint
+     * stays at the single value it has had since 16A.
+     *
+     * Comparing the step's constraint against the whole vocabulary would demand it widen to admit a
+     * kind no step can ever hold, which is how a parity check turns into pressure to weaken a
+     * constraint. It is compared against what it is supposed to enumerate instead.
+     */
+    ['workflow_step_approver_kind_check', ['membership']],
     ['workflow_step_template_approver_kind_check', APPROVER_KINDS],
     ['workflow_history_event_check', WORKFLOW_HISTORY_EVENTS],
   ] as const;

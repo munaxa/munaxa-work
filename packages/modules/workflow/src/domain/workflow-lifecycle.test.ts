@@ -158,17 +158,51 @@ describe('a workflow version', () => {
     expect(reasonOf(publishVersion(draft, [], AT, 'user:admin'))).toBe('version-has-no-steps');
   });
 
-  it('refuses to publish a gapped or duplicated order, and accepts a shuffled contiguous one', () => {
+  /**
+   * **The rule changed in Phase 16B, and this is the assertion that says how.**
+   *
+   * A gap is still refused: "advance to the next branch" has to be total, and a version jumping from
+   * 1 to 3 leaves a hole nothing walks. A **repeat is no longer a gap** — three templates at ordinal
+   * 1 are a branch of three, all asked at once, which is the whole of parallel approval. What has to
+   * be contiguous is the set of *distinct* ordinals.
+   *
+   * The old assertion was not deleted; it was rewritten to the invariant that replaced it, because a
+   * removed assertion is a removed guarantee.
+   */
+  it('refuses a gapped order, and treats a repeated ordinal as a branch', () => {
     const { templates, version } = publishedVersion(3);
     const gapped = [templates[0], templates[1]].flatMap((step) =>
       step === undefined ? [] : [{ ...step, ordinal: step.ordinal === 1 ? 1 : 3 }],
     );
-    const duplicated = templates.map((step) => ({ ...step, ordinal: 1 }));
+    const branch = templates.map((step) => ({ ...step, ordinal: 1 }));
 
     expect(ordinalsAreContiguous(gapped)).toBe(false);
-    expect(ordinalsAreContiguous(duplicated)).toBe(false);
+    expect(ordinalsAreContiguous(branch)).toBe(true);
     expect(ordinalsAreContiguous([...templates].reverse())).toBe(true);
     expect(version.status).toBe('published');
+  });
+
+  /** And a branch of three publishes, because its three steps agree about how it ends. */
+  it('publishes a version whose only branch holds three approvers', () => {
+    const { templates } = publishedVersion(3);
+    const draft = must(
+      draftVersion(
+        must(
+          createDefinition({
+            definitionId: 'd',
+            code: 'branching',
+            name: { en: 'Branching', ar: 'تفرع' },
+            subjectType: 'a.subject',
+          }),
+          'a definition',
+        ),
+        { workflowVersionId: 'v', versionNumber: 1 },
+      ),
+      'a draft',
+    );
+    const branch = templates.map((step) => ({ ...step, ordinal: 1 }));
+
+    expect(publishVersion(draft, branch, AT, 'user:admin').ok).toBe(true);
   });
 
   it('declares no maximum number of steps (AD-004)', () => {

@@ -28,22 +28,32 @@ const approveCurrent = (
 };
 
 describe('deciding a step', () => {
-  it('advances to the next step by ordinal and leaves the instance running', () => {
+  it('advances to the next branch by ordinal and leaves the instance running', () => {
     const started = startedInstance(3);
     const decided = must(approveCurrent(started, started.steps, 0), 'an approval');
 
     expect(decided.step.status).toBe('approved');
-    expect(decided.next?.ordinal).toBe(2);
-    expect(decided.next?.status).toBe('awaiting');
+    // `next` is the branch that opens, not a step. A sequential chain opens a branch of one, which
+    // is what every 16A version produces and why their behaviour is unchanged.
+    expect(decided.next.map((step) => step.ordinal)).toEqual([2]);
+    expect(decided.next.map((step) => step.status)).toEqual(['awaiting']);
     expect(decided.instance.status).toBe('running');
     expect(decided.skipped).toStrictEqual([]);
+    // And the branch of one was decided by the one person in it.
+    expect(decided.tally).toMatchObject({
+      assigned: 1,
+      approvals: 1,
+      threshold: 1,
+      outcome: 'approved',
+    });
   });
 
   it('completes the instance when the last step is approved', () => {
     const started = startedInstance(1);
     const decided = must(approveCurrent(started, started.steps, 0), 'an approval');
 
-    expect(decided.next).toBeUndefined();
+    // An empty branch rather than an absent one: `next` is "who is asked now", and nobody is.
+    expect(decided.next).toStrictEqual([]);
     expect(decided.instance.status).toBe('completed');
     expect(decided.instance.completedAt).toStrictEqual(AT);
   });
@@ -69,7 +79,8 @@ describe('deciding a step', () => {
     expect(decided.step.status).toBe('rejected');
     expect(decided.instance.status).toBe('rejected');
     expect(decided.skipped.map((step) => step.ordinal)).toStrictEqual([2, 3]);
-    expect(decided.next).toBeUndefined();
+    // An empty branch rather than an absent one: `next` is "who is asked now", and nobody is.
+    expect(decided.next).toStrictEqual([]);
   });
 
   it('runs no tally: one rejection at step one ends it, whatever the later steps would have said', () => {

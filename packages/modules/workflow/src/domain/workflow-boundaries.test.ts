@@ -39,20 +39,30 @@ const sources = readdirSync(DOMAIN).filter(
 );
 const code = sources.map((file) => codeOf(file)).join('\n');
 
-describe('Phase 16B is not quietly present', () => {
+/**
+ * The boundary this suite guards **moved in Phase 16B, and it moved by authorization rather than by
+ * drift.**
+ *
+ * Until 16B this asserted that tallies, parallel approval, branching and groups were absent. They
+ * are present now, each built against parameters that were approved one by one — so those rows were
+ * *rewritten* to assert what replaced them rather than deleted, which would have removed the guard
+ * instead of moving it.
+ *
+ * What remains deferred is Phase 16C, and every fragment below would appear in the code if any of it
+ * had been started.
+ */
+describe('Phase 16C is not quietly present', () => {
   /**
-   * Each entry is a capability the plan defers, and a fragment that would appear in the *code* if
-   * it had been built. Deliberately narrow: `sla` rather than `s`, `escalat` rather than `level`,
-   * so an ordinary word cannot trip them.
+   * Each entry is a capability 16C owns, and a fragment that would appear in the *code* if it had
+   * been built. Deliberately narrow: `sla` rather than `s`, `escalat` rather than `level`, so an
+   * ordinary word cannot trip them.
    */
   const deferred: readonly (readonly [string, readonly string[]])[] = [
     ['SLA and business days', ['sla', 'businessDay', 'workingDay', 'dueAt', 'breach']],
     ['escalation', ['escalat']],
     ['scheduling', ['JobPort', 'cron', 'schedule', 'enqueue']],
-    ['tallies and parallel approval', ['quorum', 'threshold', 'majority', 'unanimous', 'tally']],
-    ['conditional branching', ['branch', 'condition', 'expression', 'evaluate']],
-    ['roles and groups', ['roleId', 'groupId', 'approvalGroup', 'permissionHolder']],
     ['manager routing', ['manager', 'reportsTo', 'employmentId']],
+    ['role and external approvers', ['roleId', 'permissionHolder', 'externalApprover']],
     ['notification', ['notify', 'notification', 'recipient', 'reminder']],
     ['analytics', ['analytic', 'aggregate', 'distribution', 'percentile']],
   ];
@@ -67,8 +77,33 @@ describe('Phase 16B is not quietly present', () => {
     });
   }
 
-  it('knows exactly one kind of approver', () => {
-    expect([...APPROVER_KINDS]).toStrictEqual(['membership']);
+  /**
+   * The two approver kinds 16B ships, and the three it does not.
+   *
+   * A `group` is a list Workflow keeps and resolves once, at instance start. It is emphatically not
+   * a directory: `role` would need one, and this repository has committed never to build it.
+   */
+  it('knows exactly two kinds of approver', () => {
+    expect([...APPROVER_KINDS]).toStrictEqual(['membership', 'group']);
+    for (const absent of ['manager', 'role', 'external']) {
+      expect([absent, [...APPROVER_KINDS].includes(absent as never)]).toEqual([absent, false]);
+    }
+  });
+
+  /**
+   * No weight and no percentage: every tally is an integer count over an integer denominator.
+   *
+   * Anchored to word boundaries, because `ratio` is a substring of `configuration` and `operation`
+   * and an unanchored search reports the arithmetic this module refuses to do wherever it happens to
+   * name a configuration. The same lesson the 16A scope audit learned about `group` and `sla`.
+   */
+  it('has no weighted or proportional arithmetic', () => {
+    for (const fragment of ['weight', 'percent', 'ratio', 'toFixed', 'parseFloat', 'Math.round']) {
+      expect([fragment, new RegExp(`\\b${fragment.replace('.', '\\.')}`, 'i').test(code)]).toEqual([
+        fragment,
+        false,
+      ]);
+    }
   });
 
   it('places no upper bound on the number of steps (AD-004)', () => {

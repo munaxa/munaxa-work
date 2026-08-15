@@ -67,7 +67,10 @@ export const asTemplateView = (state: WorkflowStepTemplateState): WorkflowStepTe
   ordinal: state.ordinal,
   name: state.name,
   approverKind: state.approverKind,
-  approverMembershipId: state.approverMembershipId,
+  ...definedOf({
+    approverMembershipId: state.approverMembershipId,
+    approverGroupId: state.approverGroupId,
+  }),
 });
 
 export const asInstanceView = (state: WorkflowInstanceState): WorkflowInstanceView => ({

@@ -9,12 +9,16 @@
  * Eight refusals are worth stating before the lists, because each is a word that would have been
  * easy to reach for and wrong. Every one of them is a Phase 16A boundary, not an oversight:
  *
- * **No `role`, no `group`, no `permission_holder`.** There is no role or permission directory in
- * this repository and `PlatformPermissionChecker` states there never will be: *"Munaxa Work will
- * never implement a role engine or a permission engine."* `holds(permission)` answers about the
- * current caller and about nobody else, so "everybody who may approve leave" is a question nothing
- * here can ask. An approver is a **membership** — a person a tenant admitted, named individually
- * (D-3, D-4). Groups arrive in Phase 16B if a directory ever can.
+ * **No `role`, no `permission_holder`.** There is no role or permission directory in this repository
+ * and `PlatformPermissionChecker` states there never will be: *"Munaxa Work will never implement a
+ * role engine or a permission engine."* `holds(permission)` answers about the current caller and
+ * about nobody else, so "everybody who may approve leave" is a question nothing here can ask.
+ *
+ * **`group` is here, and it is not a directory.** Phase 16B added it under explicit authorization as
+ * a **Workflow-owned, explicit, static list of memberships** — no query, no inheritance, no nesting,
+ * no role semantics, and nothing Identity owns. It is a list a tenant writes down, and it earns its
+ * place by being resolved **once**, at instance start, into the individual memberships it named. An
+ * approver of a running approval is therefore still a membership, exactly as it was in 16A.
  *
  * **No `manager`, no `reports_to`, no `employment_id`.** A manager is a reporting line in Employment
  * keyed by an employment, and no principal in this repository resolves to an employment (ADR-0032,
@@ -26,16 +30,23 @@
  * need something to move it overnight, and there is nothing (D-11, D-12). SLA and escalation are
  * Phase 16B, and 16A has no column any of it could hide in.
  *
- * **No `quorum`, no `threshold`, no `vote_count`, no `parallel`.** Majority, unanimous and
- * first-response tallies are unspecified in their denominator, their ties, their abstentions and
- * their delegated votes (D-6). Phase 13 settled what to do with unspecified arithmetic: refuse it.
- * 16A approves **one step at a time, in order**, which is the whole of the mechanism.
+ * **`quorum`, `threshold` and parallel branches are here, and every parameter of them was approved
+ * rather than chosen.** 16A refused this arithmetic because its denominator, its ties, its
+ * abstentions and its delegated votes were unspecified (D-6), and Phase 13 settled what to do with
+ * unspecified arithmetic: refuse it. Phase 16B was handed each parameter explicitly — the
+ * denominator is the **assigned** approvers and never the respondents, a majority is **strictly**
+ * more than half, a tie is not an approval, a non-response never shrinks the denominator, and a
+ * delegated decision is **one** vote for the delegator. Every threshold is an integer count: there
+ * is no weight, no percentage and no `numeric` column anywhere in this module.
  *
- * **No `condition`, no `expression`, no `branch`, no `rule`.** AD-008 asks for conditional
- * branching and defines no operator set, no type system, no evaluation order and no
- * missing-key behaviour (D-7). ADR-0049 already named this exact pressure: *"What a graph buys
- * beyond that is branching and joining, which is a workflow engine."* A version's steps are a
- * sequence, and a sequence is not a graph.
+ * **`condition` is here, and it is closed rather than a language.** AD-008 asks for conditional
+ * branching and defines no operator set, no type system, no evaluation order and no missing-key
+ * behaviour (D-7); 16A refused to invent one, and 16B was given all four. A condition is a triple
+ * over the instance's own `context`, five operators, values that are strings or whole numbers,
+ * combined only by `all-of`, and **a missing key is a refusal and never a false**. There is no `or`,
+ * no nesting, no arithmetic, no date, no cross-step reference and no cross-module read — because
+ * ADR-0049 named this exact pressure: *"What a graph buys beyond that is branching and joining,
+ * which is a workflow engine."*
  *
  * **No `notified_at`, no `reminder`, no `recipient`.** The specification's own Non Goals exclude
  * notification, and `RecordingNotificationPort` records rather than delivers. A column here would be
@@ -103,14 +114,66 @@ export const WORKFLOW_VERSION_TRANSITIONS: Readonly<
 };
 
 /**
- * What an approver is, in Phase 16A.
+ * What a **step template** may name as its approver.
  *
- * One kind, and the list is a list rather than a bare constant so that adding `group` in 16B is a
- * vocabulary change reviewed on its own merits — the same reason Onboarding closed its task kinds at
- * five and said a sixth is deliberately a schema change (ADR-0049).
+ * Two kinds, and the second is deliberately narrow. A `membership` is one person a tenant admitted.
+ * A `group` is a list of them Workflow itself keeps — not a role, not a query, not a directory, and
+ * not anything Identity owns.
+ *
+ * **This vocabulary belongs to the template and not to a running step.** A group is resolved into
+ * its members when an instance starts, so every step of a running approval names a membership and
+ * `approverKind` on a step is always `membership`. That is why the step's own check constraint did
+ * not change in 16B: at the moment somebody is actually asked, there is only ever a person.
+ *
+ * `manager`, `role` and `external` remain `NOT VERIFIED`. Each needs something this repository does
+ * not have — a published employment→membership query, a role directory, and an identity model for a
+ * party outside the tenant.
  */
-export const APPROVER_KINDS = ['membership'] as const;
+export const APPROVER_KINDS = ['membership', 'group'] as const;
 export type ApproverKind = (typeof APPROVER_KINDS)[number];
+
+/**
+ * How a **branch** — the set of steps sharing one ordinal — reaches an outcome.
+ *
+ * Three rules, and the arithmetic of each was approved parameter by parameter rather than chosen
+ * here (D-5). They agree completely when a branch has one approver, which is why every 16A chain is
+ * expressible as a sequence of one-approver branches under any of them, and why `unanimous` is the
+ * value a single-approver step carries.
+ *
+ * `quorum` is **not** in this list, and that is the substantive point: a quorum does not decide
+ * anything. It is a minimum number of responses that must arrive before the rule below is evaluated
+ * at all, so it is a separate optional integer rather than a fourth rule.
+ */
+export const BRANCH_RULES = ['unanimous', 'majority', 'first-response'] as const;
+export type BranchRule = (typeof BRANCH_RULES)[number];
+
+/**
+ * What a branch's tally currently says.
+ *
+ * Computed, never stored: it is a function of the decisions that exist, and a column holding it
+ * would be a second answer that goes stale the moment a decision commits. `awaiting` is the state a
+ * branch is in while its outcome is still reachable both ways — not a fourth step status, and not
+ * something anybody sees on a queue.
+ */
+export const BRANCH_OUTCOMES = ['awaiting', 'approved', 'rejected'] as const;
+export type BranchOutcome = (typeof BRANCH_OUTCOMES)[number];
+
+/**
+ * The five comparisons a routing condition may make. There is no sixth, and no combinator but
+ * `all-of`.
+ *
+ * Closed because the alternative is an expression language, which is a product with its own parser,
+ * its own type system, its own injection surface and its own tests. `in` is the only operator taking
+ * a list; the rest take a single string or whole number.
+ */
+export const CONDITION_OPERATORS = [
+  'equals',
+  'not-equals',
+  'greater-than',
+  'less-than',
+  'in',
+] as const;
+export type ConditionOperator = (typeof CONDITION_OPERATORS)[number];
 
 // ------------------------------------------------------------------------------------------------
 // Instances and steps
@@ -303,6 +366,9 @@ export const AUTO_APPROVAL = 'system:auto-approval';
 
 export const isApproverKind = (value: string): value is ApproverKind =>
   member(APPROVER_KINDS, value);
+export const isBranchRule = (value: string): value is BranchRule => member(BRANCH_RULES, value);
+export const isConditionOperator = (value: string): value is ConditionOperator =>
+  member(CONDITION_OPERATORS, value);
 export const isApprovalDecision = (value: string): value is ApprovalDecisionKind =>
   member(APPROVAL_DECISIONS, value);
 export const isDecisionAuthority = (value: string): value is DecisionAuthority =>

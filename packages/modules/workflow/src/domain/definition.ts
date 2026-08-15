@@ -12,6 +12,9 @@ import {
 } from './workflow-vocabulary.js';
 import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
 import { definedOf } from './defined.js';
+import { branchesAreCoherent, ordinalsAreContiguous } from './branch.js';
+import { conditionsAreWellFormed, type BranchCondition } from './condition.js';
+import type { BranchRule } from './workflow-vocabulary.js';
 
 /**
  * A reusable process a tenant configured, and the versions of it.
@@ -74,20 +77,40 @@ export interface WorkflowVersionState {
 }
 
 /**
- * One step of a version: who is asked, and when in the order.
+ * One step of a version: who is asked, when in the order, and under what rule.
  *
- * `approverKind` is `membership` and nothing else in 16A. The field exists rather than being implied
- * so that adding a kind in 16B is a migration and a vocabulary change somebody reviews, rather than
- * a new meaning quietly given to an existing column.
+ * **The ordinal is a branch rather than a position.** Several templates may share one, and every
+ * template sharing an ordinal is asked at the same moment the instance reaches it. A version whose
+ * ordinals are all distinct is exactly a 16A sequential chain, which is why every process configured
+ * before this phase keeps behaving identically.
+ *
+ * **`approverKind` decides which of the two approver fields is present**, and exactly one is. A
+ * `membership` template names a person; a `group` template names a list Workflow keeps, resolved
+ * into its members when an instance starts and never consulted again.
+ *
+ * **The branch rule and quorum are carried on the template rather than on a branch row.** A branch
+ * has no identity of its own — it is a fact about a set of steps sharing an ordinal — and giving it
+ * a row would create a second thing that has to agree with the steps. What that costs is a coherence
+ * rule: every template at one ordinal must state the same rule, checked at publication, where the
+ * set is finally complete.
  */
 export interface WorkflowStepTemplateState {
   readonly stepTemplateId: string;
   readonly workflowVersionId: string;
+  /** The branch this step belongs to. Shared with every other template asked at the same time. */
   readonly ordinal: number;
   readonly name: LocalizedName;
   readonly approverKind: ApproverKind;
-  /** The membership asked to decide. A person a tenant admitted, named individually (D-3). */
-  readonly approverMembershipId: string;
+  /** Present when `approverKind` is `membership`: the person asked to decide. */
+  readonly approverMembershipId?: string;
+  /** Present when `approverKind` is `group`: the list resolved at instance start. */
+  readonly approverGroupId?: string;
+  /** How this ordinal's branch reaches an outcome. Absent means `unanimous`, which is 16A's rule. */
+  readonly branchRule?: BranchRule;
+  /** A minimum number of responses before the rule is evaluated. Absent means one. */
+  readonly quorum?: number;
+  /** Every condition that must hold for this branch to run at all. Absent means it always runs. */
+  readonly condition?: readonly BranchCondition[];
   readonly version: number;
 }
 
@@ -170,8 +193,31 @@ export interface AddStepRequest {
   readonly ordinal: number;
   readonly name: LocalizedName;
   readonly approverKind: ApproverKind;
-  readonly approverMembershipId: string;
+  readonly approverMembershipId?: string;
+  readonly approverGroupId?: string;
+  readonly branchRule?: BranchRule;
+  readonly quorum?: number;
+  readonly condition?: readonly BranchCondition[];
 }
+
+/**
+ * Exactly one approver field, and the right one for the kind.
+ *
+ * Both present is the dangerous case rather than the untidy one: a template naming a person *and* a
+ * group has two readings, and whichever one an implementation happened to pick would decide who
+ * approves. Refused outright rather than resolved by precedence.
+ */
+const approverIsCoherent = (request: AddStepRequest): WorkflowResult<ApproverKind> => {
+  if (request.approverKind === 'membership') {
+    if (request.approverGroupId !== undefined) return refuse('step-approver-ambiguous');
+    if ((request.approverMembershipId ?? '').trim() === '') return refuse('step-approver-required');
+    return accept('membership');
+  }
+
+  if (request.approverMembershipId !== undefined) return refuse('step-approver-ambiguous');
+  if ((request.approverGroupId ?? '').trim() === '') return refuse('step-approver-required');
+  return accept('group');
+};
 
 /**
  * Adding a step to a draft.
@@ -190,32 +236,40 @@ export const addStep = (
   if (!isPositiveWhole(request.ordinal)) return refuse('step-ordinal-invalid');
   if (!isLocalizedName(request.name)) return refuse('step-name-required');
 
+  const approver = approverIsCoherent(request);
+
+  if (!approver.ok) return refuse(approver.error.reason);
+  if (request.quorum !== undefined && !isPositiveWhole(request.quorum)) {
+    return refuse('branch-quorum-invalid');
+  }
+  // Shape only. Whether a branch's conditions can be *evaluated* depends on a request's context and
+  // is answered when an instance starts; whether they are well formed is an administrator's mistake,
+  // caught while they are still editing.
+  const conditions = conditionsAreWellFormed(request.condition ?? []);
+
+  if (!conditions.ok) return refuse(conditions.error.reason, conditions.error.detail);
+
   return accept({
     stepTemplateId: request.stepTemplateId,
     workflowVersionId: version.workflowVersionId,
     ordinal: request.ordinal,
     name: request.name,
     approverKind: request.approverKind,
-    approverMembershipId: request.approverMembershipId,
     version: 1,
+    ...definedOf({
+      approverMembershipId: request.approverMembershipId,
+      approverGroupId: request.approverGroupId,
+      branchRule: request.branchRule,
+      quorum: request.quorum,
+      condition: request.condition,
+    }),
   });
 };
 
 const versionPermits = (from: WorkflowVersionStatus, to: WorkflowVersionStatus): boolean =>
   WORKFLOW_VERSION_TRANSITIONS[from].includes(to);
 
-/**
- * Whether a set of steps forms a usable order: contiguous ordinals from one.
- *
- * Separate from `publishVersion` so the rule can be read, tested and reused without a version state
- * to hand — and so the refusal it produces has one origin rather than being re-derived at each call
- * site.
- */
-export const ordinalsAreContiguous = (steps: readonly WorkflowStepTemplateState[]): boolean => {
-  const ordinals = [...steps].map((step) => step.ordinal).sort((left, right) => left - right);
-
-  return ordinals.every((ordinal, index) => ordinal === index + 1);
-};
+export { ordinalsAreContiguous } from './branch.js';
 
 /**
  * Publishing a version: the moment it stops being editable and starts being followed.
@@ -235,6 +289,12 @@ export const publishVersion = (
   if (!versionPermits(state.status, 'published')) return refuse('version-transition-refused');
   if (steps.length === 0) return refuse('version-has-no-steps');
   if (!ordinalsAreContiguous(steps)) return refuse('version-step-order-broken');
+
+  // Every branch must agree with itself about how it ends. Checked here rather than in `addStep`
+  // because a branch is a property of a set of steps, and the set is not complete until now.
+  const coherent = branchesAreCoherent(steps);
+
+  if (!coherent.ok) return refuse(coherent.error.reason, coherent.error.detail);
 
   return accept({ ...state, status: 'published', publishedAt: at, publishedBy: by });
 };

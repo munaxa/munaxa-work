@@ -303,8 +303,8 @@ suite('repository uniqueness', () => {
       const decided = anApproval(seed);
       const steps = await inA(async (transaction) => {
         await fixture.stores.steps.update(transaction, decided.step, decided.step.version);
-        if (decided.next !== undefined) {
-          await fixture.stores.steps.update(transaction, decided.next, decided.next.version);
+        for (const following of decided.next) {
+          await fixture.stores.steps.update(transaction, following, following.version);
         }
         return fixture.stores.steps.forInstance(transaction, seed.instance.instanceId);
       });

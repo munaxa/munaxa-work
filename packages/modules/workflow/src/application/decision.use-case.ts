@@ -105,7 +105,11 @@ export const decideStepHandler = (
       return success({
         decisionId: decided.value.decision.decisionId,
         instanceStatus: decided.value.instance.status,
-        ...(decided.value.next === undefined ? {} : { awaitingStepId: decided.value.next.stepId }),
+        // The first step of the branch that opened, kept for the shape 16A published. A branch of
+        // several has several, and the instance detail read is where a caller sees all of them.
+        ...(decided.value.next[0] === undefined
+          ? {}
+          : { awaitingStepId: decided.value.next[0].stepId }),
       });
     }),
 });
@@ -192,8 +196,9 @@ const persistDecision = async (
   for (const skipped of decided.skipped) {
     await dependencies.stores.steps.update(transaction, skipped, skipped.version);
   }
-  if (decided.next !== undefined) {
-    await dependencies.stores.steps.update(transaction, decided.next, decided.next.version);
+  // Every step of the branch that opens, not one: a branch of four puts four people on a queue.
+  for (const following of decided.next) {
+    await dependencies.stores.steps.update(transaction, following, following.version);
   }
   await dependencies.stores.decisions.insert(transaction, decided.decision);
 

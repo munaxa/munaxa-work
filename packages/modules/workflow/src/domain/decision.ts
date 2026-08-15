@@ -8,13 +8,10 @@ import {
   type WorkflowStepStatus,
 } from './workflow-vocabulary.js';
 import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
-import {
-  skipRemaining,
-  stepAfter,
-  type WorkflowInstanceState,
-  type WorkflowStepState,
-} from './instance.js';
+import { skipRemaining, type WorkflowInstanceState, type WorkflowStepState } from './instance.js';
 import { definedOf } from './defined.js';
+import { branchAt, branchOf, tallyOf, type BranchTally, type BranchVote } from './branch.js';
+import { chooseBranch } from './branch-plan.js';
 
 /**
  * An approver deciding one step, and everything that follows from it.
@@ -41,10 +38,20 @@ import { definedOf } from './defined.js';
  * Career already refuse that actor on the act that matters. Workflow refuses it on every decision it
  * records, because a routed approval that nobody made is worse than no routing at all (ADR-0045).
  *
- * **A rejection ends the instance.** With one step awaiting at a time there is no tally to run and
- * no denominator to argue about (D-6): the step is rejected, the remaining steps are skipped, and
- * the instance is rejected. Majority, unanimity and first-response-wins are Phase 16B, and there is
- * no vocabulary in this module in which to express any of them.
+ * **A decision decides a step; a tally decides a branch.** In 16A the two were the same thing,
+ * because a branch had one step. Now a decision is recorded, the branch it belongs to is tallied
+ * under its own rule, and only then does anything follow: the branch may still be awaiting, in which
+ * case the instance is untouched and the other approvers keep their queue entries.
+ *
+ * **A branch ends the moment its outcome is arithmetically determined**, and every step of it still
+ * awaiting is moved to `skipped`. Leaving them would leave a decided approval sitting on somebody's
+ * queue, which is the failure `skipped` was introduced to prevent. There is no `superseded` state:
+ * `skipped` already means "this was not decided and never will be", and a second word for it would
+ * be a second thing to translate and to explain.
+ *
+ * **A rejected branch rejects the instance.** Not because a rejection is special-cased, but because
+ * a branch that cannot be approved is a step of the process that failed, and 16A's rule — a failed
+ * step ends the approval — is unchanged.
  */
 
 export interface WorkflowDecisionState {
@@ -76,11 +83,21 @@ export interface DecideRequest {
 export interface DecidedStep {
   readonly decision: WorkflowDecisionState;
   readonly step: WorkflowStepState;
-  /** The step that becomes `awaiting`, when the instance continues. Absent when it ends. */
-  readonly next?: WorkflowStepState;
-  /** The steps abandoned by a rejection. Empty on an approval. */
+  /**
+   * The steps that become `awaiting` — the next branch that runs.
+   *
+   * Empty while this branch is still open, and empty when the approval ends. `tally.outcome` is what
+   * distinguishes those two, and a caller reading only this array would conflate them.
+   */
+  readonly next: readonly WorkflowStepState[];
+  /**
+   * Every step abandoned: the rest of this branch once it terminated early, plus the branches a
+   * condition skipped on the way to the next one.
+   */
   readonly skipped: readonly WorkflowStepState[];
   readonly instance: WorkflowInstanceState;
+  /** How this branch stood once the decision was counted. Computed, never stored. */
+  readonly tally: BranchTally;
 }
 
 const stepPermits = (from: WorkflowStepStatus, to: WorkflowStepStatus): boolean =>
@@ -131,6 +148,8 @@ export const decide = (
   step: WorkflowStepState,
   steps: readonly WorkflowStepState[],
   request: DecideRequest,
+  /** The decisions already recorded on this instance. The votes this branch is tallied from. */
+  votes: readonly BranchVote[] = [],
 ): WorkflowResult<DecidedStep> => {
   if (instance.status !== 'running') return refuse('instance-not-running');
   if (step.instanceId !== instance.instanceId) return refuse('step-not-on-this-instance');
@@ -156,60 +175,139 @@ export const decide = (
     }),
   };
   const decided: WorkflowStepState = { ...step, status: request.decision };
+  // The branch as it stands *including* this decision. The caller passes the votes already recorded;
+  // this one is added here so a tally is never computed from a half-written branch.
+  const branch = branchAt(steps, step.ordinal);
+  const tally = tallyOf(branchOf(step), branch.length, [
+    ...votes.filter((vote) => vote.stepId !== step.stepId),
+    { stepId: step.stepId, decision: request.decision, decidedAt: request.at },
+  ]);
 
-  return accept(
-    request.decision === 'rejected'
-      ? rejectedOutcome(instance, steps, decided, decision, request.at)
-      : approvedOutcome(instance, steps, decided, decision, request.at),
-  );
+  // Steps that already carry a decision are excluded from everything that follows. A branch that
+  // ends must not move a colleague's recorded answer to `skipped` — that would replace "they
+  // approved" with "nobody asked them", which is a decision being overwritten rather than skipped.
+  const answered = new Set([...votes.map((vote) => vote.stepId), step.stepId]);
+  const open = steps.filter((other) => !answered.has(other.stepId));
+
+  const outcome: Outcome = {
+    instance,
+    steps,
+    open,
+    step: decided,
+    decision,
+    tally,
+    at: request.at,
+  };
+
+  if (tally.outcome === 'awaiting') return accept(stillOpen(outcome));
+  if (tally.outcome === 'rejected') return accept(rejectedOutcome(outcome));
+  return approvedOutcome(outcome);
 };
 
-/** A rejection: this step ends, everything still open is skipped, and the instance is rejected. */
-const rejectedOutcome = (
-  instance: WorkflowInstanceState,
-  steps: readonly WorkflowStepState[],
-  step: WorkflowStepState,
-  decision: WorkflowDecisionState,
-  at: Date,
-): DecidedStep => ({
+/**
+ * Everything the three outcomes are built from, gathered once.
+ *
+ * An object rather than seven positional parameters, because `steps` and `open` are both lists of
+ * steps and swapping them at a call site would compile and quietly skip the wrong people.
+ */
+interface Outcome {
+  readonly instance: WorkflowInstanceState;
+  /** Every step of the instance, as it was read. */
+  readonly steps: readonly WorkflowStepState[];
+  /** The steps that carry no decision — the ones that may still be skipped. */
+  readonly open: readonly WorkflowStepState[];
+  readonly step: WorkflowStepState;
+  readonly decision: WorkflowDecisionState;
+  readonly tally: BranchTally;
+  readonly at: Date;
+}
+
+/**
+ * The branch is still open: this person has answered and the others have not.
+ *
+ * Nothing moves. The instance keeps its version, the remaining steps keep their queue entries, and
+ * the only rows written are the decision and this one step.
+ */
+const stillOpen = ({ instance, step, decision, tally }: Outcome): DecidedStep => ({
   decision,
   step,
-  skipped: skipRemaining(steps.filter((other) => other.stepId !== step.stepId)),
-  instance: { ...instance, status: 'rejected', completedAt: at },
+  next: [],
+  skipped: [],
+  instance,
+  tally,
 });
 
 /**
- * An approval: the next step by ordinal starts awaiting, or the instance completes.
+ * The branch cannot be approved: everything still open is skipped and the instance is rejected.
  *
- * "The next step" is a lookup by ordinal rather than by array position, and it is total because
- * `publishVersion` refused any version whose ordinals were not contiguous from one.
+ * "Everything still open" is every step of every remaining branch, not merely this one's — a
+ * rejected approval has nothing left to ask anybody, which is 16A's behaviour unchanged.
  */
-const approvedOutcome = (
-  instance: WorkflowInstanceState,
-  steps: readonly WorkflowStepState[],
-  step: WorkflowStepState,
-  decision: WorkflowDecisionState,
-  at: Date,
-): DecidedStep => {
-  const following = stepAfter(steps, step.ordinal);
+const rejectedOutcome = ({ instance, open, step, decision, tally, at }: Outcome): DecidedStep => ({
+  decision,
+  step,
+  next: [],
+  skipped: skipRemaining(open),
+  instance: { ...instance, status: 'rejected', completedAt: at },
+  tally,
+});
 
-  if (following === undefined) {
-    return {
+/**
+ * The branch is approved: the next branch whose condition holds starts, or the instance completes.
+ *
+ * Two kinds of step are skipped here and they are skipped for different reasons. The **rest of this
+ * branch** is skipped because the outcome is already determined — a majority of five reached at
+ * three leaves two people who no longer need to answer, and leaving their queue entries would be
+ * asking for a decision that cannot change anything. The **branches in between** are skipped because
+ * their conditions did not hold.
+ *
+ * A condition that cannot be evaluated is *not* handled here: `chooseBranch` refuses, and the caller
+ * refuses with it, so nothing at all is written. That is the fail-closed rule, and it is why this
+ * function returns a result rather than a value.
+ */
+const approvedOutcome = ({
+  instance,
+  steps,
+  open,
+  step,
+  decision,
+  tally,
+  at,
+}: Outcome): WorkflowResult<DecidedStep> => {
+  // The rest of *this* branch, minus anybody who has already answered it.
+  const outstanding = skipRemaining(branchAt(open, step.ordinal));
+  const chosen = chooseBranch(steps, step.ordinal, instance.context);
+
+  // Fail closed, and all the way out. A condition that cannot be evaluated refuses the **decision**
+  // — the approver is told, nothing is written, and the approval stays exactly where it was. An
+  // earlier draft of this function treated an unevaluable condition as "nothing follows" and
+  // completed the approval, which is the precise failure the missing-key rule exists to prevent.
+  if (!chosen.ok) return refuse(chosen.error.reason, chosen.error.detail);
+
+  const skipped = [...outstanding, ...chosen.value.skipped].map(asSkipped);
+
+  if (chosen.value.running.length === 0) {
+    return accept({
       decision,
       step,
-      skipped: [],
+      next: [],
+      skipped,
       instance: { ...instance, status: 'completed', completedAt: at },
-    };
+      tally,
+    });
   }
 
-  return {
+  return accept({
     decision,
     step,
-    next: { ...following, status: 'awaiting' },
-    skipped: [],
+    next: chosen.value.running.map((following) => ({ ...following, status: 'awaiting' })),
+    skipped,
     instance,
-  };
+    tally,
+  });
 };
+
+const asSkipped = (step: WorkflowStepState): WorkflowStepState => ({ ...step, status: 'skipped' });
 
 /**
  * An instance's status as `ApprovalPort` names it.

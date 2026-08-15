@@ -63,37 +63,68 @@ const entry = (request: EntryRequest): WorkflowHistoryState => ({
 });
 
 /**
- * The entries a start produces: the instance beginning, and its first step becoming current.
+ * The entries a start produces: the instance beginning, and everybody it asked.
  *
- * Two entries rather than one, because "this was raised" and "you were asked" are different moments
- * to the two different people they concern, even when they share an instant.
+ * Separate entries because "this was raised" and "you were asked" are different moments to the
+ * different people they concern, even when they share an instant.
+ *
+ * **One `step-awaiting` per opening step**, so a branch of four records that four people were asked.
+ * A single entry would leave three of them with a queue item the timeline never explains.
+ *
+ * **A branch a condition skipped is recorded too.** Somebody reading the timeline later needs to see
+ * that a stage existed and was not run — an approval that silently omitted it would look like a
+ * process that never had that stage. And when *every* branch was skipped there is nothing to decide,
+ * so the instance completes at the instant it started and says so.
  */
 export const startHistory = (
   started: StartedInstance,
   historyIds: readonly string[],
 ): readonly WorkflowHistoryState[] => {
-  const [instanceEntryId, stepEntryId] = historyIds;
-  const first = [...started.steps].sort((left, right) => left.ordinal - right.ordinal)[0];
-
-  if (instanceEntryId === undefined || stepEntryId === undefined || first === undefined) return [];
-
-  return [
-    entry({
-      historyId: instanceEntryId,
-      instanceId: started.instance.instanceId,
+  const instanceId = started.instance.instanceId;
+  const at = started.instance.startedAt;
+  const ordered = [...started.steps].sort(
+    (left, right) => left.ordinal - right.ordinal || left.stepId.localeCompare(right.stepId),
+  );
+  const events: EntryRequest[] = [
+    {
+      historyId: '',
+      instanceId,
       event: 'instance-started',
-      occurredAt: started.instance.startedAt,
+      occurredAt: at,
       actorMembershipId: started.instance.requestedByMembershipId,
-    }),
-    entry({
-      historyId: stepEntryId,
-      instanceId: started.instance.instanceId,
-      event: 'step-awaiting',
-      occurredAt: started.instance.startedAt,
-      stepId: first.stepId,
-      ordinal: first.ordinal,
-    }),
+    },
   ];
+
+  for (const step of ordered.filter((candidate) => candidate.status === 'awaiting')) {
+    events.push({
+      historyId: '',
+      instanceId,
+      event: 'step-awaiting',
+      occurredAt: at,
+      stepId: step.stepId,
+      ordinal: step.ordinal,
+    });
+  }
+  for (const step of ordered.filter((candidate) => candidate.status === 'skipped')) {
+    events.push({
+      historyId: '',
+      instanceId,
+      event: 'step-skipped',
+      occurredAt: at,
+      stepId: step.stepId,
+      ordinal: step.ordinal,
+    });
+  }
+  if (started.instance.status === 'completed') {
+    events.push({
+      historyId: '',
+      instanceId,
+      event: 'instance-completed',
+      occurredAt: at,
+      actorMembershipId: started.instance.requestedByMembershipId,
+    });
+  }
+  return withIdentifiers(events, historyIds);
 };
 
 /**
@@ -124,14 +155,17 @@ export const decisionHistory = (
     },
   ];
 
-  if (decided.next !== undefined) {
+  // One entry per step of the branch that opens, because each is a person newly asked. A branch of
+  // four produces four `step-awaiting` entries, and a queue that showed one of them would be telling
+  // three people they had not been asked.
+  for (const following of decided.next) {
     events.push({
       historyId: '',
       instanceId,
       event: 'step-awaiting',
       occurredAt: at,
-      stepId: decided.next.stepId,
-      ordinal: decided.next.ordinal,
+      stepId: following.stepId,
+      ordinal: following.ordinal,
     });
   }
   for (const skipped of decided.skipped) {

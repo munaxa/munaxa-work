@@ -54,10 +54,14 @@ export interface WorkflowDefinitionView {
 
 export interface WorkflowStepTemplateView {
   readonly stepTemplateId: string;
+  /** The branch this step is in. Several templates may share one; all of them are asked at once. */
   readonly ordinal: number;
   readonly name: LocalizedTextView;
   readonly approverKind: ApproverKind;
-  readonly approverMembershipId: string;
+  /** Present when `approverKind` is `membership`. */
+  readonly approverMembershipId?: string;
+  /** Present when `approverKind` is `group`. Resolved into its members when an instance starts. */
+  readonly approverGroupId?: string;
 }
 
 export interface WorkflowVersionView {

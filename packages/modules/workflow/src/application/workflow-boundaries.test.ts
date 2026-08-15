@@ -65,7 +65,17 @@ const registered = [
   ...(module.queries ?? []).map((handler) => handler.queryName),
 ];
 
-describe('nothing deferred to Phase 16B is reachable', () => {
+/**
+ * The boundary moved in Phase 16B **by authorization**, and these rows moved with it.
+ *
+ * Tallies, parallel branches, conditions and groups are built now. What remains deferred is Phase
+ * 16C, and the fragments below are what its code would be written in. Rewritten rather than deleted,
+ * because a removed assertion is a removed guarantee.
+ *
+ * `group` is no longer among them — Workflow owns an explicit list of memberships. `role` still is:
+ * that needs a directory this repository has committed never to build.
+ */
+describe('nothing deferred to Phase 16C is reachable', () => {
   it('registers no handler for any of it', () => {
     const deferred = [
       'escalat',
@@ -73,15 +83,7 @@ describe('nothing deferred to Phase 16B is reachable', () => {
       'breach',
       'schedule',
       'expire',
-      'tally',
-      'majority',
-      'unanimous',
-      'quorum',
-      'parallel',
-      'branch',
-      'condition',
       'role',
-      'group',
       'manager',
       'team',
       'notify',
@@ -94,7 +96,8 @@ describe('nothing deferred to Phase 16B is reachable', () => {
     );
 
     expect(offending).toStrictEqual([]);
-    // Exactly the seventeen the checkpoint approved, and nothing else.
+    // Still exactly seventeen: Checkpoint 2 is the domain, and no handler was added. The group
+    // commands and queries arrive with the application layer in Checkpoint 4.
     expect(registered).toHaveLength(17);
   });
 
@@ -151,7 +154,7 @@ describe('nothing deferred to Phase 16B is reachable', () => {
     }
   });
 
-  it('has no code that computes a due date, an escalation or a tally', () => {
+  it('has no code that computes a due date or an escalation', () => {
     const fragments = [
       'escalat',
       'slaHours',
@@ -159,16 +162,7 @@ describe('nothing deferred to Phase 16B is reachable', () => {
       'businessDay',
       'workingDay',
       'breach',
-      'quorum',
-      'threshold',
-      'majority',
-      'unanimous',
-      'tally',
-      'voteCount',
-      'branchTo',
-      'evaluateCondition',
       'roleId',
-      'groupId',
       'managerOf',
       'reportsTo',
       'notify',
