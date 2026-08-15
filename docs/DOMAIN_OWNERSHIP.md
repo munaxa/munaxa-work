@@ -35,7 +35,8 @@ them afterwards.
 | Goal, review, rating                      | `performance`   | Phase 13 ✓    |
 | Course, enrolment, certification          | `learning`      | Phase 14A     |
 | Career path, succession plan              | `career`        | Phase 15 ✅   |
-| Approval, workflow definition, task       | `workflow`      | Phase 16      |
+| Approval, workflow definition, version, instance, step, decision | `workflow` | Phase 16A ✅ |
+| Parallel approval, tally, branching, SLA, escalation | `workflow` | Phase 16B |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
 | Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |

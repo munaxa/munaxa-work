@@ -296,8 +296,43 @@ production defects with their original failing evidence, the fourteen test and f
 them, the measured performance at 500, 10,000 and 100,000 employments with **all twenty-six workloads
 within budget**, the query plans, the sixteen `NOT VERIFIED` capabilities and the carried-forward debt
 register are in
-[`verification/phase-15-final-report.md`](verification/phase-15-final-report.md). **Phase 16 —
-workflow — is not started**: no column, no port, no route, no screen.
+[`verification/phase-15-final-report.md`](verification/phase-15-final-report.md).
+
+Phase 16A completed on 2026-08-15: Enterprise Workflow and Approvals — one module, seven tables. It
+records the approval processes a tenant configures, raises an approval about a record another module
+owns, asks one named person at a time to decide it, and writes down who answered, on whose authority
+and when — and it **owns no business data**. An approval is *about* a subject, and the subject is two
+opaque strings Workflow never interprets: there is no foreign key out of the module, no import of
+another module's package, and no shape in which it could learn what a requisition is. **Every chain
+is sequential and one named membership answers each step**: there is no role directory and no group
+directory in this product, no parallel branch, no majority, quorum or first-response, and no
+condition on which a chain forks. **Nothing is scheduled and nothing expires** — `JobPort` still has
+no adapter anywhere, so no approval ages out, no escalation fires, and a delegation is in force only
+if Identity says so *at the instant of the decision*, which is why Workflow keeps no expiry state of
+its own. "The approvals waiting for me" is the **first `read-own` in this repository that is routed
+and enforced**, because an approval is addressed to a membership and a membership is what the request
+resolved before any handler ran; no endpoint, body or command field accepts one, so nobody can aim
+the queue at somebody else. A decision records **two** memberships that never collapse into one — the
+delegate who acted and the approver whose authority was used — and two check constraints make the
+pair impossible to write wrongly. Decisions and timeline entries are **append-only at the table**,
+with two triggers refusing update and delete and no mutation method on either repository. **There is
+no `numeric`, no `real`, no `double precision`, no `bigint`, no `money` and no `date` column
+anywhere**: every number is a small whole one and every moment is an instant. **Recruitment is the
+single adopted business module**, by write, through a seam that was stopped on and approved before it
+was built: Recruitment is asked *first*, so a refusal leaves Workflow with nothing written, and the
+reverse window is closed by reconciling on the approval identifier rather than by claiming an
+atomicity two transactions do not have — there is no outbox, no broker, no worker and no scheduler.
+The kernel's `ApprovalPort` is **unchanged**; Workflow implements it inbound, published and unwired.
+Twenty-two capabilities remain `NOT VERIFIED`, none with a placeholder anywhere in the product, and
+`expired` is declared in the port's vocabulary and never produced. The planning checkpoint is in
+[`verification/phase-16-plan.md`](verification/phase-16-plan.md); the three production defects and
+one UI defect with their original failing evidence, the three fixture defects the closing audit found
+by building a database from the migrations alone, the measured performance at 500, 10,000 and 100,000
+approvals with **all eighteen workloads within budget at every tier**, the query plans, the nine
+verified races, the twenty-two `NOT VERIFIED` capabilities and the carried-forward debt register are
+in [`verification/phase-16a-final-report.md`](verification/phase-16a-final-report.md). **Phase 16B —
+parallel approval, tallies, conditional branching, roles, groups, SLA, escalation and scheduling — is
+not started**: no column, no port, no route, no screen.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

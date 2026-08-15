@@ -38,10 +38,10 @@ import {
 } from '../recruitment/recruitment.composition.js';
 import { workflowModuleFor } from './workflow.composition.js';
 import {
-  APPLICATION_ROLE,
   CONNECTION,
   OWNER_TABLES,
   TABLES,
+  applicationConnection,
 } from './workflow-cross-module-role.fixture.js';
 import { seedIdentityWorld } from './workflow-cross-module-world.js';
 import type { Asking } from '../payroll/asking.js';
@@ -119,22 +119,6 @@ export const permitting = (...granted: readonly string[]): PermissionChecker =>
   new GrantAwarePermissionChecker({
     holds: (permission) => Promise.resolve(granted.includes(permission)),
   });
-
-const unprivileged = async (admin: Pool): Promise<string> => {
-  await admin.query(
-    `do $$ begin
-       if not exists (select 1 from pg_roles where rolname = '${APPLICATION_ROLE}') then
-         create role ${APPLICATION_ROLE} login nosuperuser password 'fixture';
-       end if;
-     end $$`,
-  );
-
-  const url = new URL(CONNECTION ?? '');
-
-  url.username = APPLICATION_ROLE;
-  url.password = 'fixture';
-  return url.toString();
-};
 
 export interface WorkflowApiFixture {
   /** An application bound to one tenant, one actor, one membership and one permission set. */
@@ -257,10 +241,21 @@ const nestFor = async (
   return nest;
 };
 
+/**
+ * The unprivileged role, created **and granted** by the one function that knows what it needs.
+ *
+ * This fixture used to create the role itself and issue no grants at all, relying on a
+ * cross-module suite having run first in the same process to make it usable. Against a database
+ * created from the migrations that is not true, and every API suite here failed with
+ * `permission denied for table workflow_history` — a fixture describing a role it had not set up.
+ * `applicationConnection` grants the Workflow tables, the three Identity tables the delegation path
+ * reads and the Recruitment tables the seam writes, which is exactly the set these suites need
+ * because they mount all three modules for real.
+ */
 export const openWorkflowApi = async (): Promise<WorkflowApiFixture> => {
   const admin = new Pool({ connectionString: CONNECTION, max: 4 });
   const application = new Pool({
-    connectionString: await unprivileged(admin),
+    connectionString: await applicationConnection(),
     max: 8,
     connectionTimeoutMillis: 15_000,
   });

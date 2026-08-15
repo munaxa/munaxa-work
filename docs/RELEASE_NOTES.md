@@ -5,6 +5,60 @@ and what is still missing.
 
 ---
 
+## Phase 16A — Approvals
+
+One module. It records the approval processes a company sets up, raises an approval about a record
+another part of the product owns, asks one named person at a time to decide it, and writes down who
+answered, on whose authority, and when.
+
+**One person at a time, in the order somebody configured.** There is no parallel approval, no
+majority, no quorum and no "first to respond wins". A step names a specific member of staff, and the
+next person is asked only once the one before them has answered. Nothing branches on the value of the
+record being approved.
+
+**A step names a person, not a role or a group.** This product has no role directory and no group
+directory, so there is nothing to route to except a named member. Nothing routes to somebody's
+manager either — the product cannot work out who that is, and guessing would send a director's
+approval to the wrong person.
+
+**Nothing chases anybody.** No approval expires, nothing escalates after a delay, nothing is
+reassigned on a timer, and no email, message or notification is sent when somebody is asked to
+decide. An approval waits until a person acts on it. Nobody should expect this product to remind
+them.
+
+**"Waiting for me" means waiting for me.** The list of approvals waiting on you is worked out from
+who you are signed in as, and there is no way — no setting, no link, no address — to ask for somebody
+else's list instead. A person who cannot be identified is shown nothing rather than everything.
+
+**A stand-in is recorded as themselves.** When a deputy approves something on a director's behalf,
+the record says the deputy approved it *using the director's authority*. It does not say the director
+approved it. A year later, both questions — who decided, and whose authority was it — have their own
+answer. Whether a delegation is in force is checked at the moment of the decision, so an arrangement
+that has ended simply stops working, without anything needing to run overnight to end it.
+
+**A decision cannot be edited or deleted.** Neither can the timeline of who was asked and when. A
+correction is a new record written beside the old one. The timeline records the routing only —
+somebody's written reason for a rejection stays on the decision, where permission decides who may
+read it, rather than appearing in a list anyone with access to the queue can see.
+
+**Recruitment is the first thing it approves.** Approving a hiring request through this module moves
+the request in Recruitment, and Recruitment keeps a note of which approval decided it. If Recruitment
+will not accept the decision — because the request was withdrawn, or somebody had already decided it
+directly — the approval is refused and nothing is recorded on either side. Sending the same approval
+twice settles on one outcome rather than deciding twice.
+
+**Screens.** One read-only administrative screen at `/workflow`, in English and Arabic with the page
+laid out right to left in Arabic. It shows what has been configured, what is running, what is waiting
+on you and what you have decided. It has no buttons: every action is performed by the API, and the
+server decides each one.
+
+**Still missing**, and each stated plainly on the screen rather than left to be discovered: service
+levels and due dates, working-day calculations, escalation, scheduling, parallel and majority
+approvals, conditional routing, role and group approvers, routing to a manager, approvers outside the
+company, notifications, analytics, and employee self-service.
+
+---
+
 ## Phase 15 — Career, succession and development
 
 One module. It records the ladders a company defines, who is on one, the benches it keeps for its
