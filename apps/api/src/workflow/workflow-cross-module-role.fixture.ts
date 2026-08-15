@@ -114,9 +114,27 @@ export const applicationConnection = async (): Promise<string> => {
     await admin.query(
       `grant select, insert, update, delete, truncate on ${TABLES.join(', ')} to ${APPLICATION_ROLE}`,
     );
-    // Read-only on the two Identity tables the delegation query joins nothing to but reads through:
-    // Workflow never writes to Identity, and the role it runs as could not if it tried.
-    await admin.query(`grant select on tenant_membership, workforce_user to ${APPLICATION_ROLE}`);
+    /*
+     * Read-only on the three Identity tables the delegation path touches: `delegation` itself, and
+     * the membership and user rows its own policies consult. Workflow never writes to Identity, and
+     * the role it runs as could not if it tried.
+     *
+     * `delegation` was missing here until the Phase 16A audit, and the suites passed anyway —
+     * against a database that had carried the grant since before the fixture was written. A fresh
+     * database is what exposed it: every delegation suite failed with `permission denied for table
+     * delegation`, which is a fixture that had stopped describing what it needs rather than a
+     * product that had changed. Granted explicitly so the suites run from a migrated database and
+     * nothing else.
+     */
+    await admin.query(
+      `grant select on delegation, tenant_membership, workforce_user to ${APPLICATION_ROLE}`,
+    );
+    // And `insert` on `delegation` alone, for the **fixture** rather than for the seam: the suites
+    // write the arrangements they then test, under the tenant context and the table's own policy.
+    // Production never writes here — Workflow reads Identity and writes nothing to it, which is why
+    // no other Identity table is writable by this role and why `update` and `delete` are withheld
+    // even on this one.
+    await admin.query(`grant insert on delegation to ${APPLICATION_ROLE}`);
     // The seam's own reach into the adopting module: three tables, and no `truncate` on any.
     await admin.query(
       `grant select, insert, update, delete on ${RECRUITMENT_TABLES.join(', ')} to ${APPLICATION_ROLE}`,
