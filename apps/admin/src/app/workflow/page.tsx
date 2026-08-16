@@ -7,7 +7,9 @@ import { DefinitionsSection, StepsSection, VersionsSection } from '../../workflo
 import { InstanceStepsSection, InstancesSection } from '../../workflow/instances';
 import { ApprovalStatusSection, DecidedSection, PendingSection } from '../../workflow/approvals';
 import { HistorySection } from '../../workflow/history';
-import { StatusSection } from '../../workflow/status';
+import { ApprovalGroupsSection, GroupMembersSection } from '../../workflow/groups';
+import { AwaitingSection, BranchesSection } from '../../workflow/branches';
+import { ProvidedSection, StatusSection } from '../../workflow/status';
 import type { SectionProps } from '../../workflow/sections';
 
 /**
@@ -61,6 +63,7 @@ export default async function WorkflowPage({
 
       <OverviewSection
         {...props}
+        groupsTotal={workflow.groupsTotal}
         definitionsTotal={workflow.definitionsTotal}
         instancesTotal={workflow.instancesTotal}
         pendingTotal={workflow.pendingTotal}
@@ -68,10 +71,12 @@ export default async function WorkflowPage({
         unavailable={workflow.unavailable}
       />
 
+      <Groups {...props} workflow={workflow} />
       <Configuration {...props} workflow={workflow} />
       <Running {...props} workflow={workflow} />
       <Queues {...props} workflow={workflow} />
 
+      <ProvidedSection {...props} />
       <StatusSection {...props} />
     </main>
   );
@@ -80,6 +85,14 @@ export default async function WorkflowPage({
 interface Workspace extends SectionProps {
   readonly workflow: WorkflowForDisplay;
 }
+
+/** The lists a tenant keeps of who approves what, and the memberships on the first of them. */
+const Groups = ({ workflow, ...props }: Workspace): ReactNode => (
+  <>
+    <ApprovalGroupsSection {...props} groups={workflow.groups} total={workflow.groupsTotal} />
+    <GroupMembersSection {...props} detail={workflow.group} />
+  </>
+);
 
 /** What a tenant says an approval looks like: the workflows, their versions, the published chain. */
 const Configuration = ({ workflow, ...props }: Workspace): ReactNode => (
@@ -99,6 +112,8 @@ const Running = ({ workflow, ...props }: Workspace): ReactNode => (
   <>
     <InstancesSection {...props} instances={workflow.instances} total={workflow.instancesTotal} />
     <InstanceStepsSection {...props} detail={workflow.instance} />
+    <BranchesSection {...props} tallies={workflow.instance?.tallies ?? []} />
+    <AwaitingSection {...props} steps={workflow.instance?.awaitingSteps ?? []} />
     <ApprovalStatusSection {...props} approval={workflow.approval} />
     <HistorySection {...props} history={workflow.history} total={workflow.historyTotal} />
   </>

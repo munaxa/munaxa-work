@@ -73,11 +73,18 @@ export const InstancesSection = ({
 );
 
 /**
- * One approval's own chain, in ordinal order, with the step currently awaiting a decision named.
+ * One approval's own chain, in the order the API returned it, with each step's own status.
  *
- * `awaiting` is the API's answer rather than this screen's: exactly one step of a running approval
- * is awaiting, and the aggregate is what decides which. A screen that scanned the list for the first
- * undecided step would agree with the server most of the time, which is the worst kind of agreement.
+ * **Every step names a person, whatever the version named.** A template may name a group; a running
+ * step never does, because the list was resolved into its members before these rows existed. What
+ * `sourceGroup` records is which list somebody came from — provenance for "why was I asked?", and
+ * nothing that routes reads it. A group emptied since keeps its rows: an approval asks the people it
+ * started with.
+ *
+ * **A status here is the server's own and is never inferred from position.** Several steps may share
+ * an ordinal and be awaiting at once, so "the first undecided one" is not a question with an answer;
+ * a step that has been decided shows its decision, and a step nothing reached shows as not yet
+ * reached rather than as skipped.
  */
 export const InstanceStepsSection = ({
   t,
@@ -87,13 +94,28 @@ export const InstanceStepsSection = ({
     {detail === undefined || detail.steps.length === 0 ? (
       <Empty t={t} />
     ) : (
-      <Table t={t} headers={['ordinal', 'approver', 'status', 'stepId', 'version']}>
+      <Table
+        t={t}
+        headers={[
+          'ordinal',
+          'approver',
+          'status',
+          'sourceGroup',
+          'branchRule',
+          'stepId',
+          'version',
+        ]}
+      >
         {detail.steps.map((step) => (
           <tr key={step.stepId}>
             <td>{count(step.ordinal)}</td>
             <td>{member(step.approverMembershipId)}</td>
             <td>
               <Term t={t} group="stepStatus" value={step.status} />
+            </td>
+            <td>{short(step.sourceGroupId)}</td>
+            <td>
+              <Term t={t} group="branchRule" value={step.branchRule} />
             </td>
             <td>{short(step.stepId)}</td>
             <td>{count(step.version)}</td>

@@ -1,5 +1,7 @@
 import { loadPortalProcessEnvironment } from '@work/config';
 import type {
+  ApprovalGroupDetailView,
+  ApprovalGroupView,
   ApprovalStatusView,
   PendingApprovalView,
   WorkflowDecisionView,
@@ -36,11 +38,16 @@ import type {
  * `size`, and the four detail reads are made **once, for the first row of their listing** — never
  * one per definition, per version, per instance, per approval or per history entry.
  *
- * The count is **eight at most and it does not grow with the size of a tenant**: four collection
- * reads, then four details about the first definition and the first approval. A tenant with four
- * thousand running approvals costs exactly the same eight requests as a tenant with one. An empty
- * tenant costs four, because there is no first row to read a detail for, and a service that will not
- * answer at all costs one.
+ * The count is **ten at most and it does not grow with the size of a tenant**: five collection
+ * reads, then five details about the first definition, the first approval and the first approval
+ * group. A tenant with four thousand running approvals costs exactly the same ten requests as a
+ * tenant with one. An empty tenant costs five, because there is no first row to read a detail for,
+ * and a service that will not answer at all costs one.
+ *
+ * **A group's members are read for one group, never for each.** The group listing carries the code,
+ * the name and the row version and no member count — so the screen shows the members of the first
+ * row from its detail and says so, rather than issuing one request per group to fill a column. That
+ * is the same rule the definition and the approval details have followed since Phase 16A.
  */
 
 /** One page, the size every listing on this screen uses. Nothing asks for more. */
@@ -67,6 +74,11 @@ export interface WorkflowForDisplay {
   readonly historyTotal: number;
   /** That same approval in `ApprovalPort`'s vocabulary. */
   readonly approval: ApprovalStatusView | undefined;
+  /** The lists this tenant keeps of who approves what. */
+  readonly groups: readonly ApprovalGroupView[];
+  readonly groupsTotal: number;
+  /** One list with the memberships on it. The first of the listing. */
+  readonly group: ApprovalGroupDetailView | undefined;
   /** The caller's own queue. Resolved from the request; never asked for by identifier. */
   readonly pending: readonly PendingApprovalView[];
   readonly pendingTotal: number;
@@ -112,6 +124,9 @@ export const EMPTY: WorkflowForDisplay = {
   history: [],
   historyTotal: 0,
   approval: undefined,
+  groups: [],
+  groupsTotal: 0,
+  group: undefined,
   pending: [],
   pendingTotal: 0,
   decided: [],
@@ -120,7 +135,7 @@ export const EMPTY: WorkflowForDisplay = {
 };
 
 /**
- * The reads the screen makes. **Eight at most, and never more with more data.**
+ * The reads the screen makes. **Ten at most, and never more with more data.**
  *
  * The definition listing is read first and its failure is the signal: if the service will not answer
  * the cheapest question, the rest is a page of empty tables and a wall of failed requests.
@@ -142,7 +157,31 @@ export const loadWorkflow = async (): Promise<WorkflowForDisplay> => {
     instancesTotal: found.total,
     ...(await forFirstDefinition(definitions.items[0])),
     ...(await forFirstInstance(found.items[0])),
+    ...(await approvalGroups()),
     ...(await queues()),
+  };
+};
+
+/**
+ * The tenant's lists, and the members of the first of them.
+ *
+ * **Two requests for fifty groups.** The listing carries no member count, and the honest answer to
+ * that is to read one group's members and say which group they belong to — not to issue a detail
+ * request per row so a column can be filled. Fifty groups would be fifty requests to render one
+ * number each, and the number would grow with every list a tenant adds.
+ */
+const approvalGroups = async (): Promise<Partial<WorkflowForDisplay>> => {
+  const listing = pageParts(await read<Page<ApprovalGroupView>>(`/approval-groups?${PAGE}`));
+  const first = listing.items[0];
+
+  return {
+    groups: listing.items,
+    groupsTotal: listing.total,
+    ...(first === undefined
+      ? {}
+      : {
+          group: await read<ApprovalGroupDetailView>(`/approval-groups/${first.approvalGroupId}`),
+        }),
   };
 };
 

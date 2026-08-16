@@ -29,8 +29,8 @@ import type {
  *   and the authority would print one where two belong.
  */
 
-const AT = '2026-02-28T23:30:00.000Z';
-const LATER = '2026-02-28T23:45:00.000Z';
+export const AT = '2026-02-28T23:30:00.000Z';
+export const LATER = '2026-02-28T23:45:00.000Z';
 
 export const DEFINITION_ID = '01930000-0000-7000-8000-0000000000d1';
 export const VERSION_ID = '01930000-0000-7000-8000-0000000000a1';

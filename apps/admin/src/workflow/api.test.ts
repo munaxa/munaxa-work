@@ -13,6 +13,7 @@ import {
   anInstance,
   anInstanceDetail,
 } from './views.fixture';
+import { GROUP_ID, aGroup, aGroupDetail } from './branches.fixture';
 
 /**
  * What the screen asks the API for, how many times, and — the security assertion — with what.
@@ -39,6 +40,8 @@ const RESPONSES: Readonly<Record<string, unknown>> = {
   [`/instances/${INSTANCE_ID}`]: anInstanceDetail(),
   [`/instances/${INSTANCE_ID}/history?page=1&size=50`]: { items: aHistory(), total: 9 },
   [`/approvals/${INSTANCE_ID}/status`]: anApprovalStatus(),
+  '/approval-groups?page=1&size=50': { items: [aGroup()], total: 90 },
+  [`/approval-groups/${GROUP_ID}`]: aGroupDetail(),
   '/approvals/pending?page=1&size=50': { items: [aPendingApproval()], total: 12 },
   '/approvals/decided?page=1&size=50': { items: [aDelegatedDecision()], total: 7 },
 };
@@ -80,13 +83,13 @@ describe('the requests the screen makes', () => {
     vi.unstubAllGlobals();
   });
 
-  it('asks for exactly the eight endpoints it needs, and no others', async () => {
+  it('asks for exactly the ten endpoints it needs, and no others', async () => {
     stubFetch();
 
     await loadWorkflow();
 
     expect([...requested].sort()).toEqual([...Object.keys(RESPONSES)].sort());
-    expect(requested).toHaveLength(8);
+    expect(requested).toHaveLength(10);
   });
 
   it('sends page and size on every collection request', async () => {
@@ -96,8 +99,8 @@ describe('the requests the screen makes', () => {
 
     const collections = requested.filter((path) => path.includes('?'));
 
-    // Two listings, the timeline and the two queues.
-    expect(collections).toHaveLength(5);
+    // Three listings — workflows, approvals and approval groups — the timeline and the two queues.
+    expect(collections).toHaveLength(6);
     for (const path of collections) {
       expect([path, path.includes('page=1')]).toEqual([path, true]);
       expect([path, path.includes('size=50')]).toEqual([path, true]);
@@ -112,7 +115,7 @@ describe('the requests the screen makes', () => {
 
     const unpaged = requested.filter((path) => !path.includes('?'));
 
-    expect(unpaged).toHaveLength(3);
+    expect(unpaged).toHaveLength(4);
     for (const path of unpaged) {
       expect([path, /\/[0-9a-f-]{36}(\/status)?$/.test(path)]).toEqual([path, true]);
     }
@@ -122,9 +125,12 @@ describe('the requests the screen makes', () => {
    * The N+1 assertion, made where an N+1 would actually appear.
    *
    * Each listing returns rows; a screen that read a detail per row would issue one request per
-   * workflow, per version, per approval, per queue entry and per history entry. Here the listings
-   * return **fifty rows each** and the request count is unchanged — which is the only way to
-   * distinguish "reads the first row" from "reads every row" without counting by hand.
+   * workflow, per version, per approval, per approval group, per queue entry and per history entry.
+   * Here the listings return **fifty rows each** and the request count is unchanged — which is the
+   * only way to distinguish "reads the first row" from "reads every row" without counting by hand.
+   *
+   * The approval groups are the newest way to get this wrong: the listing carries no member count,
+   * so a column showing one would take a detail read per row. Fifty groups, one detail read.
    */
   it('issues the same requests for fifty rows as for one', async () => {
     const many = <TItem>(item: TItem): readonly TItem[] => Array.from({ length: 50 }, () => item);
@@ -150,15 +156,31 @@ describe('the requests the screen makes', () => {
 
     await loadWorkflow();
 
-    // Fifty workflows, fifty approvals, fifty queue entries, fifty timeline entries — and still
-    // eight requests. A per-row read would have made this two hundred and fifty.
-    expect(requested).toHaveLength(8);
+    // Fifty workflows, fifty approvals, fifty groups, fifty queue entries, fifty timeline entries —
+    // and still ten requests. A per-row read would have made this three hundred.
+    expect(requested).toHaveLength(10);
     expect(requested.filter((path) => path.startsWith('/definitions/'))).toHaveLength(1);
     expect(requested.filter((path) => path.startsWith('/instances/'))).toHaveLength(2);
     expect(requested.filter((path) => path.includes('/status'))).toHaveLength(1);
+    // One group detail for fifty groups, and never one per row.
+    expect(requested.filter((path) => path.startsWith('/approval-groups/'))).toHaveLength(1);
   });
 
-  it('makes four requests for an empty tenant, because there is no first row to read', async () => {
+  /** A tenant with one group of everything: the detail read happens once, for that one row. */
+  it('reads one group’s members, and reads them from the first row of the listing', async () => {
+    stubFetch();
+
+    const workflow = await loadWorkflow();
+
+    expect(requested.filter((path) => path.startsWith('/approval-groups/'))).toEqual([
+      `/approval-groups/${GROUP_ID}`,
+    ]);
+    expect(workflow.group?.members).toHaveLength(2);
+    // The listing's total is the server's own count over the tenant, not the page it returned.
+    expect([workflow.groups.length, workflow.groupsTotal]).toEqual([1, 90]);
+  });
+
+  it('makes five requests for an empty tenant, because there is no first row to read', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
@@ -173,19 +195,19 @@ describe('the requests the screen makes', () => {
 
     const workflow = await loadWorkflow();
 
-    // The two listings and the two queues, and none of the four details.
-    expect(requested).toHaveLength(4);
+    // The three listings and the two queues, and none of the four details.
+    expect(requested).toHaveLength(5);
     expect(workflow.unavailable).toBe(false);
     expect(workflow.definitionsTotal).toBe(0);
   });
 
-  /** One row is the ordinary case, and it costs the full eight — no more and no fewer. */
-  it('makes eight requests for a tenant with one of everything', async () => {
+  /** One row is the ordinary case, and it costs the full ten — no more and no fewer. */
+  it('makes ten requests for a tenant with one of everything', async () => {
     stubFetch();
 
     await loadWorkflow();
 
-    expect(requested).toHaveLength(8);
+    expect(requested).toHaveLength(10);
   });
 });
 
@@ -269,7 +291,7 @@ describe('what the screen does with an answer it did not get', () => {
     const workflow = await loadWorkflow();
 
     // One request, and the screen says the service did not answer rather than rendering a tenant
-    // with nothing in it. A wall of seven more failed requests would tell nobody anything.
+    // with nothing in it. A wall of nine more failed requests would tell nobody anything.
     expect(requested).toHaveLength(1);
     expect(workflow.unavailable).toBe(true);
   });

@@ -63,7 +63,33 @@
       "runningTotal": "Running now",
       "pendingTotal": "Waiting for you",
       "decidedTotal": "Decided by you",
-      "publishedSteps": "Published chain"
+      "publishedSteps": "Published chain",
+      "approvalGroups": "Approval groups",
+      "groupMembers": "Members of this group",
+      "branches": "Branches and tallies",
+      "awaitingSteps": "Awaiting a decision now",
+      "providedNotices": "What this release added",
+      "approvalGroupId": "Group",
+      "membershipId": "Membership",
+      "addedOn": "Added",
+      "memberCount": "Members",
+      "groupsTotal": "Approval groups",
+      "approverGroup": "Approver group",
+      "branchRule": "Branch rule",
+      "quorum": "Quorum",
+      "quorumMet": "Quorum",
+      "assigned": "Asked",
+      "approvals": "Approved",
+      "rejections": "Rejected",
+      "responses": "Answered",
+      "outstanding": "Outstanding",
+      "threshold": "Approvals needed",
+      "outcome": "Outcome",
+      "condition": "Condition",
+      "conditionKey": "Value read",
+      "conditionOperator": "Comparison",
+      "conditionValue": "Compared with",
+      "sourceGroup": "From group"
     },
     "notice": {
       "empty": "Nothing to show.",
@@ -75,7 +101,13 @@
       "approverIsConfigured": "The approver on a step is the member configured to be asked. It is not the person reading this screen.",
       "commentOnDecision": "A rejection comment stays on the decision, where a permission decides who may read it. It is never moved into the timeline.",
       "historyIsRouting": "The timeline records routing only — who was asked, who answered, and when. A business outcome belongs to the module that owns the record.",
-      "subjectIsOpaque": "A subject type and a subject identifier are the owning module’s own values. Approvals stores them and interprets neither."
+      "subjectIsOpaque": "A subject type and a subject identifier are the owning module’s own values. Approvals stores them and interprets neither.",
+      "groupIsExplicitList": "An approval group is an explicit list of memberships a tenant wrote down. It is not a role, a department, an organizational unit or a directory query, and nothing resolves it from anywhere else.",
+      "groupListingIsNotCounted": "The listing shows the groups themselves. A member count is a property of one group and is read from its detail below, for the first row only — a count per row would be one request per group.",
+      "groupIsSnapshotted": "An approval already running keeps the members it started with. Changing a group today does not reach an approval raised yesterday.",
+      "tallyIsServerComputed": "Every number in a tally is the server’s own count over the decisions that exist. Nothing on this screen adds, divides or compares them, and no percentage is derived from them.",
+      "branchIsSimultaneous": "Several approvers may share one position and are asked at the same time. A position with more than one approver is one branch, not several steps in order.",
+      "conditionIsConfiguration": "A condition is shown as it was configured. It is evaluated by the server when an approval starts, never in this screen, and a value the request does not carry is a refusal there rather than a false here."
     },
     "rejection": {
       "authority-not-delegated": "This decision names somebody it acts for, but was not made under a delegation.",
@@ -174,7 +206,8 @@
         "expired": "Expired"
       },
       "approverKind": {
-        "membership": "A named member"
+        "membership": "A named member",
+        "group": "An approval group"
       },
       "historyEvent": {
         "instance-started": "Approval raised",
@@ -185,6 +218,27 @@
         "instance-completed": "Approval completed",
         "instance-rejected": "Approval rejected",
         "instance-cancelled": "Approval cancelled"
+      },
+      "branchRule": {
+        "unanimous": "Everybody asked",
+        "majority": "A majority",
+        "first-response": "The first answer"
+      },
+      "branchOutcome": {
+        "awaiting": "Awaiting",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "conditionOperator": {
+        "equals": "is",
+        "not-equals": "is not",
+        "greater-than": "is greater than",
+        "less-than": "is less than",
+        "in": "is one of"
+      },
+      "quorumMet": {
+        "met": "Met",
+        "not-met": "Not met"
       }
     },
     "withheld": {
@@ -194,17 +248,25 @@
       "scheduling": "Nothing is scheduled. No approval is advanced, closed or reviewed by a background job.",
       "approvalExpiry": "No approval expires. `expired` is declared in the approval vocabulary and this phase never produces it.",
       "delegationExpiry": "A delegation is not expired automatically. Whether one is in force is answered when a decision is made.",
-      "parallelApproval": "Every chain is sequential. There is no parallel branch and no simultaneous approver.",
-      "tally": "There is no majority, unanimous, quorum or first-response rule. One named member answers each step.",
-      "conditionalBranching": "There is no conditional routing. A chain does not branch on the value of the record it is about.",
-      "roles": "There is no role directory. A step names a member, never a role.",
-      "groups": "There is no group directory. A step names a member, never a group.",
+      "roles": "There is no role directory and no role approver. A step names a member or an approval group — an explicit list — and never a role.",
       "managerRouting": "Managers are not resolved. Nothing here routes to somebody’s manager or reads a reporting line.",
       "externalApprovers": "There is no external approver. Everybody asked is a member of this tenant.",
       "notificationDelivery": "Nothing is delivered. No email, message or push notification is sent when somebody is asked to decide.",
       "analytics": "There are no approval analytics. No success rate, average time, bottleneck or compliance figure is calculated anywhere.",
       "asynchronousCallbacks": "There is no asynchronous callback. A decision reaches the module that raised the approval inside the approver’s own request.",
-      "outbox": "There is no outbox and no message broker. Nothing is queued for later delivery."
+      "outbox": "There is no outbox and no message broker. Nothing is queued for later delivery.",
+      "groupDirectory": "There is no group directory. An approval group is a list a tenant maintains; no department, organizational unit or membership query is resolved into one.",
+      "selfServicePortal": "There is no self-service or external portal. Approvals are read and decided by members of this tenant through this product.",
+      "routingIntelligence": "There is no routing intelligence beyond the rules above. Nothing chooses an approver by workload, history, seniority or prediction.",
+      "delegationManagement": "Delegated access is not managed here. Whether somebody may act for an approver is Identity’s answer, asked at the moment a decision is made."
+    },
+    "provided": {
+      "approvalGroups": "Workflow approval groups are supported as explicit membership lists. A step may name a group, and the group is resolved into its individual members when an approval starts.",
+      "parallelApproval": "Parallel approval is supported. Several approvers may occupy one position and are asked at the same time rather than one after another.",
+      "branchRules": "Unanimous, majority and first-response are supported as branch rules. Each is counted over the approvers the branch was given when the approval started.",
+      "quorum": "A quorum is supported as a whole number of responses. It is a count and never a proportion, and it gates an approval and a rejection alike.",
+      "conditionalBranching": "Conditional branching is supported. A branch may carry conditions on values the request supplied, and the server evaluates them when the approval starts.",
+      "tally": "A branch tally is published: who was asked, who answered, how many approvals the rule needs, and the outcome. It is computed by the server from the decisions and stored nowhere."
     }
   }
 }
