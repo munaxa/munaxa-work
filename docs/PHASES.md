@@ -367,9 +367,13 @@ its own branch, and a group's members outliving the group — with their origina
 measured performance at 500, 10,000 and 100,000 approvals with **all twenty-six workloads within
 budget at every tier**, the query plans, the ten verified races, the locked tally arithmetic, the
 carried-forward debt register and the twenty-four `NOT VERIFIED` capabilities are in
-[`verification/phase-16b-final-report.md`](verification/phase-16b-final-report.md). **Phase 16C — SLA,
-escalation, scheduling, manager routing, role approvers, notification and analytics — is not
-started**: no column, no port, no route, no screen.
+[`verification/phase-16b-final-report.md`](verification/phase-16b-final-report.md). **Phase 16C — manager routing, SLA,
+escalation and approval expiry — is not started**: no column, no route, no screen. Notification
+delivery is Phase 17's and analytics is Phase 20's, by those phases' own specifications; a durable job
+runner for the kernel's `JobPort` — which has existed as an interface since Phase 0 and has never had
+an adapter — is owned by no phase yet. The Definition of Ready, its six contradictions and its
+fourteen blocking decisions are in
+[`verification/phase-16c-plan.md`](verification/phase-16c-plan.md).
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
