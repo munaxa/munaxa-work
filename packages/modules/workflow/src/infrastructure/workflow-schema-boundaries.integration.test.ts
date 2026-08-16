@@ -41,7 +41,12 @@ const migrationAt = (directory: string): string =>
 
 /** Phase 16A's, and the routing migration Phase 16B Checkpoint 3 adds beside it. */
 const ROUTING_MIGRATION = migrationAt('20260815100000_workflow_routing');
-const MIGRATIONS = [migrationAt('20260814100000_workflow'), ROUTING_MIGRATION];
+const RESOLUTION_MIGRATION = migrationAt('20260816100000_workflow_routing_resolution');
+const MIGRATIONS = [
+  migrationAt('20260814100000_workflow'),
+  ROUTING_MIGRATION,
+  RESOLUTION_MIGRATION,
+];
 
 suite('what the Workflow schema deliberately does not contain', () => {
   let fixture: WorkflowFixture;
@@ -185,17 +190,30 @@ suite('what the Workflow schema deliberately does not contain', () => {
     ];
 
     expect(created.sort()).toStrictEqual([...WORKFLOW_TABLES].sort());
-    // Phase 16B alters two of its own, and nothing else in the database.
+    // Phases 16B and 16C alter the same two of their own, and nothing else in the database. 16C
+    // created no table at all: the manager needed no column and the target needed no row.
     expect(altered.sort()).toStrictEqual(['workflow_step', 'workflow_step_template']);
   });
 
-  it('adds exactly one migration directory, alongside the twenty-one that came before', () => {
+  /**
+   * One migration per Workflow checkpoint that needed one, and no more.
+   *
+   * The count moved from two to three in Phase 16C — by authorization, and asserted as a count so a
+   * fourth appearing without one is a failure rather than a detail. What has not moved is that every
+   * Workflow migration is Workflow's: the assertion above proves none of them touches another
+   * module's table.
+   */
+  it('adds exactly one migration directory per Workflow phase that needed one', () => {
     const directories = readdirSync(join(process.cwd(), '..', '..', '..', 'prisma', 'migrations'))
       .filter((entry) => /^\d{14}_/.test(entry))
       .sort();
 
-    expect(directories.at(-1)).toBe('20260815100000_workflow_routing');
-    expect(directories.filter((entry) => entry.includes('workflow'))).toHaveLength(2);
+    expect(directories.at(-1)).toBe('20260816100000_workflow_routing_resolution');
+    expect(directories.filter((entry) => entry.includes('workflow'))).toStrictEqual([
+      '20260814100000_workflow',
+      '20260815100000_workflow_routing',
+      '20260816100000_workflow_routing_resolution',
+    ]);
   });
 
   describe('the indexes the engine is designed around are reachable', () => {

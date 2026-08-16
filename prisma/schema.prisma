@@ -5311,6 +5311,8 @@ model WorkflowStepTemplate {
   branch_rule            String?   @db.VarChar(16)
   quorum                 Int?
   condition              Json?
+  service_level_count    Int?
+  service_level_unit     String?   @db.VarChar(8)
   metadata               Json
   created_at             DateTime  @db.Timestamptz(6)
   created_by             String    @db.VarChar(255)
@@ -5374,6 +5376,9 @@ model WorkflowStep {
   branch_rule            String?   @db.VarChar(16)
   quorum                 Int?
   condition              Json?
+  service_level_count    Int?
+  service_level_unit     String?   @db.VarChar(8)
+  awaiting_at            DateTime? @db.Timestamptz(6)
   metadata               Json
   created_at             DateTime  @db.Timestamptz(6)
   created_by             String    @db.VarChar(255)
