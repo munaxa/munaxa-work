@@ -5,6 +5,54 @@ and what is still missing.
 
 ---
 
+## Phase 16B — Approval groups, parallel approval and branching
+
+Approvals can now ask **several people at once**, and a company can decide **who** those people are
+by writing the list down.
+
+**A list of approvers.** A company can keep named lists — "capital approvers", "finance directors" —
+each an explicit set of members somebody chose, with a code and a name in both languages. A step in
+an approval process can name a list instead of a person, and when an approval is raised, everybody on
+that list is asked at the same moment.
+
+**This is a list, not a directory.** The product still has no role directory and no group directory.
+Nothing works out who is in a department, who reports to whom, or who holds a job title: a list
+contains exactly the people somebody put on it, and it changes only when somebody changes it.
+
+**How a stage ends is a choice.** A stage can require everybody asked to approve, a majority of them,
+or simply the first answer — whichever way that answer went. A majority means *more than half*: two
+of four is a tie, and a tie is not approval. A stage can also require a minimum number of replies
+before it is settled at all, which stops one quick answer from deciding something six people were
+asked about. That minimum blocks a rejection exactly as it blocks an approval, and if it can never be
+reached the stage simply keeps waiting rather than resolving itself.
+
+**Nobody is quietly dropped from the count.** The number a stage is measured against is the number of
+people asked when the approval started. Somebody who has not replied is counted as outstanding, never
+subtracted — so an approval never becomes easier to pass because a person stayed silent.
+
+**A stage can be skipped by a condition.** A stage can carry conditions on values the requesting
+record supplied — an amount over a threshold, a unit in a list — and is skipped when they do not
+hold. If a condition **cannot be worked out** (the request never supplied that value, or supplied one
+of the wrong kind), the approval **stops and says so**. It is never treated as "the condition was
+false", because those are different situations and only one of them is somebody's mistake to fix.
+
+**Changing a list does not change an approval already running.** An approval remembers the people it
+asked when it started. Take somebody off a list today and the approval raised yesterday still asks
+them — and they can still answer it, because they genuinely were asked. The *next* approval sees the
+new list.
+
+**What an administrator can see.** The approvals screen now shows the lists a company keeps, who is
+on one of them, every stage of an approval with its rule and its running count, and the people being
+asked right now. It shows conditions as they were configured and does not evaluate them. The screen
+reads and never writes, as every administration screen in this product does.
+
+**Still missing, and still deliberate.** Nothing has a service level, a due time or an age. Nothing
+escalates, nothing is scheduled, nothing expires and nothing is sent to anybody when they are asked
+to decide. There are no approval analytics. Nothing routes to a manager, a role, or somebody outside
+the company. Every one of those is named on the screen itself rather than left to be discovered.
+
+---
+
 ## Phase 16A — Approvals
 
 One module. It records the approval processes a company sets up, raises an approval about a record

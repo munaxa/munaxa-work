@@ -330,9 +330,46 @@ one UI defect with their original failing evidence, the three fixture defects th
 by building a database from the migrations alone, the measured performance at 500, 10,000 and 100,000
 approvals with **all eighteen workloads within budget at every tier**, the query plans, the nine
 verified races, the twenty-two `NOT VERIFIED` capabilities and the carried-forward debt register are
-in [`verification/phase-16a-final-report.md`](verification/phase-16a-final-report.md). **Phase 16B —
-parallel approval, tallies, conditional branching, roles, groups, SLA, escalation and scheduling — is
-not started**: no column, no port, no route, no screen.
+in [`verification/phase-16a-final-report.md`](verification/phase-16a-final-report.md).
+
+Phase 16B completed on 2026-08-16: the **routing core** — two tables, one additive migration, and the
+capability to ask several people at once and choose which people to ask. An **approval group** is an
+explicit list of memberships a tenant writes down, with a code unique per tenant and a bilingual
+name; a step may name a list instead of a person, and the list is resolved into individual steps
+**once, when the approval starts**, each recording which list it came from. **This is not a
+directory**: there is still no role directory and no group directory in this product, nothing
+resolves a department, a position or a membership query, and a member of a list is Identity's
+identifier held as an opaque value. **Several steps may share one ordinal and are asked at the same
+moment**, and how that branch ends is the tenant's choice of `unanimous`, `majority` or
+`first-response`, optionally gated by a **quorum** — a whole number of responses, never a proportion,
+which gates a rejection exactly as it gates an approval, approves nothing by itself, and leaves the
+branch awaiting when it cannot be reached. A **majority is strictly more than half**, so a tie is not
+an approval, and the denominator is the set of approvers **snapshotted at start**: a non-response is
+outstanding and never subtracted. A branch may carry **conditions** in a closed `(key, operator,
+value)` form with five operators combined only by `all-of`; a condition that cannot be evaluated is a
+**refusal and never a silent `false`**, because the request not carrying a value is somebody's
+mistake to fix rather than routing that worked. The **tally is computed from the decisions at read
+time and stored nowhere**, so there is no counter to disagree with the decisions when two approvers
+commit at once. Editing a list **never reaches an approval already running** — somebody removed today
+still decides what they were asked yesterday — while the next approval sees the new membership. The
+group tables use **composite tenant-aware foreign keys**, because PostgreSQL checks a foreign key
+without consulting row-level security and a single-column reference would let one tenant's row point
+at another's list. Row-level security is enabled **and forced** on all **nine** tables, one permissive
+policy each. **Two permissions were added and nothing else**: `workflow.group.read` and
+`workflow.group.manage`, neither implied by the other or by `workflow.definition.manage`. The Admin
+screen gained five read-only sections and its honesty section **shrank**, because six capabilities it
+had listed as absent are now real. **Nothing was scheduled, escalated, expired, notified, measured or
+routed to a manager**: `JobPort` still has no adapter, no completed module was modified, no
+cross-module contract was added, and the Recruitment seam is unchanged. Twenty-four capabilities
+remain `NOT VERIFIED`, none with a placeholder anywhere. The four production defects — a localized
+name accepted in one language, a branch skip overwriting recorded decisions, a vote counted outside
+its own branch, and a group's members outliving the group — with their original failing evidence, the
+measured performance at 500, 10,000 and 100,000 approvals with **all twenty-six workloads within
+budget at every tier**, the query plans, the ten verified races, the locked tally arithmetic, the
+carried-forward debt register and the twenty-four `NOT VERIFIED` capabilities are in
+[`verification/phase-16b-final-report.md`](verification/phase-16b-final-report.md). **Phase 16C — SLA,
+escalation, scheduling, manager routing, role approvers, notification and analytics — is not
+started**: no column, no port, no route, no screen.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

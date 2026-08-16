@@ -36,7 +36,8 @@ them afterwards.
 | Course, enrolment, certification          | `learning`      | Phase 14A     |
 | Career path, succession plan              | `career`        | Phase 15 ✅   |
 | Approval, workflow definition, version, instance, step, decision | `workflow` | Phase 16A ✅ |
-| Parallel approval, tally, branching, SLA, escalation | `workflow` | Phase 16B |
+| Approval group, group membership, parallel branch, branch rule, quorum, branch condition, branch tally | `workflow` | Phase 16B ✅ |
+| SLA, escalation, scheduled firing, manager routing, role approvers | — | not owned; no module implements any of them |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
 | Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |
@@ -123,6 +124,19 @@ nothing else owns one.
 key this module never resolves; an issued letter carries its frozen substituted values and no
 artefact. Both are missing dependencies rather than deferred features, and both are named in
 [`verification/phase-12-report.md`](verification/phase-12-report.md) §5.
+
+**`workflow` owns process and owns no business data.** It routes a decision about a subject it
+identifies by two opaque strings and never interprets, so there is no foreign key out of the module
+and no shape in which it could learn what a requisition is. Phase 16B added the **approval group** —
+and an approval group is an explicit list of memberships a tenant writes down, not a directory. This
+product owns no role directory and no group directory: nothing resolves a department, an
+organizational unit, a position or a membership query into a set of approvers, and a membership on a
+list is Identity's identifier held as an opaque value with no join behind it.
+
+A **delegation** is `identity`'s and stays there: Workflow asks whether one is in force at the
+instant a decision is made and stores none of its own. **SLA, escalation, scheduled firing, manager
+routing and role approvers are owned by nobody**, because no module implements them — the row above
+records that as an absence rather than leaving a reader to infer an owner.
 
 ## Rules
 
