@@ -13,7 +13,7 @@ import {
   requireDatabaseInCi,
   type WorkflowApiFixture,
 } from './workflow-api.fixture.js';
-import { BASE, runningApproval } from './workflow-api-scenario.js';
+import { anApprovalGroup, BASE, runningApproval } from './workflow-api-scenario.js';
 import { http } from './workflow-api.fixture.js';
 
 /**
@@ -35,6 +35,11 @@ import { http } from './workflow-api.fixture.js';
  *
  * **`approval.read-own` is not `approval.decide`.** Seeing what is waiting for you does not let you
  * answer it, and answering does not require the queue.
+ *
+ * **`group.manage` is not `definition.manage`.** Whoever edits an approval group changes who
+ * approves every request routed through a version that names it, which is a different authority from
+ * writing the process — and `group.read` is separate again, because seeing who approves capital
+ * expenditure and being able to change it are different risks.
  */
 
 const suite = CONNECTION === undefined ? describe.skip : describe;
@@ -42,7 +47,7 @@ const suite = CONNECTION === undefined ? describe.skip : describe;
 requireDatabaseInCi('The Workflow API authorization suite');
 
 interface Route {
-  readonly method: 'get' | 'post';
+  readonly method: 'get' | 'post' | 'delete';
   readonly path: string;
   readonly permission: string;
   readonly body?: Record<string, unknown>;
@@ -52,6 +57,7 @@ suite('Workflow API authorization', () => {
   let fixture: WorkflowApiFixture;
   let seeded: { readonly definitionId: string; readonly instanceId: string };
   let workflowVersionId: string;
+  let group: { readonly approvalGroupId: string; readonly approvalGroupMemberId: string };
 
   beforeAll(async () => {
     fixture = await openWorkflowApi();
@@ -84,6 +90,7 @@ suite('Workflow API authorization', () => {
 
     seeded = { definitionId: running.definitionId, instanceId: running.instanceId };
     workflowVersionId = running.workflowVersionId;
+    group = await anApprovalGroup(full, [APPROVER]);
   });
 
   /** Every route, with the one permission its handler declares. Seventeen, one per handler. */
@@ -170,6 +177,32 @@ suite('Workflow API authorization', () => {
       permission: WorkflowPermissions.approvalDecide,
       body: { decision: 'approved', expectedVersion: 1 },
     },
+    { method: 'get', path: '/approval-groups', permission: WorkflowPermissions.groupRead },
+    {
+      method: 'post',
+      path: '/approval-groups',
+      permission: WorkflowPermissions.groupManage,
+      body: {
+        code: `guarded-${uuidV7().slice(0, 8)}`,
+        name: { en: 'Guarded list', ar: 'قائمة محمية' },
+      },
+    },
+    {
+      method: 'get',
+      path: `/approval-groups/${group.approvalGroupId}`,
+      permission: WorkflowPermissions.groupRead,
+    },
+    {
+      method: 'post',
+      path: `/approval-groups/${group.approvalGroupId}/members`,
+      permission: WorkflowPermissions.groupManage,
+      body: { membershipId: uuidV7() },
+    },
+    {
+      method: 'delete',
+      path: `/approval-groups/members/${group.approvalGroupMemberId}`,
+      permission: WorkflowPermissions.groupManage,
+    },
   ];
 
   const call = async (
@@ -177,19 +210,20 @@ suite('Workflow API authorization', () => {
     route: Route,
   ): Promise<{ readonly status: number }> => {
     const agent = http(application);
-    const response =
-      route.method === 'get'
-        ? await agent.get(`${BASE}${route.path}`).send()
-        : await agent.post(`${BASE}${route.path}`).send(route.body ?? {});
+    const response = await (route.method === 'get'
+      ? agent.get(`${BASE}${route.path}`).send()
+      : route.method === 'delete'
+        ? agent.delete(`${BASE}${route.path}`).send()
+        : agent.post(`${BASE}${route.path}`).send(route.body ?? {}));
 
     return { status: response.status };
   };
 
-  it('covers every one of the seventeen handlers exactly once', () => {
+  it('covers every one of the twenty-two handlers exactly once', () => {
     const declared = routes();
 
-    expect(declared).toHaveLength(17);
-    expect(new Set(declared.map((route) => `${route.method} ${route.path}`)).size).toBe(17);
+    expect(declared).toHaveLength(22);
+    expect(new Set(declared.map((route) => `${route.method} ${route.path}`)).size).toBe(22);
     for (const route of declared) {
       expect(ALL_WORKFLOW_PERMISSIONS).toContain(route.permission);
     }

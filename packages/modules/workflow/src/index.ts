@@ -46,3 +46,4 @@ export { WorkflowDefinitionController } from './api/definition.controller.js';
 export { WorkflowVersionController } from './api/version.controller.js';
 export { WorkflowInstanceController } from './api/instance.controller.js';
 export { WorkflowApprovalController } from './api/approval.controller.js';
+export { WorkflowApprovalGroupController } from './api/approval-group.controller.js';

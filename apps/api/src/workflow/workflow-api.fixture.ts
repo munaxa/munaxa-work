@@ -23,6 +23,7 @@ import {
 } from '@work/identity';
 import {
   WorkflowApprovalController,
+  WorkflowApprovalGroupController,
   WorkflowDefinitionController,
   WorkflowDispatcher,
   WorkflowInstanceController,
@@ -183,6 +184,7 @@ export const CONTROLLERS = [
   WorkflowVersionController,
   WorkflowInstanceController,
   WorkflowApprovalController,
+  WorkflowApprovalGroupController,
 ];
 
 const nestFor = async (

@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsDefined,
   IsIn,
   IsInt,
@@ -15,7 +17,11 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-import { APPROVAL_DECISIONS } from '../domain/workflow-vocabulary.js';
+import {
+  APPROVAL_DECISIONS,
+  BRANCH_RULES,
+  CONDITION_OPERATORS,
+} from '../domain/workflow-vocabulary.js';
 
 /**
  * The wire shapes Workflow accepts, and the rules that run through every one of them.
@@ -58,6 +64,15 @@ export const SUBJECT_TYPE = /^[a-z0-9]+(-[a-z0-9]+)*(\.[a-z0-9]+(-[a-z0-9]+)*)+$
 
 const TEXT = 500;
 const COMMENT = 4000;
+
+/**
+ * A bound on how many conditions one branch may carry.
+ *
+ * Not a rule about approvals — the domain has none — but a bound on an unbounded array arriving from
+ * an untrusted edge, which is the same reason every collection read in this module is paged. Twenty
+ * `all-of` clauses on one branch is already past what anybody could read on a screen.
+ */
+const CONDITIONS = 20;
 
 /**
  * Bilingual text a tenant authored.
@@ -120,18 +135,56 @@ export class CreateDefinitionBody {
 }
 
 /**
+ * One condition on a branch, in the closed form the domain evaluates.
+ *
+ * **The shape is checked here and the meaning is not.** A key, one of five operators, and a value —
+ * that is all this class can honestly assert, because whether `'50000'` suits `greater-than` and
+ * whether a key exists in a particular request's payload are questions about an operator's semantics
+ * and about facts that arrive later. `conditionIsWellFormed` answers the first when a version is
+ * published and `evaluateCondition` answers the second when an approval starts, each with a reason
+ * that names the mistake. A 400 here for either would be telling a client its request was malformed
+ * when it was well formed and declined.
+ *
+ * `value` is deliberately untyped beyond "present": the domain takes a string, a whole number, or a
+ * list of one kind for `in`, and there is no `class-validator` decorator for that union. Declaring it
+ * as a string would refuse the numeric comparison the feature exists for.
+ */
+export class BranchConditionBody {
+  @ApiProperty({ maxLength: TEXT, description: 'A top-level key of the instance’s context.' })
+  @IsString()
+  @IsNotEmpty()
+  @Length(1, TEXT)
+  public readonly key!: string;
+
+  @ApiProperty({ enum: CONDITION_OPERATORS })
+  @IsIn([...CONDITION_OPERATORS])
+  public readonly operator!: (typeof CONDITION_OPERATORS)[number];
+
+  @ApiProperty({ description: 'Text, a whole number, or a list of one kind for `in`.' })
+  @IsDefined()
+  public readonly value!: string | number | readonly (string | number)[];
+}
+
+/**
  * A step on a draft version.
  *
  * `approverMembershipId` names **the person being asked**, not the person asking. It is a subject
  * rather than a credential: an administrator configuring a workflow states who must decide, and the
  * caller's own identity is never read from a body (ADR-0032).
  *
- * There is no `approverKind` here. The domain has exactly one — `membership` — and offering a field
- * with a single legal value would imply a choice the product does not have; adding a kind in 16B is
- * a vocabulary change somebody reviews rather than a new meaning given to an existing field.
+ * **There is still no `approverKind`, and now that is load-bearing rather than tidy.** The domain has
+ * two kinds since Phase 16B, and the application *derives* which one this is from whichever approver
+ * field was filled in. A client that could send the kind could send one that disagrees with the field
+ * beside it — `group` with a membership, `membership` with a group — and something would have to pick
+ * a reading. `forbidNonWhitelisted` refuses the property outright, so the derivation cannot be
+ * argued with, and `role` is unreachable because there is no field it could arrive in.
+ *
+ * Naming **both** approvers, or neither, is the domain's refusal (`step-approver-ambiguous`,
+ * `step-approver-required`) rather than a 400: both bodies are well formed, and which one a caller
+ * meant is a question about the process they are configuring.
  */
 export class AddStepBody {
-  @ApiProperty({ minimum: 1, description: 'Position in the chain. Bounded below, never above.' })
+  @ApiProperty({ minimum: 1, description: 'The branch. Several steps may share one ordinal.' })
   @IsInt()
   @Min(1)
   public readonly ordinal!: number;
@@ -150,9 +203,69 @@ export class AddStepBody {
   @Type(() => LocalizedTextBody)
   public readonly name!: LocalizedTextBody;
 
-  @ApiProperty({ format: 'uuid', description: 'The membership asked to decide.' })
+  @ApiPropertyOptional({ format: 'uuid', description: 'The membership asked to decide.' })
+  @IsOptional()
   @IsUUID()
-  public readonly approverMembershipId!: string;
+  public readonly approverMembershipId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'The list resolved at instance start.' })
+  @IsOptional()
+  @IsUUID()
+  public readonly approverGroupId?: string;
+
+  @ApiPropertyOptional({ enum: BRANCH_RULES, description: 'Absent means unanimous.' })
+  @IsOptional()
+  @IsIn([...BRANCH_RULES])
+  public readonly branchRule?: (typeof BRANCH_RULES)[number];
+
+  /** Responses before the rule is consulted. A count of people, bounded below and not above. */
+  @ApiPropertyOptional({ minimum: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  public readonly quorum?: number;
+
+  @ApiPropertyOptional({ type: [BranchConditionBody], maxItems: CONDITIONS })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(CONDITIONS)
+  @ValidateNested({ each: true })
+  @Type(() => BranchConditionBody)
+  public readonly condition?: readonly BranchConditionBody[];
+}
+
+/**
+ * A named list of memberships a tenant maintains.
+ *
+ * Two fields, and the absences are the design: no status, no owner, no effective period, no role and
+ * no query. A group is a list somebody wrote down, and every one of those would make it something
+ * else — the directory ADR-0001 places with Platform.
+ */
+export class CreateApprovalGroupBody {
+  @ApiProperty({ pattern: CODE.source })
+  @IsString()
+  @Matches(CODE)
+  public readonly code!: string;
+
+  @ApiProperty({ type: LocalizedTextBody })
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => LocalizedTextBody)
+  public readonly name!: LocalizedTextBody;
+}
+
+/**
+ * Putting somebody on a list.
+ *
+ * One field. `membershipId` is **the person being added**, not the person adding — a subject rather
+ * than a credential, exactly as a step's approver is. Nothing resolves it: Workflow does not ask
+ * Identity whether this membership exists, holds a position or reports to anybody, because a lookup
+ * here would be the first half of a directory this product has committed not to build.
+ */
+export class AddGroupMemberBody {
+  @ApiProperty({ format: 'uuid', description: 'Identity’s identifier, held as an opaque value.' })
+  @IsUUID()
+  public readonly membershipId!: string;
 }
 
 /**
@@ -214,6 +327,23 @@ export class DecideStepBody extends VersionedBody {
   @ApiProperty({ enum: APPROVAL_DECISIONS })
   @IsIn([...APPROVAL_DECISIONS])
   public readonly decision!: (typeof APPROVAL_DECISIONS)[number];
+
+  /**
+   * Which of the caller's **own** open steps this answers, and it is not an identity.
+   *
+   * Almost no request carries it: a caller asked once — every 16A approval, and every branch a person
+   * appears in once — has their step resolved from the membership on the request, exactly as before.
+   * It exists for the one case a branch asks the same person twice, which a version naming somebody
+   * individually *and* through a group at one ordinal produces, where answering "one of them" would
+   * record a decision against a step nobody chose.
+   *
+   * **It can only narrow.** The handler computes the caller's own steps first and then filters by
+   * this; naming a colleague's step earns the same refusal as sending nothing would.
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  public readonly stepId?: string;
 
   @ApiPropertyOptional({ maxLength: COMMENT })
   @IsOptional()

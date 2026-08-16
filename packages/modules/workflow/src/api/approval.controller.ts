@@ -103,7 +103,9 @@ export class WorkflowApprovalController {
         instanceId,
         decision: body.decision,
         expectedVersion: body.expectedVersion,
-        ...present({ comment: body.comment }),
+        // `stepId` narrows the caller's own open steps and cannot widen them: the handler resolves
+        // what is theirs from the membership on the request first, and filters by this afterwards.
+        ...present({ comment: body.comment, stepId: body.stepId }),
       }),
     );
   }

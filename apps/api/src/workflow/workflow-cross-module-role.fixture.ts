@@ -55,6 +55,10 @@ export const TABLES = [
   'workflow_step_template',
   'workflow_version',
   'workflow_definition',
+  // The two Phase 16B added. A group is named by a step template, so it is the least dependent of
+  // the nine and comes last — and the role needs both, because the API now creates and reads them.
+  'workflow_approval_group_member',
+  'workflow_approval_group',
 ];
 
 /**

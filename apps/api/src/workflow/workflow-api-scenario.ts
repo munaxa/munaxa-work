@@ -21,6 +21,8 @@ export interface Created {
   readonly workflowVersionId?: string;
   readonly instanceId?: string;
   readonly stepTemplateId?: string;
+  readonly approvalGroupId?: string;
+  readonly approvalGroupMemberId?: string;
   readonly created?: boolean;
 }
 
@@ -128,6 +130,81 @@ export const publishedWorkflow = async (
   return {
     definitionId: String(definition.definitionId),
     workflowVersionId: String(version.workflowVersionId),
+  };
+};
+
+/**
+ * A definition with a **draft** version, and nothing else.
+ *
+ * The branch suites configure steps one at a time and want each refusal to be their own, so they
+ * cannot use `publishedWorkflow` — which adds a step and publishes before they have said anything.
+ */
+export const aDraftVersion = async (
+  application: INestApplication,
+  subjectType: string,
+): Promise<PublishedWorkflow> => {
+  sequence += 1;
+
+  const definition = must(
+    await post(application, '/definitions', {
+      code: `branch-${String(sequence)}`,
+      name: NAME,
+      subjectType,
+    }),
+    'creating a definition',
+  );
+  const version = must(
+    await post(application, `/definitions/${String(definition.definitionId)}/versions`, {}),
+    'drafting a version',
+  );
+
+  return {
+    definitionId: String(definition.definitionId),
+    workflowVersionId: String(version.workflowVersionId),
+  };
+};
+
+export interface SeededGroup {
+  readonly approvalGroupId: string;
+  readonly approvalGroupMemberId: string;
+}
+
+/**
+ * A list with the memberships on it, over HTTP.
+ *
+ * Returns the **first** member's row identifier as well as the group's, because removal addresses
+ * the membership row rather than the pair — the application's command takes one identifier, and a
+ * helper that returned only the group would leave every removal test reading the group back first.
+ */
+export const anApprovalGroup = async (
+  application: INestApplication,
+  members: readonly string[],
+): Promise<SeededGroup> => {
+  sequence += 1;
+
+  const group = must(
+    await post(application, '/approval-groups', {
+      code: `list-${String(sequence)}`,
+      name: { en: 'Capital approvers', ar: 'معتمدو النفقات' },
+    }),
+    'creating an approval group',
+  );
+  const created: string[] = [];
+
+  for (const membershipId of members) {
+    const member = must(
+      await post(application, `/approval-groups/${String(group.approvalGroupId)}/members`, {
+        membershipId,
+      }),
+      'adding a group member',
+    );
+
+    created.push(String(member.approvalGroupMemberId));
+  }
+
+  return {
+    approvalGroupId: String(group.approvalGroupId),
+    approvalGroupMemberId: created[0] ?? '',
   };
 };
 

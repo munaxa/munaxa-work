@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import {
   WorkflowApprovalController,
+  WorkflowApprovalGroupController,
   WorkflowDefinitionController,
   WorkflowDispatcher,
   WorkflowInstanceController,
@@ -36,15 +37,20 @@ import { IdentityModule } from '../identity/identity.module.js';
   // one whose route begins with a parameter on the same prefix.
   //
   // Here every prefix belongs to exactly one controller — `definitions`, `versions`, `instances`,
-  // `approvals` — so no controller can shadow another. Within `workflow/approvals`, `pending` and
-  // `decided` are literals declared before `:instanceId/status` and `:instanceId/decision`, which is
-  // the one place a parameter could have captured a sibling. An API test asserts that resolution
-  // rather than trusting this comment.
+  // `approvals`, `approval-groups` — so no controller can shadow another. `approvals` and
+  // `approval-groups` are distinct segments rather than nested, so neither captures the other.
+  //
+  // Two places inside a prefix could have gone wrong and are asserted rather than trusted. Within
+  // `workflow/approvals`, `pending` and `decided` are literals declared before `:instanceId/status`
+  // and `:instanceId/decision`. Within `workflow/approval-groups`, `members/:memberId` is a literal
+  // segment declared on a different method from `:approvalGroupId`, so a member removal is never
+  // read as a group identifier.
   controllers: [
     WorkflowDefinitionController,
     WorkflowVersionController,
     WorkflowInstanceController,
     WorkflowApprovalController,
+    WorkflowApprovalGroupController,
   ],
   providers: [
     {
