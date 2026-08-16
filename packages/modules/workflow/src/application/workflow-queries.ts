@@ -215,16 +215,22 @@ export const readInstanceHandler = (
       );
       const open = awaitingSteps(steps);
       const [first] = open;
+      // The instant this approval is being *read* at, and the only thing due-ness is answered
+      // against. One reading for the whole response, so a step cannot be `within` in one field and
+      // `overdue` in another because a millisecond passed between two mappings.
+      const asAt = dependencies.clock.now();
 
       return success({
         instance: asInstanceView(instance),
-        steps: [...steps].sort((left, right) => left.ordinal - right.ordinal).map(asStepView),
+        steps: [...steps]
+          .sort((left, right) => left.ordinal - right.ordinal)
+          .map((step) => asStepView(step, asAt)),
         decisions: decisions.map(asDecisionView),
-        awaitingSteps: open.map(asStepView),
+        awaitingSteps: open.map((step) => asStepView(step, asAt)),
         tallies: talliesOf(steps, decisions),
         // The first of them, for the shape 16A published. A branch of four has four, and
         // `awaitingSteps` above is where a caller sees all of them.
-        ...(first === undefined ? {} : { awaiting: asStepView(first) }),
+        ...(first === undefined ? {} : { awaiting: asStepView(first, asAt) }),
       });
     }),
 });

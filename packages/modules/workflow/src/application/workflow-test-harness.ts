@@ -20,6 +20,8 @@ import type {
   DelegationPort,
   TerminalApproval,
 } from './workflow-ports.js';
+import type { ReportingLinePort } from './workflow-reporting-line.js';
+import type { ManagerResolution } from '../domain/manager.js';
 
 /**
  * The harness the application suites run against: the real module, the real dispatcher, the real
@@ -39,6 +41,11 @@ import type {
  * **There is no notification recorder, no job runner and no role directory here**, because there is
  * no port for any of them. Faking one would let the suites demonstrate a capability production does
  * not have, which is the most expensive kind of green.
+ *
+ * **The reporting-line double is the exception that proves the rule.** There *is* a port for it, with
+ * a shape narrow enough to state in one line, and the double answers exactly what that port declares
+ * — one manager or one of four named absences, never a chain, a team or a directory. What it stands
+ * in for is the adapter, which is Checkpoint 7's and does not exist yet.
  */
 
 export const TENANT = uuidV7();
@@ -131,6 +138,36 @@ export class FakeDelegation implements DelegationPort {
 }
 
 /**
+ * Employment and Identity, answering who somebody's manager is on a given day.
+ *
+ * **It records every question it was asked**, and half the manager suite is about that list rather
+ * than about the answers: asked once for a process naming two managers, asked not at all for a
+ * process naming none, and asked with the approval's own UTC date. A double that only returned
+ * answers could not demonstrate any of it.
+ *
+ * **The default is `no-primary-employment`** rather than a resolved manager. A test that forgot to
+ * arrange one then fails closed, which is the behaviour under test; a double that invented a manager
+ * by default would make every unarranged suite pass for the wrong reason.
+ *
+ * This is a **test** double and there is deliberately no production counterpart: the adapter belongs
+ * to Checkpoint 7, after Identity's own query is built and verified on its own side (Checkpoint 6). A
+ * fake in a real composition would be a manager Workflow made up.
+ */
+export class FakeReportingLine implements ReportingLinePort {
+  public readonly asked: { readonly membershipId: string; readonly asOfDate: string }[] = [];
+  private answer: ManagerResolution = { outcome: 'no-primary-employment' };
+
+  public answers(resolution: ManagerResolution): void {
+    this.answer = resolution;
+  }
+
+  public managerOf(requesterMembershipId: string, asOfDate: string): Promise<ManagerResolution> {
+    this.asked.push({ membershipId: requesterMembershipId, asOfDate });
+    return Promise.resolve(this.answer);
+  }
+}
+
+/**
  * The adopting module, for the application suites.
  *
  * **It records and refuses, and it never pretends to be a database.** What the application layer has
@@ -160,6 +197,7 @@ export interface Harness {
   readonly dispatcher: Dispatcher;
   readonly clock: FixedClock;
   readonly delegation: FakeDelegation;
+  readonly reportingLine: FakeReportingLine;
   readonly business: FakeBusinessDecisions;
   readonly stores: ReturnType<typeof inMemoryWorkflowStores>;
   /** Runs work as a named membership, in this harness's tenant. */
@@ -176,6 +214,16 @@ export interface Harness {
 export interface HarnessOptions {
   readonly permissions?: readonly string[];
   readonly tenantId?: string;
+  /**
+   * Composes the module with **no** reporting line, which is what production is until Checkpoint 7
+   * builds the adapter.
+   *
+   * Here so that the unwired case is exercised against the real `workflowModule` rather than argued
+   * about in prose: a manager step started against this composition must fail closed, not silently
+   * lose a stage. The harness still exposes its `reportingLine` double so a suite can assert it was
+   * never asked.
+   */
+  readonly withoutReportingLine?: boolean;
 }
 
 export const harnessFor = (options: HarnessOptions = {}): Harness => {
@@ -186,6 +234,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
   const dispatcher = new Dispatcher(permissions);
   const clock = new FixedClock(NOW);
   const delegation = new FakeDelegation();
+  const reportingLine = new FakeReportingLine();
   const business = new FakeBusinessDecisions();
   const stores = inMemoryWorkflowStores();
   const tenantId = options.tenantId ?? TENANT;
@@ -193,6 +242,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     unitOfWork: new InMemoryUnitOfWork(tenantId),
     stores,
     delegation,
+    ...(options.withoutReportingLine === true ? {} : { reportingLine }),
     businessDecision: business,
     permissions,
     clock,
@@ -222,6 +272,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     dispatcher,
     clock,
     delegation,
+    reportingLine,
     business,
     stores,
     as: (membershipId, work) => run(tenantId, membershipId, work),

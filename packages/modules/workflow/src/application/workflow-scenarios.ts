@@ -90,9 +90,12 @@ export interface StepSpec {
   readonly ordinal: number;
   readonly approverMembershipId?: string;
   readonly approverGroupId?: string;
+  /** `manager`, for the one kind that names nobody. Absent means the kind is derived, as before. */
+  readonly approverKind?: 'manager';
   readonly branchRule?: BranchRule;
   readonly quorum?: number;
   readonly condition?: readonly BranchCondition[];
+  readonly serviceLevel?: { readonly count: number; readonly unit: string };
 }
 
 /**

@@ -1,10 +1,9 @@
 import { success, uuidV7, type Command, type CommandHandler, type Transaction } from '@work/kernel';
 
 import { cancelInstance, startInstance, type StartedInstance } from '../domain/instance.js';
-import { membersOf } from '../domain/approval-group.js';
-import { plannedStepCount, type GroupSnapshot } from '../domain/branch-plan.js';
-import type { WorkflowStepTemplateState } from '../domain/definition.js';
+import { plannedStepCount } from '../domain/branch-plan.js';
 import { cancellationHistory, startHistory } from '../domain/history.js';
+import { snapshotGroups, snapshotManager } from './instance-snapshot.js';
 import {
   currentActor,
   currentCorrelation,
@@ -27,7 +26,15 @@ import type { WorkflowDependencies } from './workflow-dependencies.js';
  *
  * **The requester is the caller's membership, never a command field.** A caller who could name the
  * requester could raise an approval in somebody else's name — and the requester is what the
- * `instance-started` history entry records.
+ * `instance-started` history entry records. Since Phase 16C it is also *whose manager* a `manager`
+ * step means, which makes the absence of that field an authorization control twice over.
+ *
+ * **Everything a running approval depends on is read here and never again.** The group memberships,
+ * the requester's manager, and the instant every opening step's clock starts. Each is copied onto the
+ * steps, so editing a group, reorganizing a reporting line or correcting a target afterwards changes
+ * nothing about an approval already under way (AD-003). A manager that cannot be resolved fails the
+ * **whole** start — no instance, no steps, no history — because the writes are one `execute` and a
+ * refusal from the domain returns before any of them.
  *
  * **A duplicate submission converges rather than erroring.** `workflow_instance_open_subject_idx`
  * permits one running approval per subject, which is the specification's "Duplicate Approval
@@ -97,6 +104,10 @@ export const startInstanceHandler = (
         version.workflowVersionId,
       );
       const groups = await snapshotGroups(dependencies, transaction, templates);
+      // One instant for the whole start: the approval's `startedAt`, the day the reporting line is
+      // read at, and the clock every opening step begins from are the same moment, read once.
+      const at = dependencies.clock.now();
+      const manager = await snapshotManager(dependencies, templates, requester, at);
       const started = startInstance(version, templates, {
         instanceId: uuidV7(),
         subjectType: command.subjectType,
@@ -104,11 +115,12 @@ export const startInstanceHandler = (
         requestedByMembershipId: requester,
         correlationId: currentCorrelation(),
         context: command.context ?? {},
-        at: dependencies.clock.now(),
+        at,
         // One identifier per **planned** step, not per template: a group of four expands to four
         // steps, and the count is the plan's rather than the configuration's.
-        stepIds: Array.from({ length: plannedStepCount(templates, groups) }, () => uuidV7()),
+        stepIds: Array.from({ length: plannedStepCount(templates, groups, manager) }, () => uuidV7()),
         groups,
+        ...(manager === undefined ? {} : { manager }),
       });
 
       if (!started.ok) return refusedBy(started.error);
@@ -117,46 +129,6 @@ export const startInstanceHandler = (
       return success({ instanceId: started.value.instance.instanceId, created: true });
     }),
 });
-
-/**
- * Every group the version names, as its membership stands **right now**.
- *
- * This is the snapshot, and this function is the only moment it is taken. `membersOfAll` reads every
- * group in one call rather than one per group, so raising an approval costs the same whether the
- * process names one list or five. From here the group is irrelevant to this approval: the members
- * are copied onto its steps, and editing, emptying or deleting the list afterwards changes nothing
- * about who was asked (AD-003, applied to the one thing that could otherwise move underneath a live
- * approval).
- *
- * `membersOf` supplies the order and the de-duplication: a person on a list twice is asked once and
- * counted once, and two instances started from one group produce their steps in the same sequence.
- *
- * A group named by a template that no longer exists resolves to **nothing here**, deliberately — the
- * domain refuses the start with `branch-group-unresolved`, which is a refusal a caller can act on,
- * rather than this function silently omitting an approver.
- */
-const snapshotGroups = async (
-  dependencies: WorkflowDependencies,
-  transaction: Transaction,
-  templates: readonly WorkflowStepTemplateState[],
-): Promise<readonly GroupSnapshot[]> => {
-  const named = [
-    ...new Set(
-      templates
-        .map((template) => template.approverGroupId)
-        .filter((groupId): groupId is string => groupId !== undefined),
-    ),
-  ];
-
-  if (named.length === 0) return [];
-
-  const members = await dependencies.stores.groups.membersOfAll(transaction, named);
-
-  return named.map((approvalGroupId) => ({
-    approvalGroupId,
-    members: membersOf(members.filter((member) => member.approvalGroupId === approvalGroupId)),
-  }));
-};
 
 /**
  * The writes a start makes.

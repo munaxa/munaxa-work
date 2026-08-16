@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ALL_WORKFLOW_PERMISSIONS } from '@work/workflow';
 
+import { LAYERS, PRODUCTION, ROOT, TESTS, codeOf, textOf } from './workflow-audit.fixture.js';
+
 /**
  * The Phase 16B audit, over the whole module at once.
  *
@@ -26,38 +28,6 @@ import { ALL_WORKFLOW_PERMISSIONS } from '@work/workflow';
  * no skipped test, no disabled lint rule, no `any`. Those are how an audit passes without auditing.
  */
 
-const ROOT = join(process.cwd(), '..', '..', 'packages', 'modules', 'workflow', 'src');
-const LAYERS = ['domain', 'application', 'infrastructure', 'api', 'contracts'];
-
-const isTest = (file: string): boolean => file.includes('.test.') || file.includes('.spec.');
-const isFixture = (file: string): boolean =>
-  file.includes('fixture') || file.includes('test-harness') || file.includes('scenarios');
-
-const filesIn = (layer: string, wanted: (file: string) => boolean): readonly string[] =>
-  readdirSync(join(ROOT, layer))
-    .filter((file) => file.endsWith('.ts') && wanted(file))
-    .map((file) => join(layer, file));
-
-/** Every production file of the module: no test, no fixture, no harness. */
-const PRODUCTION = LAYERS.flatMap((layer) =>
-  filesIn(layer, (file) => !isTest(file) && !isFixture(file)),
-);
-
-/** And every test file of the module, for the hygiene assertions at the end. */
-const TESTS = LAYERS.flatMap((layer) => filesIn(layer, isTest));
-
-/** Source with block comments, line comments and string literals removed. */
-const codeOf = (file: string): string =>
-  readFileSync(join(ROOT, file), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ')
-    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/g, '``');
-
-/** The same file with its prose intact, for the assertions that are about the text. */
-const textOf = (file: string): string => readFileSync(join(ROOT, file), 'utf8');
-
 describe('the Workflow module, audited whole', () => {
   it('covers all five layers, discovered rather than listed', () => {
     expect(PRODUCTION.length).toBeGreaterThanOrEqual(35);
@@ -78,11 +48,23 @@ describe('the Workflow module, audited whole', () => {
   });
 
   /**
-   * The capabilities Phase 16B does not have, in **executable code** anywhere in the module.
+   * The capabilities the module still does not have, in **executable code** anywhere in it.
    *
    * Every one of these is named somewhere in the module's prose, and several are rendered as
    * sentences on the Admin screen. What must not exist is an implementation: a timer, a scheduled
-   * fire, a port, a resolution of somebody's manager, a due time, a delivery.
+   * fire, a port, a delivery.
+   *
+   * **Three names left this list in Phase 16C, by authorization rather than by attrition.**
+   * `managerOf` and `reportingLine` are the manager approver D-16C-04 authorized — one membership in,
+   * one manager out, resolved once when an approval starts and copied onto its steps. `slaDue` is
+   * gone in favour of the narrower `slaHours`, because D-16C-05 authorized a target and the due time
+   * derived from it. All three are asserted **present** in the companion test below, so a name
+   * removed from this list can never pass for a capability quietly abandoned.
+   *
+   * Everything still here is still absent. Note what did *not* leave: `escalate`, `escalation`,
+   * `expiresAt`, `roleDirectory`, `externalApprover`, `businessDay`, `workingDay`, and every word for
+   * a timer, a queue and a notification. A target that nothing fires on and a manager read once are
+   * exactly as far as this phase went.
    */
   it('implements none of the capabilities the phase defers', () => {
     for (const file of PRODUCTION) {
@@ -100,12 +82,10 @@ describe('the Workflow module, audited whole', () => {
         'schedule(',
         'escalate',
         'escalation',
-        'slaDue',
+        'slaHours',
         'businessDay',
         'workingDay',
-        'managerOf',
         'reportsTo',
-        'reportingLine',
         'roleDirectory',
         'externalApprover',
         'notify(',
@@ -135,6 +115,27 @@ describe('the Workflow module, audited whole', () => {
 
     for (const documented of ['sla', 'escalat', 'manager', 'notification', 'schedul', 'expir']) {
       expect([documented, prose.includes(documented)]).toEqual([documented, true]);
+    }
+  });
+
+  /**
+   * And the complement of the negative list: what Phase 16C **did** build is in executable code.
+   *
+   * Without this, the three names removed from the deferred list above would read exactly like a
+   * relaxed audit. A boundary suite that only ever loosens has stopped meaning anything, so each
+   * authorized capability is pinned to a file that must contain it.
+   */
+  it('implements the two capabilities Phase 16C authorized, in named files', () => {
+    for (const [file, built] of [
+      ['domain/manager.ts', 'resolveManager'],
+      ['domain/manager.ts', 'resolutionDateOf'],
+      ['domain/service-level.ts', 'dueAt'],
+      ['domain/service-level.ts', 'serviceLevelState'],
+      ['application/workflow-reporting-line.ts', 'managerOf'],
+      ['application/instance-snapshot.ts', 'snapshotManager'],
+    ] as const) {
+      expect([file, PRODUCTION.includes(file)]).toEqual([file, true]);
+      expect([file, built, codeOf(file).includes(built)]).toEqual([file, built, true]);
     }
   });
 

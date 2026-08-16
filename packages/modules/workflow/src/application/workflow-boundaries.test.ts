@@ -7,7 +7,7 @@ import { workflowModule } from './workflow-module.js';
 import type { ApprovalDelivery } from './workflow-ports.js';
 import { inMemoryWorkflowStores } from './in-memory-stores.js';
 import { ALL_WORKFLOW_PERMISSIONS, DELEGABLE_SCOPES } from './workflow-permissions.js';
-import { FakeDelegation, FixedClock, NOW } from './workflow-test-harness.js';
+import { FakeDelegation, FakeReportingLine, FixedClock, NOW } from './workflow-test-harness.js';
 
 /**
  * What the application layer deliberately does not contain, asserted three ways.
@@ -17,8 +17,8 @@ import { FakeDelegation, FixedClock, NOW } from './workflow-test-harness.js';
  * module itself rather than typed here again.
  *
  * **By dependency**, which is nearly as strong: a capability with no port behind it has nothing to
- * call. `WorkflowDependencies` is five fields, and the audit asserts the shape rather than trusting
- * that nobody added a sixth.
+ * call. `WorkflowDependencies` is seven fields, and the audit asserts the shape rather than trusting
+ * that nobody added an eighth.
  *
  * **By source**, with comments and string literals stripped. This is the weakest of the three and it
  * is here for the cases the other two miss — a helper that computes a due date, say, reachable from
@@ -58,6 +58,7 @@ const dependencies = {
   },
   permissions: { holds: () => Promise.resolve(true) },
   clock: new FixedClock(NOW),
+  reportingLine: new FakeReportingLine(),
 };
 const module = workflowModule(dependencies);
 const registered = [
@@ -66,16 +67,21 @@ const registered = [
 ];
 
 /**
- * The boundary moved in Phase 16B **by authorization**, and these rows moved with it.
+ * The boundary has now moved twice, both times **by authorization**, and these rows moved with it.
  *
- * Tallies, parallel branches, conditions and groups are built now. What remains deferred is Phase
- * 16C, and the fragments below are what its code would be written in. Rewritten rather than deleted,
- * because a removed assertion is a removed guarantee.
+ * 16B built tallies, parallel branches, conditions and groups. 16C built the manager approver and the
+ * service-level target. What remains deferred is everything that needs something to run when nobody
+ * is asking — escalation, expiry, notification — plus the two capabilities that need facts this
+ * product does not hold: a role directory and a business-day calendar. The fragments below are what
+ * each would be written in. Rewritten rather than deleted, because a removed assertion is a removed
+ * guarantee, and the complement is asserted too so a loosened row cannot pass for a built one.
  *
- * `group` is no longer among them — Workflow owns an explicit list of memberships. `role` still is:
- * that needs a directory this repository has committed never to build.
+ * `group` left the list in 16B — Workflow owns an explicit list of memberships. `manager` is not on
+ * it either, in the *handler* sense: there is no manager command and no manager query. The manager is
+ * resolved inside `start-instance` and appears as an approver, which is why the registration
+ * assertion below still forbids the word.
  */
-describe('nothing deferred to Phase 16C is reachable', () => {
+describe('nothing deferred beyond Phase 16C is reachable', () => {
   it('registers no handler for any of it', () => {
     const deferred = [
       'escalat',
@@ -102,13 +108,19 @@ describe('nothing deferred to Phase 16C is reachable', () => {
   });
 
   /**
-   * Six dependencies, and the list is the capability surface.
+   * Seven dependencies, and the list is the capability surface.
    *
-   * The unit of work, the stores, Identity's delegation read, the permission checker, a clock — and,
-   * since Checkpoint 7, the one outbound seam through which a terminal decision reaches the module
-   * that asked for it. A seventh would be the beginning of a capability this phase refuses, and the
-   * names below are the ones that would announce it: a scheduler, a notifier, a blob store, an index,
-   * a role directory.
+   * The unit of work, the stores, Identity's delegation read, the permission checker, a clock, the
+   * one outbound seam through which a terminal decision reaches the module that asked for it — and,
+   * since Phase 16C, one reporting-line read. An eighth would be the beginning of a capability this
+   * phase refuses, and the names below are the ones that would announce it: a scheduler, a notifier,
+   * a blob store, an index, a role directory.
+   *
+   * **`reportingLine` is not `directory`, and that word is still on the forbidden list below.** A
+   * directory answers questions *about* people — who holds this role, who is in this department, who
+   * reports to me. This port answers one: who is this one person's manager, on this one day. It is
+   * the same distinction that let an approval group exist in 16B, and it is asserted here rather than
+   * merely argued.
    *
    * `businessDecision` is checked by name rather than by pattern because "approval" appears in it
    * only in the honest sense — it carries an approval that has already been decided — while the
@@ -120,6 +132,7 @@ describe('nothing deferred to Phase 16C is reachable', () => {
       'clock',
       'delegation',
       'permissions',
+      'reportingLine',
       'stores',
       'unitOfWork',
     ]);
@@ -154,16 +167,31 @@ describe('nothing deferred to Phase 16C is reachable', () => {
     }
   });
 
-  it('has no code that computes a due date or an escalation', () => {
+  /**
+   * The row that moved in Phase 16C, and it moved **by authorization**.
+   *
+   * `dueAt` and `managerOf` left this list because D-16C-04 authorized the manager approver and
+   * D-16C-05 the service-level target. They are asserted *present* below rather than merely dropped
+   * from here, because a fragment silently removed from a forbidden list is indistinguishable from a
+   * capability quietly abandoned.
+   *
+   * Everything still here is still absent, and each for its own reason. **`escalat`** and
+   * **`breach`** need something that writes when nobody is asking. **`businessDay`** and
+   * **`workingDay`** need a calendar Workflow does not hold and declined to take a dependency on.
+   * **`roleId`** and **`reportsTo`** are the two shapes a directory would arrive in — the first a
+   * role engine, the second the chain rather than one level of it. **`notify`** is Phase 17's.
+   * **`setTimeout`**, **`setInterval`** and **`cron`** are the three ways a timer gets into a process
+   * that has none.
+   */
+  it('has no code that escalates, expires, schedules or consults a calendar', () => {
     const fragments = [
       'escalat',
       'slaHours',
-      'dueAt',
       'businessDay',
       'workingDay',
       'breach',
+      'expiresAt',
       'roleId',
-      'managerOf',
       'reportsTo',
       'notify',
       'setTimeout',
@@ -173,6 +201,18 @@ describe('nothing deferred to Phase 16C is reachable', () => {
     const present = fragments.filter((fragment) => new RegExp(fragment, 'i').test(code));
 
     expect(present).toStrictEqual([]);
+  });
+
+  /**
+   * And the complement: the two capabilities 16C *did* build are in the source, not only in prose.
+   *
+   * Without this, the edit above would read exactly like a deletion — and a boundary suite that only
+   * ever loosens is a suite that stopped meaning anything.
+   */
+  it('does compute a due date and does resolve one manager', () => {
+    for (const fragment of ['dueAt', 'managerOf', 'serviceLevelState', 'resolutionDateOf']) {
+      expect([fragment, new RegExp(fragment).test(code)]).toStrictEqual([fragment, true]);
+    }
   });
 
   it('names those capabilities in its prose, which is where they belong', () => {

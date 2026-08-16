@@ -57,6 +57,9 @@ export const pendingApprovalsHandler = (
       if (caller === undefined) return success(emptyPage<PendingApprovalView>());
 
       const found = await dependencies.stores.steps.awaitingFor(transaction, caller, pageOf(query));
+      // One reading instant for the whole page, so two rows read in the same request are compared
+      // against the same moment rather than against whenever each of them happened to be mapped.
+      const asAt = dependencies.clock.now();
       const rows: PendingApprovalView[] = [];
 
       for (const step of found.items) {
@@ -69,7 +72,7 @@ export const pendingApprovalsHandler = (
           instance.definitionId,
         );
 
-        rows.push(asPendingView(step, instance, definition?.code ?? ''));
+        rows.push(asPendingView(step, instance, definition?.code ?? '', asAt));
       }
       // The total is the store's count over the same predicate, not this page's length: a queue
       // that reported `items.length` would tell somebody with three hundred approvals they have

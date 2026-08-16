@@ -307,7 +307,14 @@ const approvedOutcome = ({
   return accept({
     decision,
     step,
-    next: chosen.value.running.map((following) => ({ ...following, status: 'awaiting' })),
+    // The branch that opens starts its clock now, at the instant this decision was made (P-5), and
+    // every step of it starts together. A step's own `awaitingAt` is written once and never moved:
+    // nothing here touches the instant on the step just decided, or on any step already open.
+    next: chosen.value.running.map((following) => ({
+      ...following,
+      status: 'awaiting',
+      awaitingAt: at,
+    })),
     skipped,
     instance,
     tally,

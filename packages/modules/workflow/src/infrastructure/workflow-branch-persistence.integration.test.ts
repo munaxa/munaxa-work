@@ -216,6 +216,17 @@ suite('the branch columns, persisted', () => {
       // `source_group_id` holds an identifier of a group that was never inserted, and the write
       // succeeds: it is provenance rather than a reference, which is what stops a running approval
       // depending on a list somebody may later delete.
+      //
+      // **Red at the end of Phase 16C Checkpoint 4, deliberately and for one reason.** The domain now
+      // stamps `awaitingAt` on a step that becomes awaiting, and carries `serviceLevel` copied from
+      // its template; Checkpoint 3 added `awaiting_at`, `service_level_count` and
+      // `service_level_unit` to `workflow_step` for them. The **mapper** that would round-trip the
+      // three is a PostgreSQL repository, which is Checkpoint 5's and is out of this checkpoint's
+      // scope — so a step written here comes back without them.
+      //
+      // Left failing rather than narrowed to the columns that survive, because this assertion is the
+      // only thing that will refuse a Checkpoint 5 which forgets one of the three. 16B's Checkpoint 2
+      // left exactly one test red for the same reason and Checkpoint 3 turned it green.
       expect(read).toStrictEqual(snapshotted);
     });
 

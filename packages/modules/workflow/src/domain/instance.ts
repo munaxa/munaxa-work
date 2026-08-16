@@ -6,8 +6,9 @@ import {
 } from './workflow-vocabulary.js';
 import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
 import { definedOf } from './defined.js';
-import { chooseBranch, planSteps, type GroupSnapshot } from './branch-plan.js';
+import { chooseBranch, planSteps, type GroupSnapshot, type ManagerSnapshot } from './branch-plan.js';
 import type { BranchCondition } from './condition.js';
+import type { ServiceLevelTarget } from './service-level.js';
 import type { BranchRule } from './workflow-vocabulary.js';
 import type { WorkflowStepTemplateState, WorkflowVersionState } from './definition.js';
 
@@ -91,6 +92,23 @@ export interface WorkflowStepState {
   readonly branchRule?: BranchRule;
   readonly quorum?: number;
   readonly condition?: readonly BranchCondition[];
+  /**
+   * The target this step started with, copied from its template. Absent means no due time at all.
+   *
+   * Copied rather than read back, for the reason every other configured field on this row is copied:
+   * an approval already under way follows the version it started on, and a target corrected
+   * afterwards must not move a due time on a step somebody is already waiting to answer.
+   */
+  readonly serviceLevel?: ServiceLevelTarget;
+  /**
+   * The instant this step became `awaiting`, and the instant its target counts from (P-5).
+   *
+   * Absent until the step is reached, and never moved once set: not by an escalation, not by a
+   * delegation, and not by a decision on a sibling step. Nothing derived is stored beside it — due,
+   * overdue and by-how-much are computed from this, the target and an explicit reading instant, every
+   * time they are asked.
+   */
+  readonly awaitingAt?: Date;
   readonly version: number;
 }
 
@@ -111,6 +129,14 @@ export interface StartInstanceRequest {
   readonly stepIds: readonly string[];
   /** The membership of every group the version names, as the caller read it. Snapshotted here. */
   readonly groups?: readonly GroupSnapshot[];
+  /**
+   * The requester's manager, as the caller found them — read once, here, and never again.
+   *
+   * Absent when no template names a manager, which is why the caller does not ask for one it will not
+   * use. Absent when a template *does* name one is a caller defect rather than a tenant's mistake, and
+   * `planSteps` refuses the start rather than quietly dropping the step.
+   */
+  readonly manager?: ManagerSnapshot;
 }
 
 export interface StartedInstance {
@@ -136,7 +162,7 @@ export const startInstance = (
 
   if (!usable.ok) return refuse(usable.error.reason);
 
-  const planned = planSteps(templates, request.groups ?? []);
+  const planned = planSteps(templates, request.groups ?? [], request.manager);
 
   if (!planned.ok) return refuse(planned.error.reason, planned.error.detail);
   if (request.stepIds.length !== planned.value.length) {
@@ -158,6 +184,7 @@ export const startInstance = (
       branchRule: configuration.get(step.ordinal)?.branchRule,
       quorum: configuration.get(step.ordinal)?.quorum,
       condition: configuration.get(step.ordinal)?.condition,
+      serviceLevel: configuration.get(step.ordinal)?.serviceLevel,
     }),
   }));
   // Which branch actually opens: the first one whose condition holds. Everything before it is
@@ -189,12 +216,34 @@ export const startInstance = (
       version: 1,
       ...definedOf({ completedAt: nothingToDecide ? request.at : undefined }),
     },
-    steps: pending.map((step) => ({
-      ...step,
-      status: statusOf(step.stepId, awaiting, skipped),
-    })),
+    steps: startedSteps(pending, awaiting, skipped, request.at),
   });
 };
+
+/**
+ * Each planned step with the status it starts in, and — for the ones actually being asked — the
+ * instant their clock started.
+ *
+ * **Only an `awaiting` step gets one**, which is the whole of P-5 in one condition. A step of a later
+ * branch is nobody's to answer yet, so a target attached to it counts from nothing; stamping the
+ * start of the approval onto it would make a third step overdue before the second was decided. Every
+ * step of a parallel branch opens together and therefore starts together, from this same instant.
+ */
+const startedSteps = (
+  pending: readonly WorkflowStepState[],
+  awaiting: ReadonlySet<string>,
+  skipped: ReadonlySet<string>,
+  at: Date,
+): readonly WorkflowStepState[] =>
+  pending.map((step) => {
+    const status = statusOf(step.stepId, awaiting, skipped);
+
+    return {
+      ...step,
+      status,
+      ...definedOf({ awaitingAt: status === 'awaiting' ? at : undefined }),
+    };
+  });
 
 /** Everything that must be true before a start is even planned. Separated to keep `startInstance`
  * about building an approval rather than about validating one. */
