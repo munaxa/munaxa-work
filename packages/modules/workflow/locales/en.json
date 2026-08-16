@@ -146,7 +146,14 @@
       "group-name-required": "A group needs a name in both languages.",
       "instance-has-no-awaiting-step": "This approval is not waiting on anybody.",
       "instance-not-running": "This approval has already finished.",
+      "manager-is-the-requester": "This process asks somebody to approve their own request, because they are their own manager.",
+      "manager-no-primary-employment": "The person who raised this approval has no active primary employment, so their manager cannot be found.",
+      "manager-not-a-member": "The manager’s employment belongs to nobody who can sign in to this tenant.",
+      "manager-not-assigned": "The person who raised this approval has no manager on their primary reporting line.",
+      "manager-not-resolved": "This process names a manager, and no manager was resolved for it.",
       "membership-unresolved": "This product cannot tell which member you are, so it cannot act on your behalf.",
+      "service-level-count-invalid": "A target must be a whole number of one or more.",
+      "service-level-unit-invalid": "A target is measured in whole hours or whole days, and nothing else.",
       "step-approver-ambiguous": "A step names one approver: a person, or a group, and not both.",
       "step-approver-required": "This step names no approver.",
       "step-identifiers-mismatched": "The steps and their identifiers do not correspond.",
@@ -207,7 +214,8 @@
       },
       "approverKind": {
         "membership": "A named member",
-        "group": "An approval group"
+        "group": "An approval group",
+        "manager": "The requester’s manager"
       },
       "historyEvent": {
         "instance-started": "Approval raised",
@@ -239,6 +247,15 @@
       "quorumMet": {
         "met": "Met",
         "not-met": "Not met"
+      },
+      "serviceLevelUnit": {
+        "hours": "Hours",
+        "days": "Days"
+      },
+      "serviceLevelState": {
+        "none": "No target",
+        "within": "Within target",
+        "overdue": "Overdue"
       }
     },
     "withheld": {

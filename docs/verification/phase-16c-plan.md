@@ -1,9 +1,7 @@
 # Phase 16C — Definition of Ready
 
-**Status: approved 2026-08-16. Checkpoint 2 is blocked on six open parameters (§7B).**
-
-All fourteen blocking decisions were approved as recommended; the register is §7A. No implementation
-has begun.
+**Status: approved 2026-08-16. Fourteen decisions (§7A) and six parameters (§7B) are approved.
+Checkpoint 2 — Domain is in progress.**
 
 Written from the tree at `c0488c9`, after Phase 16B completed. Every claim below was checked against
 the repository, the database catalogue and the phase specifications rather than against an earlier
@@ -582,11 +580,23 @@ Both of those turn out to need parameters the fourteen decisions do not carry. T
 
 ---
 
-## 7B. Open parameters — Checkpoint 2 is blocked on these
+## 7B. Approved parameters
 
 **Six.** Each was reached by attempting the domain and finding no approved answer; none is a
 preference, and each changes observable behaviour. They are not new decisions in the sense of §7 —
 they are the parameters D-16C-04, D-16C-05 and D-16C-11 need in order to mean something in code.
+
+**All six were approved by the user on 2026-08-16.** The approved answer is stated first under each,
+and the options that were declined are kept below it so a later reader can see what was considered.
+
+| ID | Parameter | Approved |
+| --- | --- | --- |
+| P-1 | Whose manager | **The requester's.** Resolved from `requested_by_membership_id`. No template-level target field; not the previous approver; multi-level chains are not implemented by changing the target. |
+| P-2 | Which employment | **The primary active employment only.** No active primary employment ⇒ a named refusal. Never chosen by `linked_at`; multiple active non-primary employments are not interchangeable. |
+| P-3 | Which reporting line | **The `primary` reporting line only.** Never `functional`. Unresolvable ⇒ a named refusal. |
+| P-4 | How many levels | **Exactly one — the immediate manager.** No configurable depth, no recursion. Unresolvable to an active membership ⇒ a named refusal. |
+| P-5 | SLA attachment and clock | **Attaches to the step template; the clock starts when that step becomes `awaiting`.** Each awaiting step of a parallel branch starts its own clock. Instance start does not start every future step's clock. Escalation, delegation, retry and any decision never restart a running clock. A step with no target has no due time. |
+| P-6 | Time zone for `asOf` | **UTC.** The resolution instant stays the exact `startedAt`; one named function converts it to a civil date in UTC, tested around the midnight boundary. No Organization dependency, no tenant-local behaviour. |
 
 ### P-1 ⛔ — Whose manager does a `manager` step name?
 
@@ -651,7 +661,22 @@ explicitly declined to take a dependency on. So the three available answers are:
 and stated; **(b)** the tenant's time zone, which needs an Organization dependency D-16C-05 refused;
 **(c)** the approval carries the civil date the caller intended, which puts a date on the wire.
 
-**None of the six may be defaulted.** Checkpoint 2 resumes when they are answered.
+### Constraints attached to the parameter approval
+
+1. Every Phase 16A and 16B invariant is preserved.
+2. Manager resolution is snapshotted at instance start and never re-resolved for a running approval.
+3. Manager routing **adds exactly one** immediate manager membership; it replaces and mutates nothing.
+4. Group membership remains snapshotted exactly as in 16B.
+5. An unresolvable manager never causes a step to be skipped or silently removed.
+6. No schema field for a manager target is required.
+7. No configurable manager depth.
+8. No functional reporting lines.
+9. No business-day calculation.
+10. No Organization and no scheduling dependency.
+11. SLA expiry stays observed and derived; no automatic terminal state.
+12. Escalation stays an application-level command that adds an approver and never restarts the clock.
+13. Phase 16D does not begin.
+14. Repository, API, Admin and later checkpoint work does not begin early.
 
 ---
 

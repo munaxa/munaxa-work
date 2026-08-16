@@ -14,6 +14,7 @@ import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
 import { definedOf } from './defined.js';
 import { branchesAreCoherent, ordinalsAreContiguous } from './branch.js';
 import { conditionsAreWellFormed, type BranchCondition } from './condition.js';
+import { serviceLevelTarget, type ServiceLevelTarget } from './service-level.js';
 import type { BranchRule } from './workflow-vocabulary.js';
 
 /**
@@ -84,9 +85,11 @@ export interface WorkflowVersionState {
  * ordinals are all distinct is exactly a 16A sequential chain, which is why every process configured
  * before this phase keeps behaving identically.
  *
- * **`approverKind` decides which of the two approver fields is present**, and exactly one is. A
- * `membership` template names a person; a `group` template names a list Workflow keeps, resolved
- * into its members when an instance starts and never consulted again.
+ * **`approverKind` decides which approver field is present, and a `manager` template has none.** A
+ * `membership` template names a person; a `group` template names a list Workflow keeps, resolved into
+ * its members when an instance starts and never consulted again; a `manager` template names **the
+ * requester's immediate manager** and therefore carries no identifier at all — whose manager it means
+ * is fixed rather than configured (P-1), so there is no field to fill and none to get wrong.
  *
  * **The branch rule and quorum are carried on the template rather than on a branch row.** A branch
  * has no identity of its own — it is a fact about a set of steps sharing an ordinal — and giving it
@@ -105,12 +108,20 @@ export interface WorkflowStepTemplateState {
   readonly approverMembershipId?: string;
   /** Present when `approverKind` is `group`: the list resolved at instance start. */
   readonly approverGroupId?: string;
-  /** How this ordinal's branch reaches an outcome. Absent means `unanimous`, which is 16A's rule. */
+  /** Absent when `approverKind` is `manager`: the requester's manager needs no identifier here. */
   readonly branchRule?: BranchRule;
   /** A minimum number of responses before the rule is evaluated. Absent means one. */
   readonly quorum?: number;
   /** Every condition that must hold for this branch to run at all. Absent means it always runs. */
   readonly condition?: readonly BranchCondition[];
+  /**
+   * How long this step is expected to take once it becomes awaiting. Absent means no due time.
+   *
+   * A target and nothing more: no state changes when it passes, nothing fires, and no step becomes
+   * `expired` (D-16C-06). The clock starts when *this* step becomes awaiting rather than when the
+   * approval started (P-5), so a target is a property of a step and not of a process.
+   */
+  readonly serviceLevel?: ServiceLevelTarget;
   readonly version: number;
 }
 
@@ -198,25 +209,39 @@ export interface AddStepRequest {
   readonly branchRule?: BranchRule;
   readonly quorum?: number;
   readonly condition?: readonly BranchCondition[];
+  readonly serviceLevel?: ServiceLevelTarget;
 }
 
 /**
- * Exactly one approver field, and the right one for the kind.
+ * Exactly one approver field, and the right one for the kind — or, for a manager, none.
  *
  * Both present is the dangerous case rather than the untidy one: a template naming a person *and* a
  * group has two readings, and whichever one an implementation happened to pick would decide who
  * approves. Refused outright rather than resolved by precedence.
+ *
+ * A `manager` template carrying **either** identifier is the same mistake wearing a different hat —
+ * somebody believing they had configured whose manager to ask. There is no such setting (P-1), so an
+ * identifier here is refused rather than ignored: silently dropping it would leave a tenant sure they
+ * had routed to one person's manager while the approval asked another's.
  */
 const approverIsCoherent = (request: AddStepRequest): WorkflowResult<ApproverKind> => {
-  if (request.approverKind === 'membership') {
-    if (request.approverGroupId !== undefined) return refuse('step-approver-ambiguous');
-    if ((request.approverMembershipId ?? '').trim() === '') return refuse('step-approver-required');
-    return accept('membership');
+  const named = (value: string | undefined): boolean => (value ?? '').trim() !== '';
+
+  if (request.approverKind === 'manager') {
+    const carried =
+      request.approverMembershipId !== undefined || request.approverGroupId !== undefined;
+
+    return carried ? refuse('step-approver-ambiguous') : accept('manager');
   }
 
-  if (request.approverMembershipId !== undefined) return refuse('step-approver-ambiguous');
-  if ((request.approverGroupId ?? '').trim() === '') return refuse('step-approver-required');
-  return accept('group');
+  const own =
+    request.approverKind === 'membership' ? request.approverMembershipId : request.approverGroupId;
+  const other =
+    request.approverKind === 'membership' ? request.approverGroupId : request.approverMembershipId;
+
+  if (other !== undefined) return refuse('step-approver-ambiguous');
+  if (!named(own)) return refuse('step-approver-required');
+  return accept(request.approverKind);
 };
 
 /**
@@ -228,14 +253,19 @@ const approverIsCoherent = (request: AddStepRequest): WorkflowResult<ApproverKin
  * same instant and a pre-check would let both through. Career took the same position on duplicate
  * nominations.
  */
-export const addStep = (
-  version: WorkflowVersionState,
-  request: AddStepRequest,
-): WorkflowResult<WorkflowStepTemplateState> => {
-  if (version.status !== 'draft') return refuse('version-not-editable');
-  if (!isPositiveWhole(request.ordinal)) return refuse('step-ordinal-invalid');
-  if (!isLocalizedName(request.name)) return refuse('step-name-required');
-
+/**
+ * The approver, the quorum, the conditions and the target, checked as one.
+ *
+ * Split out of `addStep` for the complexity budget, and the seam is a real one: everything here is a
+ * question about *this template's own configuration*, while what is left in `addStep` is about the
+ * version it is being added to and the row that comes out.
+ *
+ * The service-level target is re-checked even though a caller building one through
+ * `serviceLevelTarget` already validated it, because a state can also arrive from a row: a target
+ * that reached the column as a fraction would otherwise become a due time nobody could have
+ * configured.
+ */
+const branchIsWellFormed = (request: AddStepRequest): WorkflowResult<ApproverKind> => {
   const approver = approverIsCoherent(request);
 
   if (!approver.ok) return refuse(approver.error.reason);
@@ -248,6 +278,27 @@ export const addStep = (
   const conditions = conditionsAreWellFormed(request.condition ?? []);
 
   if (!conditions.ok) return refuse(conditions.error.reason, conditions.error.detail);
+
+  const target =
+    request.serviceLevel === undefined
+      ? undefined
+      : serviceLevelTarget(request.serviceLevel.count, request.serviceLevel.unit);
+
+  if (target !== undefined && !target.ok) return refuse(target.error.reason);
+  return approver;
+};
+
+export const addStep = (
+  version: WorkflowVersionState,
+  request: AddStepRequest,
+): WorkflowResult<WorkflowStepTemplateState> => {
+  if (version.status !== 'draft') return refuse('version-not-editable');
+  if (!isPositiveWhole(request.ordinal)) return refuse('step-ordinal-invalid');
+  if (!isLocalizedName(request.name)) return refuse('step-name-required');
+
+  const branch = branchIsWellFormed(request);
+
+  if (!branch.ok) return refuse(branch.error.reason, branch.error.detail);
 
   return accept({
     stepTemplateId: request.stepTemplateId,
@@ -262,6 +313,7 @@ export const addStep = (
       branchRule: request.branchRule,
       quorum: request.quorum,
       condition: request.condition,
+      serviceLevel: request.serviceLevel,
     }),
   });
 };

@@ -116,20 +116,28 @@ export const WORKFLOW_VERSION_TRANSITIONS: Readonly<
 /**
  * What a **step template** may name as its approver.
  *
- * Two kinds, and the second is deliberately narrow. A `membership` is one person a tenant admitted.
- * A `group` is a list of them Workflow itself keeps — not a role, not a query, not a directory, and
- * not anything Identity owns.
+ * Three kinds, and each is deliberately narrow. A `membership` is one person a tenant admitted. A
+ * `group` is a list of them Workflow itself keeps — not a role, not a query, not a directory, and
+ * not anything Identity owns. A `manager` is **the requester's immediate manager**, and every word
+ * of that is a parameter somebody approved rather than a reading this module chose (P-1 to P-4).
+ *
+ * **`manager` names nobody, and that is what makes it different from the other two.** A membership
+ * and a group both carry an identifier on the template; a manager carries none, because whose
+ * manager it means is fixed — the person who raised the approval. There is no target field to
+ * configure, no previous-approver chain, and no depth: one level, the immediate manager, resolved as
+ * at the instant the approval started.
  *
  * **This vocabulary belongs to the template and not to a running step.** A group is resolved into
- * its members when an instance starts, so every step of a running approval names a membership and
- * `approverKind` on a step is always `membership`. That is why the step's own check constraint did
- * not change in 16B: at the moment somebody is actually asked, there is only ever a person.
+ * its members and a manager into one membership when an instance starts, so every step of a running
+ * approval names a membership and `approverKind` on a step is always `membership`. That is why the
+ * step's own check constraint did not change in 16B and does not change in 16C: at the moment
+ * somebody is actually asked, there is only ever a person.
  *
- * `manager`, `role` and `external` remain `NOT VERIFIED`. Each needs something this repository does
- * not have — a published employment→membership query, a role directory, and an identity model for a
- * party outside the tenant.
+ * `role` and `external` remain `NOT VERIFIED`. Each needs something this repository does not have —
+ * a role directory, and an identity model for a party outside the tenant — and the first was refused
+ * by decision rather than deferred.
  */
-export const APPROVER_KINDS = ['membership', 'group'] as const;
+export const APPROVER_KINDS = ['membership', 'group', 'manager'] as const;
 export type ApproverKind = (typeof APPROVER_KINDS)[number];
 
 /**

@@ -26,6 +26,8 @@ export * from './domain/workflow-vocabulary.js';
 export * from './domain/workflow-rejection.js';
 export * from './domain/defined.js';
 export * from './domain/definition.js';
+export * from './domain/manager.js';
+export * from './domain/service-level.js';
 export * from './domain/instance.js';
 export * from './domain/decision.js';
 export * from './domain/history.js';

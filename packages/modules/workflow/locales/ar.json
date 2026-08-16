@@ -146,7 +146,14 @@
       "group-name-required": "تحتاج المجموعة إلى اسم باللغتين.",
       "instance-has-no-awaiting-step": "هذا الاعتماد لا ينتظر أحدًا.",
       "instance-not-running": "انتهى هذا الاعتماد بالفعل.",
+      "manager-is-the-requester": "يطلب هذا الإجراء من شخص اعتماد طلبه بنفسه، لأنه مدير نفسه.",
+      "manager-no-primary-employment": "ليس لمن رفع هذا الاعتماد وظيفة أساسية سارية، فتعذّر العثور على مديره.",
+      "manager-not-a-member": "وظيفة المدير لا تعود إلى أحد يستطيع الدخول إلى هذا المستأجر.",
+      "manager-not-assigned": "ليس لمن رفع هذا الاعتماد مدير على خط التبعية الأساسي.",
+      "manager-not-resolved": "يسمّي هذا الإجراء مديرًا، ولم يُحدَّد له أي مدير.",
       "membership-unresolved": "لا يستطيع هذا المنتج تحديد هويتك كعضو، لذا لا يمكنه التصرف نيابةً عنك.",
+      "service-level-count-invalid": "يجب أن يكون الهدف عددًا صحيحًا لا يقل عن واحد.",
+      "service-level-unit-invalid": "يُقاس الهدف بالساعات الكاملة أو الأيام الكاملة، ولا شيء غير ذلك.",
       "step-approver-ambiguous": "تذكر الخطوة معتمدًا واحدًا: شخصًا أو مجموعة، لا كليهما.",
       "step-approver-required": "لا تذكر هذه الخطوة أي معتمد.",
       "step-identifiers-mismatched": "الخطوات ومعرفاتها غير متطابقة.",
@@ -207,7 +214,8 @@
       },
       "approverKind": {
         "membership": "عضو محدّد",
-        "group": "مجموعة اعتماد"
+        "group": "مجموعة اعتماد",
+        "manager": "مدير مقدّم الطلب"
       },
       "historyEvent": {
         "instance-started": "رُفع طلب الاعتماد",
@@ -239,6 +247,15 @@
       "quorumMet": {
         "met": "مكتمل",
         "not-met": "غير مكتمل"
+      },
+      "serviceLevelUnit": {
+        "hours": "ساعات",
+        "days": "أيام"
+      },
+      "serviceLevelState": {
+        "none": "بلا هدف",
+        "within": "ضمن الهدف",
+        "overdue": "متأخر"
       }
     },
     "withheld": {

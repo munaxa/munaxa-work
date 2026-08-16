@@ -1,6 +1,7 @@
 import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
 import { branchAt, branchOrdinals, conditionsOf } from './branch.js';
 import { evaluateAllOf, type BranchCondition } from './condition.js';
+import { resolveManager, type ManagerResolution } from './manager.js';
 import type { WorkflowStepTemplateState } from './definition.js';
 
 /**
@@ -18,6 +19,12 @@ import type { WorkflowStepTemplateState } from './definition.js';
  * by a list as it stands today. This is 16A's rule about copying a version's steps (AD-003,
  * ADR-0048), applied to the one new thing that could otherwise change underneath a running approval.
  *
+ * **A manager is resolved once and never again either**, on exactly the same terms. The application
+ * follows the chain — the requester's primary employment, its primary reporting line, that manager's
+ * membership — and hands the answer in; this turns it into one approver or into one of four named
+ * refusals. A reorganization the day after an approval starts changes nothing about it, which is the
+ * same sentence as the group rule and is deliberately not a second rule (P-1 to P-4, D-16C-08).
+ *
  * **A condition decides whether a branch runs at all**, and it is evaluated against the instance's
  * own `context` — the payload the requesting module supplied, stored since 16A and until now read by
  * nothing. A branch whose condition does not hold is **skipped**, with the history entry every
@@ -29,6 +36,18 @@ import type { WorkflowStepTemplateState } from './definition.js';
 export interface GroupSnapshot {
   readonly approvalGroupId: string;
   readonly members: readonly string[];
+}
+
+/**
+ * The requester, and what the application found when it followed the reporting line from them.
+ *
+ * One per instance rather than one per template, because a `manager` step always means *the
+ * requester's* manager (P-1). Two templates naming `manager` in one process therefore resolve to the
+ * same person, and asking twice would be asking the same question twice.
+ */
+export interface ManagerSnapshot {
+  readonly requesterMembershipId: string;
+  readonly resolution: ManagerResolution;
 }
 
 /** One approver an instance will actually ask, after groups have been expanded. */
@@ -52,9 +71,63 @@ export interface PlannedStep {
  * instantly while looking like a process, which is the failure `version-has-no-steps` exists to
  * prevent, arriving by another road.
  */
+/** The approvers one template resolves to: one person, one manager, or every member of a list. */
+const approversFor = (
+  template: WorkflowStepTemplateState,
+  groups: readonly GroupSnapshot[],
+  manager: ManagerSnapshot | undefined,
+): WorkflowResult<readonly PlannedStep[]> => {
+  const { ordinal } = template;
+
+  if (template.approverKind === 'membership') {
+    const approverMembershipId = template.approverMembershipId;
+
+    if (approverMembershipId === undefined) return refuse('step-approver-required');
+    return accept([{ ordinal, approverMembershipId }]);
+  }
+
+  if (template.approverKind === 'manager') {
+    // Absent only if the application planned a manager step without reading the chain first. That is
+    // its bug rather than a tenant's mistake, and it fails closed like every other unresolvable
+    // approver: nobody is quietly routed past a step somebody configured (P-4, constraint 5).
+    if (manager === undefined) return refuse('manager-not-resolved');
+
+    const resolved = resolveManager(manager.requesterMembershipId, manager.resolution);
+
+    if (!resolved.ok) return refuse(resolved.error.reason);
+    return accept([{ ordinal, approverMembershipId: resolved.value.managerMembershipId }]);
+  }
+
+  return membersFor(template, groups);
+};
+
+/** Every member of the list a template names, or the reason there are none to ask. */
+const membersFor = (
+  template: WorkflowStepTemplateState,
+  groups: readonly GroupSnapshot[],
+): WorkflowResult<readonly PlannedStep[]> => {
+  const groupId = template.approverGroupId;
+
+  if (groupId === undefined) return refuse('step-approver-required');
+
+  const snapshot = groups.find((group) => group.approvalGroupId === groupId);
+
+  if (snapshot === undefined) return refuse('branch-group-unresolved', { group: groupId });
+  if (snapshot.members.length === 0) return refuse('branch-group-empty', { group: groupId });
+
+  return accept(
+    snapshot.members.map((approverMembershipId) => ({
+      ordinal: template.ordinal,
+      approverMembershipId,
+      sourceGroupId: groupId,
+    })),
+  );
+};
+
 export const planSteps = (
   templates: readonly WorkflowStepTemplateState[],
   groups: readonly GroupSnapshot[],
+  manager?: ManagerSnapshot,
 ): WorkflowResult<readonly PlannedStep[]> => {
   const planned: PlannedStep[] = [];
   const ordered = [...templates].sort(
@@ -63,30 +136,10 @@ export const planSteps = (
   );
 
   for (const template of ordered) {
-    if (template.approverKind === 'membership') {
-      const membershipId = template.approverMembershipId;
+    const approvers = approversFor(template, groups, manager);
 
-      if (membershipId === undefined) return refuse('step-approver-required');
-      planned.push({ ordinal: template.ordinal, approverMembershipId: membershipId });
-      continue;
-    }
-
-    const groupId = template.approverGroupId;
-
-    if (groupId === undefined) return refuse('step-approver-required');
-
-    const snapshot = groups.find((group) => group.approvalGroupId === groupId);
-
-    if (snapshot === undefined) return refuse('branch-group-unresolved', { group: groupId });
-    if (snapshot.members.length === 0) return refuse('branch-group-empty', { group: groupId });
-
-    for (const membershipId of snapshot.members) {
-      planned.push({
-        ordinal: template.ordinal,
-        approverMembershipId: membershipId,
-        sourceGroupId: groupId,
-      });
-    }
+    if (!approvers.ok) return refuse(approvers.error.reason, approvers.error.detail);
+    planned.push(...approvers.value);
   }
   return accept(planned);
 };
@@ -95,8 +148,9 @@ export const planSteps = (
 export const plannedStepCount = (
   templates: readonly WorkflowStepTemplateState[],
   groups: readonly GroupSnapshot[],
+  manager?: ManagerSnapshot,
 ): number => {
-  const planned = planSteps(templates, groups);
+  const planned = planSteps(templates, groups, manager);
 
   return planned.ok ? planned.value.length : 0;
 };

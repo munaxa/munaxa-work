@@ -48,20 +48,32 @@ const code = sources.map((file) => codeOf(file)).join('\n');
  * *rewritten* to assert what replaced them rather than deleted, which would have removed the guard
  * instead of moving it.
  *
- * What remains deferred is Phase 16C, and every fragment below would appear in the code if any of it
- * had been started.
+ * **It moved again in Phase 16C, on the same terms.** The requester's manager is now an approver kind
+ * and a step may carry an elapsed-time target — both against parameters approved one at a time
+ * (D-16C-04, D-16C-05, P-1 to P-6). So those two rows were rewritten to assert *what is still absent
+ * around them*, which is narrower and therefore harder to satisfy by accident: manager routing exists
+ * but only one level from the requester along the primary line, and a target exists but nothing
+ * measures it in business days and nothing turns it into a state.
+ *
+ * What remains deferred is Phase 16D and later, and every fragment below would appear in the code if
+ * any of it had been started.
  */
-describe('Phase 16C is not quietly present', () => {
+describe('what is still not present', () => {
   /**
    * Each entry is a capability 16C owns, and a fragment that would appear in the *code* if it had
    * been built. Deliberately narrow: `sla` rather than `s`, `escalat` rather than `level`, so an
    * ordinary word cannot trip them.
    */
   const deferred: readonly (readonly [string, readonly string[]])[] = [
-    ['SLA and business days', ['sla', 'businessDay', 'workingDay', 'dueAt', 'breach']],
+    // A target is elapsed time and nothing else: no calendar, and no state it turns into. `breach`
+    // and `expired` are the words a written terminal state would arrive under, and D-16C-06 refused
+    // one — a step is *read* as overdue and never stored that way.
+    ['business days or a breach state', ['sla', 'businessDay', 'workingDay', 'breach', 'expired']],
     ['escalation', ['escalat']],
     ['scheduling', ['JobPort', 'cron', 'schedule', 'enqueue']],
-    ['manager routing', ['manager', 'reportsTo', 'employmentId']],
+    // Manager routing exists; walking a hierarchy does not. One level, from the requester, along the
+    // primary line (P-1 to P-4) — so a chain, a depth or a functional line would all be new.
+    ['manager chains beyond one level', ['reportsTo', 'reportingLine', 'functional', 'levelsUp']],
     ['role and external approvers', ['roleId', 'permissionHolder', 'externalApprover']],
     ['notification', ['notify', 'notification', 'recipient', 'reminder']],
     ['analytics', ['analytic', 'aggregate', 'distribution', 'percentile']],
@@ -78,14 +90,15 @@ describe('Phase 16C is not quietly present', () => {
   }
 
   /**
-   * The two approver kinds 16B ships, and the three it does not.
+   * The three approver kinds this module ships, and the two it does not.
    *
-   * A `group` is a list Workflow keeps and resolves once, at instance start. It is emphatically not
-   * a directory: `role` would need one, and this repository has committed never to build it.
+   * A `group` is a list Workflow keeps and resolves once, at instance start. A `manager` is the
+   * requester's immediate manager, resolved once at the same moment. Neither is a directory: `role`
+   * would need one, and this repository has committed never to build it.
    */
-  it('knows exactly two kinds of approver', () => {
-    expect([...APPROVER_KINDS]).toStrictEqual(['membership', 'group']);
-    for (const absent of ['manager', 'role', 'external']) {
+  it('knows exactly three kinds of approver', () => {
+    expect([...APPROVER_KINDS]).toStrictEqual(['membership', 'group', 'manager']);
+    for (const absent of ['role', 'external', 'dynamic']) {
       expect([absent, [...APPROVER_KINDS].includes(absent as never)]).toEqual([absent, false]);
     }
   });
@@ -103,6 +116,19 @@ describe('Phase 16C is not quietly present', () => {
         fragment,
         false,
       ]);
+    }
+  });
+
+  /**
+   * The control on every row above: what 16C *did* build is present.
+   *
+   * A negative suite alone cannot tell "refused" from "forgotten". These four fragments would be
+   * missing if the manager rule or the elapsed-time target had quietly not been written, and the
+   * rows above would then pass for the wrong reason.
+   */
+  it('does contain the manager rule and the elapsed-time target it was approved to build', () => {
+    for (const built of ['resolveManager', 'resolutionDateOf', 'serviceLevelTarget', 'dueAt']) {
+      expect([built, new RegExp(`\\b${built}\\b`).test(code)]).toEqual([built, true]);
     }
   });
 
