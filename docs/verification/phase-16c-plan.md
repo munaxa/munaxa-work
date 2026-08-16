@@ -1,6 +1,9 @@
 # Phase 16C — Definition of Ready
 
-**Status: not approved. No implementation has begun.**
+**Status: approved 2026-08-16. Checkpoint 2 is blocked on six open parameters (§7B).**
+
+All fourteen blocking decisions were approved as recommended; the register is §7A. No implementation
+has begun.
 
 Written from the tree at `c0488c9`, after Phase 16B completed. Every claim below was checked against
 the repository, the database catalogue and the phase specifications rather than against an earlier
@@ -530,6 +533,125 @@ tables, not the tally arithmetic.
 ### D-16C-14 ⛔ — Is Phase 16C split?
 
 See §8. *Approval required: yes.*
+
+---
+
+## 7A. Approved decision register
+
+**Approved by the user on 2026-08-16**, in full, as recommended. Recorded verbatim in substance. No
+decision below was inferred, defaulted or amended by the implementer.
+
+| ID | Decision | Approved outcome |
+| --- | --- | --- |
+| D-16C-01 | Durable job runner | **Not part of 16C.** `JobPort` is used only as an existing contract; a separate infrastructure phase owns the durable runner. |
+| D-16C-02 | Actor for a decision no human request initiated | **Nothing terminal fires without a human request.** No `system:auto-approval` and no other synthetic actor. |
+| D-16C-03 | Role approvers | **Remain `NOT VERIFIED`.** AD-005 and the documentation are amended to reconcile the specification. No role directory and no role engine. |
+| D-16C-04 | Manager approver | **Authorized.** One narrow Identity contract resolving employment → active membership. Identity remains the owner of the fact. No broader directory or query capability. |
+| D-16C-05 | SLA unit | **Elapsed time, in whole hours or days.** No business-day calculation and no Organization calendar dependency. |
+| D-16C-06 | Approval expiry | **Observed and derived, never written.** A read may report overdue; no automatic state transition, no history mutation, no branch mutation, no denominator mutation, no decision-port mutation. |
+| D-16C-07 | Escalation | **A bounded, idempotent command that adds an approver.** Recorded in history. Never replaces an approver, never removes an assigned one, never restarts the SLA clock. |
+| D-16C-08 | Live versus snapshot | **Snapshot at instance start**, following the 16B group rule. A running approval never changes authority because organizational data changed later. |
+| D-16C-09 | Further module adoptions | **Zero by default.** Every adoption is approved by name before implementation. |
+| D-16C-10 | Unresolvable approver | **Fail closed with a named refusal.** Never silently skip a configured approver that cannot be resolved. |
+| D-16C-11 | Manager effective date | **As at the instant the approval starts.** Never re-resolved at decision time. |
+| D-16C-12 | Automatic delegation expiry | **Not added.** Delegation validity continues to be checked at decision time through Identity's existing contract. |
+| D-16C-13 | Schema changes | **Additive only** — additive columns and widened closed vocabularies. No invariant, uniqueness rule, RLS policy, append-only guarantee, snapshot rule, denominator rule or tenant boundary is weakened. |
+| D-16C-14 | Split | **Approved.** Phase 16C — Routing Resolution, then Phase 16D — Time in Workflow. 16D does not begin until 16C is complete and closed. |
+
+### Standing constraints attached to the approval
+
+1. Every locked Phase 16A/16B invariant is preserved.
+2. No behaviour beyond these decisions is inferred.
+3. No `JobPort` infrastructure, scheduling, notification, analytics, self-service portal, external
+   approver, role routing, business-day SLA or automatic delegation expiry is implemented.
+4. No completed module changes except the Identity query authorized by D-16C-04.
+5. That Identity change stays narrowly scoped to employment → active membership, with its own
+   contract, permission, tenancy, effective-date and negative tests.
+6. Phase 16D does not begin.
+7. API, Admin, repository and schema work wait for their own checkpoints.
+
+### What the approved set determines, and what it does not
+
+The approval settles **thirteen** of the fourteen questions completely. `D-16C-06` and `D-16C-07`
+together make expiry a derived read and escalation an application-level command, so neither adds a
+domain state — which is why the 16C domain reduces to two things: **the manager resolution rule** and
+**the SLA target value**.
+
+Both of those turn out to need parameters the fourteen decisions do not carry. They are recorded in
+§7B rather than chosen, under the approval's own instruction 10.
+
+---
+
+## 7B. Open parameters — Checkpoint 2 is blocked on these
+
+**Six.** Each was reached by attempting the domain and finding no approved answer; none is a
+preference, and each changes observable behaviour. They are not new decisions in the sense of §7 —
+they are the parameters D-16C-04, D-16C-05 and D-16C-11 need in order to mean something in code.
+
+### P-1 ⛔ — Whose manager does a `manager` step name?
+
+`manager` is an approver kind; the kind does not say whose manager. Three readings, all supported by
+the specification's language:
+
+**(a) The requester's.** The instance already carries `requested_by_membership_id`. This is the
+familiar "route to my manager".
+**(b) A membership named on the step template.** "The manager of X", where X is configured — the
+template would carry a subject membership as well as the kind.
+**(c) The previous step's approver's.** A chain of command that walks up the hierarchy, which is what
+the specification's "Multi-level Escalation" describes.
+
+These are three different products, and the schema differs: **(b)** needs a second identifier column
+on the step template and **(a)** and **(c)** do not.
+
+### P-2 ⛔ — Which employment, when a membership holds several?
+
+`employment_link` is many-to-many and carries `is_primary`; `forMembership` orders by
+`is_primary desc, linked_at desc`, and a `primaryFor` read exists. A person with two employments has
+potentially two managers.
+
+**(a)** The primary employment only. **(b)** Every active employment, producing several approvers at
+one position — a branch, under the 16B rules. **(c)** Refuse when there is more than one, per
+D-16C-10's fail-closed principle.
+
+### P-3 ⛔ — Which reporting line?
+
+`REPORTING_LINE_TYPES = ['primary', 'functional']`, and `EmploymentDetailView.reportingLines` is a
+list: an employment may have both in force at once. `EmploymentView.managerEmploymentId` is *"the
+manager in force on `asOf`"* singular, and which line that reflects is not stated in the contract.
+
+**(a)** `primary` only. **(b)** Both, producing a branch. **(c)** Configurable per step.
+
+### P-4 ⛔ — How many levels up?
+
+One level, or a configured number. AD-005 names a `Manager` approver and the escalation section names
+`Multi-level`; neither says whether the approver kind itself takes a level.
+
+**(a)** Exactly one. **(b)** A configured whole number of levels, with a refusal when the chain is
+shorter than asked.
+
+### P-5 ⛔ — Where does the SLA attach, and when does its clock start?
+
+D-16C-05 approved the **unit**; D-16C-07 approved that escalation **never restarts the clock**, which
+presupposes a start that has not been approved.
+
+**Attachment:** the step template (per step), the version (one target for the whole process), or both.
+**Start:** the instant the **approval started**, or the instant the **step became awaiting**. For a
+sequential chain these differ by however long the earlier steps took, and for a parallel branch every
+step in the branch starts together under the second reading but not under the first.
+
+### P-6 ⛔ — Which time zone converts an instant into Employment's `asOf`?
+
+D-16C-11 approved resolution **as at the instant the approval starts**. Employment's contract takes
+`asOf` as a **civil date string**, not an instant (`EmploymentView.asOf: string`, and
+`managerEmploymentId` is *"the manager in force on `asOf`"*). Converting one to the other requires a
+time zone, and an approval raised at 23:30 UTC resolves against a different day in Riyadh.
+
+The tenant's time zone lives in `TenantSettingsView` — an **Organization** read, which D-16C-05
+explicitly declined to take a dependency on. So the three available answers are: **(a)** UTC, fixed
+and stated; **(b)** the tenant's time zone, which needs an Organization dependency D-16C-05 refused;
+**(c)** the approval carries the civil date the caller intended, which puts a date on the wire.
+
+**None of the six may be defaulted.** Checkpoint 2 resumes when they are answered.
 
 ---
 
