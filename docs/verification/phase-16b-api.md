@@ -17,11 +17,11 @@ controller in the phase.
 
 | Method | Path | Command or query | Permission |
 | --- | --- | --- | --- |
-| `GET` | `/approval-groups` | `workflow.search-approval-groups` | `workflow.approval-group.read` |
-| `POST` | `/approval-groups` | `workflow.create-approval-group` | `workflow.approval-group.manage` |
-| `GET` | `/approval-groups/:approvalGroupId` | `workflow.read-approval-group` | `workflow.approval-group.read` |
-| `POST` | `/approval-groups/:approvalGroupId/members` | `workflow.add-group-member` | `workflow.approval-group.manage` |
-| `DELETE` | `/approval-groups/members/:approvalGroupMemberId` | `workflow.remove-group-member` | `workflow.approval-group.manage` |
+| `GET` | `/approval-groups` | `workflow.search-approval-groups` | `workflow.group.read` |
+| `POST` | `/approval-groups` | `workflow.create-approval-group` | `workflow.group.manage` |
+| `GET` | `/approval-groups/:approvalGroupId` | `workflow.read-approval-group` | `workflow.group.read` |
+| `POST` | `/approval-groups/:approvalGroupId/members` | `workflow.add-group-member` | `workflow.group.manage` |
+| `DELETE` | `/approval-groups/members/:approvalGroupMemberId` | `workflow.remove-group-member` | `workflow.group.manage` |
 
 `workflow.dto.ts` gained `CreateApprovalGroupBody`, `AddGroupMemberBody` and `BranchConditionBody`;
 `AddStepBody` gained `approverMembershipId` (now optional), `approverGroupId`, `branchRule`, `quorum`
@@ -141,7 +141,7 @@ rather than seven.
 ## Preserved
 
 Nine permissions, unchanged and unextended — the two group permissions are Checkpoint 4's, and
-`workflow.instance.start` still does not imply `workflow.approval-group.manage`. Twelve commands and
+`workflow.instance.start` still does not imply `workflow.group.manage`. Twelve commands and
 ten queries, each reachable by exactly one route, reconciled by name against `workflowModuleFor`
 rather than counted. No generic execute endpoint. No controller reaches a repository, Prisma or the
 Recruitment seam. No `Date` and no domain type crosses the boundary in either direction.

@@ -1,3 +1,5 @@
+import { seedBranches, seedGroups } from './workflow-benchmark-groups.mjs';
+
 /**
  * Seeding one tenant's whole approval position, for `measure-workflow-performance.mjs`.
  *
@@ -55,6 +57,7 @@ const STEPS_PER_VERSION = 2;
 /** How many people share the approving. See the file note on selectivity. */
 export const APPROVERS = 200;
 
+
 /** The subject types the fixture raises approvals about. Opaque strings; Workflow reads neither. */
 const SUBJECT_TYPES = ['recruitment.requisition', 'leave.request', 'compensation.change'];
 
@@ -79,9 +82,11 @@ const NUMBER_OF = `substring(i.subject_id from 6)::int`;
  * measurement has to go looking for a row first and accidentally time that instead.
  */
 export const seedTenant = async (admin, tenant, approvals) => {
+  await seedGroups(admin, tenant, membership);
   await seedConfiguration(admin, tenant);
   await seedInstances(admin, tenant, approvals);
   await seedSteps(admin, tenant);
+  await seedBranches(admin, tenant, membership);
   await seedRecords(admin, tenant);
 
   return handles(admin, tenant);
@@ -295,11 +300,30 @@ const handles = async (admin, tenant) => {
     `select subject_id from workflow_instance where tenant_id = $1 order by subject_id limit 200`,
     [tenant],
   );
+  // Every group, so `membersOfAll` can be asked the question it exists for — all forty at once —
+  // rather than a handful that would not tell one statement apart from a few.
+  const groups = await admin.query(
+    `select id, code from workflow_approval_group where tenant_id = $1 order by code`,
+    [tenant],
+  );
+  // A branch: an approval with three steps awaiting at one position, and one of the three approvers.
+  const branch = await admin.query(
+    `select s.instance_id, s.approver_membership_id, s.source_group_id
+       from workflow_step s
+      where s.tenant_id = $1 and s.status = 'awaiting' and s.branch_rule is not null
+      order by s.instance_id, s.approver_membership_id limit 1`,
+    [tenant],
+  );
 
   return {
     ...rows[0],
     approver: approver.rows[0]?.approver_membership_id,
     decider: decider.rows[0]?.decided_by_membership_id,
     cohort: cohort.rows.map((row) => row.subject_id),
+    group: groups.rows[0]?.id,
+    groupCode: groups.rows[0]?.code,
+    groupIds: groups.rows.map((row) => row.id),
+    branchInstance: branch.rows[0]?.instance_id,
+    branchApprover: branch.rows[0]?.approver_membership_id,
   };
 };

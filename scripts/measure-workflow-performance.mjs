@@ -64,15 +64,19 @@ import { postgresWorkflowStores } from '../packages/modules/workflow/dist/index.
 import { seedTenant } from './workflow-benchmark-data.mjs';
 import { report } from './workflow-benchmark-report.mjs';
 import {
-  assertExactValues,
-  assertIsolation,
   assertNoCrossModuleForeignKeys,
   assertNoInexactColumns,
   assertRoleUnprivileged,
   assertRowLevelSecurityForced,
   assertVocabularyParity,
   explain,
+  forgetStatistics,
 } from './workflow-benchmark-audit.mjs';
+import {
+  assertCompositeForeignKeys,
+  assertExactValues,
+  assertIsolation,
+} from './workflow-benchmark-isolation.mjs';
 
 const CONNECTION = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -107,7 +111,7 @@ const DATASETS = [
   { key: 'C', approvals: 100_000, budgetMs: { queue: 100, detail: 150, cohort: 60_000 } },
 ];
 
-/** The seven tables, most dependent first: a truncate in the wrong order fails on a foreign key. */
+/** The nine tables, most dependent first: a truncate in the wrong order fails on a foreign key. */
 const TABLES = [
   'workflow_history',
   'workflow_decision',
@@ -116,6 +120,8 @@ const TABLES = [
   'workflow_step_template',
   'workflow_version',
   'workflow_definition',
+  'workflow_approval_group_member',
+  'workflow_approval_group',
 ];
 
 /**
@@ -139,6 +145,21 @@ const VOCABULARIES = [
     ['pending', 'awaiting', 'approved', 'rejected', 'skipped'],
   ],
   ['workflow_decision_kind_check', 'decision', ['approved', 'rejected']],
+  // Phase 16B. A **template** may name a person or a list; a running **step** never names a list,
+  // because the list was resolved into its members before the row existed. The two constraints are
+  // deliberately different and are checked as two.
+  ['workflow_step_template_approver_kind_check', 'template approver kind', ['membership', 'group']],
+  ['workflow_step_approver_kind_check', 'step approver kind', ['membership']],
+  [
+    'workflow_step_template_branch_rule_check',
+    'template branch rule',
+    ['unanimous', 'majority', 'first-response'],
+  ],
+  [
+    'workflow_step_branch_rule_check',
+    'step branch rule',
+    ['unanimous', 'majority', 'first-response'],
+  ],
   ['workflow_decision_authority_check', 'decision authority', ['assigned', 'delegated']],
   [
     'workflow_history_event_check',
@@ -273,6 +294,24 @@ const measure = async (stores, asTenant, mine) => {
       total: 1,
     })),
 
+    // Phase 16B — the lists, and the read an approval start depends on.
+    groupSearch: await one((tx) => stores.groups.search(tx, PAGE)),
+    groupByCode: await one((tx) => stores.groups.byCode(tx, mine.groupCode)),
+    groupRead: await one((tx) => stores.groups.byId(tx, mine.group)),
+    groupMembers: await one((tx) => stores.groups.membersOf(tx, mine.group)),
+    // Every group in the tenant at once. One statement, whatever the number of lists.
+    membersOfAll: await one((tx) => stores.groups.membersOfAll(tx, mine.groupIds)),
+
+    // Phase 16B — a branch: three steps awaiting at one position on one approval.
+    branchSteps: await one((tx) => stores.steps.forInstance(tx, mine.branchInstance)),
+    branchDetail: await one(async (tx) => ({
+      instance: await stores.instances.byId(tx, mine.branchInstance),
+      steps: await stores.steps.forInstance(tx, mine.branchInstance),
+      decisions: await stores.decisions.forInstance(tx, mine.branchInstance),
+      total: 1,
+    })),
+    branchQueue: await one((tx) => stores.steps.awaitingFor(tx, mine.branchApprover, PAGE)),
+
     cohort: await one(async (tx) => {
       const found = [];
 
@@ -320,8 +359,11 @@ const run = async () => {
       return mine;
     });
 
-    missed.push(...report(dataset, seeded, await measure(stores, asTenant, seeded.value), await counts()));
+    missed.push(
+      ...report(dataset, seeded, await measure(stores, asTenant, seeded.value), await counts()),
+    );
     await assertIsolation(stores, asTenant, OTHER, seeded.value);
+    await assertCompositeForeignKeys(admin, OTHER, seeded.value);
     await assertExactValues(stores, asTenant, TENANT, seeded.value);
     if (plans) await explain(asTenant, stores, TENANT, seeded.value);
   }
@@ -338,7 +380,9 @@ const run = async () => {
     // The statistics matter as much as the rows: a suite that plans against a table PostgreSQL
     // still believes holds two hundred thousand rows is planning against this benchmark's leftovers.
     await admin.query('vacuum analyze');
-    console.log('Seed data removed. Pass --keep to leave it in place.');
+    console.log(
+      `Seed data removed${await forgetStatistics(admin, TABLES)}. Pass --keep to leave it in place.`,
+    );
   }
   await admin.end();
 };
