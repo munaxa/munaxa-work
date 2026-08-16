@@ -89,7 +89,18 @@ export const racingOn = (fixture: WorkflowFixture, second: UnitOfWork): Racing =
         await challenger(transaction);
       });
 
-      return { first: await outcomeOf(firstRun), second: await outcomeOf(secondRun) };
+      // **Both handlers are attached before either is awaited**, and the order matters.
+      //
+      // `outcomeOf` is what turns a rejection into a name, so calling it is what gives each promise a
+      // `catch`. Written as `{ first: await outcomeOf(firstRun), second: await outcomeOf(secondRun) }`
+      // the second call does not happen until the first has settled — and a challenger that loses its
+      // race *before* then rejects with nothing listening, which Node reports as an unhandled
+      // rejection and Vitest fails the run for. It is a timing window rather than a certainty, which
+      // is why it survived from Phase 16B until an uncached serial run happened to lose it.
+      const firstOutcome = outcomeOf(firstRun);
+      const secondOutcome = outcomeOf(secondRun);
+
+      return { first: await firstOutcome, second: await secondOutcome };
     },
   };
 };

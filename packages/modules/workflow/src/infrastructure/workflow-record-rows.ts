@@ -11,6 +11,7 @@ import type {
   WorkflowInstanceStatus,
   WorkflowStepStatus,
 } from '../domain/workflow-vocabulary.js';
+import { serviceLevelOf, serviceLevelValues } from './workflow-service-level-columns.js';
 import { asNumber, orNull, presentOf, type RowValues } from './row-writer.js';
 
 /**
@@ -105,11 +106,22 @@ export const instanceValues = (state: WorkflowInstanceState, tenantId: string): 
 });
 
 /**
- * One step of a running approval, and the four columns Phase 16B added.
+ * One step of a running approval: the four columns Phase 16B added, and the three Phase 16C did.
  *
  * **`approver_membership_id` stays `not null` here**, and that asymmetry with the template is the
- * group snapshot: a template may name a list, a running step never does, because the group was
- * expanded into its members before this row existed.
+ * whole of the snapshot rule. A template may name a list or a manager; a running step never does,
+ * because both were resolved into concrete memberships before this row existed. That is why
+ * `workflow_step_approver_kind_check` still enumerates `membership` alone: at the moment somebody is
+ * actually asked, there is only ever a person. **A manager-resolved step is therefore
+ * indistinguishable here from one a tenant typed** — which is the point, and the reason there is no
+ * manager column on this table and nothing in this file that knows a reporting line exists.
+ *
+ * **`awaiting_at` is ordinary persisted state, supplied by the application.** Nothing here generates
+ * it, reads a clock for it, or derives it from `created_at` or from the history table. The domain
+ * stamps it at the instant a step becomes `awaiting`, from the instant already flowing through the
+ * command; this mapper stores what it is given and hands it back. Several steps of one parallel
+ * branch legitimately share an instant, and a later step of a chain legitimately has a later one —
+ * there is no uniqueness anywhere near it.
  *
  * **`source_group_id` is provenance rather than a reference.** It records which list the person came
  * from so "why was I asked?" has an answer; it carries no foreign key, so editing or deleting that
@@ -129,6 +141,9 @@ export interface StepRow {
   readonly branch_rule: string | null;
   readonly quorum: number | null;
   readonly condition: unknown;
+  readonly service_level_count: number | null;
+  readonly service_level_unit: string | null;
+  readonly awaiting_at: Date | null;
   readonly version: number;
 }
 
@@ -144,6 +159,9 @@ export const stepColumns = (alias: string): string =>
     `${alias}.branch_rule`,
     `${alias}.quorum`,
     `${alias}.condition`,
+    `${alias}.service_level_count`,
+    `${alias}.service_level_unit`,
+    `${alias}.awaiting_at`,
     `${alias}.version`,
   ].join(', ');
 
@@ -159,7 +177,11 @@ export const stepState = (row: StepRow): WorkflowStepState => ({
     sourceGroupId: row.source_group_id,
     branchRule: row.branch_rule as BranchRule | null,
     quorum: row.quorum === null ? null : asNumber(row.quorum),
+    // A `timestamptz` the driver hands back as a `Date` holding an absolute instant, passed through
+    // untouched. Null on every step not yet reached, and on every step that predates Phase 16C.
+    awaitingAt: row.awaiting_at,
   }),
+  ...serviceLevelOf(row.service_level_count, row.service_level_unit),
   // Separately, because a `jsonb` column arrives parsed rather than as a scalar `presentOf` can pass
   // through — and because an empty array is a real stored value rather than an absent one.
   ...(row.condition === null || row.condition === undefined
@@ -179,6 +201,8 @@ export const stepValues = (state: WorkflowStepState, tenantId: string): RowValue
   branch_rule: orNull(state.branchRule),
   quorum: orNull(state.quorum),
   condition: state.condition === undefined ? null : JSON.stringify(state.condition),
+  ...serviceLevelValues(state.serviceLevel),
+  awaiting_at: orNull(state.awaitingAt),
 });
 
 // ------------------------------------------------------------------------------------------------

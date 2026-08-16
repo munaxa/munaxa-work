@@ -6,7 +6,12 @@ import {
 } from './workflow-vocabulary.js';
 import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
 import { definedOf } from './defined.js';
-import { chooseBranch, planSteps, type GroupSnapshot, type ManagerSnapshot } from './branch-plan.js';
+import {
+  chooseBranch,
+  planSteps,
+  type GroupSnapshot,
+  type ManagerSnapshot,
+} from './branch-plan.js';
 import type { BranchCondition } from './condition.js';
 import type { ServiceLevelTarget } from './service-level.js';
 import type { BranchRule } from './workflow-vocabulary.js';

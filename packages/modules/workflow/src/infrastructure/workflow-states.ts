@@ -17,6 +17,8 @@ import {
   type ApprovalGroupState,
 } from '../domain/approval-group.js';
 import type { BranchCondition } from '../domain/condition.js';
+import type { ManagerSnapshot } from '../domain/branch-plan.js';
+import type { ServiceLevelTarget } from '../domain/service-level.js';
 import type { BranchRule } from '../domain/workflow-vocabulary.js';
 import { decide, type DecidedStep } from '../domain/decision.js';
 import { startHistory } from '../domain/history.js';
@@ -117,12 +119,74 @@ export const aGroupMember = (
     addApprovalGroupMember(group, { approvalGroupMemberId: uuidV7(), membershipId, at: NOW }),
   );
 
-/** How a branch ends, and whether it runs at all. Whatever the case under test needs. */
+/** How a branch ends, whether it runs at all, and how long it is expected to take. */
 export interface BranchOptions {
   readonly branchRule?: BranchRule;
   readonly quorum?: number;
   readonly condition?: readonly BranchCondition[];
+  readonly serviceLevel?: ServiceLevelTarget;
 }
+
+/**
+ * A template that names **nobody** — the manager kind.
+ *
+ * No approver identifier of either sort, which is what `workflow_step_template_approver_check`
+ * requires for this kind and what the round-trip suite asserts survives the columns.
+ */
+export const aManagerTemplate = (
+  draft: WorkflowVersionState,
+  ordinal: number,
+  branch: BranchOptions = {},
+): WorkflowStepTemplateState =>
+  accepted(
+    addStep(draft, {
+      stepTemplateId: uuidV7(),
+      ordinal,
+      name: NAME,
+      approverKind: 'manager',
+      ...branch,
+    }),
+  );
+
+/**
+ * A published definition whose templates the caller built, and one instance started against it.
+ *
+ * `aStartedInstance` below builds the sequential chain of named approvers most suites want. This one
+ * exists for the shapes only a caller can describe: a manager template, a target on one step and not
+ * another, a branch. The instance is started through `startInstance`, so the steps carry whatever
+ * that function copies and stamps — which is the point, since `service_level_*` and `awaiting_at` are
+ * exactly what it copies and stamps.
+ */
+export const aStartedApproval = (
+  templatesOf: (draft: WorkflowVersionState) => readonly WorkflowStepTemplateState[],
+  options: { subjectId?: string; at?: Date; manager?: ManagerSnapshot } = {},
+): StartedFromDefinition => {
+  const definition = aDefinition();
+  const draft = aDraft(definition, 1);
+  const templates = templatesOf(draft);
+  const version = accepted(publishVersion(draft, templates, NOW, ADMIN));
+  const started = accepted(
+    startInstance(version, templates, {
+      instanceId: uuidV7(),
+      subjectType: SUBJECT_TYPE,
+      subjectId: options.subjectId ?? 'requisition-1',
+      requestedByMembershipId: REQUESTER,
+      correlationId: uuidV7(),
+      context: { headcount: 2 },
+      at: options.at ?? NOW,
+      stepIds: templates.map(() => uuidV7()),
+      ...(options.manager === undefined ? {} : { manager: options.manager }),
+    }),
+  );
+
+  return {
+    definition,
+    version,
+    templates,
+    ...started,
+    history: startHistory(started, [uuidV7(), uuidV7()]),
+  };
+};
 
 /** A template that names a list rather than a person. */
 export const aGroupTemplate = (

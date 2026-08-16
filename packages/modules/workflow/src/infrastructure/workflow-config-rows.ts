@@ -11,6 +11,7 @@ import type {
   WorkflowVersionStatus,
 } from '../domain/workflow-vocabulary.js';
 import type { BranchCondition } from '../domain/condition.js';
+import { serviceLevelOf, serviceLevelValues } from './workflow-service-level-columns.js';
 import { asNumber, orNull, presentOf, type RowValues } from './row-writer.js';
 
 /**
@@ -139,11 +140,20 @@ export const versionValues = (state: WorkflowVersionState, tenantId: string): Ro
 });
 
 /**
- * One step of a version, and the four columns Phase 16B added to it.
+ * One step of a version: the four columns Phase 16B added to it, and the two Phase 16C did.
  *
  * **`approver_membership_id` is nullable now**, because a `group` template names no person. The
  * pairing is not left loose: `workflow_step_template_approver_check` requires exactly the field the
- * kind implies, which is stricter per row than `not null` was.
+ * kind implies, which is stricter per row than `not null` was — and it generalized to `manager` for
+ * free, since a manager template names **neither** identifier and both of that constraint's
+ * biconditionals are false for it. There is no manager column here and no row shape that would want
+ * one: whose manager a template means is the requester's, fixed rather than configured.
+ *
+ * **`service_level_count` and `service_level_unit` are two columns rather than one interval**,
+ * because "two days" and "forty-eight hours" are the same duration and not the same sentence — an
+ * administrator typed one of them and a screen has to show it back. They travel together: the
+ * database's `workflow_step_template_service_level_check` requires both or neither, and the mapper
+ * assembles them into one value object or omits it entirely.
  *
  * **`condition` is `jsonb` and is passed through in both directions.** The mapper stringifies on the
  * way in and hands the parsed array back on the way out, and does nothing else — it does not read a
@@ -162,6 +172,8 @@ export interface TemplateRow {
   readonly branch_rule: string | null;
   readonly quorum: number | null;
   readonly condition: unknown;
+  readonly service_level_count: number | null;
+  readonly service_level_unit: string | null;
   readonly version: number;
 }
 
@@ -176,6 +188,8 @@ export const TEMPLATE_COLUMNS = [
   'branch_rule',
   'quorum',
   'condition',
+  'service_level_count',
+  'service_level_unit',
   'version',
 ].join(', ');
 
@@ -193,6 +207,7 @@ export const templateState = (row: TemplateRow): WorkflowStepTemplateState => ({
     quorum: row.quorum === null ? null : asNumber(row.quorum),
   }),
   ...conditionOf(row.condition),
+  ...serviceLevelOf(row.service_level_count, row.service_level_unit),
 });
 
 export const templateValues = (state: WorkflowStepTemplateState, tenantId: string): RowValues => ({
@@ -207,6 +222,7 @@ export const templateValues = (state: WorkflowStepTemplateState, tenantId: strin
   branch_rule: orNull(state.branchRule),
   quorum: orNull(state.quorum),
   condition: state.condition === undefined ? null : JSON.stringify(state.condition),
+  ...serviceLevelValues(state.serviceLevel),
 });
 
 /**

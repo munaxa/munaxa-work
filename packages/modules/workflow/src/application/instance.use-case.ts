@@ -118,7 +118,9 @@ export const startInstanceHandler = (
         at,
         // One identifier per **planned** step, not per template: a group of four expands to four
         // steps, and the count is the plan's rather than the configuration's.
-        stepIds: Array.from({ length: plannedStepCount(templates, groups, manager) }, () => uuidV7()),
+        stepIds: Array.from({ length: plannedStepCount(templates, groups, manager) }, () =>
+          uuidV7(),
+        ),
         groups,
         ...(manager === undefined ? {} : { manager }),
       });

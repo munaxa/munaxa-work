@@ -4,6 +4,7 @@ import { workflowModule } from '../application/workflow-module.js';
 import {
   FakeBusinessDecisions,
   FakeDelegation,
+  FakeReportingLine,
   FixedClock,
 } from '../application/workflow-test-harness.js';
 import type { WorkflowInstanceDetailView } from '../contracts/views.js';
@@ -31,6 +32,14 @@ import { NOW, aCode } from './workflow-states.js';
 export interface Live {
   readonly dispatcher: Dispatcher;
   readonly delegation: FakeDelegation;
+  /**
+   * Employment and Identity, answering who somebody's manager is.
+   *
+   * A double for the same reason the delegation register is one: it is not this module. The adapter
+   * that will answer it from a real Identity query is Checkpoint 7's, and nothing in the persistence
+   * layer imports either module — asserted over the infrastructure source in the manager suite.
+   */
+  readonly reportingLine: FakeReportingLine;
   readonly business: FakeBusinessDecisions;
   as<TResult>(
     tenantId: string,
@@ -44,9 +53,12 @@ export interface StepSpec {
   readonly ordinal: number;
   readonly approverMembershipId?: string;
   readonly approverGroupId?: string;
+  /** `manager`, for the one kind that names nobody. Absent means the kind is derived, as before. */
+  readonly approverKind?: 'manager';
   readonly branchRule?: 'unanimous' | 'majority' | 'first-response';
   readonly quorum?: number;
   readonly condition?: readonly Record<string, unknown>[];
+  readonly serviceLevel?: { readonly count: number; readonly unit: string };
 }
 
 export interface LiveWorkflow extends Live {
@@ -228,11 +240,13 @@ const liveModule = (fixture: WorkflowFixture): Live => {
   const permissions = { holds: (): Promise<boolean> => Promise.resolve(true) };
   const dispatcher = new Dispatcher(permissions);
   const delegation = new FakeDelegation();
+  const reportingLine = new FakeReportingLine();
   const business = new FakeBusinessDecisions();
   const module = workflowModule({
     unitOfWork: fixture.unitOfWork,
     stores: fixture.stores,
     delegation,
+    reportingLine,
     businessDecision: business,
     permissions,
     clock: new FixedClock(NOW),
@@ -244,6 +258,7 @@ const liveModule = (fixture: WorkflowFixture): Live => {
   return {
     dispatcher,
     delegation,
+    reportingLine,
     business,
     as: (tenantId, membershipId, work) =>
       runInContext(
