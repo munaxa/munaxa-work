@@ -56,6 +56,46 @@ export class TenantMembershipRepository
     return row === undefined ? undefined : toState(row);
   }
 
+  /**
+   * The memberships that may act now and hold one employment — the reverse lookup Phase 16C added.
+   *
+   * **One statement and one index.** The join runs in the database rather than as a link read
+   * followed by a membership read per link, so the cost is one bounded lookup whatever the
+   * cardinality. `employment_link_employment_idx` on `(tenant_id, employment_id)` is the access
+   * path, and it existed before this query did — nothing was added for it.
+   *
+   * **Both halves are filtered, and they filter different things.** `el.status = 'linked'` is a
+   * live link: an employment somebody has left is not theirs any more. `m.status = 'active'` is a
+   * membership that may act — `isActingMembership`'s rule, restated in SQL because that is where
+   * this predicate has to run. A person whose membership was suspended still has a link and must
+   * not come back from this query, which is precisely the distinction a caller needs in order to
+   * tell "there is no manager" from "the manager cannot sign".
+   *
+   * Ordered by identifier so two calls agree. That is determinism, not a choice between
+   * candidates: this returns everybody it finds and leaves the choosing to a caller who has
+   * approval to make it.
+   */
+  public async activeForEmployment(
+    transaction: Transaction,
+    employmentId: string,
+  ): Promise<readonly TenantMembershipState[]> {
+    const rows = await transaction.execute<MembershipRow>(
+      `select ${COLUMNS.split(', ')
+        .map((column) => `m.${column}`)
+        .join(', ')}
+         from tenant_membership m
+         join employment_link el
+           on el.membership_id = m.id and el.tenant_id = m.tenant_id
+        where m.tenant_id = $1 and el.employment_id = $2
+          and el.status = 'linked' and el.deleted_at is null
+          and m.status = 'active' and m.deleted_at is null
+        order by m.id`,
+      [transaction.tenantId, employmentId],
+    );
+
+    return rows.map(toState);
+  }
+
   /** This person's membership of the tenant in context. At most one exists, by unique index. */
   public async byUser(
     transaction: Transaction,

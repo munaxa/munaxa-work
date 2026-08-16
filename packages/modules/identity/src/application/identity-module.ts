@@ -9,6 +9,7 @@ import {
 } from './employment-linking.use-case.js';
 import {
   activeDelegationsForHandler,
+  activeMembershipsForEmploymentHandler,
   describeMemberHandler,
   listInvitationsHandler,
   listMembershipsHandler,
@@ -57,6 +58,7 @@ export const identityModule = (dependencies: IdentityDependencies): WorkModule =
     describeMemberHandler(dependencies),
     searchMembersHandler(dependencies),
     activeDelegationsForHandler(dependencies),
+    activeMembershipsForEmploymentHandler(dependencies),
   ] as readonly QueryHandler<Query, unknown>[],
 
   eventHandlers: [onMembershipEnded(dependencies)],

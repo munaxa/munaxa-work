@@ -96,16 +96,24 @@ const matchesStatus = <TState extends { status: string }>(
  * behave like the repositories they stand in for, and a reader checking that has to be able to
  * see one of them at a time.
  */
-export const inMemoryIdentityStores = (): IdentityStores => ({
-  users: userStore(new Table<WorkforceUserState & Stored>('workforce_user')),
-  memberships: membershipStore(new Table<TenantMembershipState>('tenant_membership')),
-  invitations: invitationStore(new Table<InvitationState>('invitation')),
-  portals: portalStore(new Table<PortalAssignmentState>('portal_assignment')),
-  employmentLinks: employmentLinkStore(new Table<EmploymentLinkState>('employment_link')),
-  delegations: delegationStore(new Table<DelegationState>('delegation')),
-  profiles: profileStore(new Table<BusinessProfileState>('business_profile')),
-  preferences: preferenceStore(new Table<UserPreferenceState>('user_preference')),
-});
+export const inMemoryIdentityStores = (): IdentityStores => {
+  // The two tables `activeForEmployment` joins, built before the stores so both can see them. The
+  // repository resolves that question in one SQL join; a fake that could not reach both tables
+  // would have to answer it some other way, and would then be testing something else.
+  const memberships = new Table<TenantMembershipState>('tenant_membership');
+  const employmentLinks = new Table<EmploymentLinkState>('employment_link');
+
+  return {
+    users: userStore(new Table<WorkforceUserState & Stored>('workforce_user')),
+    memberships: membershipStore(memberships, employmentLinks),
+    invitations: invitationStore(new Table<InvitationState>('invitation')),
+    portals: portalStore(new Table<PortalAssignmentState>('portal_assignment')),
+    employmentLinks: employmentLinkStore(employmentLinks),
+    delegations: delegationStore(new Table<DelegationState>('delegation')),
+    profiles: profileStore(new Table<BusinessProfileState>('business_profile')),
+    preferences: preferenceStore(new Table<UserPreferenceState>('user_preference')),
+  };
+};
 
 /** Tenant-less by design (ADR-0033), so this one and only this one reads across tenants. */
 const userStore = (rows: Table<WorkforceUserState & Stored>): IdentityStores['users'] => ({
@@ -116,8 +124,25 @@ const userStore = (rows: Table<WorkforceUserState & Stored>): IdentityStores['us
   update: (_: Transaction, state, expected) => Promise.resolve(rows.update(state, expected)),
 });
 
-const membershipStore = (rows: Table<TenantMembershipState>): IdentityStores['memberships'] => ({
+const membershipStore = (
+  rows: Table<TenantMembershipState>,
+  links: Table<EmploymentLinkState>,
+): IdentityStores['memberships'] => ({
   byId: (_: Transaction, id) => Promise.resolve(rows.byId(id)),
+  // Both predicates, exactly as the repository applies them: a live link *and* a membership that
+  // may act. Sorted by identifier so two calls agree, and never narrowed to one.
+  activeForEmployment: (_: Transaction, employmentId) =>
+    Promise.resolve(
+      links
+        .all()
+        .filter((link) => link.employmentId === employmentId && link.status === 'linked')
+        .flatMap((link) => {
+          const membership = rows.byId(link.membershipId);
+
+          return membership === undefined || membership.status !== 'active' ? [] : [membership];
+        })
+        .sort((left, right) => left.id.localeCompare(right.id)),
+    ),
   byUser: (_: Transaction, workforceUserId) =>
     Promise.resolve(rows.all().find((row) => row.workforceUserId === workforceUserId)),
   list: (_: Transaction, query) =>
