@@ -6,6 +6,7 @@ import type {
 } from '@work/workflow/contracts';
 
 import { count, member, short } from './exact';
+import { ServiceLevelState } from './service-level';
 import { Empty, Section, Table, Term, type SectionProps } from './sections';
 
 /**
@@ -97,7 +98,17 @@ export const AwaitingSection = ({
     {steps.length === 0 ? (
       <Empty t={t} />
     ) : (
-      <Table t={t} headers={['ordinal', 'approver', 'sourceGroup', 'branchRule', 'quorum']}>
+      <Table
+        t={t}
+        headers={[
+          'ordinal',
+          'approver',
+          'sourceGroup',
+          'branchRule',
+          'quorum',
+          'serviceLevelState',
+        ]}
+      >
         {steps.map((step) => (
           <tr key={step.stepId}>
             <td>{count(step.ordinal)}</td>
@@ -109,6 +120,11 @@ export const AwaitingSection = ({
               <Term t={t} group="branchRule" value={step.branchRule} />
             </td>
             <td>{count(step.quorum)}</td>
+            {/* One cell here rather than four: this table is about who is being asked, and the
+                approval's own chain below carries the target, the due instant and the minutes. */}
+            <td>
+              <ServiceLevelState t={t} level={step.serviceLevel} />
+            </td>
           </tr>
         ))}
       </Table>

@@ -6,6 +6,7 @@ import type {
 } from '@work/workflow/contracts';
 
 import { count, instant, member, short } from './exact';
+import { ServiceLevelState } from './service-level';
 import { Empty, Figure, Section, Table, Term, type SectionProps } from './sections';
 
 /**
@@ -32,7 +33,10 @@ import { Empty, Figure, Section, Table, Term, type SectionProps } from './sectio
  *
  * The row carries the workflow's code and the subject so the person can tell what they are being
  * asked about, and no approver column — the only approver a row of this list can have is the caller.
- * There is no due date and no age, because Workflow publishes neither.
+ *
+ * **Where a step carries a target, how it stands against it is one cell.** The state is the server's
+ * own word, read from the same bounded response that returned the row: there is no request per row
+ * to work it out, no clock read here, and no age computed from the instant beside it.
  */
 export const PendingSection = ({
   t,
@@ -61,6 +65,7 @@ export const PendingSection = ({
           'subjectId',
           'ordinal',
           'startedOn',
+          'serviceLevelState',
           'instanceId',
         ]}
       >
@@ -71,6 +76,9 @@ export const PendingSection = ({
             <td>{short(step.subjectId)}</td>
             <td>{count(step.ordinal)}</td>
             <td>{instant(step.startedOn, language)}</td>
+            <td>
+              <ServiceLevelState t={t} level={step.serviceLevel} />
+            </td>
             <td>{short(step.instanceId)}</td>
           </tr>
         ))}

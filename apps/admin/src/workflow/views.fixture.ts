@@ -37,6 +37,19 @@ export const VERSION_ID = '01930000-0000-7000-8000-0000000000a1';
 export const INSTANCE_ID = '01930000-0000-7000-8000-0000000000c1';
 export const APPROVER = '01930000-0000-7000-8000-0000000000e1';
 export const DEPUTY = '01930000-0000-7000-8000-0000000000e2';
+/** The membership a manager step resolved to when its approval started. */
+export const MANAGER = '01930000-0000-7000-8000-0000000000e4';
+
+/**
+ * Two due instants the **server** computed. Nothing in these fixtures derives one from a target.
+ *
+ * Deliberately not on the 1st of March and not at 15:30. Those are the two renderings a *dropped*
+ * UTC pin produces for `AT` — east and west of UTC respectively — and the instant regression suite
+ * searches the whole page for them. A fixture that happened to contain one would disarm the sharpest
+ * assertion on this screen while looking like ordinary data.
+ */
+export const WITHIN_DUE = '2026-03-05T09:15:00.000Z';
+export const OVERDUE_DUE = '2026-03-04T09:15:00.000Z';
 export const SUBJECT_ID = '01930000-0000-7000-8000-0000000000f1';
 
 export const aDefinition = (): WorkflowDefinitionView => ({
@@ -93,6 +106,17 @@ export const aDefinitionDetail = (): WorkflowDefinitionDetailView => ({
       name: { en: 'Finance director', ar: 'المدير المالي' },
       approverKind: 'membership',
       approverMembershipId: DEPUTY,
+      // Phase 16C: a target, in the unit somebody configured it in.
+      serviceLevel: { count: 2, unit: 'days' },
+    },
+    // A manager template names **nobody**: no membership, no group. Both cells are empty on the
+    // screen, and that is the configuration rather than missing data.
+    {
+      stepTemplateId: '01930000-0000-7000-8000-0000000000b3',
+      ordinal: 3,
+      name: { en: 'Line manager', ar: 'المدير المباشر' },
+      approverKind: 'manager',
+      serviceLevel: { count: 48, unit: 'hours' },
     },
   ],
 });
@@ -121,15 +145,8 @@ export const anInstanceDetail = (): WorkflowInstanceDetailView => ({
       status: 'approved',
       version: 2,
     },
-    {
-      stepId: '01930000-0000-7000-8000-000000000092',
-      instanceId: INSTANCE_ID,
-      ordinal: 2,
-      approverKind: 'membership',
-      approverMembershipId: DEPUTY,
-      status: 'awaiting',
-      version: 1,
-    },
+    awaitingStep(),
+    aResolvedManagerStep(),
   ],
   decisions: [aDirectDecision()],
   // A sequential chain: branches of one, so the plural and the singular agree and every tally has a
@@ -167,6 +184,34 @@ export const anInstanceDetail = (): WorkflowInstanceDetailView => ({
   ],
 });
 
+/**
+ * The manager step, once it is running: a concrete person, `membership`, and past its target.
+ *
+ * The resolution happened when the approval started; nothing on the screen re-derives it, and the
+ * step is indistinguishable from one a tenant typed a membership into — which is the point.
+ *
+ * The two service-level numbers are chosen so that a screen computing either would print something
+ * else. Forty-eight hours after `AT` is the 2nd of March, not the 4th, and ninety minutes is not the
+ * difference between the due instant and any other instant on this page.
+ */
+const aResolvedManagerStep = (): WorkflowStepView => ({
+  stepId: '01930000-0000-7000-8000-000000000093',
+  instanceId: INSTANCE_ID,
+  ordinal: 3,
+  approverKind: 'membership',
+  approverMembershipId: MANAGER,
+  status: 'pending',
+  version: 1,
+  serviceLevel: {
+    count: 48,
+    unit: 'hours',
+    awaitingOn: AT,
+    dueOn: OVERDUE_DUE,
+    state: 'overdue',
+    overdueByMinutes: 90,
+  },
+});
+
 const awaitingStep = (): WorkflowStepView => ({
   stepId: '01930000-0000-7000-8000-000000000092',
   instanceId: INSTANCE_ID,
@@ -175,6 +220,14 @@ const awaitingStep = (): WorkflowStepView => ({
   approverMembershipId: DEPUTY,
   status: 'awaiting',
   version: 1,
+  // Within its target, so there is no overdue count to render rather than a zero.
+  serviceLevel: {
+    count: 2,
+    unit: 'days',
+    awaitingOn: AT,
+    dueOn: WITHIN_DUE,
+    state: 'within',
+  },
 });
 
 /** A decision somebody made on their own step: an actor, and no authority beyond their own. */
@@ -214,6 +267,14 @@ export const aPendingApproval = (): PendingApprovalView => ({
   definitionCode: 'requisition-approval',
   startedOn: AT,
   version: 1,
+  // The queue row carries how this step stands, from the same bounded response that returned it.
+  serviceLevel: {
+    count: 2,
+    unit: 'days',
+    awaitingOn: AT,
+    dueOn: WITHIN_DUE,
+    state: 'within',
+  },
 });
 
 /** An approval still pending: one step answered, one not. `expired` is never produced. */

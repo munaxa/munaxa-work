@@ -40,6 +40,11 @@
       "ordinal": "Position",
       "approver": "Approver asked",
       "approverKind": "Approver kind",
+      "serviceLevel": "Expected to take",
+      "serviceLevelState": "Against target",
+      "awaitingOn": "Asked at",
+      "dueOn": "Due",
+      "overdueByMinutes": "Overdue by (minutes)",
       "definitionCode": "Workflow",
       "instanceId": "Approval",
       "definitionId": "Workflow",
@@ -107,7 +112,11 @@
       "groupIsSnapshotted": "An approval already running keeps the members it started with. Changing a group today does not reach an approval raised yesterday.",
       "tallyIsServerComputed": "Every number in a tally is the server’s own count over the decisions that exist. Nothing on this screen adds, divides or compares them, and no percentage is derived from them.",
       "branchIsSimultaneous": "Several approvers may share one position and are asked at the same time. A position with more than one approver is one branch, not several steps in order.",
-      "conditionIsConfiguration": "A condition is shown as it was configured. It is evaluated by the server when an approval starts, never in this screen, and a value the request does not carry is a refusal there rather than a false here."
+      "conditionIsConfiguration": "A condition is shown as it was configured. It is evaluated by the server when an approval starts, never in this screen, and a value the request does not carry is a refusal there rather than a false here.",
+      "managerIsConfiguredNotNamed": "A manager step names nobody. It means the manager of whoever raises the approval, which is fixed rather than configured, so there is no person, employment or reporting line to show here.",
+      "managerIsSnapshotted": "The manager is worked out once, when an approval starts, and the person found then stays on that approval for its whole life. A reporting line changed afterwards does not move an approval already running; the next one raised will find the new manager.",
+      "serviceLevelIsObserved": "A target is a target and not a deadline. Nothing happens when it passes: no approval expires, nobody is reminded and nothing is reassigned. Whether a step is past its target is worked out by the server each time this page is read.",
+      "serviceLevelIsElapsedTime": "A target counts elapsed time from the moment that step was asked. Two days means forty-eight hours, including weekends and holidays: this product holds no calendar and no working-time rule."
     },
     "rejection": {
       "authority-not-delegated": "This decision names somebody it acts for, but was not made under a delegation.",
@@ -260,14 +269,12 @@
       }
     },
     "withheld": {
-      "sla": "No approval has a service level, a due time or an age. Nothing is measured against one.",
       "businessDays": "Nothing is calculated in business days. Approvals holds no calendar and no working-time rule.",
-      "escalation": "Nothing escalates. There is no reassignment after a delay and no next approver on a timer.",
+      "escalation": "Nothing escalates. A step past its target is shown as past it and nothing follows: no reassignment after a delay, and no next approver on a timer.",
       "scheduling": "Nothing is scheduled. No approval is advanced, closed or reviewed by a background job.",
-      "approvalExpiry": "No approval expires. `expired` is declared in the approval vocabulary and this phase never produces it.",
+      "approvalExpiry": "No approval expires. A step may be past its target and stays exactly where it is; `expired` is declared in the approval vocabulary and this phase never produces it.",
       "delegationExpiry": "A delegation is not expired automatically. Whether one is in force is answered when a decision is made.",
-      "roles": "There is no role directory and no role approver. A step names a member or an approval group — an explicit list — and never a role.",
-      "managerRouting": "Managers are not resolved. Nothing here routes to somebody’s manager or reads a reporting line.",
+      "roles": "There is no role directory and no role approver. A step names a member, an approval group — an explicit list — or the requester’s manager, and never a role.",
       "externalApprovers": "There is no external approver. Everybody asked is a member of this tenant.",
       "notificationDelivery": "Nothing is delivered. No email, message or push notification is sent when somebody is asked to decide.",
       "analytics": "There are no approval analytics. No success rate, average time, bottleneck or compliance figure is calculated anywhere.",
@@ -284,7 +291,9 @@
       "branchRules": "Unanimous, majority and first-response are supported as branch rules. Each is counted over the approvers the branch was given when the approval started.",
       "quorum": "A quorum is supported as a whole number of responses. It is a count and never a proportion, and it gates an approval and a rejection alike.",
       "conditionalBranching": "Conditional branching is supported. A branch may carry conditions on values the request supplied, and the server evaluates them when the approval starts.",
-      "tally": "A branch tally is published: who was asked, who answered, how many approvals the rule needs, and the outcome. It is computed by the server from the decisions and stored nowhere."
+      "tally": "A branch tally is published: who was asked, who answered, how many approvals the rule needs, and the outcome. It is computed by the server from the decisions and stored nowhere.",
+      "managerRouting": "A step may ask the requester’s manager. The person is found once, when the approval starts — through their primary employment and its primary reporting line, one level up — and stays on that approval afterwards.",
+      "serviceLevel": "A step may carry a target of whole hours or days, counted from the moment that step was asked. It is observed rather than enforced: the server reports whether a step is within or past it, and nothing fires when it passes."
     }
   }
 }

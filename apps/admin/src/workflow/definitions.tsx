@@ -6,6 +6,7 @@ import type {
 
 import { count, instant, member, short } from './exact';
 import { Clauses } from './branches';
+import { Target } from './service-level';
 import { Empty, named, Section, Table, Term, type SectionProps } from './sections';
 
 /**
@@ -99,6 +100,12 @@ export const VersionsSection = ({
  * Whether somebody may act for an approver is Identity's answer at the moment of a decision rather
  * than a property of the configuration.
  *
+ * **A step may name nobody at all, and that is the manager kind.** `Manager` means the manager of
+ * whoever raises the approval — which is fixed rather than configured — so both approver cells are
+ * empty and there is nothing missing about that. No employment, no reporting line and no person is
+ * shown here, because at configuration time no person has been chosen: one is worked out when an
+ * approval actually starts, and the approvals below are where it appears.
+ *
  * **Several rows may share one position, and that is a branch rather than a mistake.** Everybody at
  * one ordinal is asked at the same moment, and the rule, the quorum and the condition beside them
  * say how that branch ends. A step configured before Phase 16B carries none of the three, and the
@@ -130,6 +137,7 @@ export const StepsSection = ({
               'branchRule',
               'quorum',
               'condition',
+              'serviceLevel',
             ]}
           >
             {steps.map((step) => (
@@ -149,10 +157,16 @@ export const StepsSection = ({
                 <td>
                   <Clauses t={t} condition={step.condition} />
                 </td>
+                {/* What was configured, in the unit it was configured in. Nothing converts it. */}
+                <td>
+                  <Target t={t} target={step.serviceLevel} />
+                </td>
               </tr>
             ))}
           </Table>
           <p className="text-xs opacity-60">{t('workflow.notice.conditionIsConfiguration')}</p>
+          <p className="text-xs opacity-60">{t('workflow.notice.managerIsConfiguredNotNamed')}</p>
+          <p className="text-xs opacity-60">{t('workflow.notice.serviceLevelIsElapsedTime')}</p>
         </>
       )}
     </Section>

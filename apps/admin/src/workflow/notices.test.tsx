@@ -115,6 +115,8 @@ describe('what this release added', () => {
         'workflow.provided.quorum',
         'workflow.provided.conditionalBranching',
         'workflow.provided.tally',
+        'workflow.provided.managerRouting',
+        'workflow.provided.serviceLevel',
       ]) {
         expect([language, key, markup.includes(escaped(translate(key)))]).toEqual([
           language,
@@ -135,7 +137,15 @@ describe('what this release added', () => {
   it('no longer carries a catalogue entry claiming any of them is absent', () => {
     const withheld = Object.keys(catalogue.workflow.withheld);
 
-    for (const gone of ['parallelApproval', 'tally', 'conditionalBranching', 'groups']) {
+    for (const gone of [
+      'parallelApproval',
+      'tally',
+      'conditionalBranching',
+      'groups',
+      // Phase 16C: both were blanket claims, and both are now false.
+      'sla',
+      'managerRouting',
+    ]) {
       expect([gone, withheld.includes(gone)]).toEqual([gone, false]);
     }
     // What replaced the blanket claims is narrower and still true.
@@ -143,6 +153,15 @@ describe('what this release added', () => {
     expect(withheld).toContain('roles');
     expect(en('workflow.withheld.roles')).toContain('approval group');
     expect(en('workflow.withheld.groupDirectory')).toContain('list a tenant maintains');
+    // A target exists; a *business-day* target does not, and nothing fires when one passes.
+    expect(withheld).toContain('businessDays');
+    expect(withheld).toContain('escalation');
+    expect(withheld).toContain('approvalExpiry');
+    expect(en('workflow.withheld.escalation')).toContain('past its target');
+    expect(en('workflow.withheld.approvalExpiry')).toContain('stays exactly where it is');
+    // And a manager is resolved once rather than continuously — the claim that replaced the old one.
+    expect(en('workflow.provided.managerRouting')).toContain('once, when the approval starts');
+    expect(en('workflow.provided.serviceLevel')).toContain('observed rather than enforced');
   });
 });
 
@@ -155,7 +174,6 @@ describe('what this product does not do', () => {
       const markup = html(<StatusSection t={translate} language={language} />);
 
       for (const key of [
-        'workflow.withheld.sla',
         'workflow.withheld.businessDays',
         'workflow.withheld.escalation',
         'workflow.withheld.scheduling',
@@ -164,7 +182,6 @@ describe('what this product does not do', () => {
         'workflow.withheld.delegationManagement',
         'workflow.withheld.roles',
         'workflow.withheld.groupDirectory',
-        'workflow.withheld.managerRouting',
         'workflow.withheld.externalApprovers',
         'workflow.withheld.notificationDelivery',
         'workflow.withheld.analytics',
@@ -212,23 +229,26 @@ describe('the claims no heading or column makes', () => {
    * **Four words left this list in Phase 16B and one changed meaning.** A branch, a rule, a quorum
    * and a tally are now data the server publishes, so a column naming one is a description rather
    * than a claim — the test below asserts they are present rather than absent. `group` moved for a
-   * narrower reason: an approval group is real, a group *directory* is not, so what stays forbidden
-   * is `role`, `manager` and `team`, the words that would turn an explicit list into a directory.
+   * narrower reason: an approval group is real, a group *directory* is not.
+   *
+   * **Four more left it in Phase 16C, and `manager` is the one worth reading twice.** A step may ask
+   * the requester's manager and a step may carry a target, so `manager`, `due`, `overdue` and
+   * `service level` now describe data rather than claim capability, and the companion test asserts
+   * each of them appears. What stays forbidden is what still does not exist: `role`, `team`,
+   * `directory` and `department` — the words that would turn one resolved person into a directory —
+   * along with `sla`, `elapsed`, `age` and `business day`, which would each claim an arithmetic this
+   * screen does not perform.
    */
   it('has no heading, column or figure naming a capability this phase deferred', () => {
     const structural = labels(populated('en'));
 
     for (const claim of [
       'sla',
-      'service level',
       'escalat',
-      'due',
-      'overdue',
       'elapsed',
       'age',
       'business day',
       'role',
-      'manager',
       'team',
       'directory',
       'department',
@@ -248,11 +268,26 @@ describe('the claims no heading or column makes', () => {
     }
   });
 
-  /** And the four that are now real are named as columns, because the data is there to describe. */
-  it('names the branch, the rule, the quorum and the tally, which now exist', () => {
+  /**
+   * And what is now real is named as a column, because the data is there to describe.
+   *
+   * This is the complement of the list above, and it is what stops a word leaving the forbidden list
+   * from reading as a capability quietly dropped: each of these must actually appear.
+   */
+  it('names the branch, the rule, the quorum, the tally, the target and how it stands', () => {
     const structural = labels(populated('en'));
 
-    for (const provided of ['branch rule', 'quorum', 'approvals needed', 'outcome', 'members']) {
+    for (const provided of [
+      'branch rule',
+      'quorum',
+      'approvals needed',
+      'outcome',
+      'members',
+      // Phase 16C's columns.
+      'expected to take',
+      'against target',
+      'approver kind',
+    ]) {
       expect([provided, structural.includes(provided)]).toEqual([provided, true]);
     }
   });

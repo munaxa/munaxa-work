@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { WorkflowInstanceDetailView, WorkflowInstanceView } from '@work/workflow/contracts';
 
 import { count, instant, member, short } from './exact';
+import { StepServiceLevel } from './service-level';
 import { Empty, Section, Table, Term, type SectionProps } from './sections';
 
 /**
@@ -81,6 +82,13 @@ export const InstancesSection = ({
  * nothing that routes reads it. A group emptied since keeps its rows: an approval asks the people it
  * started with.
  *
+ * **A step whose template named a manager names a person here, like every other step.** The manager
+ * was worked out once, when this approval started, and the membership below is that answer written
+ * down. Nothing on this screen calls it a manager: the API says `membership` and a person, and
+ * inferring more from an identifier would be guessing at the one fact an auditor needs to be certain
+ * of. What is behind that resolution — an employment, a reporting line — is not published here and
+ * is not shown.
+ *
  * **A status here is the server's own and is never inferred from position.** Several steps may share
  * an ordinal and be awaiting at once, so "the first undecided one" is not a question with an answer;
  * a step that has been decided shows its decision, and a step nothing reached shows as not yet
@@ -88,6 +96,7 @@ export const InstancesSection = ({
  */
 export const InstanceStepsSection = ({
   t,
+  language,
   detail,
 }: SectionProps & { readonly detail: WorkflowInstanceDetailView | undefined }): ReactNode => (
   <Section t={t} title="instanceSteps" note="workflow.notice.detailIsFirstRow">
@@ -102,6 +111,7 @@ export const InstanceStepsSection = ({
           'status',
           'sourceGroup',
           'branchRule',
+          'serviceLevel',
           'stepId',
           'version',
         ]}
@@ -117,11 +127,18 @@ export const InstanceStepsSection = ({
             <td>
               <Term t={t} group="branchRule" value={step.branchRule} />
             </td>
+            {/* Target, state, due instant and overdue minutes — four published fields, four cells,
+                and no arithmetic between them. */}
+            <td>
+              <StepServiceLevel t={t} language={language} level={step.serviceLevel} />
+            </td>
             <td>{short(step.stepId)}</td>
             <td>{count(step.version)}</td>
           </tr>
         ))}
       </Table>
     )}
+    <p className="text-xs opacity-60">{t('workflow.notice.managerIsSnapshotted')}</p>
+    <p className="text-xs opacity-60">{t('workflow.notice.serviceLevelIsObserved')}</p>
   </Section>
 );

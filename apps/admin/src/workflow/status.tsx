@@ -25,12 +25,17 @@ import { Section, type SectionProps } from './sections';
  *
  * Four are worth the words even though something adjacent does exist:
  *
- * - The approval vocabulary declares **`expired`** and nothing in this phase produces it. The
- *   mapping is total so a reader can see the gap; the gap is not an operational state.
+ * - The approval vocabulary declares **`expired`** and nothing here produces it. A step may be past
+ *   its target and stays exactly where it is. The mapping is total so a reader can see the gap; the
+ *   gap is not an operational state.
  * - A **delegation** is real and Identity owns it. Nothing expires one on a timer — whether one is
  *   in force is asked at the instant a decision is made.
- * - Every approval carries **instants**, and no service level is measured against any of them.
- *   Publishing a time is not measuring one.
+ * - A **service level** is now real and is still not a deadline. A target is *observed* — the server
+ *   says whether a step is within or past it, each time somebody reads the page — and nothing fires
+ *   when it passes. Measuring a time is not enforcing one.
+ * - A **manager** is now resolved, once, when an approval starts. That is not a directory and not a
+ *   live lookup: the person found then stays on that approval, and a reporting line changed
+ *   afterwards moves nothing.
  * - A decision reaches the module that raised the approval **inside the approver's own request**.
  *   That is a seam, not a queue: there is no outbox, no broker and no callback.
  *
@@ -39,7 +44,7 @@ import { Section, type SectionProps } from './sections';
  */
 
 /**
- * The six capabilities this phase added, the seventeen absences the module still states, and the
+ * The eight capabilities these phases added, the fifteen absences the module still states, and the
  * three portal-level facts this screen adds for itself.
  *
  * The absences are the module's own `workflow.withheld.*` catalogue. The last three are the portal's
@@ -53,10 +58,11 @@ const PROVIDED = [
   'workflow.provided.quorum',
   'workflow.provided.conditionalBranching',
   'workflow.provided.tally',
+  'workflow.provided.managerRouting',
+  'workflow.provided.serviceLevel',
 ] as const;
 
 const NOT_VERIFIED = [
-  'workflow.withheld.sla',
   'workflow.withheld.businessDays',
   'workflow.withheld.escalation',
   'workflow.withheld.scheduling',
@@ -65,7 +71,6 @@ const NOT_VERIFIED = [
   'workflow.withheld.delegationManagement',
   'workflow.withheld.roles',
   'workflow.withheld.groupDirectory',
-  'workflow.withheld.managerRouting',
   'workflow.withheld.externalApprovers',
   'workflow.withheld.notificationDelivery',
   'workflow.withheld.analytics',
@@ -82,11 +87,17 @@ const PORTAL = [
 ] as const;
 
 /**
- * What this release added, said before what it still does not do.
+ * What these releases added, said before what they still do not do.
  *
- * Six of the capabilities the previous phase named as absent are now real, and leaving them on the
+ * Eight of the capabilities earlier phases named as absent are now real, and leaving them on the
  * list below would be the same failure in the other direction: a screen that told an administrator
- * this product cannot run two approvers at once, on a page rendering a branch that does.
+ * this product cannot run two approvers at once, on a page rendering a branch that does — or that it
+ * cannot route to a manager, beside a step that just did.
+ *
+ * The two that moved in Phase 16C were **rewritten rather than deleted** in both directions. What is
+ * absent is now narrower than what was absent: there is no *business-day* service level and nothing
+ * that fires when a target passes, while a target itself is real; and there is no role or group
+ * directory and no live reporting-line lookup, while one manager resolved at the start is real.
  */
 export const ProvidedSection = ({ t }: SectionProps): ReactNode => (
   <Section t={t} title="providedNotices">
