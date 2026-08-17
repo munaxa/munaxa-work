@@ -294,3 +294,66 @@ export const forgetStatistics = async (admin, tables) => {
     return ' — but its planner statistics remain; re-migrate a fresh database before the plan suites';
   }
 };
+
+/**
+ * Every closed vocabulary the domain declares, checked against the constraint that enforces it.
+ *
+ * Named by constraint rather than by column: `workflow_version` has two check constraints that
+ * mention `status`, and matching on the column would compare the domain's list against whichever
+ * one the catalogue returned first.
+ */
+export const VOCABULARIES = [
+  ['workflow_definition_status_check', 'definition status', ['active', 'retired']],
+  ['workflow_version_status_check', 'version status', ['draft', 'published', 'archived']],
+  [
+    'workflow_instance_status_check',
+    'instance status',
+    ['running', 'completed', 'rejected', 'cancelled'],
+  ],
+  [
+    'workflow_step_status_check',
+    'step status',
+    ['pending', 'awaiting', 'approved', 'rejected', 'skipped'],
+  ],
+  ['workflow_decision_kind_check', 'decision', ['approved', 'rejected']],
+  // Phase 16B. A **template** may name a person or a list; a running **step** never names a list,
+  // because the list was resolved into its members before the row existed. The two constraints are
+  // deliberately different and are checked as two.
+  //
+  // Phase 16C widened the **template** constraint by one value and left the **step** constraint
+  // exactly as it was, which is the whole shape of manager routing in the database: a template may
+  // say `manager`, and a running step never can, because the kind was resolved into a concrete
+  // membership before the row existed. That the step list below is still one value long is the
+  // load-bearing half of this pair.
+  [
+    'workflow_step_template_approver_kind_check',
+    'template approver kind',
+    ['membership', 'group', 'manager'],
+  ],
+  ['workflow_step_approver_kind_check', 'step approver kind', ['membership']],
+  [
+    'workflow_step_template_branch_rule_check',
+    'template branch rule',
+    ['unanimous', 'majority', 'first-response'],
+  ],
+  [
+    'workflow_step_branch_rule_check',
+    'step branch rule',
+    ['unanimous', 'majority', 'first-response'],
+  ],
+  ['workflow_decision_authority_check', 'decision authority', ['assigned', 'delegated']],
+  [
+    'workflow_history_event_check',
+    'history event',
+    [
+      'instance-started',
+      'step-awaiting',
+      'step-approved',
+      'step-rejected',
+      'step-skipped',
+      'instance-completed',
+      'instance-rejected',
+      'instance-cancelled',
+    ],
+  ],
+];

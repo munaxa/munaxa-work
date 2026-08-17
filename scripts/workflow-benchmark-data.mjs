@@ -57,7 +57,6 @@ const STEPS_PER_VERSION = 2;
 /** How many people share the approving. See the file note on selectivity. */
 export const APPROVERS = 200;
 
-
 /** The subject types the fixture raises approvals about. Opaque strings; Workflow reads neither. */
 const SUBJECT_TYPES = ['recruitment.requisition', 'leave.request', 'compensation.change'];
 
@@ -122,13 +121,25 @@ const seedConfiguration = async (admin, tenant) => {
       where d.tenant_id = $1`,
     [tenant],
   );
+  // Phase 16C. **The second step of every process routes to the requester's manager**, and carries a
+  // service-level target; the first names a person and carries none. Two proportions, deliberately:
+  // a fixture where every template were a manager step would measure a column that is never null,
+  // and one where none were would measure the schema as it stood before this phase.
+  //
+  // A manager template names **nobody** — `workflow_step_template_approver_check` refuses a manager
+  // row carrying either identifier — so the `case` below is not a stylistic choice. It is the
+  // database's own rule about what a manager step may say, written out.
   await admin.query(
     `insert into workflow_step_template
        (id, tenant_id, workflow_version_id, ordinal, name, approver_kind, approver_membership_id,
+        service_level_count, service_level_unit,
         metadata, created_at, created_by, updated_at, updated_by, version)
      select app_uuid_v7(), $1, v.id, s,
             jsonb_build_object('en', 'Step ' || s, 'ar', 'خطوة ' || s),
-            'membership', ${membership(tenant, 's')},
+            case when s = 2 then 'manager' else 'membership' end,
+            case when s = 2 then null else ${membership(tenant, 's')} end,
+            case when s = 2 then 48 end,
+            case when s = 2 then 'hours' end,
             '{}'::jsonb, ${AUDIT}
        from workflow_version v
        cross join generate_series(1, ${String(STEPS_PER_VERSION)}) as s
@@ -186,6 +197,7 @@ const seedSteps = async (admin, tenant) => {
   await admin.query(
     `insert into workflow_step
        (id, tenant_id, instance_id, ordinal, approver_kind, approver_membership_id, status,
+        service_level_count, service_level_unit, awaiting_at,
         metadata, created_at, created_by, updated_at, updated_by, version)
      select app_uuid_v7(), $1, i.id, t.ordinal, 'membership',
             ${membership(tenant, `1 + ((${NUMBER_OF} + t.ordinal) % ${String(APPROVERS)})`)},
@@ -197,6 +209,18 @@ const seedSteps = async (admin, tenant) => {
               when i.status = 'rejected' then 'rejected'
               else 'approved'
             end,
+            -- Phase 16C. The target the template carried, copied onto the running step exactly as
+            -- the handler copies it. Every step is 'membership' here whatever its template said,
+            -- because a manager kind is resolved into a person before this row exists — and
+            -- \`workflow_step_approver_kind_check\` refuses anything else.
+            case when t.ordinal = 2 then 48 end,
+            case when t.ordinal = 2 then 'hours' end,
+            -- The clock starts when *this* step begins waiting (P-5), so only an awaiting step has
+            -- one. The fixture's start times fan out over four hundred hours, so against a
+            -- forty-eight-hour target roughly an eighth of these are within it and the rest are
+            -- past it — a mixture, which is what makes a derived state something a read has to work
+            -- out per row rather than a constant. Nothing stores that answer.
+            case when i.status = 'running' and t.ordinal = 2 then i.started_at end,
             '{}'::jsonb, ${AUDIT}
        from workflow_instance i
        cross join generate_series(1, ${String(STEPS_PER_VERSION)}) as t(ordinal)

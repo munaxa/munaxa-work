@@ -82,7 +82,9 @@ export const assertIsolation = async (stores, asTenant, other, mine) => {
 
   // And the neighbour's own queue, for the membership identifier the two tenants share, returns
   // only the neighbour's steps — the case a benchmark with disjoint identifiers cannot test at all.
-  const groupSearch = await asTenant(other, (transaction) => stores.groups.search(transaction, PAGE));
+  const groupSearch = await asTenant(other, (transaction) =>
+    stores.groups.search(transaction, PAGE),
+  );
 
   if (groupSearch.items.some((row) => mine.groupIds.includes(row.approvalGroupId))) {
     throw new Error(`Tenant isolation broken: B's group listing returned one of A's lists.`);
@@ -174,29 +176,71 @@ export const assertExactValues = async (stores, asTenant, tenant, mine) => {
     version: await stores.versions.byId(transaction, mine.version),
     instance: await stores.instances.byId(transaction, mine.running),
     steps: await stores.steps.forInstance(transaction, mine.running),
+    templates: await stores.versions.templatesFor(transaction, mine.version),
   }));
   const faults = [];
 
-  if (typeof read.definition?.definitionId !== 'string') faults.push('definitionId is not a string');
+  if (typeof read.definition?.definitionId !== 'string')
+    faults.push('definitionId is not a string');
   if (read.definition?.definitionId !== mine.definition) faults.push('definitionId changed');
   if (typeof read.definition?.description?.en !== 'string') {
     faults.push('description did not round-trip as localized text');
   }
-  if (!Number.isInteger(read.version?.versionNumber)) faults.push('versionNumber is not an integer');
+  if (!Number.isInteger(read.version?.versionNumber))
+    faults.push('versionNumber is not an integer');
   if (!Number.isInteger(read.instance?.version)) faults.push('row version is not an integer');
   if (!(read.instance?.startedAt instanceof Date)) faults.push('startedAt is not a Date');
-  if (read.instance?.completedAt !== undefined) faults.push('a running approval carries a completion');
+  if (read.instance?.completedAt !== undefined)
+    faults.push('a running approval carries a completion');
   for (const step of read.steps) {
-    if (!Number.isInteger(step.ordinal)) faults.push(`ordinal ${String(step.ordinal)} is not whole`);
+    if (!Number.isInteger(step.ordinal))
+      faults.push(`ordinal ${String(step.ordinal)} is not whole`);
   }
   const ordinals = read.steps.map((step) => step.ordinal);
 
   if (ordinals.join(',') !== [...ordinals].sort((a, b) => a - b).join(',')) {
     faults.push('steps are not returned in ordinal order');
   }
+  faults.push(...routingFaults(read));
   if (faults.length > 0) throw new Error(`Exactness broken: ${faults.join('; ')}.`);
   console.log(
     `Exactness: identifiers are strings, ordinals and versions are whole, the localized ` +
-      `description round-trips as an object, and instants arrive as dates.`,
+      `description round-trips as an object, instants arrive as dates, the manager template names ` +
+      `nobody, its running step names a person, and the target survives as a whole number.`,
   );
+};
+
+/**
+ * Phase 16C, read back through the production mappers rather than counted in the database.
+ *
+ * The seed writes a manager template, a target and an awaiting instant; nothing so far proves the
+ * repository **returns** them. A benchmark that seeded three columns and never read one would time a
+ * query over data the mapper drops, and would report the phase as costing nothing because it does.
+ *
+ * The two halves of manager routing are asserted as a pair. A *template* says `manager` and names
+ * nobody; the *step* it produced says `membership` and names a person. A mapper that leaked the
+ * template's kind onto the running row, or that invented an approver for the template, breaks
+ * exactly one of these.
+ */
+const routingFaults = (read) => {
+  const faults = [];
+  const manager = read.templates.find((template) => template.approverKind === 'manager');
+  const targeted = read.steps.find((step) => step.serviceLevel !== undefined);
+
+  if (manager === undefined) faults.push('no manager template survived the read');
+  if (manager?.approverMembershipId !== undefined) faults.push('a manager template named somebody');
+  if (manager?.approverGroupId !== undefined) faults.push('a manager template named a list');
+  if (manager?.serviceLevel?.count !== 48) faults.push('the template target did not round-trip');
+  if (manager?.serviceLevel?.unit !== 'hours') faults.push('the template unit did not round-trip');
+  if (targeted === undefined) faults.push('no step carried a service-level target');
+  if (!Number.isInteger(targeted?.serviceLevel?.count)) faults.push('a step target is not whole');
+  if (targeted !== undefined && !(targeted.awaitingAt instanceof Date)) {
+    faults.push('awaitingAt is not a Date');
+  }
+  for (const step of read.steps) {
+    // A resolved step is always a person. The database refuses anything else; this proves the
+    // mapper does not invent one on the way back out.
+    if (step.approverKind !== 'membership') faults.push(`a step said ${String(step.approverKind)}`);
+  }
+  return faults;
 };

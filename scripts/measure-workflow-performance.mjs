@@ -64,6 +64,7 @@ import { postgresWorkflowStores } from '../packages/modules/workflow/dist/index.
 import { seedTenant } from './workflow-benchmark-data.mjs';
 import { report } from './workflow-benchmark-report.mjs';
 import {
+  VOCABULARIES,
   assertNoCrossModuleForeignKeys,
   assertNoInexactColumns,
   assertRoleUnprivileged,
@@ -122,59 +123,6 @@ const TABLES = [
   'workflow_definition',
   'workflow_approval_group_member',
   'workflow_approval_group',
-];
-
-/**
- * Every closed vocabulary the domain declares, checked against the constraint that enforces it.
- *
- * Named by constraint rather than by column: `workflow_version` has two check constraints that
- * mention `status`, and matching on the column would compare the domain's list against whichever
- * one the catalogue returned first.
- */
-const VOCABULARIES = [
-  ['workflow_definition_status_check', 'definition status', ['active', 'retired']],
-  ['workflow_version_status_check', 'version status', ['draft', 'published', 'archived']],
-  [
-    'workflow_instance_status_check',
-    'instance status',
-    ['running', 'completed', 'rejected', 'cancelled'],
-  ],
-  [
-    'workflow_step_status_check',
-    'step status',
-    ['pending', 'awaiting', 'approved', 'rejected', 'skipped'],
-  ],
-  ['workflow_decision_kind_check', 'decision', ['approved', 'rejected']],
-  // Phase 16B. A **template** may name a person or a list; a running **step** never names a list,
-  // because the list was resolved into its members before the row existed. The two constraints are
-  // deliberately different and are checked as two.
-  ['workflow_step_template_approver_kind_check', 'template approver kind', ['membership', 'group']],
-  ['workflow_step_approver_kind_check', 'step approver kind', ['membership']],
-  [
-    'workflow_step_template_branch_rule_check',
-    'template branch rule',
-    ['unanimous', 'majority', 'first-response'],
-  ],
-  [
-    'workflow_step_branch_rule_check',
-    'step branch rule',
-    ['unanimous', 'majority', 'first-response'],
-  ],
-  ['workflow_decision_authority_check', 'decision authority', ['assigned', 'delegated']],
-  [
-    'workflow_history_event_check',
-    'history event',
-    [
-      'instance-started',
-      'step-awaiting',
-      'step-approved',
-      'step-rejected',
-      'step-skipped',
-      'instance-completed',
-      'instance-rejected',
-      'instance-cancelled',
-    ],
-  ],
 ];
 
 const only = process.argv
