@@ -680,6 +680,66 @@ and stated; **(b)** the tenant's time zone, which needs an Organization dependen
 
 ---
 
+---
+
+## 7C. Two adapter parameters, approved on 2026-08-17
+
+Checkpoint 7 stopped before writing the reporting-line adapter: composing the three published
+contracts met two of its own stop conditions. Both were reported in
+[`phase-16c-adapter-blockers.md`](./phase-16c-adapter-blockers.md) and **both were approved by the
+user on 2026-08-17**. They are recorded here, in the register, because implementation was not
+permitted to begin until they were.
+
+| ID | Parameter | Approved |
+| --- | --- | --- |
+| B-1 | An employment with two active holders | **A fifth `ManagerResolution` outcome, failing closed.** Zero memberships keeps the existing `manager-not-a-member` semantics; exactly one resolves; two or more is a **distinct** refusal, `manager-membership-ambiguous`. The adapter never manufactures a manager: no first-of, no ordering by identifier or `linked_at`, no oldest or newest, no `isPrimary`, no requester preference, no workforce or platform user, no directory, no ranking, no fallback. |
+| B-2 | Requester membership → primary employment | **One additional narrow Identity query**, `identity.primary-employment-for-membership`, taking a membership and returning the primary active employment relationship P-2 requires. Guarded by the **existing** `identity.employment-link.read`. `identity.membership.read` is **not** granted and the member register is not exposed. No directory, no generic membership lookup, no recursive reporting query. |
+
+### B-1 — why a fifth outcome rather than a rule
+
+`manager-not-a-member` is documented at its declaration as *"resolves to **no** active membership"*.
+Two candidates is not none, and reporting it that way would send an administrator to link somebody to
+an employment that already has two people linked to it — a mistake that is not theirs and not real.
+
+No approved rule could select one. `employment_link_one_primary_key` is unique on
+`(tenant_id, membership_id)` — one primary *employment per member* — so two memberships may each mark
+the same employment primary; P-2 governs the requester choosing among their own employments and says
+nothing about choosing among holders of one employment. `isPrimary` is not in the published
+`TenantMembershipView` either. Every remaining tie-break would be a routing rule invented inside an
+adapter.
+
+So ambiguity fails closed with its own name, which is the same rule the other four refusals keep:
+each names a different person's mistake to fix.
+
+### B-2 — why a second query rather than a wider grant
+
+The port receives a **membership**, and Employment has no concept of a membership anywhere in its
+contracts — `employment.search` filters by person, unit, position, cost centre and manager, never
+membership. So the requester's employment can only come from Identity.
+
+The only published path was `identity.describe-member`, guarded by `identity.membership.read` — the
+permission behind the member register, returning profile, preferences, portals, links and delegations
+in one object. Granting that to the approvals engine to read one boolean would be far broader than
+the single capability D-16C-04 authorized. A second narrow query under the permission Checkpoint 6
+already uses keeps Workflow's grant at exactly two employment-scoped reads.
+
+### The read budget, amended
+
+Checkpoint 7's original budget of two cross-module reads is amended to **three bounded reads** per
+manager resolution, which is what the chain costs when it crosses three module boundaries:
+
+1. Identity — membership → primary active employment
+2. Employment — employment → primary manager employment, as at the approved date
+3. Identity — manager employment → active memberships
+
+No fourth lookup, no loop, no enumeration, no recursive traversal, and a short circuit as soon as an
+earlier step refuses.
+
+**Everything else is unchanged**: the requester's manager, one level, primary employment, primary
+reporting line, snapshot at instance start, the UTC conversion of the instance-start instant, fail
+closed, no live re-resolution, no functional line, no role or group or HR fallback, no second-level
+manager, no scheduler, no escalation, no expiry state, no business-day SLA.
+
 ## 8. Should 16C be split?
 
 **Recommendation: yes — 16C and 16D — but the seam is not the one the example suggests.**
