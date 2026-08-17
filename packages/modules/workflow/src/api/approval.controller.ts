@@ -15,7 +15,7 @@ import type {
 } from '../application/approval-queries.js';
 import type { DecideStepCommand } from '../application/decision.use-case.js';
 
-import { DecideStepBody } from './workflow.dto.js';
+import { DecideStepBody } from './workflow-approval.dto.js';
 import { WorkflowDispatcher } from './workflow-dispatcher.js';
 import { paged, present } from './search-filters.js';
 import { unwrapOrThrow } from './handler-result.js';

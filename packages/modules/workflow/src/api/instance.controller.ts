@@ -14,7 +14,7 @@ import type {
   StartInstanceCommand,
 } from '../application/instance.use-case.js';
 
-import { CancelInstanceBody, StartInstanceBody } from './workflow.dto.js';
+import { CancelInstanceBody, StartInstanceBody } from './workflow-approval.dto.js';
 import { WorkflowDispatcher } from './workflow-dispatcher.js';
 import { optional, paged, present } from './search-filters.js';
 import { unwrapOrThrow } from './handler-result.js';

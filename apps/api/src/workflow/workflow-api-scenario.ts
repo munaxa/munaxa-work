@@ -59,7 +59,7 @@ export const get = async (
 };
 
 /** Fails loudly with the body, so a broken step names itself rather than the next one. */
-const must = (
+export const must = (
   outcome: { readonly status: number; readonly body: Record<string, unknown> },
   what: string,
 ): Created => {
@@ -76,7 +76,7 @@ export interface PublishedWorkflow {
   readonly workflowVersionId: string;
 }
 
-const NAME = { en: 'Approval', ar: 'اعتماد' };
+export const NAME = { en: 'Approval', ar: 'اعتماد' };
 
 let sequence = 0;
 

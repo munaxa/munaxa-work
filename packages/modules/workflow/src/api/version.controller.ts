@@ -35,8 +35,12 @@ import { unwrapOrThrow } from './handler-result.js';
  *
  * **Parallel steps, a quorum and a branch condition arrive on the step body since Phase 16B**, and
  * on no route of their own: a branch is a property of the steps that share an ordinal rather than a
- * thing with an identity, so there is nothing to create and nothing to address. There is still no
- * route here for an escalation or an SLA, and no body below has a field that could carry one.
+ * thing with an identity, so there is nothing to create and nothing to address. **A manager approver
+ * and a service-level target joined them in Phase 16C**, on the same body and still on no route of
+ * their own — both are properties of a step somebody is configuring.
+ *
+ * There is still no route here for an escalation, an expiry or a due date, and no body below has a
+ * field that could carry one. A target is configuration; nothing fires when it passes.
  */
 @ApiTags('workflow')
 @ApiForbiddenResponse({ description: 'The caller lacks the permission the operation requires.' })
@@ -51,11 +55,17 @@ export class WorkflowVersionController {
    * a person makes it a person step; naming both or neither is the domain's refusal with a reason
    * that says which mistake it was. There is no `approverKind` property on the body, so
    * `forbidNonWhitelisted` refuses one outright — a client cannot send a kind that disagrees with
-   * the field beside it, and `role` has no field to arrive in.
+   * the field beside it, and `role` and `external` have no field to arrive in.
    *
-   * The branch configuration travels through untouched: this controller does not read a condition,
-   * does not check a quorum against a branch's size and does not resolve a group. Each of those is a
-   * fact about a set of rows the domain checks when the version is published.
+   * **A manager is the one kind that is declared**, because it names nobody: `routeToRequestersManager`
+   * is a boolean, and the mapping below is the whole of its translation. The controller does not
+   * resolve a manager, does not ask Identity or Employment, and could not — resolution happens once,
+   * when an instance starts, three layers away from here.
+   *
+   * The branch configuration and the service-level target travel through untouched: this controller
+   * does not read a condition, does not check a quorum against a branch's size, does not resolve a
+   * group and computes no due time. Each of those is a fact the domain checks, and the last of them
+   * is derived at read time from stored inputs rather than at configuration time at all.
    */
   @Post(':workflowVersionId/steps')
   @ApiOperation({ summary: 'Add a step to a draft: a person or a list, and how its branch ends' })
@@ -75,9 +85,13 @@ export class WorkflowVersionController {
         ...present({
           approverMembershipId: body.approverMembershipId,
           approverGroupId: body.approverGroupId,
+          // The boolean becomes the kind here and nowhere else. `false` is not `manager`, so an
+          // explicit `false` reads exactly as an omission does rather than as a third state.
+          approverKind: body.routeToRequestersManager === true ? ('manager' as const) : undefined,
           branchRule: body.branchRule,
           quorum: body.quorum,
           condition: body.condition,
+          serviceLevel: body.serviceLevel,
         }),
       }),
     );
