@@ -38,6 +38,7 @@ export * from './application/workflow-module.js';
 export * from './application/workflow-permissions.js';
 export * from './application/workflow-dependencies.js';
 export * from './application/workflow-ports.js';
+export * from './application/workflow-reporting-line.js';
 export * from './application/in-memory-stores.js';
 export * from './application/workflow-views.js';
 export * from './application/workflow-paging.js';

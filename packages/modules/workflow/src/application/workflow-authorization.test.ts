@@ -9,6 +9,7 @@ import {
   ADMINISTRATOR,
   FixedClock,
   FakeDelegation,
+  FakeReportingLine,
   NOW,
   TENANT,
   attempt,
@@ -37,6 +38,7 @@ const dependenciesFor = (granted: readonly string[]) => ({
   },
   stores: inMemoryWorkflowStores(),
   delegation: new FakeDelegation(),
+  reportingLine: new FakeReportingLine(),
   businessDecision: {
     apply: (): Promise<ApprovalDelivery> => Promise.resolve({ kind: 'not-adopted' }),
   },

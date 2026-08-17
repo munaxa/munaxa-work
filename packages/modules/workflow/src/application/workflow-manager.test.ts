@@ -14,6 +14,7 @@ import {
   failureOf,
   harnessFor,
   send,
+  FakeReportingLine,
   type Harness,
 } from './workflow-test-harness.js';
 
@@ -228,40 +229,32 @@ describe('when there is no manager to route to', () => {
   });
 
   /**
-   * No reporting line composed at all — which is production, until Checkpoint 7 wires the adapter.
+   * There is no longer a composition without a reporting line, and that is the Checkpoint 7 change.
    *
-   * It fails closed on the same rule, with the refusal that says a manager step was planned and
-   * nobody resolved one. Not a skipped step, and not an approval that looks complete.
+   * These two tests used to build one and assert it failed closed with `manager-not-resolved`. The
+   * dependency became **required** when the real adapter arrived, so an unwired composition no
+   * longer type-checks and the case it described cannot occur — which is a stronger guarantee than
+   * the refusal was. Rewritten rather than deleted, because a removed assertion is a removed
+   * guarantee: what is asserted now is the property that replaced it.
+   *
+   * `manager-not-resolved` itself is untouched and still reachable — it is the caller defect of
+   * planning a manager step without reading the chain, and the domain suite covers it directly.
    */
-  it('refuses when no reporting line is composed, rather than skipping the step', async () => {
-    const unwired = harnessFor({ withoutReportingLine: true });
-    // Answers a perfectly good manager, so that nothing about this refusal comes from the answer.
-    unwired.reportingLine.answers(resolved);
-
-    const process = await managerProcess(unwired, 'unwired');
-    const refused = await unwired.as(REQUESTER, () =>
-      attempt(unwired, {
-        commandName: 'workflow.start-instance',
-        definitionId: process.definitionId,
-        subjectType: SUBJECT_TYPE,
-        subjectId: 'subject-unwired',
-      }),
-    );
-
-    expect(failureOf(refused)).toBe('workflow.rejection.manager-not-resolved');
-    // Nothing was asked, because there was nothing to ask.
-    expect(unwired.reportingLine.asked).toStrictEqual([]);
+  it('is always composed with a reporting line, because the field is no longer optional', () => {
+    expect(harnessFor().reportingLine).toBeInstanceOf(FakeReportingLine);
+    // The shape itself — seven required fields, none optional — is pinned by the boundary suite,
+    // which is where a dependency arriving or leaving is meant to be noticed.
   });
 
-  /** And an unwired composition is unaffected for every process that names no manager. */
-  it('starts a process of named approvers with no reporting line at all', async () => {
-    const unwired = harnessFor({ withoutReportingLine: true });
+  /** And a process of named approvers still never asks it, wired or not. */
+  it('starts a process of named approvers without consulting the reporting line', async () => {
     const process = await publishedBranches(
-      unwired,
+      harness,
       [{ ordinal: 1, approverMembershipId: APPROVER }],
-      'unwired-ordinary',
+      'ordinary-process',
     );
 
-    await expect(startedOn(unwired, process, 'subject-ordinary')).resolves.toBeTruthy();
+    await expect(startedOn(harness, process, 'subject-ordinary')).resolves.toBeTruthy();
+    expect(harness.reportingLine.asked).toStrictEqual([]);
   });
 });

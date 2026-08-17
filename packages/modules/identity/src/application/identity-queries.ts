@@ -341,3 +341,54 @@ export const activeMembershipsForEmploymentHandler = (
       return success(found.map(asMembershipView));
     }),
 });
+
+/**
+ * The one employment a member holds as their primary, and only if it is still live.
+ *
+ * The companion to the query above and the other half of what Phase 16C authorized (B-2, approved
+ * 2026-08-17). That one goes employment → holder; this one goes member → job. Between them a
+ * consumer that holds a membership can reach the employment it belongs to and back again, and
+ * nothing else about anybody.
+ *
+ * **It answers about one member and returns at most one link.** No list, no page, no filter, no
+ * search term and no tenant argument. `primaryFor` is the read behind it and it was already here —
+ * the application service has used it since Identity's own phase to demote an incumbent primary
+ * before promoting another. Publishing it adds a contract, not a capability.
+ *
+ * **Primary *and* linked, which is one predicate more than the name suggests.** `is_primary` alone
+ * would return the job somebody left, because a link keeps its flag until another is promoted. The
+ * pairing is exactly P-2's *"primary **active** employment"*, and it is the repository's predicate
+ * rather than a second definition written here.
+ *
+ * **Why this exists rather than a consumer reading `identity.describe-member`.** That query answers
+ * the whole of a member's page — profile, preferences, portals, links and delegations — and is
+ * guarded by `identity.membership.read`, the permission behind the member register. A consumer that
+ * needed one employment identifier would have had to hold the register to get it. This one is
+ * guarded by `identity.employment-link.read`, which is the permission for exactly this fact and the
+ * one its companion already uses.
+ *
+ * **Absent is a real answer.** A member with no employment at all, and a member whose links are all
+ * unlinked, both return nothing — and that is the fact a caller needs, not an error. Whether the
+ * membership itself exists is a different question, and this query does not conflate them.
+ */
+export interface PrimaryEmploymentForMembership extends Query {
+  readonly queryName: 'identity.primary-employment-for-membership';
+  readonly membershipId: string;
+}
+
+export const primaryEmploymentForMembershipHandler = (
+  dependencies: IdentityDependencies,
+): QueryHandler<PrimaryEmploymentForMembership, EmploymentLinkView | undefined> => ({
+  queryName: 'identity.primary-employment-for-membership',
+  permission: IdentityPermissions.employmentLinkRead,
+
+  handle: async (query) =>
+    dependencies.unitOfWork.execute(async (transaction) => {
+      const found = await dependencies.stores.employmentLinks.primaryFor(
+        transaction,
+        query.membershipId,
+      );
+
+      return success(found === undefined ? undefined : asEmploymentView(found));
+    }),
+});

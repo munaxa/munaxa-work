@@ -10,6 +10,7 @@ import {
 import {
   activeDelegationsForHandler,
   activeMembershipsForEmploymentHandler,
+  primaryEmploymentForMembershipHandler,
   describeMemberHandler,
   listInvitationsHandler,
   listMembershipsHandler,
@@ -59,6 +60,7 @@ export const identityModule = (dependencies: IdentityDependencies): WorkModule =
     searchMembersHandler(dependencies),
     activeDelegationsForHandler(dependencies),
     activeMembershipsForEmploymentHandler(dependencies),
+    primaryEmploymentForMembershipHandler(dependencies),
   ] as readonly QueryHandler<Query, unknown>[],
 
   eventHandlers: [onMembershipEnded(dependencies)],

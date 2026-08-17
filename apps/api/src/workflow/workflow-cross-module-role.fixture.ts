@@ -86,10 +86,40 @@ export const RECRUITMENT_TABLES = [
  * is made. **Every assertion in the suites runs through the application role**, whose `rolsuper` and
  * `rolbypassrls` are checked before any isolation result is believed.
  */
-export const IDENTITY_TABLES = ['delegation', 'tenant_membership', 'workforce_user'];
+export const IDENTITY_TABLES = [
+  'delegation',
+  // Phase 16C: the reporting-line adapter resolves a membership to its primary employment and an
+  // employment back to its holder, both through Identity's own published queries.
+  'employment_link',
+  'tenant_membership',
+  'workforce_user',
+];
+
+/**
+ * Employment's tables, for the one query the manager chain asks: `employment.read-employment`.
+ *
+ * Read-only for the application role and seeded by the owner, on exactly the reasoning the Identity
+ * grant above records — setting up another module's world is fixture work, and every assertion still
+ * runs through the unprivileged role. Workflow never writes to Employment and the role it runs as
+ * could not if it tried.
+ *
+ * `employment_status_record` is here because `read-employment` reconstructs the status in force on a
+ * date from the history rather than reading the row, so its own handler touches a table the manager
+ * chain never names.
+ */
+export const EMPLOYMENT_TABLES = [
+  'employment_reporting_line',
+  // An employment references a person by a real foreign key, so the fixture seeds one and the
+  // owner clears it. Nothing on the manager path reads it.
+  'person',
+  'employment_status_record',
+  'employment_assignment',
+  'employment_contract',
+  'employment',
+];
 
 /** Everything the owner clears between tests, most dependent first. */
-export const OWNER_TABLES = [...RECRUITMENT_TABLES, ...IDENTITY_TABLES];
+export const OWNER_TABLES = [...RECRUITMENT_TABLES, ...EMPLOYMENT_TABLES, ...IDENTITY_TABLES];
 
 /**
  * A role that owns nothing, holds no `BYPASSRLS`, and is not a superuser.
@@ -130,9 +160,10 @@ export const applicationConnection = async (): Promise<string> => {
      * product that had changed. Granted explicitly so the suites run from a migrated database and
      * nothing else.
      */
-    await admin.query(
-      `grant select on delegation, tenant_membership, workforce_user to ${APPLICATION_ROLE}`,
-    );
+    await admin.query(`grant select on ${IDENTITY_TABLES.join(', ')} to ${APPLICATION_ROLE}`);
+    // And read-only on Employment's, for the same reason and with the same limits: the manager
+    // chain asks Employment one question and writes nothing anywhere.
+    await admin.query(`grant select on ${EMPLOYMENT_TABLES.join(', ')} to ${APPLICATION_ROLE}`);
     // And `insert` on `delegation` alone, for the **fixture** rather than for the seam: the suites
     // write the arrangements they then test, under the tenant context and the table's own policy.
     // Production never writes here — Workflow reads Identity and writes nothing to it, which is why

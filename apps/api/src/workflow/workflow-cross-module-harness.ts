@@ -22,6 +22,7 @@ import {
   postgresIdentityStores,
   systemClock,
 } from '@work/identity';
+import { employmentModule, postgresEmploymentStores } from '@work/employment';
 import { ALL_WORKFLOW_PERMISSIONS } from '@work/workflow';
 import { PostgresUnitOfWork } from '@work/persistence';
 
@@ -80,6 +81,10 @@ export {
   AUDIT,
   AUDIT_COLUMNS,
   B_APPROVER,
+  B_REQUESTER_EMPLOYMENT,
+  MANAGER,
+  MANAGER_EMPLOYMENT,
+  REQUESTER_EMPLOYMENT,
   B_DEPUTY,
   B_REQUESTER,
   DECIDE_SCOPE,
@@ -93,11 +98,22 @@ export {
   TENANT_B,
   UNADOPTED,
   seedIdentityWorld,
+  seedReportingLine,
 } from './workflow-cross-module-world.js';
 
 export interface WorkflowCrossModuleHarness {
   readonly dispatcher: Dispatcher;
   readonly pool: Pool;
+  /**
+   * The owner connection, for seeding another module's world only.
+   *
+   * Identity's memberships already go in this way, and Phase 16C's employments and reporting lines
+   * join them: `tenant_membership` and `employment` are written by their own modules' commands in
+   * production, and the unprivileged role this suite asserts through cannot and should not
+   * bootstrap them. **No assertion uses this pool** — every security claim still runs through the
+   * application role, whose `rolsuper` and `rolbypassrls` are checked first.
+   */
+  readonly owner: Pool;
   /**
    * Every permission elevation a bounded service grant performed, in the order it happened.
    *
@@ -136,6 +152,11 @@ export interface HarnessOptions {
    * composition rather than behind a stub.
    */
   readonly withoutRecruitment?: boolean;
+  /**
+   * Leaves Employment off the dispatcher — the module that owns the reporting line being
+   * unavailable, in the production composition rather than behind a stub.
+   */
+  readonly withoutEmployment?: boolean;
 }
 
 /** Raw SQL on the harness's pool, inside one tenant's row-security context. */
@@ -188,20 +209,18 @@ const register = (
   dispatcher: Dispatcher,
   unitOfWork: PostgresUnitOfWork,
   permissions: PermissionChecker,
-  present: { readonly identity: boolean; readonly recruitment: boolean },
+  present: {
+    readonly identity: boolean;
+    readonly recruitment: boolean;
+    readonly employment: boolean;
+  },
 ): void => {
-  const identity = identityModule({
-    unitOfWork,
-    stores: postgresIdentityStores(),
-    settings: new ConfiguredTenantSettings(IDENTITY_DEFAULTS),
-    clock: systemClock,
-  });
+  if (present.identity) attach(dispatcher, identityFor(unitOfWork));
+  if (present.employment) attach(dispatcher, employmentFor(unitOfWork));
 
-  if (present.identity) attach(dispatcher, identity);
-
-  // Recruitment's real module, on the same dispatcher: `recruitment.decide-requisition` runs its own
-  // handler, its own aggregate and its own repository against the real tables under its own policy.
-  // The seam under test is a command going into a module, so a stub here would test nothing.
+  // Recruitment's real module: `recruitment.decide-requisition` runs its own handler, its own
+  // aggregate and its own repository against the real tables under its own policy. The seam under
+  // test is a command going into a module, so a stub here would test nothing.
   const recruitmentSender = new DeferredRecruitmentSender();
   const recruitment = recruitmentModuleFor(unitOfWork, recruitmentSender);
 
@@ -214,8 +233,40 @@ const register = (
     ask: (query) => dispatcher.ask(query),
     send: (command) => dispatcher.send(command),
   };
+
   attach(dispatcher, workflowModuleFor(unitOfWork, asking, sending, permissions));
 };
+
+/** Identity's real module. Its queries answer the delegation and manager reads Workflow makes. */
+const identityFor = (unitOfWork: PostgresUnitOfWork): WorkModule =>
+  identityModule({
+    unitOfWork,
+    stores: postgresIdentityStores(),
+    settings: new ConfiguredTenantSettings(IDENTITY_DEFAULTS),
+    clock: systemClock,
+  });
+
+/**
+ * Employment's real module, for the one query the reporting-line adapter asks it:
+ * `employment.read-employment`, which resolves the primary line in force on a date.
+ *
+ * Its two outbound ports are stubbed because neither is on this path — a person's name is optional
+ * on the view, and an organizational unit is only checked when an assignment is written, which these
+ * suites never do. Everything the manager chain actually reads is the real module over real tables.
+ */
+const employmentFor = (unitOfWork: PostgresUnitOfWork): WorkModule =>
+  employmentModule(
+    {
+      unitOfWork,
+      stores: postgresEmploymentStores(),
+      people: { find: () => Promise.resolve(undefined) },
+      organization: { unitExists: () => Promise.resolve(true) },
+      clock: systemClock,
+    },
+    // Employment sends no command on this path, and a harness that let it would be offering these
+    // suites a capability Workflow's grants do not include.
+    { send: () => Promise.reject(new Error('Employment sends no command in this suite.')) },
+  );
 
 /** Every handler a module declares, on the dispatcher. */
 const attach = (dispatcher: Dispatcher, module: WorkModule): void => {
@@ -243,11 +294,13 @@ export const harnessFor = (options: HarnessOptions = {}): WorkflowCrossModuleHar
   register(dispatcher, unitOfWork, permissions, {
     identity: options.withoutIdentity !== true,
     recruitment: options.withoutRecruitment !== true,
+    employment: options.withoutEmployment !== true,
   });
 
   return {
     dispatcher,
     pool,
+    owner: admin,
     elevations,
     rowsIn: readerFor(pool),
     inTenant: (tenantId, membershipId, work) =>

@@ -47,23 +47,17 @@ export interface WorkflowDependencies {
   /**
    * Who the requester's manager is, on the day an approval started. Read once, at the start.
    *
-   * **The one optional field on this interface, and it is optional for a stated reason with an end
-   * date.** The Identity query behind it is authorized (D-16C-04) and is a *completed module's*
-   * change, built and verified on its own side before Workflow depends on it — Checkpoint 6, with the
-   * adapter following in Checkpoint 7. Until then no composition can supply this honestly: an adapter
-   * would be that work done early, and a stub answering "no manager" would be Workflow inventing an
-   * organizational fact and blaming the tenant for it.
+   * **Required, as of Checkpoint 7.** It was optional for exactly one checkpoint and for a stated
+   * reason: the Identity contract behind it is a *completed module's* change, built and verified on
+   * its own side first, so no composition could have supplied this honestly before it existed. An
+   * adapter would have been that work done early, and a stub answering "no manager" would have been
+   * Workflow inventing an organizational fact and blaming the tenant for it.
    *
-   * **Absent is not a silent skip.** A version naming a `manager` step, started against a composition
-   * that has no reporting line, is refused with `manager-not-resolved` — the same refusal a caller
-   * that forgot to read the chain gets, and the same fail-closed rule an empty approval group has had
-   * since 16B. A configured approval stage is never quietly dropped. A process naming no manager is
-   * unaffected, which is every process configured before this phase.
-   *
-   * This field becomes required at Checkpoint 7, and the boundary suite pins it as the only optional
-   * one so that a second cannot arrive without somebody deciding it should.
+   * Both halves exist now, so the field is required and there is no composition — production or
+   * test — that can omit it. `WorkflowDependencies` has no optional field again, which is the
+   * property the composition doc has relied on since 16A: a dependency cannot be forgotten quietly.
    */
-  readonly reportingLine?: ReportingLinePort;
+  readonly reportingLine: ReportingLinePort;
   /**
    * Where a terminal decision goes.
    *

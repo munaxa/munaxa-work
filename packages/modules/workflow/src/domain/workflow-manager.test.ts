@@ -60,21 +60,46 @@ describe('resolving the requester’s manager', () => {
   });
 
   /**
-   * Four refusals rather than one, because they are four different people's mistakes to fix.
+   * Five refusals rather than one, because they are five different people's mistakes to fix.
    *
    * A missing employment link is an administrator's; a missing reporting line is the organization's;
-   * a manager who cannot sign in is Identity's; and a process asking somebody to approve their own
-   * request is the process designer's. Collapsing them into "manager unresolved" would send all four
-   * to whoever happened to raise the approval.
+   * a manager who cannot sign in is Identity's; a job held by two people is whoever linked the
+   * second; and a process asking somebody to approve their own request is the process designer's.
+   * Collapsing them into "manager unresolved" would send all five to whoever happened to raise the
+   * approval.
+   *
+   * **The last two of those are opposite problems and must not share a name.** `manager-not-a-member`
+   * means nobody holds the job; `manager-membership-ambiguous` means two people do. Reporting the
+   * second as the first would send somebody to link a member to an employment that already has two.
    */
   it.each([
     ['no-primary-employment', 'manager-no-primary-employment'],
     ['no-manager', 'manager-not-assigned'],
     ['manager-not-a-member', 'manager-not-a-member'],
+    ['manager-membership-ambiguous', 'manager-membership-ambiguous'],
   ] as const)('refuses %s with its own reason', (outcome, reason) => {
     const refused = resolveManager(REQUESTER, { outcome });
 
     expect(refused).toMatchObject({ ok: false, error: { reason } });
+  });
+
+  /**
+   * Two holders is not nobody, and the two refusals stay apart.
+   *
+   * Asserted as a pair rather than singly, because the failure this guards against is one being
+   * quietly mapped onto the other — which compiles, passes a single-outcome test, and tells an
+   * administrator to fix the opposite problem.
+   */
+  it('keeps ambiguity and absence as two different refusals', () => {
+    const absent = resolveManager(REQUESTER, { outcome: 'manager-not-a-member' });
+    const ambiguous = resolveManager(REQUESTER, { outcome: 'manager-membership-ambiguous' });
+
+    expect(absent).toMatchObject({ ok: false, error: { reason: 'manager-not-a-member' } });
+    expect(ambiguous).toMatchObject({
+      ok: false,
+      error: { reason: 'manager-membership-ambiguous' },
+    });
+    expect(absent).not.toStrictEqual(ambiguous);
   });
 
   it('refuses a requester who is their own manager', () => {
@@ -89,6 +114,7 @@ describe('resolving the requester’s manager', () => {
       'no-primary-employment',
       'no-manager',
       'manager-not-a-member',
+      'manager-membership-ambiguous',
     ] as const) {
       const refused = resolveManager(REQUESTER, { outcome });
 
@@ -168,6 +194,7 @@ describe('planning a manager step', () => {
     ['no-primary-employment', 'manager-no-primary-employment'],
     ['no-manager', 'manager-not-assigned'],
     ['manager-not-a-member', 'manager-not-a-member'],
+    ['manager-membership-ambiguous', 'manager-membership-ambiguous'],
   ] as const)('refuses the whole plan when the chain ends at %s', (outcome, reason) => {
     const planned = planSteps([managerTemplate()], [], snapshotOf({ outcome }));
 

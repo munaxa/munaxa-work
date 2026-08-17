@@ -148,6 +148,7 @@
       "instance-not-running": "This approval has already finished.",
       "manager-is-the-requester": "This process asks somebody to approve their own request, because they are their own manager.",
       "manager-no-primary-employment": "The person who raised this approval has no active primary employment, so their manager cannot be found.",
+      "manager-membership-ambiguous": "The manager’s employment is held by more than one member of this tenant, so it is not clear who should approve.",
       "manager-not-a-member": "The manager’s employment belongs to nobody who can sign in to this tenant.",
       "manager-not-assigned": "The person who raised this approval has no manager on their primary reporting line.",
       "manager-not-resolved": "This process names a manager, and no manager was resolved for it.",

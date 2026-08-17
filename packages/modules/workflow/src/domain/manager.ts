@@ -15,17 +15,19 @@ import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
  * exists to prevent. So the shape is exactly the one 16B used for groups: the **application** does
  * the reading and hands the answer in, and this decides what the answer means.
  *
- * **The answer is a value with four ways of being absent, and they are four refusals.** A missing
+ * **The answer is a value with four ways of being absent, and they are four refusals** — five, with
+ * the self-approval rule below, which is the one this file decides rather than is told. A missing
  * manager is not an empty list and never a skipped step (P-4, and constraint 5 of the parameter
  * approval): an approval configured to ask somebody's manager, that cannot find one, must stop and
  * say which link broke. That is 16B's `branch-group-empty` rule arriving by another road — a branch
  * nobody was asked to decide would complete instantly while looking like a process.
  *
- * The refusals are deliberately **four rather than one**, because they are four different mistakes
+ * The refusals are deliberately **five rather than one**, because they are five different mistakes
  * somebody has to go and fix: nobody linked the requester to an employment, nobody gave that
- * employment a manager, the manager's employment belongs to nobody who can sign in, or the requester
- * holds employments and none of them is primary. A single "manager unresolved" would send all four
- * to the same person, and three of them are not that person's to fix.
+ * employment a manager, the manager's employment belongs to nobody who can sign in, two people hold
+ * it and nothing says which of them approves, or the requester turns out to be their own manager. A
+ * single "manager unresolved" would send all five to the same person, and four of them are not that
+ * person's to fix.
  */
 
 /**
@@ -54,7 +56,21 @@ export type ManagerResolution =
   /** That employment has no manager on the primary reporting line on the resolution date (P-3). */
   | { readonly outcome: 'no-manager' }
   /** The manager's employment resolves to no active membership — nobody who could be asked. */
-  | { readonly outcome: 'manager-not-a-member' };
+  | { readonly outcome: 'manager-not-a-member' }
+  /**
+   * The manager's employment resolves to **more than one** active membership (B-1).
+   *
+   * Kept apart from `manager-not-a-member` because it is the opposite problem and a different
+   * person's to fix: that one means nobody holds the job, this one means two people do. Reporting
+   * ambiguity as absence would send an administrator to link somebody to an employment that already
+   * has two members linked to it — a mistake that is neither theirs nor real.
+   *
+   * There is no rule for choosing between them, and the absence is deliberate. `is_primary` is
+   * unique per *membership*, so two members may each mark the same employment primary; ordering by
+   * identifier or by when the link was made would be a routing decision invented in an adapter. So
+   * the approval stops, and somebody who can see both decides which of them approves.
+   */
+  | { readonly outcome: 'manager-membership-ambiguous' };
 
 /** The one approver a `manager` template resolves to. Exactly one, or none at all. */
 export interface ResolvedManager {
@@ -83,6 +99,9 @@ export const resolveManager = (
   }
   if (resolution.outcome === 'no-manager') return refuse('manager-not-assigned');
   if (resolution.outcome === 'manager-not-a-member') return refuse('manager-not-a-member');
+  if (resolution.outcome === 'manager-membership-ambiguous') {
+    return refuse('manager-membership-ambiguous');
+  }
   if (resolution.managerMembershipId === requesterMembershipId) {
     return refuse('manager-is-the-requester');
   }

@@ -136,38 +136,54 @@ describe('workflow composition', () => {
   });
 
   /**
-   * **The exact grant set: three permissions, in three grants, across two adapters.**
+   * **The exact grant set: five permissions, in six grants, across three adapters.**
    *
-   * One to read Identity's delegations, and two — read and approve — for the one module Workflow
-   * writes into. Counted from source rather than asserted as a sentence, because a fourth grant, a
-   * widened `permits`, a wildcard or a prefix is exactly the change that would pass every behavioural
-   * test in this repository.
+   * It was three and three until Phase 16C. The reporting-line adapter added three grants of two
+   * permissions — one Identity read used twice, at the two ends of the manager chain, and one
+   * Employment read in the middle. Counted from source rather than asserted as a sentence, because a
+   * seventh grant, a widened `permits`, a wildcard or a prefix is exactly the change that would pass
+   * every behavioural test in this repository.
+   *
+   * **What is not here is the point.** `identity.membership.read` would have reached the requester's
+   * employment through `identity.describe-member` — and handed the approvals engine the tenant's
+   * member register to read one identifier. B-2 authorized a second narrow Identity query instead,
+   * so both of Workflow's Identity grants stay employment-scoped, and the forbidden list below names
+   * the register explicitly.
    */
-  it('holds exactly three cross-module grants, of exactly three permissions', () => {
+  it('holds exactly six cross-module grants, of exactly five permissions', () => {
     const delegations = codeOf('workflow-sources.ts');
     const decisions = codeOf('recruitment-decisions.ts');
-    const both = `${delegations}\n${decisions}`;
-    const grants = both.match(/runWithServiceGrant\(/g) ?? [];
-    const permits = both.match(/permits: \[[^\]]*\]/g) ?? [];
+    const reporting = codeOf('workflow-reporting-line.ts');
+    const all = `${delegations}\n${decisions}\n${reporting}`;
+    const grants = all.match(/runWithServiceGrant\(/g) ?? [];
+    const permits = all.match(/permits: \[[^\]]*\]/g) ?? [];
 
-    expect(grants).toHaveLength(3);
+    expect(grants).toHaveLength(6);
     expect(permits).toEqual([
       'permits: [DELEGATION_READ]',
       'permits: [REQUISITION_READ]',
       'permits: [REQUISITION_APPROVE]',
+      'permits: [EMPLOYMENT_LINK_READ]',
+      'permits: [EMPLOYMENT_READ]',
+      'permits: [EMPLOYMENT_LINK_READ]',
     ]);
     expect(delegations).toContain("const DELEGATION_READ = 'identity.delegation.read';");
     expect(decisions).toContain("const REQUISITION_READ = 'recruitment.requisition.read';");
     expect(decisions).toContain("const REQUISITION_APPROVE = 'recruitment.requisition.approve';");
+    expect(reporting).toContain("const EMPLOYMENT_LINK_READ = 'identity.employment-link.read';");
+    expect(reporting).toContain("const EMPLOYMENT_READ = 'employment.employment.read';");
     // No wildcard, no prefix, and no grant permitting two things at once.
-    expect(both).not.toMatch(/'[a-z]+\.\*'/);
-    expect(both).not.toMatch(/permits: \[[^\]]*,/);
+    expect(all).not.toMatch(/'[a-z]+\.\*'/);
+    expect(all).not.toMatch(/permits: \[[^\]]*,/);
+    // And above all, not the member register.
+    expect(all).not.toContain('identity.membership.read');
   });
 
-  /** Three published contracts in total, each named in full, and nothing else reachable. */
-  it('consumes exactly three published contracts', () => {
+  /** Six published contracts in total, each named in full, and nothing else reachable. */
+  it('consumes exactly six published contracts', () => {
     const delegations = codeOf('workflow-sources.ts');
     const decisions = codeOf('recruitment-decisions.ts');
+    const reporting = codeOf('workflow-reporting-line.ts');
     const names = (source: string): readonly string[] => [
       ...new Set(source.match(/(?:queryName|commandName): '[a-z.-]+'/g) ?? []),
     ];
@@ -177,16 +193,26 @@ describe('workflow composition', () => {
       "commandName: 'recruitment.decide-requisition'",
       "queryName: 'recruitment.read-requisition'",
     ]);
-    // The broad reads that would answer the same questions less honestly.
+    // Three, in the order the manager chain asks them, and no command anywhere: this adapter reads.
+    expect(names(reporting)).toEqual([
+      "queryName: 'identity.primary-employment-for-membership'",
+      "queryName: 'employment.read-employment'",
+      "queryName: 'identity.active-memberships-for-employment'",
+    ]);
+    // The broad reads that would answer the same questions less honestly. `employment.` left this
+    // list in Phase 16C — the manager chain asks Employment one bounded question — and is replaced
+    // by the reads that would make it a directory or a search.
     for (const forbidden of [
       'identity.list-memberships',
       'identity.search-members',
+      'identity.describe-member',
       'recruitment.search-requisitions',
       'recruitment.search-candidates',
-      'employment.',
+      'employment.search',
+      'employment.export-workforce',
       'organization.',
     ]) {
-      expect(`${delegations}\n${decisions}`).not.toContain(forbidden);
+      expect(`${delegations}\n${decisions}\n${reporting}`).not.toContain(forbidden);
     }
   });
 

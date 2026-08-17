@@ -214,16 +214,6 @@ export interface Harness {
 export interface HarnessOptions {
   readonly permissions?: readonly string[];
   readonly tenantId?: string;
-  /**
-   * Composes the module with **no** reporting line, which is what production is until Checkpoint 7
-   * builds the adapter.
-   *
-   * Here so that the unwired case is exercised against the real `workflowModule` rather than argued
-   * about in prose: a manager step started against this composition must fail closed, not silently
-   * lose a stage. The harness still exposes its `reportingLine` double so a suite can assert it was
-   * never asked.
-   */
-  readonly withoutReportingLine?: boolean;
 }
 
 export const harnessFor = (options: HarnessOptions = {}): Harness => {
@@ -242,7 +232,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     unitOfWork: new InMemoryUnitOfWork(tenantId),
     stores,
     delegation,
-    ...(options.withoutReportingLine === true ? {} : { reportingLine }),
+    reportingLine,
     businessDecision: business,
     permissions,
     clock,
