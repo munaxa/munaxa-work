@@ -202,16 +202,19 @@ describe('the permissions, after 16B', () => {
     'workflow.instance.cancel',
     'workflow.approval.decide',
     'workflow.approval.read-own',
+    // Phase 16D's, approved by name in the second half of D-16D-02. Implied by nothing, which the
+    // application suite asserts one permission at a time.
+    'workflow.approval.escalate',
     'workflow.group.read',
     'workflow.group.manage',
   ];
 
-  it('is exactly the nine the phase declares', () => {
+  it('is exactly the ten the phase declares', () => {
     expect([...ALL_WORKFLOW_PERMISSIONS].sort()).toStrictEqual([...EXPECTED].sort());
   });
 
   /**
-   * Nine literals, and no way to hold one without being granted it.
+   * Ten literals, and no way to hold one without being granted it.
    *
    * A wildcard, a prefix match or a `startsWith` in a permission check turns nine grants into one:
    * `workflow.*` would give the holder of a read permission the ability to decide an approval, and
@@ -241,7 +244,7 @@ describe('the permissions, after 16B', () => {
   it('keeps reading a list and editing one apart', () => {
     expect(ALL_WORKFLOW_PERMISSIONS).toContain('workflow.group.read');
     expect(ALL_WORKFLOW_PERMISSIONS).toContain('workflow.group.manage');
-    expect(new Set(ALL_WORKFLOW_PERMISSIONS).size).toBe(9);
+    expect(new Set(ALL_WORKFLOW_PERMISSIONS).size).toBe(10);
   });
 
   it('declares no permission for a capability the phase does not have', () => {
@@ -250,7 +253,10 @@ describe('the permissions, after 16B', () => {
       'manager',
       'team',
       'sla',
-      'escalation',
+      // `escalation` left this list when D-16D-02 approved `workflow.approval.escalate` by name.
+      // What must never become a permission is the automatic half — nothing grants a right to have
+      // the product act on its own.
+      'auto-escalate',
       'notification',
       'admin',
     ]) {

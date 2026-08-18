@@ -54,6 +54,24 @@ export const WorkflowPermissions = {
   approvalDecide: 'workflow.approval.decide',
   /** The caller's own queue, resolved from the membership on the request and from nothing else. */
   approvalReadOwn: 'workflow.approval.read-own',
+  /**
+   * Adding an approver to a branch that is stuck. The tenth, and it is implied by nothing.
+   *
+   * **It is the most powerful thing an administrator can do to a running approval short of ending
+   * one**, which is why it stands on its own rather than riding on a grant somebody already holds.
+   * `group.manage` changes who approves *the next* approval; this changes who approves *the one
+   * already under way*, after people have started answering it — and `instance.cancel` is the only
+   * other permission that reaches an approval in flight. That pair is the precedent, and the
+   * separation is the same one AD-0045 draws for Recruitment.
+   *
+   * **The actor's, never the added approver's.** The membership in the request is the person being
+   * brought in; whoever issues the command is resolved from the request context, and there is no
+   * field through which a caller could name themselves or anybody else as the actor.
+   *
+   * It is deliberately **not** in `DELEGABLE_SCOPES`. A delegation lets somebody decide in your
+   * place, and nobody approved letting somebody widen an approval in your place.
+   */
+  approvalEscalate: 'workflow.approval.escalate',
 
   /** Reading the approval groups a tenant keeps, and who is on them. */
   groupRead: 'workflow.group.read',

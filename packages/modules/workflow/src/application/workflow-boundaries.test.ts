@@ -84,7 +84,12 @@ const registered = [
 describe('nothing deferred beyond Phase 16C is reachable', () => {
   it('registers no handler for any of it', () => {
     const deferred = [
-      'escalat',
+      // `escalat` gave way to the automatic half when Phase 16D registered
+      // `workflow.escalate-branch`, a human's command. What must never appear is a handler that
+      // *fires* one, and no elapsed time can reach any name in this list.
+      'auto-escalat',
+      'escalate-after',
+      'sweep',
       'sla',
       'breach',
       'schedule',
@@ -102,9 +107,11 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
     );
 
     expect(offending).toStrictEqual([]);
-    // Twenty-two: seventeen from 16A, plus the three group commands and two group reads Checkpoint 4
-    // added. Counted so a handler nobody decided on fails here rather than shipping.
-    expect(registered).toHaveLength(22);
+    // Twenty-three: seventeen from 16A, the three group commands and two group reads 16B added, and
+    // Phase 16D's one escalation command. Counted so a handler nobody decided on fails here rather
+    // than shipping.
+    expect(registered).toHaveLength(23);
+    expect(registered).toContain('workflow.escalate-branch');
   });
 
   /**
@@ -185,7 +192,11 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
    */
   it('has no code that escalates, expires, schedules or consults a calendar', () => {
     const fragments = [
-      'escalat',
+      // See the handler list above: the human command is built, and the thing that would fire one is
+      // not. `escalateAfter` and a sweep are what an automatic escalation would be written in.
+      'escalateAfter',
+      'autoEscalat',
+      'escalationTimer',
       'slaHours',
       'businessDay',
       'workingDay',
@@ -204,13 +215,21 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
   });
 
   /**
-   * And the complement: the two capabilities 16C *did* build are in the source, not only in prose.
+   * And the complement: what 16C and 16D *did* build is in the source, not only in prose.
    *
-   * Without this, the edit above would read exactly like a deletion — and a boundary suite that only
-   * ever loosens is a suite that stopped meaning anything.
+   * Without this, the edits above would read exactly like deletions — and a boundary suite that only
+   * ever loosens is a suite that stopped meaning anything. `escalateBranch` is 16D's, and it is here
+   * because a human command that adds an approver was authorized; nothing above it fires one.
    */
-  it('does compute a due date and does resolve one manager', () => {
-    for (const fragment of ['dueAt', 'managerOf', 'serviceLevelState', 'resolutionDateOf']) {
+  it('does compute a due date, resolve one manager, and escalate on request', () => {
+    for (const fragment of [
+      'dueAt',
+      'managerOf',
+      'serviceLevelState',
+      'resolutionDateOf',
+      'escalateBranch',
+      'escalationHistory',
+    ]) {
       expect([fragment, new RegExp(fragment).test(code)]).toStrictEqual([fragment, true]);
     }
   });

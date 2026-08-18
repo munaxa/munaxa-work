@@ -49,10 +49,11 @@ const dependenciesFor = (granted: readonly string[]) => ({
 describe('every Workflow handler declares a permission', () => {
   const module = workflowModule(dependenciesFor(ALL_WORKFLOW_PERMISSIONS));
 
-  it('registers twelve commands and ten queries, each with one', () => {
-    // Nine and eight in 16A; Phase 16B adds three group commands and two group reads. Counted here
-    // so a handler that arrives without a permission — or without a decision behind it — fails.
-    expect(module.commands).toHaveLength(12);
+  it('registers thirteen commands and ten queries, each with one', () => {
+    // Nine and eight in 16A; Phase 16B adds three group commands and two group reads; Phase 16D adds
+    // one escalation command. Counted here so a handler that arrives without a permission — or
+    // without a decision behind it — fails.
+    expect(module.commands).toHaveLength(13);
     expect(module.queries).toHaveLength(10);
 
     const declared = [
@@ -69,11 +70,13 @@ describe('every Workflow handler declares a permission', () => {
     }
   });
 
-  it('publishes exactly the nine permissions it declares, and no more', () => {
-    // The two Phase 16B adds are the two the plan authorized, and nothing else came with them.
+  it('publishes exactly the ten permissions it declares, and no more', () => {
+    // The two Phase 16B adds are the two the plan authorized, and Phase 16D's is the one the second
+    // half of D-16D-02 approved by name. Nothing else came with any of them.
     expect([...ALL_WORKFLOW_PERMISSIONS].sort()).toStrictEqual(
       [
         'workflow.approval.decide',
+        'workflow.approval.escalate',
         'workflow.approval.read-own',
         'workflow.definition.manage',
         'workflow.definition.read',

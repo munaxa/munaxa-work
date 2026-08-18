@@ -1,6 +1,7 @@
+import { ESCALATION_EVENT } from './escalation.js';
 import type { WorkflowHistoryEvent } from './workflow-vocabulary.js';
 import type { DecidedStep } from './decision.js';
-import type { CancelledInstance, StartedInstance } from './instance.js';
+import type { CancelledInstance, StartedInstance, WorkflowStepState } from './instance.js';
 import { definedOf } from './defined.js';
 
 /**
@@ -246,3 +247,34 @@ const withIdentifiers = (
       (pair): pair is { event: EntryRequest; historyId: string } => pair.historyId !== undefined,
     )
     .map((pair) => entry({ ...pair.event, historyId: pair.historyId }));
+
+/**
+ * The single entry an escalation writes: somebody was **added** to a branch.
+ *
+ * Two `step-awaiting` entries would be closer to what happens — a step opened, and it is awaiting —
+ * and would be wrong: a reader could not tell the added approver from the ones the approval started
+ * with, which is the distinction the whole phase exists to keep. One entry, under its own event.
+ *
+ * **The actor is required here, unlike a cancellation's.** An escalation is somebody's decision to
+ * widen an approval other people are already answering, and an entry that could not say whose
+ * decision it was would be the one row in this timeline that records a change of approver with
+ * nobody attached to it. There is no reconciliation or migration path that writes one.
+ *
+ * The step is named so the timeline points at the approver who was added, and the ordinal so it
+ * points at the branch they were added to.
+ */
+export const escalationHistory = (
+  step: WorkflowStepState,
+  at: Date,
+  historyId: string,
+  actorMembershipId: string,
+): WorkflowHistoryState =>
+  entry({
+    historyId,
+    instanceId: step.instanceId,
+    event: ESCALATION_EVENT,
+    occurredAt: at,
+    stepId: step.stepId,
+    ordinal: step.ordinal,
+    actorMembershipId,
+  });

@@ -9,6 +9,7 @@ import {
 } from './definition.use-case.js';
 import { addStepHandler } from './step.use-case.js';
 import { cancelInstanceHandler, startInstanceHandler } from './instance.use-case.js';
+import { escalateBranchHandler } from './escalation.use-case.js';
 import {
   addGroupMemberHandler,
   createApprovalGroupHandler,
@@ -32,7 +33,7 @@ import { ALL_WORKFLOW_PERMISSIONS, WorkflowPermissions } from './workflow-permis
 import type { WorkflowDependencies } from './workflow-dependencies.js';
 
 /**
- * Workflow's module declaration: twelve commands, ten queries, two navigation entries.
+ * Workflow's module declaration: thirteen commands, ten queries, two navigation entries.
  *
  * Registered on the same dispatcher as every other module. **Nothing here subscribes to an event.**
  * Dispatch is post-commit, in-process and at-most-once with no outbox, so a module whose correctness
@@ -40,9 +41,10 @@ import type { WorkflowDependencies } from './workflow-dependencies.js';
  * exactly why a decision reaches an adopting module inside the approver's own request rather than
  * through an event (D-9). ADR-0050 settled the same question for onboarding.
  *
- * **Nothing here is scheduled.** No approval comes due by itself, nothing escalates and no delegation
- * expires on a timer: `JobPort` has no adapter anywhere in this repository. SLA and escalation are
- * Phase 16B, and there is no handler here that could fire one.
+ * **Nothing here is scheduled.** No approval comes due by itself, nothing escalates *by itself* and
+ * no delegation expires on a timer: `JobPort` has no adapter anywhere in this repository. Phase 16D
+ * added `workflow.escalate-branch`, and it is a **human's command** at the end of a request somebody
+ * made — there is no handler in this list that any elapsed time could fire.
  *
  * **Nothing here writes outside Workflow**, and the shape of this list is part of why: every command
  * names a Workflow aggregate, and there is no handler whose name or dependencies could reach a
@@ -100,6 +102,7 @@ const commandsOf = (
     startInstanceHandler(dependencies),
     decideStepHandler(dependencies),
     cancelInstanceHandler(dependencies),
+    escalateBranchHandler(dependencies),
   ] as readonly CommandHandler<Command, unknown>[];
 
 const queriesOf = (dependencies: WorkflowDependencies): readonly QueryHandler<Query, unknown>[] =>
