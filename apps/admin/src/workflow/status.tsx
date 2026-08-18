@@ -44,7 +44,7 @@ import { Section, type SectionProps } from './sections';
  */
 
 /**
- * The eight capabilities these phases added, the fifteen absences the module still states, and the
+ * The nine capabilities these phases added, the fifteen absences the module still states, and the
  * three portal-level facts this screen adds for itself.
  *
  * The absences are the module's own `workflow.withheld.*` catalogue. The last three are the portal's
@@ -60,6 +60,11 @@ const PROVIDED = [
   'workflow.provided.tally',
   'workflow.provided.managerRouting',
   'workflow.provided.serviceLevel',
+  // Phase 16D. It is on this list because it is real, and it is worded to say what is real: an
+  // administrator adds an approver through the API. `withheld.escalation` still sits below saying
+  // nothing does it on its own, and the two are not in tension — one names a person's act and the
+  // other names the absence of a timer.
+  'workflow.provided.escalation',
 ] as const;
 
 const NOT_VERIFIED = [
@@ -89,7 +94,7 @@ const PORTAL = [
 /**
  * What these releases added, said before what they still do not do.
  *
- * Eight of the capabilities earlier phases named as absent are now real, and leaving them on the
+ * Nine of the capabilities earlier phases named as absent are now real, and leaving them on the
  * list below would be the same failure in the other direction: a screen that told an administrator
  * this product cannot run two approvers at once, on a page rendering a branch that does — or that it
  * cannot route to a manager, beside a step that just did.

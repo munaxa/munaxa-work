@@ -233,6 +233,7 @@
         "step-approved": "Step approved",
         "step-rejected": "Step rejected",
         "step-skipped": "Step skipped",
+        "step-escalated": "Approver added",
         "instance-completed": "Approval completed",
         "instance-rejected": "Approval rejected",
         "instance-cancelled": "Approval cancelled"
@@ -270,7 +271,7 @@
     },
     "withheld": {
       "businessDays": "Nothing is calculated in business days. Approvals holds no calendar and no working-time rule.",
-      "escalation": "Nothing escalates. A step past its target is shown as past it and nothing follows: no reassignment after a delay, and no next approver on a timer.",
+      "escalation": "Nothing escalates by itself. A step past its target is shown as past it and nothing follows: no reassignment after a delay, and no next approver on a timer.",
       "scheduling": "Nothing is scheduled. No approval is advanced, closed or reviewed by a background job.",
       "approvalExpiry": "No approval expires. A step may be past its target and stays exactly where it is; `expired` is declared in the approval vocabulary and this phase never produces it.",
       "delegationExpiry": "A delegation is not expired automatically. Whether one is in force is answered when a decision is made.",
@@ -293,7 +294,8 @@
       "conditionalBranching": "Conditional branching is supported. A branch may carry conditions on values the request supplied, and the server evaluates them when the approval starts.",
       "tally": "A branch tally is published: who was asked, who answered, how many approvals the rule needs, and the outcome. It is computed by the server from the decisions and stored nowhere.",
       "managerRouting": "A step may ask the requester’s manager. The person is found once, when the approval starts — through their primary employment and its primary reporting line, one level up — and stays on that approval afterwards.",
-      "serviceLevel": "A step may carry a target of whole hours or days, counted from the moment that step was asked. It is observed rather than enforced: the server reports whether a step is within or past it, and nothing fires when it passes."
+      "serviceLevel": "A step may carry a target of whole hours or days, counted from the moment that step was asked. It is observed rather than enforced: the server reports whether a step is within or past it, and nothing fires when it passes.",
+      "escalation": "An administrator can add an approver to a branch that is stuck, through the API. It adds somebody — nobody is replaced, removed or reassigned, and the approvers already asked stay asked. Nothing starts it but a person."
     }
   }
 }

@@ -39,6 +39,16 @@ export const APPROVER = '01930000-0000-7000-8000-0000000000e1';
 export const DEPUTY = '01930000-0000-7000-8000-0000000000e2';
 /** The membership a manager step resolved to when its approval started. */
 export const MANAGER = '01930000-0000-7000-8000-0000000000e4';
+/**
+ * The membership an administrator added to a stuck branch in Phase 16D, and the one who added them.
+ *
+ * The added approver arrives as an **ordinary membership step** — `WorkflowStepView` publishes no
+ * escalation marker, so nothing in the steps table sets this row apart from `DEPUTY` beside it. That
+ * is the contract as it stands, and the fixture is faithful to it rather than to what a screen might
+ * want: the only published trace of the escalation is the timeline entry below.
+ */
+export const ESCALATED = '01930000-0000-7000-8000-0000000000e5';
+export const ADMINISTRATOR = '01930000-0000-7000-8000-0000000000e6';
 
 /**
  * Two due instants the **server** computed. Nothing in these fixtures derives one from a target.
@@ -146,13 +156,19 @@ export const anInstanceDetail = (): WorkflowInstanceDetailView => ({
       version: 2,
     },
     awaitingStep(),
+    anEscalatedStep(),
     aResolvedManagerStep(),
   ],
   decisions: [aDirectDecision()],
-  // A sequential chain: branches of one, so the plural and the singular agree and every tally has a
-  // denominator of one. The Admin screens are Checkpoint 7's; this fixture carries the fields the
-  // contract now has so the existing screens keep compiling against the whole view.
-  awaitingSteps: [awaitingStep()],
+  /**
+   * A sequential chain of branches of one — **and an escalation on the second of them**.
+   *
+   * Two steps await at ordinal 2 while its tally still reads `assigned: 1`, which is the locked
+   * 16D rule (D-16D-08) as an administrator would see it: escalation adds somebody to ask, and moves
+   * neither the denominator nor the threshold. A fixture whose denominator followed the row count
+   * would let a screen recomputing one pass by coincidence.
+   */
+  awaitingSteps: [awaitingStep(), anEscalatedStep()],
   awaiting: awaitingStep(),
   tallies: [
     {
@@ -209,6 +225,31 @@ const aResolvedManagerStep = (): WorkflowStepView => ({
     dueOn: OVERDUE_DUE,
     state: 'overdue',
     overdueByMinutes: 90,
+  },
+});
+
+/**
+ * The approver an administrator added, exactly as the API publishes them.
+ *
+ * `membership`, `awaiting`, the branch's own target — the same shape as `awaitingStep()` beside it,
+ * with a different person. There is deliberately no field here saying this one was escalated: the
+ * view has none to set, and inventing one in a fixture would let a screen appear to render a
+ * distinction the server never sends.
+ */
+const anEscalatedStep = (): WorkflowStepView => ({
+  stepId: '01930000-0000-7000-8000-000000000094',
+  instanceId: INSTANCE_ID,
+  ordinal: 2,
+  approverKind: 'membership',
+  approverMembershipId: ESCALATED,
+  status: 'awaiting',
+  version: 1,
+  serviceLevel: {
+    count: 2,
+    unit: 'days',
+    awaitingOn: AT,
+    dueOn: WITHIN_DUE,
+    state: 'within',
   },
 });
 
@@ -310,5 +351,22 @@ export const aHistory = (): readonly WorkflowHistoryView[] => [
     ordinal: 1,
     actorMembershipId: DEPUTY,
     onBehalfOfMembershipId: APPROVER,
+  },
+  /**
+   * Phase 16D's ninth event: an administrator added an approver to the branch at ordinal 2.
+   *
+   * This entry is the **whole** published record of the escalation — the step it created carries no
+   * marker, so the timeline is where an administrator learns that a branch was widened, when, and by
+   * whom. It names the actor and nobody's authority: an escalation is issued in the caller's own
+   * name, never on behalf of the person added.
+   */
+  {
+    historyId: '01930000-0000-7000-8000-000000000084',
+    instanceId: INSTANCE_ID,
+    event: 'step-escalated',
+    occurredOn: LATER,
+    stepId: '01930000-0000-7000-8000-000000000094',
+    ordinal: 2,
+    actorMembershipId: ADMINISTRATOR,
   },
 ];

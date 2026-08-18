@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadWorkflow } from './api';
 import { requested, stubFetch, stubUnreachable } from './api.fixture';
-import { INSTANCE_ID, MANAGER } from './views.fixture';
+import { DEPUTY, INSTANCE_ID, MANAGER } from './views.fixture';
 
 /**
  * What the screen makes of the answers it gets — and of the ones it does not.
@@ -70,7 +70,7 @@ describe('the values the screen carries through', () => {
     expect([workflow.instances.length, workflow.instancesTotal]).toEqual([1, 4000]);
     expect([workflow.pending.length, workflow.pendingTotal]).toEqual([1, 12]);
     expect([workflow.decided.length, workflow.decidedTotal]).toEqual([1, 7]);
-    expect([workflow.history.length, workflow.historyTotal]).toEqual([3, 9]);
+    expect([workflow.history.length, workflow.historyTotal]).toEqual([4, 9]);
   });
 
   it('keeps the timeline in the order the API returned it', async () => {
@@ -82,6 +82,8 @@ describe('the values the screen carries through', () => {
       'instance-started',
       'step-awaiting',
       'step-approved',
+      // Phase 16D's ninth event, last because it happened last — the loader sorts nothing.
+      'step-escalated',
     ]);
   });
 
@@ -97,16 +99,21 @@ describe('the values the screen carries through', () => {
     stubFetch();
 
     const steps = (await loadWorkflow()).instance?.steps ?? [];
+    // Selected by the person rather than by position, so that adding a step to the fixture cannot
+    // silently point these assertions at a different row.
+    const within = steps.find((step) => step.approverMembershipId === DEPUTY);
+    const past = steps.find((step) => step.approverMembershipId === MANAGER);
 
-    expect(steps[1]?.serviceLevel).toStrictEqual({
+    expect([within, past].every(Boolean)).toBe(true);
+    expect(within?.serviceLevel).toStrictEqual({
       count: 2,
       unit: 'days',
       awaitingOn: '2026-02-28T23:30:00.000Z',
       dueOn: '2026-03-05T09:15:00.000Z',
       state: 'within',
     });
-    expect(steps[1]?.serviceLevel?.overdueByMinutes).toBeUndefined();
-    expect(steps[2]?.serviceLevel?.overdueByMinutes).toBe(90);
+    expect(within?.serviceLevel?.overdueByMinutes).toBeUndefined();
+    expect(past?.serviceLevel?.overdueByMinutes).toBe(90);
   });
 
   /**
@@ -120,11 +127,13 @@ describe('the values the screen carries through', () => {
     const steps = workflow.instance?.steps ?? [];
     const templates = workflow.definition?.publishedSteps ?? [];
 
-    // Both rows exist, so neither assertion below can pass by finding nothing at that index.
-    expect([steps.length, templates.length]).toEqual([3, 3]);
+    // Both rows exist, so neither assertion below can pass by finding nothing. Four running steps
+    // against three templates: Phase 16D's escalated approver has no template and never had one,
+    // because a person added them to an approval that was already running.
+    expect([steps.length, templates.length]).toEqual([4, 3]);
     // The running step is a membership and a concrete identifier, exactly as the API published it.
     // Nothing here re-reads it and nothing marks it as manager-derived.
-    expect(steps[2]).toMatchObject({
+    expect(steps.find((step) => step.approverMembershipId === MANAGER)).toMatchObject({
       approverKind: 'membership',
       approverMembershipId: MANAGER,
     });

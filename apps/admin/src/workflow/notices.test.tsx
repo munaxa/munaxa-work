@@ -12,6 +12,8 @@ import { ApprovalStatusSection, DecidedSection, PendingSection } from './approva
 import { HistorySection } from './history';
 import { ProvidedSection, StatusSection } from './status';
 import {
+  DEPUTY,
+  ESCALATED,
   aDefinitionDetail,
   aDelegatedDecision,
   aDirectDecision,
@@ -117,6 +119,8 @@ describe('what this release added', () => {
         'workflow.provided.tally',
         'workflow.provided.managerRouting',
         'workflow.provided.serviceLevel',
+        // Phase 16D: a person can widen a branch. Nothing else about it changed.
+        'workflow.provided.escalation',
       ]) {
         expect([language, key, markup.includes(escaped(translate(key)))]).toEqual([
           language,
@@ -162,6 +166,78 @@ describe('what this release added', () => {
     // And a manager is resolved once rather than continuously — the claim that replaced the old one.
     expect(en('workflow.provided.managerRouting')).toContain('once, when the approval starts');
     expect(en('workflow.provided.serviceLevel')).toContain('observed rather than enforced');
+  });
+});
+
+/**
+ * The one claim of this phase, and the refusal it sits beside.
+ *
+ * Phase 16D added a route a person can call to widen a stuck branch. That makes exactly one sentence
+ * on this page newly true — and it makes the sentence next to it newly *misleading*, because "nothing
+ * escalates" and "an administrator can escalate" cannot both stand. Neither one was deleted: the
+ * refusal was narrowed to the thing that is still refused, which is that nothing escalates **on its
+ * own**. The pair is asserted together, because the honesty of either depends on the other.
+ */
+describe('escalation, claimed and refused in the same breath', () => {
+  it('claims a person can widen a branch and still refuses that anything does it unprompted', () => {
+    const claim = en('workflow.provided.escalation');
+    const refusal = en('workflow.withheld.escalation');
+
+    // What is now true: somebody does it, it adds, and it removes nobody.
+    expect(claim).toContain('administrator');
+    expect(claim).toContain('add an approver');
+    expect(claim).toContain('nobody is replaced');
+    // And what is still false, which is every automatic form of the same word.
+    expect(refusal).toContain('by itself');
+    expect(refusal).toContain('on a timer');
+    expect(refusal).toContain('after a delay');
+    // The refusal must not have been emptied into a claim: it is still on the deferred list.
+    expect(Object.keys(catalogue.workflow.withheld)).toContain('escalation');
+  });
+
+  /**
+   * And the timeline can say the word, in both languages.
+   *
+   * The event is the **only** published trace of an escalation — `WorkflowStepView` carries no marker
+   * — so a missing catalogue entry would not be a cosmetic gap. `translator` answers a missing key
+   * with the key itself, which renders as `workflow.vocabulary.historyEvent.step-escalated` in a
+   * table cell: legible enough to look deliberate and wrong in a way nobody reports.
+   */
+  it.each([
+    ['en', en],
+    ['ar', ar],
+  ] as const)('names the escalation event as words rather than a key in %s', (language, translate) => {
+    const KEY = 'workflow.vocabulary.historyEvent.step-escalated';
+    const word = translate(KEY);
+
+    expect(word).not.toBe(KEY);
+    expect(word).not.toContain('workflow.');
+
+    const markup = html(<HistorySection t={translate} language={language} history={aHistory()} total={9} />);
+
+    expect(markup).toContain(escaped(word));
+    expect(markup).not.toContain(KEY);
+  });
+
+  /**
+   * The added approver is a row, not a recomputed denominator.
+   *
+   * Two steps await at ordinal 2 and the branch still needs one approval. A screen that counted the
+   * rows it was rendering would print two, which is the failure this asserts against — the tally is
+   * the server's arithmetic and this page only prints it.
+   */
+  it('renders the widened branch without moving the number it needs', () => {
+    const detail = anInstanceDetail();
+    const second = detail.tallies?.find((tally) => tally.ordinal === 2);
+
+    expect(detail.awaitingSteps?.filter((step) => step.ordinal === 2)).toHaveLength(2);
+    expect([second?.assigned, second?.threshold, second?.outstanding]).toStrictEqual([1, 1, 1]);
+
+    const markup = html(<InstanceStepsSection {...props} detail={detail} />);
+
+    // Both people are on the screen, each as an ordinary awaiting membership step.
+    expect(markup).toContain(DEPUTY);
+    expect(markup).toContain(ESCALATED);
   });
 });
 
