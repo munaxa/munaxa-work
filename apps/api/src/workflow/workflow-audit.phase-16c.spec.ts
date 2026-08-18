@@ -186,13 +186,19 @@ suite('the delivered schema, read from the database rather than from a report', 
    * Every one of these is a *derived* value the application computes per read, or an organizational
    * fact that belongs to another module. A column for any of them would be a second record able to
    * disagree with the first, and there is no column for any of them.
+   *
+   * **`escalat` narrowed in Phase 16D**, when `workflow_step.escalated_at` arrived. That column is
+   * provenance rather than a derived value — it says an approver was *added* rather than snapshotted,
+   * and its absence is what the branch tally counts as the denominator. What the pattern still
+   * forbids is a column nothing would maintain: an escalation level to climb, or a time at which the
+   * product would escalate by itself.
    */
   it('grew no column for anything derived, scheduled or organizational', async () => {
     const { rows } = await pool.query<{ named: string }>(
       `select table_name || '.' || column_name as named
          from information_schema.columns
         where table_schema = 'public' and table_name like 'workflow%'
-          and column_name ~ 'due|expir|breach|escalat|manager|employment|overdue|elapsed|business|notif|schedul|job|cron|timer'`,
+          and column_name ~ 'due|expir|breach|escalation_level|escalate_at|manager|employment|overdue|elapsed|business|notif|schedul|job|cron|timer'`,
     );
 
     expect(rows.map((row) => row.named)).toStrictEqual([]);
