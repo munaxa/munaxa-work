@@ -206,18 +206,23 @@ describe('escalation, claimed and refused in the same breath', () => {
   it.each([
     ['en', en],
     ['ar', ar],
-  ] as const)('names the escalation event as words rather than a key in %s', (language, translate) => {
-    const KEY = 'workflow.vocabulary.historyEvent.step-escalated';
-    const word = translate(KEY);
+  ] as const)(
+    'names the escalation event as words rather than a key in %s',
+    (language, translate) => {
+      const KEY = 'workflow.vocabulary.historyEvent.step-escalated';
+      const word = translate(KEY);
 
-    expect(word).not.toBe(KEY);
-    expect(word).not.toContain('workflow.');
+      expect(word).not.toBe(KEY);
+      expect(word).not.toContain('workflow.');
 
-    const markup = html(<HistorySection t={translate} language={language} history={aHistory()} total={9} />);
+      const markup = html(
+        <HistorySection t={translate} language={language} history={aHistory()} total={9} />,
+      );
 
-    expect(markup).toContain(escaped(word));
-    expect(markup).not.toContain(KEY);
-  });
+      expect(markup).toContain(escaped(word));
+      expect(markup).not.toContain(KEY);
+    },
+  );
 
   /**
    * The added approver is a row, not a recomputed denominator.
