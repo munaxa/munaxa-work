@@ -116,7 +116,7 @@ suite('the Workflow API surface', () => {
    * set. **Every application handler is reachable exactly once**, which is the property that makes
    * the count worth asserting rather than the number itself.
    */
-  it('exposes exactly twenty-two routes, one per application handler', () => {
+  it('exposes exactly twenty-three routes, one per application handler', () => {
     const sources = CONTROLLER_FILES.map(codeOf);
     const routes = sources.flatMap(
       (source) => source.match(/@(?:Get|Post|Put|Patch|Delete)\(/g) ?? [],
@@ -125,14 +125,17 @@ suite('the Workflow API surface', () => {
       ...(source.match(/(?:queryName|commandName): 'workflow\.[a-z-]+'/g) ?? []),
     ]);
 
-    expect(routes).toHaveLength(22);
-    expect(dispatched).toHaveLength(22);
-    expect(new Set(dispatched).size).toBe(22);
+    expect(routes).toHaveLength(23);
+    expect(dispatched).toHaveLength(23);
+    expect(new Set(dispatched).size).toBe(23);
 
     const commands = dispatched.filter((name) => name.startsWith('commandName'));
     const queries = dispatched.filter((name) => name.startsWith('queryName'));
 
-    expect(commands).toHaveLength(12);
+    // Thirteen writes and ten reads. Phase 16D added one command and **no query**: escalation is
+    // something somebody does, not something anybody asks about, and reading a branch already
+    // answers what it did.
+    expect(commands).toHaveLength(13);
     expect(queries).toHaveLength(10);
   });
 
@@ -169,16 +172,12 @@ suite('the Workflow API surface', () => {
     // Every route reaches a handler: a controller dispatching a name nothing registers is a 404 in
     // production and always a defect.
     expect([...dispatched].filter((name) => !registered.has(name))).toStrictEqual([]);
-    // And every handler is reachable — with **one named exception**, pending its own checkpoint.
-    //
-    // Phase 16D's Checkpoint 4 registered `workflow.escalate-branch` and was explicitly forbidden to
-    // add a route for it; HTTP exposure belongs to the phase's API checkpoint. Asserting the exact
-    // set rather than skipping the direction is what keeps this a moved guard: a *second* unrouted
-    // handler fails here immediately, and when the escalation route lands this list must be emptied
-    // in the same change or the assertion fails again. Neither can be forgotten.
-    expect([...registered].filter((name) => !dispatched.has(name))).toStrictEqual([
-      'workflow.escalate-branch',
-    ]);
+    // And every handler is reachable. **The list is empty again**, which is the point of having
+    // asserted the exact set rather than skipping the direction: Checkpoint 4 registered
+    // `workflow.escalate-branch` without a route and named it here, and Checkpoint 6's route emptied
+    // it in the same change that added the route. A handler nobody can reach cannot hide in this
+    // assertion, and neither can a stale exemption.
+    expect([...registered].filter((name) => !dispatched.has(name))).toStrictEqual([]);
   });
 
   /**
@@ -255,12 +254,18 @@ suite('the Workflow API surface', () => {
      * domain's vocabulary, and the API now carries them **as values a client may send** on a step
      * body. What must stay absent is an *implementation* — a controller computing a threshold — and
      * that is asserted structurally below rather than by the presence of a word.
+     *
+     * **`escalation` left it in Phase 16D**, because `POST /instances/:id/escalation` is now a real
+     * sub-resource: a human adds an approver to a branch, and a route that could not be named would
+     * be a capability nobody could reach. `/escalations` — the *collection* — stays refused above,
+     * because a list of escalations to poll is what a scheduler would want and there is nothing to
+     * poll: escalation is an act on one approval, never a queue of pending work.
      */
     for (const fragment of [
       "'me'",
       'my-team',
       'roles',
-      'escalation',
+      'auto-escalat',
       'sla',
       'notification',
       'analytics',

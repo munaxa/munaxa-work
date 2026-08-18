@@ -13,8 +13,13 @@ import type {
   CancelInstanceCommand,
   StartInstanceCommand,
 } from '../application/instance.use-case.js';
+import type { EscalateBranchCommand } from '../application/escalation.use-case.js';
 
-import { CancelInstanceBody, StartInstanceBody } from './workflow-approval.dto.js';
+import {
+  CancelInstanceBody,
+  EscalateBranchBody,
+  StartInstanceBody,
+} from './workflow-approval.dto.js';
 import { WorkflowDispatcher } from './workflow-dispatcher.js';
 import { optional, paged, present } from './search-filters.js';
 import { unwrapOrThrow } from './handler-result.js';
@@ -33,6 +38,12 @@ import { unwrapOrThrow } from './handler-result.js';
  *
  * **The requester is the membership on the request.** No body below names one, so there is no route
  * through which a caller could raise an approval in somebody else's name.
+ *
+ * **Escalation is its own sub-resource and its own permission**, beside cancellation and for the
+ * same reason: adding an approver to an approval others are already answering is a different act
+ * from raising or ending one, and `approval.escalate` is implied by none of the nine before it. It
+ * **adds** — no route replaces, removes or reassigns an approver, because no command does. And like
+ * every route here it is the end of a request somebody made: nothing fires after a delay.
  *
  * **There is no route that sets an instance's status.** An approval reaches `completed`, `rejected`
  * or `cancelled` by being decided or by being cancelled, and a generic status endpoint would let a
@@ -112,6 +123,25 @@ export class WorkflowInstanceController {
         instanceId,
         reason: body.reason,
         expectedVersion: body.expectedVersion,
+      }),
+    );
+  }
+
+  @Post(':instanceId/escalation')
+  @ApiOperation({ summary: 'Add an approver to a branch that is awaiting. Never replaces one' })
+  @ApiOkResponse({ description: 'The step the escalation created.' })
+  public async escalate(
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Body() body: EscalateBranchBody,
+  ): Promise<unknown> {
+    // Three fields forwarded and nothing computed: whether the branch is awaiting, whether its rule
+    // permits an addition, and what any of it does to the tally are the domain's.
+    return unwrapOrThrow(
+      await this.dispatcher.send<unknown, EscalateBranchCommand>({
+        commandName: 'workflow.escalate-branch',
+        instanceId,
+        ordinal: body.ordinal,
+        approverMembershipId: body.approverMembershipId,
       }),
     );
   }

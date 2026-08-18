@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   IsUUID,
   Length,
   Matches,
+  Min,
 } from 'class-validator';
 
 import { APPROVAL_DECISIONS } from '../domain/workflow-vocabulary.js';
@@ -114,4 +116,38 @@ export class DecideStepBody extends VersionedBody {
   @IsString()
   @Length(1, COMMENT)
   public readonly comment?: string;
+}
+
+/**
+ * Bringing one more approver into a branch that is stuck.
+ *
+ * **Two fields, and the third is the path.** The approval is `:instanceId`, exactly as it is for a
+ * cancellation — the closest sibling to this route, and for the same reason: both are an
+ * administrator acting on somebody else's approval that is already under way.
+ *
+ * **`approverMembershipId` is the person being added, never the person asking.** Whoever asked comes
+ * from the authenticated request, as it does for every other shape in this file. That is what makes
+ * the field safe: it names a subject rather than an identity, and there is no shape here through
+ * which a caller could claim to be somebody.
+ *
+ * **No `expectedVersion`, and its absence is deliberate.** Every other shape that touches an existing
+ * row carries one, because it *updates* that row and a caller who cannot say which version they read
+ * cannot be protected from overwriting somebody's change. Escalation updates nothing: it inserts one
+ * step beside the ones already there, and the original approvers' rows are not read back, rewritten
+ * or versioned. A version here would be protecting against a write that does not happen.
+ *
+ * **No reason, no `escalateAfter`, no due date and no level.** Why somebody escalated is a sentence
+ * nobody approved a column for, and the timeline already records who did it and when. The rest are
+ * the automatic capability this phase deliberately did not build, and `forbidNonWhitelisted` turns
+ * every one of them into a 400 rather than a silently ignored field.
+ */
+export class EscalateBranchBody {
+  @ApiProperty({ minimum: 1, description: 'The branch. Several steps may share one ordinal.' })
+  @IsInt()
+  @Min(1)
+  public readonly ordinal!: number;
+
+  @ApiProperty({ format: 'uuid', description: 'The approver being added. Never the caller.' })
+  @IsUUID()
+  public readonly approverMembershipId!: string;
 }
