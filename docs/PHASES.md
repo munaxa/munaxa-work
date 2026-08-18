@@ -367,13 +367,57 @@ its own branch, and a group's members outliving the group — with their origina
 measured performance at 500, 10,000 and 100,000 approvals with **all twenty-six workloads within
 budget at every tier**, the query plans, the ten verified races, the locked tally arithmetic, the
 carried-forward debt register and the twenty-four `NOT VERIFIED` capabilities are in
-[`verification/phase-16b-final-report.md`](verification/phase-16b-final-report.md). **Phase 16C — manager routing, SLA,
-escalation and approval expiry — is not started**: no column, no route, no screen. Notification
-delivery is Phase 17's and analytics is Phase 20's, by those phases' own specifications; a durable job
-runner for the kernel's `JobPort` — which has existed as an interface since Phase 0 and has never had
-an adapter — is owned by no phase yet. The Definition of Ready, its six contradictions and its
-fourteen blocking decisions are in
+[`verification/phase-16b-final-report.md`](verification/phase-16b-final-report.md). The Definition of
+Ready for what follows, its six contradictions and its fourteen blocking decisions are in
 [`verification/phase-16c-plan.md`](verification/phase-16c-plan.md).
+
+Phase 16C completed on 2026-08-18: **routing resolution** — one additive migration, five columns, no
+new table, no new index, no new route, no new permission and no new screen. A step can now route to
+**the requester's manager**, and a step can carry **a service-level target**. Nothing else was added,
+and two capabilities the 16B record had named as 16C's were *decided against* rather than deferred:
+approval expiry is **observed and derived, never written** (D-16C-06) and escalation is defined as a
+future bounded command that adds an approver (D-16C-07), so neither adds a domain state and the phase
+reduces to those two things. **The manager is resolved once, when the approval starts**, by composing
+three published contracts across two modules — the requester's primary employment, the primary
+reporting line in force on that day, and who actually holds the manager's employment — and the answer
+is copied onto the running step. A **manager template names nobody**: whose manager it means is the
+requester, fixed rather than configured, and the database enforces it — a template may say `manager`
+and a running step may not, because the kind is resolved into a person before anybody is asked. So a
+running approval still names a concrete membership and depends on no live organizational lookup, which
+is 16B's invariant preserved rather than a happy accident: a reporting line that moves afterwards does
+not move a running approval, and the *next* approval reaches the new manager. **Five outcomes fail
+closed** and none silently skips a configured approver — no primary employment, no manager on the
+primary line, nobody holds the manager's employment, **two or more people hold it**, or the requester
+turns out to be their own manager. That fourth is kept distinct from the third deliberately: one means
+nobody holds the job and the other means two do, they are opposite problems for different people to
+fix, and there is **no rule for choosing between two candidates** — no ordering, no `is_primary`, no
+first-of, no fallback. **This is still not a directory.** Identity gained two narrow queries on a
+permission it already had, `identity.membership.read` was **not** granted, and nothing enumerates
+memberships, resolves a role, reads an organization chart or traverses more than one level. A
+**service level is elapsed time in whole hours or days** (D-16C-05) — never business days, because
+Workflow holds no calendar and the approval declined an Organization dependency for one — configured
+on the template, copied onto the step, counted from the instant **that step** became awaiting, so each
+step of a parallel branch starts its own clock and nothing restarts one. **Due-ness, state and overdue
+minutes are derived on every read** from the target, that instant and an explicit reading instant the
+caller supplies, and **stored nowhere**: there is no `due_at`, no `expired`, no `breached` and no
+escalation column, because a stored due time would be a second record able to disagree with its own
+inputs and a stored `expired` would need something to write it — a scheduler this phase does not have
+or a synthetic actor ADR-0045 refuses. Exactly at the target is **within** it, a step three seconds
+past is overdue by **zero** minutes, and every number is a truncated integer. **Nothing was scheduled,
+escalated, expired, notified, measured or routed to a role**: `JobPort` still has no adapter anywhere.
+Twenty-two capabilities remain `NOT VERIFIED`, none with a placeholder anywhere, and two left that
+list by delivery rather than by attrition. **No production defect was found by the closing audit** —
+its findings were two benchmark defects and three test-coverage gaps, all fixed or closed within it.
+The manager chain end to end, the five refusals, the boundary arithmetic, the three cross-module query
+plans (which no module had ever planned), the measured performance at 500, 10,000 and 100,000
+approvals with **one workload missing its budget** — the tier C unfiltered instance listing at 124 ms,
+carried from 16B where it measured 91.4 ms and unaffected by this phase — the carried-forward debt
+register and the twenty-two `NOT VERIFIED` capabilities are in
+[`verification/phase-16c-final-report.md`](verification/phase-16c-final-report.md). **Phase 16D — Time
+in Workflow — is not started**: no scheduler, no timer, no expiry transition and no escalation
+execution exists. Notification delivery is Phase 17's and analytics is Phase 20's, by those phases' own
+specifications; a durable job runner for the kernel's `JobPort` — which has existed as an interface
+since Phase 0 and has never had an adapter — **is owned by no phase yet**, and 16C did not assign one.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

@@ -5,6 +5,66 @@ and what is still missing.
 
 ---
 
+## Phase 16C — Routing to a manager, and how long a step should take
+
+Two things an approval process can now do: **ask the requester's manager**, and **say how long a step
+is expected to take**.
+
+**Route to my manager.** A stage in an approval process can be set to ask whoever the requester
+reports to, instead of naming a person. Nobody is named when it is configured — the stage says "the
+requester's manager" and works the person out when an approval is actually raised.
+
+**Worked out once, when the approval starts.** The product finds the requester's job, the manager on
+their reporting line that day, and who holds that manager's job — and then writes that person onto the
+approval. Reorganize afterwards and the approval already running still asks the person it asked at the
+start; they were genuinely asked, and it would be strange for it to change hands while somebody is
+looking at it. The **next** approval asks the new manager.
+
+**It stops rather than guesses.** If the requester has no job on record, or no manager on their
+reporting line, or nobody holds the manager's job, the approval **does not start** and says which of
+those it was. And if **two people** hold the manager's job, it stops and says *that* — rather than
+picking one. Those are opposite problems: one means nobody is in the role, the other means two people
+are, and they need different people to fix them. The product will not choose between two managers on
+your behalf.
+
+**This is still not a directory.** Nothing looks up a department, a job title or an organization
+chart. The product asks two narrow questions about one person's employment and stops there — it
+cannot list who reports to whom, and it never goes more than one level up.
+
+**How long a step should take.** A stage can carry a target: a whole number of hours or days. The
+clock starts when *that* stage begins waiting — not when the approval was raised — so in a chain the
+third stage's clock starts when the second is answered, and in a parallel stage everybody's starts
+together. Nothing restarts it.
+
+**A target is a target, not a deadline. Nothing happens when it passes.** Nobody is reminded, nothing
+escalates, nothing is reassigned and nothing expires. A step past its target sits exactly where it
+was, marked as overdue, until a person acts on it. If you need chasing, this product still does not do
+it, and the screen says so in as many words.
+
+**Elapsed time, weekends included.** "Two days" means forty-eight hours. It does not skip weekends or
+public holidays — the product holds no working calendar for approvals, and pretending otherwise would
+give a confidently wrong answer.
+
+**The count is never rounded up.** A step three seconds past its target is overdue by **zero**
+minutes, not one. A step exactly at its target is still within it: "two hours to approve" means two
+whole hours.
+
+**What an administrator can see.** The approvals screen now shows which stages route to a manager (and
+that they name nobody — the two blank columns are the configuration, not missing data), who a running
+approval actually resolved to, the target each stage carries in the unit it was typed in, when it
+falls due, whether it is within or past that, and by how many minutes. It shows the person as a
+member, not as "the manager", because the product knows the identifier and should not narrate where it
+came from. Nothing about the employment, reporting line, department or chain appears anywhere. No
+progress bars, no countdowns, no timers — the screen displays what the server worked out and works
+nothing out itself.
+
+**Still missing, and still deliberate.** Nothing escalates, nothing is scheduled, nothing expires and
+nothing is sent to anybody. There are no approval analytics. Nothing routes to a role or to somebody
+outside the company, and there is no working-day calculation. Every one of those is named on the
+screen itself rather than left to be discovered.
+
+---
+
 ## Phase 16B — Approval groups, parallel approval and branching
 
 Approvals can now ask **several people at once**, and a company can decide **who** those people are

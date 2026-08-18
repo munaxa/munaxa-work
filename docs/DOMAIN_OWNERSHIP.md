@@ -37,7 +37,8 @@ them afterwards.
 | Career path, succession plan              | `career`        | Phase 15 ✅   |
 | Approval, workflow definition, version, instance, step, decision | `workflow` | Phase 16A ✅ |
 | Approval group, group membership, parallel branch, branch rule, quorum, branch condition, branch tally | `workflow` | Phase 16B ✅ |
-| SLA, escalation, scheduled firing, manager routing, role approvers | — | not owned; no module implements any of them |
+| Service-level target, manager-routing resolution and snapshot | `workflow` | Phase 16C ✅ |
+| Escalation, scheduled firing, approval expiry as a written state, role approvers | — | not owned; no module implements any of them |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
 | Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |
@@ -134,9 +135,22 @@ organizational unit, a position or a membership query into a set of approvers, a
 list is Identity's identifier held as an opaque value with no join behind it.
 
 A **delegation** is `identity`'s and stays there: Workflow asks whether one is in force at the
-instant a decision is made and stores none of its own. **SLA, escalation, scheduled firing, manager
-routing and role approvers are owned by nobody**, because no module implements them — the row above
-records that as an absence rather than leaving a reader to infer an owner.
+instant a decision is made and stores none of its own.
+
+Phase 16C added two things to that picture and neither moved a fact across a boundary. A
+**service-level target** is wholly Workflow's: a whole number of hours or days on a step, and a state
+derived from it on every read and stored nowhere. **Manager routing** is Workflow's *orchestration
+only* — the reporting line remains `employment`'s and which member holds an employment remains
+`identity`'s, and Workflow asks each of them one bounded question, composes the answers, and copies
+the result onto the step. It caches nothing, joins nothing and re-reads nothing once an approval is
+running. It is still **not a directory**: the two Identity queries take one identifier and return one
+answer, `identity.membership.read` was not granted, and nothing enumerates memberships, resolves a
+role or traverses more than a single level.
+
+**Escalation, scheduled firing, approval expiry as a written state, and role approvers are owned by
+nobody**, because no module implements them — the row above records that as an absence rather than
+leaving a reader to infer an owner. The kernel's `JobPort` is a contract with no adapter anywhere, and
+no phase yet owns a durable runner for it.
 
 ## Rules
 
