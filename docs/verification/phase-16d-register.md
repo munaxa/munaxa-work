@@ -421,3 +421,65 @@ the snapshotted assigned denominator, the stable assigned set, the exclusion of 
 `assigned`, `majority`, `first-response`, the `unanimous` refusal, quorum, condition behaviour,
 threshold calculation, outstanding semantics, tally semantics, branch isolation or snapshot
 semantics.
+
+---
+
+# IMPLEMENTATION STATUS — 2026-08-18
+
+Recorded after the approved work was implemented (`2bbf019`) and the Identity contract investigated
+([`phase-16d-identity-contract.md`](phase-16d-identity-contract.md)). **Approvals above are
+unchanged**; this section records only what has and has not been built.
+
+| Decision | Approved option | Implementation |
+|---|---|---|
+| D-16D-09 | A | **DELIVERED** — `WorkflowStepView.escalated: boolean` |
+| D-16D-10 | A | **N/A by approval** — outside Phase 16D; no Work-side authentication exists or is permitted |
+| D-16D-11 | B | **BLOCKED** — depends on D-16D-12; port shape documented, not written |
+| D-16D-12 | A | **BLOCKED — narrow Identity contract required** |
+| D-16D-13 | B | **DELIVERED** — `escalation-approver-is-the-requester` |
+| D-16D-14 | A | **DELIVERED** — `escalation-approver-already-decided`; terminal = `approved`, `rejected` |
+| D-16D-15 | D | **DELIVERED as a proven absence** — `DelegationPort` spied on and never called during escalation |
+| D-16D-16 | A | **DELIVERED as a proven absence** — no enumeration contract exists |
+
+## D-16D-12 — `BLOCKED — narrow Identity contract required`
+
+**Not implemented, and deliberately not approximated.** The approval requires active membership to be
+a command-side invariant validated on the write path. That needs a fact Identity owns, and **no
+Identity query answers it narrowly**: the only membership-keyed read is `identity.describe-member`,
+whose payload is a member's whole page — profile, preferences, portals, employments and delegations.
+A permission does not narrow a payload, so it must not be used for escalation.
+
+**This is not a permission gap.** `identity.membership.read` is approved, exists, and suffices through
+ADR-0043's bounded service grant, as `workflow-reporting-line.ts` already demonstrates. The gap is a
+**contract**: a new narrow Identity query is unavoidable, and Identity may not be modified under the
+current instruction.
+
+Consequently the escalation command enforces **six of the seven** approved eligibility rules. Rule 5
+— the supplied membership is active — is **not enforced**. Nothing weaker was substituted in its
+place: no UI-only interpretation, no invented permission, no `describe-member` workaround.
+
+The full analysis, proposed contract, failure semantics, port shape, test plan and the exact
+conditions required to unblock are in
+[`phase-16d-identity-contract.md`](phase-16d-identity-contract.md).
+
+## D-16D-17 — Refusals for an ineligible membership · `OPEN — awaiting explicit approval`
+
+*Question.* When D-16D-12 is implemented, does an ineligible membership produce **one** escalation
+refusal or **two**? Identity will distinguish *inactive* from *missing*; Workflow may keep them apart
+or collapse them.
+
+*Options.*
+- **A — one refusal** (e.g. `escalation-approver-not-active`): both mean "you cannot ask this person".
+- **B — two refusals** (e.g. `escalation-approver-not-active` and
+  `escalation-approver-not-a-membership`): a suspended colleague and a mistyped identifier are
+  different mistakes for different people to fix. The manager path already splits exactly this way
+  (`manager-not-a-member` beside its four siblings), on this module's stated principle that a single
+  refusal *"would send all of them to the same person"*.
+
+*Not recommended here.* Both remain open.
+
+*Constraint.* Identity's contract must distinguish the two cases **regardless of this decision**,
+because collapsing them there would remove the choice. That distinction is specified in
+`phase-16d-identity-contract.md` §6.
+
+*Blocks.* The implementation of D-16D-12, alongside the Identity contract approval itself.
