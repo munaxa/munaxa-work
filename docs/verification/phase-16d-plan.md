@@ -367,6 +367,48 @@ Recorded before any domain code, as the approval required. Three of the seven ar
 the branch, **not** the current number of rows in the branch.* The 16B rule is not amended to
 accommodate escalation; the representation must fit the rule.
 
+#### D-16D-02, second half — the permission ⛔→✅
+
+D-16D-02 asked two questions: *which of options (a)–(e), **and does it get a tenth permission?*** The
+2026-08-18 approval settled the first. The second was settled on **2026-08-19**, and Checkpoint 4
+stopped in between rather than choosing one — a command handler must declare exactly one permission
+through `CommandHandler.permission`, so there was no shape in which the work could proceed.
+
+**Approved 2026-08-19: exactly one new Workflow permission, named exactly**
+
+```text
+workflow.approval.escalate
+```
+
+meaning: *authorize a human actor to request escalation of an already-running approval branch by
+adding an approver, according to the approved Phase 16D escalation semantics.*
+
+Attached constraints, recorded verbatim in substance:
+
+1. **Exactly one** permission is added; the nine existing ones are neither renamed, removed, merged
+   nor modified. The vocabulary becomes **ten**.
+2. It is **implied by nothing** — not `instance.start`, `instance.cancel`, `definition.manage`,
+   `group.manage`, `approval.decide`, nor any other. Holding every other Workflow permission and not
+   this one is **forbidden**, and that is negatively tested one permission at a time.
+3. No wildcard and no prefix authorization. No role-based, manager-based, team-based or dynamic
+   authorization.
+4. The command declares this exact name through the existing `CommandHandler.permission` contract.
+5. **The permission is the actor's, not the added approver's.** The membership in the request is the
+   person being brought in; the caller is resolved from the ambient authorization context and is
+   never a body field. The tenant stays ambient.
+6. No completed-module dependency is authorized or required.
+7. The approval authorizes **nothing automatic**: no scheduling, `JobPort`, timer, worker, outbox,
+   notification or background execution.
+8. It changes no 16B or 16C invariant, and it does not touch D-16D-08 — `unanimous` still refuses,
+   `majority` and `first-response` still permit. The snapshotted denominator is unchanged, and
+   escalation still adds rather than replaces.
+9. `workflow_step_escalation_idx` remains the concurrency guarantee. No application-level duplicate
+   preflight, mutex or retry is added.
+10. The Checkpoint 3 mapper/parity failure remains untouched; Checkpoint 5 owns it.
+
+The earlier record of D-16D-02 above is preserved unchanged, including the register line that named
+this question as open.
+
 #### D-16D-08 — what an escalated approver's decision counts for
 
 **Approved 2026-08-18: option (iii).** The four options are kept in §11C; the rejected three are not
