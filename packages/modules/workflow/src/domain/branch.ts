@@ -61,6 +61,24 @@ export interface BranchVote {
   readonly decidedAt: Date;
 }
 
+/**
+ * One approver of a branch, and whether they were in the set the instance snapshotted.
+ *
+ * **The denominator is a set, not a count** (D-16D-02), and this is the minimum a tally needs to tell
+ * the set from the additions. `escalatedAt` present means an escalation added this approver after the
+ * approval started; absent means the instance snapshotted them, which is every step written before
+ * Phase 16D and every step of every branch nobody escalates.
+ */
+export interface BranchMember {
+  readonly stepId: string;
+  readonly escalatedAt?: Date;
+}
+
+/** The approvers the instance snapshotted — the denominator, and the only thing it is counted from. */
+const assignedOf = <TMember extends BranchMember>(
+  members: readonly TMember[],
+): readonly TMember[] => members.filter((member) => member.escalatedAt === undefined);
+
 export interface BranchTally {
   readonly rule: BranchRule;
   /** The snapshotted approver count. The denominator, and it does not move. */
@@ -107,40 +125,66 @@ export const thresholdFor = (rule: BranchRule, assigned: number): number => {
  */
 export const tallyOf = (
   configuration: BranchConfiguration,
-  assigned: number,
+  members: readonly BranchMember[],
   votes: readonly BranchVote[],
 ): BranchTally => {
+  const answered = new Set(votes.map((vote) => vote.stepId));
+  const assigned = assignedOf(members);
   const approvals = votes.filter((vote) => vote.decision === 'approved').length;
   const rejections = votes.filter((vote) => vote.decision === 'rejected').length;
-  const responses = approvals + rejections;
   const quorum = configuration.quorum ?? 1;
+  const responses = approvals + rejections;
   const base = {
     rule: configuration.rule,
-    assigned,
+    assigned: assigned.length,
     approvals,
     rejections,
     responses,
-    outstanding: assigned - responses,
-    threshold: thresholdFor(configuration.rule, assigned),
+    // Counted over the snapshotted approvers rather than subtracted from them (D-16D-08). An
+    // escalated approver may answer after every assigned one already has, and `assigned - responses`
+    // would then publish a **negative** integer in a module whose every number is a whole
+    // non-negative one. Counting who has not answered cannot go below zero by construction.
+    outstanding: assigned.filter((member) => !answered.has(member.stepId)).length,
+    threshold: thresholdFor(configuration.rule, assigned.length),
     quorum,
     quorumMet: responses >= quorum,
   };
 
-  return { ...base, outcome: outcomeOf(base, votes) };
+  return {
+    ...base,
+    // Reachability is asked of **everybody who can still answer**, which is not the same set as
+    // `outstanding` once a branch has been escalated. See `outcomeOf`.
+    outcome: outcomeOf(
+      base,
+      votes,
+      members.filter((member) => !answered.has(member.stepId)).length,
+    ),
+  };
 };
 
 type Standing = Omit<BranchTally, 'outcome'>;
 
-const outcomeOf = (standing: Standing, votes: readonly BranchVote[]): BranchOutcome => {
+const outcomeOf = (
+  standing: Standing,
+  votes: readonly BranchVote[],
+  unresolved: number,
+): BranchOutcome => {
   if (!standing.quorumMet) return 'awaiting';
   if (standing.rule === 'first-response') return firstResponseOutcome(votes);
 
-  // Reached: enough approvals exist.
+  // Reached: enough approvals exist. An escalated approval counts here, which is the whole of
+  // D-16D-08 option (iii) for `majority` — and cannot arise for `unanimous`, because escalating one
+  // is refused before a step is ever created.
   if (standing.approvals >= standing.threshold) return 'approved';
-  // Impossible: even if every outstanding approver approved, the threshold is out of reach. For
+  // Impossible: even if everybody who can still answer approved, the threshold is out of reach. For
   // `unanimous` — where the threshold *is* the denominator — this reduces to "one rejection ends
   // it", which is the approved rule falling out of the arithmetic rather than being special-cased.
-  if (standing.approvals + standing.outstanding < standing.threshold) return 'rejected';
+  //
+  // **`unresolved`, not `outstanding`.** They are the same number on every branch nobody escalated,
+  // and they differ afterwards: an escalated approver who has not answered is not one of the
+  // snapshotted approvers, so they are not `outstanding` — but their approval is still reachable,
+  // and counting only the assigned ones would reject a branch that could still be approved.
+  if (standing.approvals + unresolved < standing.threshold) return 'rejected';
   return 'awaiting';
 };
 

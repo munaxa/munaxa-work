@@ -69,7 +69,12 @@ describe('what is still not present', () => {
     // and `expired` are the words a written terminal state would arrive under, and D-16C-06 refused
     // one — a step is *read* as overdue and never stored that way.
     ['business days or a breach state', ['sla', 'businessDay', 'workingDay', 'breach', 'expired']],
-    ['escalation', ['escalat']],
+    // `escalat` left this list in Phase 16D **by authorization, not by attrition** (D-16D-02,
+    // D-16D-05), exactly as `managerOf` and `slaDue` left it in 16C. What replaced it is narrower and
+    // sharper: escalation exists, and the *automatic* half of it still does not. The companion test
+    // below asserts the capability **present**, so a fragment removed from this list can never pass
+    // for a capability quietly abandoned.
+    ['automatic escalation', ['escalateAfter', 'autoEscalat', 'escalationTimer', 'sweep']],
     ['scheduling', ['JobPort', 'cron', 'schedule', 'enqueue']],
     // Manager routing exists; walking a hierarchy does not. One level, from the requester, along the
     // primary line (P-1 to P-4) — so a chain, a depth or a functional line would all be new.
@@ -128,6 +133,29 @@ describe('what is still not present', () => {
    */
   it('does contain the manager rule and the elapsed-time target it was approved to build', () => {
     for (const built of ['resolveManager', 'resolutionDateOf', 'serviceLevelTarget', 'dueAt']) {
+      expect([built, new RegExp(`\\b${built}\\b`).test(code)]).toEqual([built, true]);
+    }
+  });
+
+  /**
+   * And the same control for Phase 16D's one capability.
+   *
+   * `escalat` left the deferred list above by authorization; this is what stops that from being a
+   * hole. Escalation exists as a rule, the denominator is a set the tally can tell from its
+   * additions, the identity a duplicate is judged on is written down, and the history event is named
+   * — all four would be missing if the row above had simply been deleted.
+   *
+   * **Identifiers only.** The refusal names are string literals and this scanner strips those, on
+   * purpose: what it searches is code. That the `unanimous` refusal fires by its own name is asserted
+   * where it can be — against the function, in `workflow-escalation.test.ts`.
+   */
+  it('does contain the escalation rule Phase 16D was approved to build', () => {
+    for (const built of [
+      'escalateBranch',
+      'escalationIdentity',
+      'escalatedAt',
+      'ESCALATION_EVENT',
+    ]) {
       expect([built, new RegExp(`\\b${built}\\b`).test(code)]).toEqual([built, true]);
     }
   });

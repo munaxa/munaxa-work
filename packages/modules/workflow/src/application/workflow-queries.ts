@@ -271,7 +271,7 @@ const talliesOf = (
 
     return asTallyView(
       ordinal,
-      tallyOf(first === undefined ? { rule: 'unanimous' } : branchOf(first), branch.length, votes),
+      tallyOf(first === undefined ? { rule: 'unanimous' } : branchOf(first), branch, votes),
     );
   });
 };

@@ -185,7 +185,7 @@ export const decide = (
   // exactly the right subset would be the only thing standing between that and a wrong outcome.
   const branch = branchAt(steps, step.ordinal);
   const inBranch = new Set(branch.map((other) => other.stepId));
-  const tally = tallyOf(branchOf(step), branch.length, [
+  const tally = tallyOf(branchOf(step), branch, [
     ...votes.filter((vote) => inBranch.has(vote.stepId) && vote.stepId !== step.stepId),
     { stepId: step.stepId, decision: request.decision, decidedAt: request.at },
   ]);

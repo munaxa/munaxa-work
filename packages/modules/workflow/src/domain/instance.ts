@@ -114,6 +114,23 @@ export interface WorkflowStepState {
    * time they are asked.
    */
   readonly awaitingAt?: Date;
+  /**
+   * The instant an **escalation** added this approver, and absent on every approver snapshotted when
+   * the instance started (D-16D-02).
+   *
+   * **Its absence is the denominator.** 16B's locked rule is that the denominator is the approver set
+   * snapshotted at start, and the tally reads it as the number of steps at an ordinal — so a step
+   * added later would move `assigned`, `threshold` and the outcome of a branch already under way, and
+   * could revert a decided branch to `awaiting`. Marking the addition is what keeps the original set
+   * countable after it has been added to: `tallyOf` counts the members without this field, and the
+   * snapshot stays exactly what it was.
+   *
+   * It follows `sourceGroupId` — the provenance this row already carries, nullable, meaning "where
+   * this approver came from" — rather than introducing a second mechanism for the same kind of fact.
+   * An instant rather than a flag because *when somebody was brought in* is worth keeping, and the
+   * presence of the value is the marker either way.
+   */
+  readonly escalatedAt?: Date;
   readonly version: number;
 }
 
