@@ -37,7 +37,10 @@ const DEFERRED = [
   'JobPort',
   'cron',
   'enqueue',
-  'escalate',
+  // `escalate` was on this list when Phase 16C closed and left it when Phase 16D built the
+  // capability, by authorization rather than by attrition. The narrower fragment is what stayed
+  // deferred: escalation that fires on its own, which needs a runner nobody owns.
+  'escalateAfter',
   'expiresAt',
   'businessDay',
   'workingDay',
@@ -104,7 +107,15 @@ describe('the negative-space scanner, proved capable before its results are beli
     for (const term of DEFERRED) {
       expect([term, code.includes(term)]).toStrictEqual([term, false]);
     }
-    for (const delivered of ['resolveManager', 'overdueByMinutes', 'awaitingAt', 'dueAt']) {
+    for (const delivered of [
+      'resolveManager',
+      'overdueByMinutes',
+      'awaitingAt',
+      'dueAt',
+      // Phase 16D's one capability, pinned here for the same reason the four above are: a name that
+      // leaves the deferred list must arrive on this one, or the audit has quietly relaxed.
+      'escalateBranch',
+    ]) {
       expect([delivered, code.includes(delivered)]).toStrictEqual([delivered, true]);
     }
   });

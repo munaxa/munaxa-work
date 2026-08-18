@@ -1,10 +1,10 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 import { ALL_WORKFLOW_PERMISSIONS } from '@work/workflow';
 
-import { LAYERS, PRODUCTION, ROOT, TESTS, codeOf, textOf } from './workflow-audit.fixture.js';
+import { LAYERS, PRODUCTION, ROOT, codeOf, textOf } from './workflow-audit.fixture.js';
 
 /**
  * The Phase 16B audit, over the whole module at once.
@@ -24,8 +24,9 @@ import { LAYERS, PRODUCTION, ROOT, TESTS, codeOf, textOf } from './workflow-audi
  * and an audit that could not tell them apart would force the code to stop explaining itself. The
  * methodology is Checkpoint 6's and Checkpoint 7's, applied to a wider tree.
  *
- * **It audits the test estate too**, for the properties a reader cannot check by reading: no `.only`,
- * no skipped test, no disabled lint rule, no `any`. Those are how an audit passes without auditing.
+ * The test estate has its own suite beside this one — `workflow-audit.hygiene.spec.ts` — because no
+ * `.only`, no skipped test and no disabled lint rule are claims about the *suites* rather than about
+ * the module, and they are how an audit passes without auditing.
  */
 
 describe('the Workflow module, audited whole', () => {
@@ -80,8 +81,15 @@ describe('the Workflow module, audited whole', () => {
         'cron',
         'scheduler',
         'schedule(',
-        'escalate',
-        'escalation',
+        // `escalate` and `escalation` left this list in Phase 16D, by authorization rather than by
+        // attrition (D-16D-02, D-16D-05), exactly as three names left it in 16C. What remains
+        // forbidden is the half nobody approved: escalation that fires **on its own**. A human
+        // adding one approver to a stuck branch is built and is asserted present below; a delay
+        // after which the product acts by itself is not, and there is nothing in this repository
+        // that could run it.
+        'escalateAfter',
+        'autoEscalat',
+        'escalationTimer',
         'slaHours',
         'businessDay',
         'workingDay',
@@ -125,7 +133,7 @@ describe('the Workflow module, audited whole', () => {
    * relaxed audit. A boundary suite that only ever loosens has stopped meaning anything, so each
    * authorized capability is pinned to a file that must contain it.
    */
-  it('implements the two capabilities Phase 16C authorized, in named files', () => {
+  it('implements the capabilities 16C and 16D authorized, in named files', () => {
     for (const [file, built] of [
       ['domain/manager.ts', 'resolveManager'],
       ['domain/manager.ts', 'resolutionDateOf'],
@@ -133,6 +141,11 @@ describe('the Workflow module, audited whole', () => {
       ['domain/service-level.ts', 'serviceLevelState'],
       ['application/workflow-reporting-line.ts', 'managerOf'],
       ['application/instance-snapshot.ts', 'snapshotManager'],
+      // Phase 16D. The act, the duplicate identity it is judged on, and the marker that keeps the
+      // snapshotted denominator countable after somebody has been added to it.
+      ['domain/escalation.ts', 'escalateBranch'],
+      ['domain/escalation.ts', 'escalationIdentity'],
+      ['domain/branch.ts', 'escalatedAt'],
     ] as const) {
       expect([file, PRODUCTION.includes(file)]).toEqual([file, true]);
       expect([file, built, codeOf(file).includes(built)]).toEqual([file, built, true]);
@@ -288,109 +301,6 @@ describe('the module reaches no other business module', () => {
         ['@work/kernel', '@work/persistence'].includes(name) || !name.startsWith('@work/');
 
       expect([name, allowed]).toEqual([name, true]);
-    }
-  });
-});
-
-describe('the test estate cannot pass an audit by disabling one', () => {
-  /**
-   * A suite with its comments **and** its literals removed.
-   *
-   * This file names every evasion it forbids, in prose and in a list, so a scan of raw text finds
-   * all of them here and reports the audit as the offender. A focused or skipped test is *code*, and
-   * survives neither strip — which is what makes the scan below about what runs rather than about
-   * what is written down.
-   */
-  const executable = (source: string): string =>
-    source
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/\/\/[^\n]*/g, ' ')
-      .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
-      .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
-      .replace(/`(?:[^`\\]|\\.)*`/g, '``')
-      // And a regular-expression literal, which is a value like any other. The scan below is for a
-      // **type annotation**, and no annotation can appear inside a pattern — while the pattern that
-      // searches for one necessarily contains the word it searches for. Matched only where a literal
-      // can begin, so an ordinary division is left alone.
-      .replace(/(?<=[=(,:]\s*)\/(?:[^/\\\n]|\\.)+\/[gimsuy]*/g, '//');
-
-  /**
-   * The three directives that live in a comment, matched as the directive rather than as the word.
-   *
-   * A lint-disable and a type-suppression only do anything when they follow `//` or open a block
-   * comment, so that is what is searched for. Naming one in a sentence is not disabling anything,
-   * and a looser search would have made the audit unable to describe its own rules.
-   *
-   * **The words are assembled from fragments rather than written out**, because the repository's own
-   * standards gate forbids those literals in any source file — including, correctly, this one. A
-   * gate cannot tell a rule from a use of it, so the file that enforces the rule must not contain
-   * the string. The alternative was an exemption, and an audit with an exemption in it is not one.
-   */
-  const DIRECTIVE = new RegExp(
-    `(?://|/\\*)\\s*(?:${['eslint', 'disable'].join('-')}|@ts${['', 'ignore'].join('-')}|@ts${['', 'expect', 'error'].join('-')})`,
-  );
-
-  const SUITES = [
-    ...TESTS.map((file) => [file, readFileSync(join(ROOT, file), 'utf8')] as const),
-    ...readdirSync(join(process.cwd(), 'src', 'workflow'))
-      .filter((file) => file.endsWith('.ts'))
-      .map(
-        (file) =>
-          [
-            `api/${file}`,
-            readFileSync(join(process.cwd(), 'src', 'workflow', file), 'utf8'),
-          ] as const,
-      ),
-  ];
-
-  it('audits every Workflow suite in the module and in the API app', () => {
-    expect(SUITES.length).toBeGreaterThanOrEqual(50);
-  });
-
-  it('has no focused test, no skipped test and no disabled lint rule', () => {
-    for (const [file, raw] of SUITES) {
-      const source = executable(raw);
-
-      for (const evasion of [
-        'it.only',
-        'describe.only',
-        'test.only',
-        'it.skip',
-        'describe.skip(',
-        'test.skip',
-        'it.todo',
-      ]) {
-        expect([file, evasion, source.includes(evasion)]).toEqual([file, evasion, false]);
-      }
-      expect([file, DIRECTIVE.test(raw)]).toEqual([file, false]);
-    }
-  });
-
-  /**
-   * `describe.skip` **as a value** is the one legitimate use, and it is not an exception to the rule
-   * above.
-   *
-   * Every integration suite begins `const suite = CONNECTION === undefined ? describe.skip : describe`
-   * — a suite that needs a database and says so, rather than one somebody switched off. The
-   * assertion above forbids `describe.skip(`, the call; this one requires that wherever the value
-   * appears, it is guarded by the connection and by nothing else.
-   */
-  it('skips a suite only for a missing database, never for a failing assertion', () => {
-    for (const [file, source] of SUITES) {
-      if (!source.includes('describe.skip')) continue;
-      expect([file, /CONNECTION === undefined \? describe\.skip : describe/.test(source)]).toEqual([
-        file,
-        true,
-      ]);
-    }
-  });
-
-  it('uses no `any`, in production or in a suite', () => {
-    for (const [file, source] of [
-      ...SUITES,
-      ...PRODUCTION.map((file) => [file, readFileSync(join(ROOT, file), 'utf8')] as const),
-    ]) {
-      expect([file, /\bas any\b|:\s*any\b|<any>/.test(executable(source))]).toEqual([file, false]);
     }
   });
 });
