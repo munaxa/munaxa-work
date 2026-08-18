@@ -367,6 +367,37 @@ Recorded before any domain code, as the approval required. Three of the seven ar
 the branch, **not** the current number of rows in the branch.* The 16B rule is not amended to
 accommodate escalation; the representation must fit the rule.
 
+#### D-16D-08 — what an escalated approver's decision counts for
+
+**Approved 2026-08-18: option (iii).** The four options are kept in §11C; the rejected three are not
+deleted.
+
+**Escalation is refused for `unanimous` branches** and permitted for `majority` and `first-response`.
+For those two, a decision made by an escalated approver **counts fully** toward the branch outcome.
+
+For `unanimous`: escalation is refused, **no escalated step is created, no decision is recorded, no
+history event is written, and the original branch is unchanged.** The refusal is a **named domain
+refusal, distinct** from branch-not-awaiting, duplicate escalation, approver-already-assigned,
+instance-cancelled and invalid-approver. `unanimous` is **not silently reinterpreted**.
+
+#### `outstanding`, redefined so the fixed denominator stays non-negative
+
+`outstanding = assigned - responses` is **forbidden**, because an escalated approver may respond after
+the whole assigned set already has, which drives it negative.
+
+```text
+assigned    = the original snapshotted assigned approvers
+threshold   = thresholdFor(rule, assigned)
+outstanding = original assigned approvers who have not yet responded
+```
+
+Therefore an escalated response never makes `outstanding` negative, never changes `assigned` and
+never changes `threshold`; it can affect the outcome for `majority`; an escalated **first** response
+can terminate a `first-response` branch; and it can never validate a `unanimous` branch, because
+escalation on one is refused.
+
+**These three semantics are fixed here and may not be changed later in Application, API or Admin.**
+
 The remaining four — D-16D-01, D-16D-03, D-16D-06, D-16D-07 — are **not approved** and nothing may be
 implemented from them.
 
