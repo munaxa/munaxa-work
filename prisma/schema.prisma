@@ -5364,6 +5364,11 @@ model WorkflowInstance {
 /// template may name a group, a running step never does. `source_group_id` records which list the
 /// person came from and is **provenance rather than a reference** — no foreign key, so editing a
 /// group cannot reach an approval already under way.
+///
+/// `escalated_at` is the second provenance on this row and the same kind of fact: null means the
+/// instance snapshotted this approver at start, and an instant means somebody added them later. The
+/// branch tally counts the null ones, which is what keeps the snapshotted denominator from moving
+/// when an approver is added (Phase 16D).
 model WorkflowStep {
   id                     String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
   tenant_id              String    @db.Uuid
@@ -5379,6 +5384,7 @@ model WorkflowStep {
   service_level_count    Int?
   service_level_unit     String?   @db.VarChar(8)
   awaiting_at            DateTime? @db.Timestamptz(6)
+  escalated_at           DateTime? @db.Timestamptz(6)
   metadata               Json
   created_at             DateTime  @db.Timestamptz(6)
   created_by             String    @db.VarChar(255)

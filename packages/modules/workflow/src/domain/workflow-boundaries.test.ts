@@ -202,6 +202,11 @@ describe('history records routing and not business facts', () => {
       'step-approved',
       'step-rejected',
       'step-skipped',
+      // Phase 16D's ninth, added with the database constraint in the same migration rather than
+      // before it. It says an approver was **added** to a branch, and it is deliberately not one of
+      // the three decision events above: recording an escalation as an approval, a rejection or a
+      // skip would put an answer in the timeline that nobody gave.
+      'step-escalated',
       'instance-completed',
       'instance-rejected',
       'instance-cancelled',

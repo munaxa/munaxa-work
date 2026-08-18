@@ -68,7 +68,13 @@ suite('what the module stores about time it does not', () => {
           'elapsed',
           'schedul',
           'job',
-          'escalat',
+          // `escalat` gave way to the narrower pair when Phase 16D added `escalated_at`. That column
+          // is **provenance, not a derived value**: it says an approver was added rather than
+          // snapshotted, and its absence is what the branch tally counts. What stays forbidden is a
+          // column that would have to be *maintained* — a scheduled escalation time, or an
+          // escalation level nothing moves.
+          'escalate_at',
+          'escalation_level',
           'notif',
           'sla',
         ].some((word) => row.column_name.includes(word)),

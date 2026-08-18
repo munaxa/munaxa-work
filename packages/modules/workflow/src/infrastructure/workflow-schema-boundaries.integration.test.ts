@@ -81,7 +81,11 @@ suite('what the Workflow schema deliberately does not contain', () => {
         'SLA and business days',
         ['sla', 'due_at', 'due_on', 'business_day', 'working_day', 'breach'],
       ],
-      ['escalation', ['escalat']],
+      // `escalat` gave way to the narrower pair when Phase 16D added `escalated_at`, which is
+      // provenance rather than a capability: it records that an approver was added, and its absence
+      // is what the branch tally counts as the snapshotted denominator. What stays forbidden is a
+      // column nothing would maintain — a scheduled escalation time, or a level to climb.
+      ['automatic escalation', ['escalate_at', 'escalation_level', 'escalation_due']],
       ['scheduling', ['cron', 'schedule', 'run_at', 'next_run', 'job_']],
       // A tally is **derived** from the decisions that exist. A stored count would be a second
       // source of truth that disagrees with `workflow_decision` the moment two approvers commit at
@@ -208,11 +212,14 @@ suite('what the Workflow schema deliberately does not contain', () => {
       .filter((entry) => /^\d{14}_/.test(entry))
       .sort();
 
-    expect(directories.at(-1)).toBe('20260816100000_workflow_routing_resolution');
+    expect(directories.at(-1)).toBe('20260818100000_workflow_escalation');
+    // One per phase that needed one, and no phase needed two. 16A built the module, 16B the routing
+    // core, 16C the routing resolution, and 16D one column, one widened vocabulary and one index.
     expect(directories.filter((entry) => entry.includes('workflow'))).toStrictEqual([
       '20260814100000_workflow',
       '20260815100000_workflow_routing',
       '20260816100000_workflow_routing_resolution',
+      '20260818100000_workflow_escalation',
     ]);
   });
 
@@ -333,11 +340,14 @@ suite('what the Workflow schema deliberately does not contain', () => {
       );
 
       expect(rows.filter((row) => !row.valid)).toStrictEqual([]);
-      // Nine primary keys, the six partial unique indexes the invariants rest on, and the group's
-      // `(id, tenant_id)` key that lets a child reference carry a tenant. Two fewer partial ones than
-      // 16A had: an ordinal and an awaiting step stopped being unique when a branch became several
-      // steps, and `workflow-parallel.integration.test.ts` asserts what they permit instead.
-      expect(rows).toHaveLength(16);
+      // Nine primary keys, the **seven** partial unique indexes the invariants rest on, and the
+      // group's `(id, tenant_id)` key that lets a child reference carry a tenant. Two fewer partial
+      // ones than 16A had — an ordinal and an awaiting step stopped being unique when a branch became
+      // several steps, and `workflow-parallel.integration.test.ts` asserts what they permit instead —
+      // and one more than 16C had, because Phase 16D's escalation index is the thing that makes
+      // asking the same person onto one branch twice impossible rather than merely unlikely.
+      expect(rows).toHaveLength(17);
+      expect(rows.map((row) => row.indexname)).toContain('workflow_step_escalation_idx');
     });
   });
 });

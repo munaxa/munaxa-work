@@ -210,15 +210,17 @@ describe('what escalation never touches', () => {
   /**
    * The history boundary, asserted rather than described.
    *
-   * An escalation is not an answer, so it must never be recorded as one. The event it needs is named
-   * in the domain and is **deliberately not yet in the closed vocabulary**: that list is checked
-   * against the database's own constraint, and the two have to widen together in Checkpoint 3.
+   * An escalation is not an answer, so it must never be recorded as one. Checkpoint 2 named the event
+   * and deliberately kept it *out* of the closed vocabulary, because that list is checked against the
+   * database's own constraint and the two had to widen together. Checkpoint 3's migration did that,
+   * so the assertion moved with them: the event is now one of nine, and still none of the three
+   * decisions.
    */
-  it('names an event that is neither a decision nor yet in the closed vocabulary', () => {
+  it('names an event that is one of the nine and none of the three decisions', () => {
     for (const decision of ['step-approved', 'step-rejected', 'step-skipped']) {
       expect(ESCALATION_EVENT).not.toBe(decision);
     }
-    expect([...WORKFLOW_HISTORY_EVENTS]).not.toContain(ESCALATION_EVENT);
-    expect([...WORKFLOW_HISTORY_EVENTS]).toHaveLength(8);
+    expect([...WORKFLOW_HISTORY_EVENTS]).toContain(ESCALATION_EVENT);
+    expect([...WORKFLOW_HISTORY_EVENTS]).toHaveLength(9);
   });
 });

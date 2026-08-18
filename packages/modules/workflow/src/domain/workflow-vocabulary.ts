@@ -290,6 +290,16 @@ export const REACHABLE_APPROVAL_STATES = ['pending', 'approved', 'rejected', 'ca
  * A closed list, because history is Workflow's own audit of **routing** and must never restate a
  * business fact. "The requisition was approved" belongs to Recruitment; "step 2 of instance X was
  * approved by membership Y acting for membership Z" belongs here.
+ *
+ * **This list and `workflow_history_event_check` are one vocabulary in two places**, and the parity
+ * suite fails the moment they disagree. `step-escalated` was named by the Phase 16D domain a
+ * checkpoint before the constraint could carry it, and deliberately left out of this list until the
+ * migration widened the constraint — so the two moved together rather than the code claiming a value
+ * the database would refuse.
+ *
+ * **An escalation is not a decision.** `step-escalated` says an approver was added to a branch, and
+ * it is deliberately none of `step-approved`, `step-rejected` or `step-skipped`: recording it as one
+ * of those would put an answer in the timeline that nobody gave.
  */
 export const WORKFLOW_HISTORY_EVENTS = [
   'instance-started',
@@ -297,6 +307,7 @@ export const WORKFLOW_HISTORY_EVENTS = [
   'step-approved',
   'step-rejected',
   'step-skipped',
+  'step-escalated',
   'instance-completed',
   'instance-rejected',
   'instance-cancelled',

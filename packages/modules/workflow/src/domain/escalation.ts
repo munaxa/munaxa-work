@@ -1,6 +1,7 @@
 import { branchAt, branchOf } from './branch.js';
 import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
 import { definedOf } from './defined.js';
+import type { WorkflowHistoryEvent } from './workflow-vocabulary.js';
 import type { WorkflowInstanceState, WorkflowStepState } from './instance.js';
 
 /**
@@ -41,19 +42,21 @@ import type { WorkflowInstanceState, WorkflowStepState } from './instance.js';
  */
 
 /**
- * The history this act would write, named here and **not yet in the closed vocabulary**.
+ * The history this act writes.
  *
- * `WORKFLOW_HISTORY_EVENTS` is checked against `workflow_history_event_check` by the parity suite, and
- * the constraint is the schema's. Adding the value to the domain list before Checkpoint 3 widens the
- * constraint would make the domain and the database disagree, and the parity suite would say so —
- * correctly. So the name lives here until the two can move together.
+ * Named here in Checkpoint 2 and **deliberately kept out of `WORKFLOW_HISTORY_EVENTS`** until
+ * Checkpoint 3's migration widened `workflow_history_event_check`, because that list and that
+ * constraint are one vocabulary in two places and the parity suite fails the moment they disagree.
+ * They moved together, and this is now one of the nine.
  *
- * It is a value rather than a comment because Checkpoint 3 needs the exact string, and because the
- * one thing this event must never be is a decision: an escalation is **not** `step-approved`,
+ * Typed against the vocabulary rather than as a bare string, so the two can no longer drift: if the
+ * value were ever removed from the closed list, this stops compiling.
+ *
+ * The one thing this event must never be is a **decision**. An escalation is not `step-approved`,
  * `step-rejected` or `step-skipped`, and recording it as any of those would put an answer in the
  * timeline that nobody gave.
  */
-export const ESCALATION_EVENT = 'step-escalated';
+export const ESCALATION_EVENT: WorkflowHistoryEvent = 'step-escalated';
 
 /** Who is being brought in, to which branch, and when. */
 export interface EscalateBranchRequest {

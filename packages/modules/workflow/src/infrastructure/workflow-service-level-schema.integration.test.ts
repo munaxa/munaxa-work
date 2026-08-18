@@ -251,6 +251,12 @@ suite('the service-level schema', () => {
      * disagrees with its inputs, an expiry nothing can write, an escalation level, a scheduler's
      * bookkeeping. None exists, and the migration's comments explaining why do not affect this
      * assertion because it reads `information_schema`.
+     *
+     * **`escalated_at` left this list in Phase 16D**, and it is the one name here that was ever going
+     * to. It is not a derived fact and not a scheduler's bookkeeping: it records that an approver was
+     * *added* rather than snapshotted, and its absence is what the branch tally counts as the
+     * denominator. `escalation_level` stays, because a level is a chain nobody approved and nothing
+     * would climb.
      */
     it('added no derived, expiry, escalation or scheduling column to any Workflow table', async () => {
       const { rows } = await fixture.admin.query<{ table_name: string; column_name: string }>(
@@ -267,7 +273,6 @@ suite('the service-level schema', () => {
         'overdue',
         'breached',
         'escalation_level',
-        'escalated_at',
         'sla_id',
         'role_id',
         'job_id',

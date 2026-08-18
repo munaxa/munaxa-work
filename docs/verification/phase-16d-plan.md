@@ -658,6 +658,38 @@ what a duplicate **is** — same instance, same ordinal, same membership — but
 
 ---
 
+## 11D. The mapper/parity boundary Checkpoint 3 leaves open
+
+Checkpoint 3 added `workflow_step.escalated_at` to the database and **did not touch a repository or a
+mapper**, because repositories are Checkpoint 5's. One assertion is therefore red, deliberately, and
+it is recorded here rather than hidden or worked around:
+
+```
+FAIL  workflow-repository-parity.integration.test.ts
+      > mapper and schema parity
+      > reads every domain column the database has, so none is silently unmapped
+
+      expected [ 'workflow_step.escalated_at' ] to deeply equal []
+```
+
+**This is the audit tool working exactly as designed, on the first change since it was built.** Its
+own comment records why it exists: when Phase 16C's Checkpoint 3 added `service_level_count`,
+`service_level_unit` and `awaiting_at`, the suite *"reported parity for a checkpoint and a half while
+three columns were invisible to the application"*, and a round-trip assertion elsewhere caught it
+rather than this file. The fourth direction — schema → mapper — was closed afterwards precisely so
+the next unmapped column would be loud. It is the next unmapped column, and it is loud.
+
+**Checkpoint 5 owns it**, and closing it means one thing: `workflow-record-rows.ts` reads and writes
+`escalated_at` on `workflow_step`, after which this assertion passes without being touched. The
+alternative — naming the column on `INFRASTRUCTURE`, the set of columns deliberately not mapped —
+would be wrong: `escalatedAt` is a domain field on `WorkflowStepState` that the branch tally depends
+on, not a piece of row bookkeeping.
+
+Making it green in Checkpoint 3 would have required editing a mapper, which this checkpoint may not
+do. Every other Workflow assertion is green.
+
+---
+
 ## 12. Proposed checkpoint structure
 
 The nine-checkpoint structure in the brief is **evaluated and not endorsed as written**, for one
