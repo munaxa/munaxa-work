@@ -353,6 +353,27 @@ authorized — and would still need something to call it. Both absences remain.
 
 ## 11. Decision register
 
+### 11A. Approved by the user on 2026-08-18
+
+Recorded before any domain code, as the approval required. Three of the seven are now settled.
+
+| ID | Approved |
+| --- | --- |
+| **D-16D-02** | **Option A — keep the 16C semantics.** Escalation is a human-invoked, bounded, idempotent command that **adds** an approver. It must never replace or remove an approver, never restart `awaiting_at` or the SLA clock, never alter or rewrite a recorded decision, and must preserve the 16B assigned-denominator, branch-snapshot, quorum and majority semantics. It must be safe for a future scheduler to invoke **without itself creating or requiring one**. Automatic escalation is not implemented. ADR-0071's bounded deterministic command pattern applies where applicable. |
+| **D-16D-04** | **Option A — the current awaiting branch only.** An escalation may target only the branch currently awaiting decisions, and must refuse when the target is not awaiting, skipped, completed, cancelled, from another branch, or otherwise outside it. No additional targeting semantics are inferred. |
+| **D-16D-05** | **Option A — yes.** Escalation stays in Phase 16D, subject to the semantics above. |
+
+**Attached and restated as locked:** *the denominator is the snapshotted assigned approver set for
+the branch, **not** the current number of rows in the branch.* The 16B rule is not amended to
+accommodate escalation; the representation must fit the rule.
+
+The remaining four — D-16D-01, D-16D-03, D-16D-06, D-16D-07 — are **not approved** and nothing may be
+implemented from them.
+
+---
+
+### 11B. Still open
+
 None of these is approved. Nothing may be implemented from them.
 
 | ID | Question | Blocks CP2 |
@@ -465,6 +486,147 @@ is forbidden to do. Recorded as unresolved, exactly as 16C left it.
 
 ---
 
+## 11C. Domain compatibility investigation, and the conflict it found
+
+Required before Checkpoint 2 by the approval's own instruction. **Nothing was modified.**
+
+### How the domain represents a branch today
+
+| Question | Answer, from the source |
+| --- | --- |
+| How are assigned approvers snapshotted? | As `workflow_step` **rows**, written once when the instance starts. A group's members are resolved into one row each; a manager into one row |
+| Where is branch membership represented? | Nowhere but the rows: `branchAt(steps, ordinal) = steps.filter(s => s.ordinal === ordinal)`. **There is no branch entity** — deliberately, per `branch.ts` |
+| How is `assigned` calculated? | `branch.length` — the **live row count**, at `workflow-queries.ts:274` and `decision.ts:188` |
+| How is `threshold` calculated? | `thresholdFor(rule, assigned)`: unanimous → `assigned`; majority → `floor(assigned / 2) + 1`; first-response → 1 |
+| How is the outcome derived? | `approvals >= threshold` → approved; `approvals + outstanding < threshold` → rejected; else awaiting, gated by `quorumMet` |
+| Is there already a provenance concept? | **Yes.** `WorkflowStepState.sourceGroupId` — *"the group this approver was snapshotted from"* — persisted as the nullable `workflow_step.source_group_id` |
+| Can history represent an addition without a false decision? | Not yet: `workflow_history_event_check` is a **closed eight-value constraint** with no event for it |
+| Can an escalated approver legally become `awaiting`? | Yes. `workflow_step_awaiting_idx` is a **plain** partial index, so several awaiting steps may share an ordinal |
+
+**The provenance precedent is the key finding.** `sourceGroupId` proves the model already distinguishes
+*where an approver came from* on the step row itself, and persists it as a nullable column. An
+escalated approver is the same kind of fact, and the distinction §10 of the approval asks for —
+*original assignment* versus *escalation assignment* — has an established shape to take.
+
+### The representation that satisfies all eight required properties
+
+Mark the escalated step, and compute the denominator over **unmarked** steps only:
+
+```
+assigned  = branch.filter(not escalated).length     ← the snapshotted set, stable forever
+threshold = thresholdFor(rule, assigned)            ← stable forever
+```
+
+| Required property | Holds |
+| --- | --- |
+| Original assigned denominator stable | ✓ escalated rows are excluded by construction |
+| Original threshold stable | ✓ it is a function of that denominator |
+| No retroactive alteration of an evaluated branch | ✓ neither number moves when a row is added |
+| Consistent with "adds an approver" | ✓ a new person is genuinely asked and may decide |
+| An approved branch cannot become awaiting | ✓ `approvals` only grows; `approvals >= threshold` stays true |
+| A recorded decision can never be invalidated | ✓ nothing touches an existing row |
+| A new approver cannot receive a historical decision | ✓ a new step carries no decision |
+| Deterministic | ✓ no ordering, no clock, no choice |
+
+**All eight hold.** The locked denominator rule is satisfied *without being amended* — which is the
+outcome the approval required.
+
+### ⛔ The conflict: what an escalated **vote** does
+
+The eight properties constrain the denominator. They do not settle what the escalated approver's
+**decision** counts for, and every available answer changes who gets approved.
+
+`outcomeOf` reads `approvals`, `responses` and `outstanding`. If an escalated vote counts in them:
+
+| Rule | Before | After an escalated **approval** |
+| --- | --- | --- |
+| `unanimous`, assigned 2, A approved, B silent | threshold 2, approvals 1 → awaiting | approvals 2 ≥ 2 → **approved, while B never answered** |
+| `majority`, assigned 3, A approved, B and C silent | threshold 2, approvals 1 → awaiting | approvals 2 ≥ 2 → **approved on one original approval** |
+
+Under `unanimous`, threshold *is* the snapshotted denominator, so an escalated approval **completes
+the branch in place of an assigned approver's consent**. Nobody was removed and nobody was replaced —
+but the original approver's agreement stopped being necessary, which is what "unanimous" means.
+
+The mirror case is worse. `approvals + outstanding < threshold → rejected`, so an escalated
+**rejection** can push a branch to `rejected` that the assigned set would not have rejected — one
+escalated person ending an approval three others were still considering.
+
+And `outstanding = assigned - responses` breaks arithmetically: with `assigned` fixed at the original
+count and escalated responses added, `outstanding` **goes negative** — assigned 2, both originals and
+one escalated having answered gives `2 - 3 = -1`. A published contract field
+(`BranchTallyView.outstanding`) would carry a negative integer in a module whose every number is a
+non-negative whole one.
+
+If instead the escalated vote counts for **nothing**, every invariant holds trivially and the
+capability is empty: an approver who cannot affect the outcome has not been added in any sense that
+matters.
+
+### Why this is a stop rather than a judgement call
+
+The approved decisions settle that escalation **adds** an approver and that the denominator does not
+move. They do not settle **whether an escalated approval may satisfy a branch in place of an assigned
+approver's answer** — and that question has at least four defensible answers which produce four
+different products:
+
+| | Answer | Consequence |
+| --- | --- | --- |
+| **(i)** | Escalated votes count fully | An escalated approval can complete a `unanimous` branch without an assigned approver's consent; an escalated rejection can end one. `outstanding` must be redefined to stay non-negative |
+| **(ii)** | Escalated votes count only once every assigned approver has answered | Preserves unanimity exactly; the escalated person is a tie-breaker rather than a substitute. Needs a new evaluation stage |
+| **(iii)** | Escalation is refused on `unanimous` branches; counts fully on `majority` and `first-response` | Fail-closed and coherent per rule. Refuses the case escalation is most often wanted for |
+| **(iv)** | Escalated votes never count | Every invariant holds; the capability does nothing |
+
+**Each requires the published `BranchTally` and `BranchTallyView` to change** — `outstanding` at
+minimum, and under (ii) the outcome function itself. That is a contract change reaching the API and
+the Admin tally screen, not a domain-local addition.
+
+**STOP.** Per the approval's §10 — *"if the approved 'adds an approver' semantics requires a new
+distinction between original assignment and escalation assignment, identify it explicitly before
+implementing"* — the distinction is identified above, and the vote question it exposes is not
+answered by any approved decision. Choosing (i)–(iv) is a product decision, and §14's instruction is
+*do not make the decision yourself*.
+
+**Recorded as D-16D-08. It blocks Checkpoint 2.**
+
+### D-16D-08 — What does an escalated approver's decision count for? ⛔
+
+*Evidence.* §11C. `outcomeOf` reads `approvals`, `responses` and `outstanding`; `thresholdFor`
+returns `assigned` for `unanimous`; `outstanding = assigned - responses` goes negative once escalated
+responses are counted against a fixed denominator.
+
+*Options.* (i) count fully · (ii) count only after the assigned set has answered · (iii) refuse
+escalation on `unanimous`, count fully elsewhere · (iv) never count. Consequences above.
+
+*Recommendation.* **(iii), with (ii) as the alternative worth considering.** (iii) is fail-closed,
+needs no change to `outcomeOf`, and refuses precisely the rule where "add without replacing" has no
+coherent meaning — leaving `majority` and `first-response`, where a fixed threshold over an enlarged
+pool is exactly what escalation should mean. It also keeps `outstanding` non-negative if it is
+redefined as *assigned approvers who have not answered*, counted over the assigned steps rather than
+by subtraction. (i) is the most useful and the least honest. (iv) is not worth building.
+
+*Requires:* completed-module authorization — no. Schema — yes, see below. Infrastructure — no.
+**Blocks Checkpoint 2.**
+
+### Schema required by Checkpoint 3, whichever option is chosen
+
+Reported here rather than implemented, as the approval's §11 directs:
+
+1. **A provenance marker on `workflow_step`** — nullable, following `source_group_id` exactly. Either
+   `escalated_at timestamptz` or an `origin varchar` with a closed check. This is what makes
+   `assigned` exclude escalated rows.
+2. **A ninth `workflow_history` event** — the closed eight-value
+   `workflow_history_event_check` must be widened so the addition is recorded without writing a false
+   decision. Additive and strictly wider, permitted by D-16C-13.
+3. **A partial unique index** for idempotency, per ADR-0071 —
+   `(tenant_id, instance_id, ordinal, approver_membership_id) where deleted_at is null` — so
+   escalating the same person onto the same branch twice creates nothing under concurrency, arbitrated
+   by the database rather than by a read-then-write.
+
+**Idempotency cannot be represented in the domain alone.** ADR-0071 is explicit that a `select` then
+an `insert` *"is not idempotent under concurrency"*; the guarantee is the index. The domain can define
+what a duplicate **is** — same instance, same ordinal, same membership — but not enforce it.
+
+---
+
 ## 12. Proposed checkpoint structure
 
 The nine-checkpoint structure in the brief is **evaluated and not endorsed as written**, for one
@@ -513,19 +675,31 @@ real Platform adapter.
 
 ## 14. Stop conditions met
 
-Three, and each halts a different part of the phase:
+Three at Checkpoint 1, and each halted a different part of the phase:
 
 1. **Escalation cannot be defined without changing the denominator semantics** (§5) — the blocker the
-   brief names explicitly.
+   brief named explicitly.
 2. **Automatic execution requires an unowned infrastructure capability** (§7, §8) — all four
    time-triggered behaviours.
 3. **Business-day SLA requires a completed-module change that is not authorized** (§9).
 
-A fourth is borderline and is recorded rather than claimed: **D-16D-05** asks whether the phase exists
-at all, and answering it by inference would be exactly the assumption this checkpoint exists to
-prevent.
+A fourth was borderline and recorded rather than claimed: **D-16D-05**, whether the phase exists at
+all.
+
+**Resolution.** The 2026-08-18 approval settled (1) by instruction — the denominator rule is *not*
+amended, and the representation must fit it — and settled D-16D-05. (2) and (3) stand unchanged. The
+compatibility investigation that approval required then found the representation **does** fit
+(§11C) — and surfaced a fourth stop:
+
+4. **What an escalated vote counts for is settled by no approved decision** (D-16D-08), and every
+   answer changes who gets approved and requires the published `BranchTally` contract to change.
 
 ---
 
-**Phase 16D Checkpoint 1 is complete. Checkpoint 2 must not begin until D-16D-02, D-16D-04 and
-D-16D-05 are explicitly approved.**
+**Phase 16D Checkpoint 1 is complete.** D-16D-02, D-16D-04 and D-16D-05 were approved on 2026-08-18
+and are recorded in §11A.
+
+**Checkpoint 2 has not begun**, and must not until **D-16D-08** is approved: the domain compatibility
+investigation the approval required (§11C) found that the escalated approver can be *represented*
+without amending any locked invariant, but that what the escalated **vote** counts for is settled by
+no approved decision and changes who gets approved.
