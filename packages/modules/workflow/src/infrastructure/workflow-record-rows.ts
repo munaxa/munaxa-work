@@ -106,7 +106,8 @@ export const instanceValues = (state: WorkflowInstanceState, tenantId: string): 
 });
 
 /**
- * One step of a running approval: the four columns Phase 16B added, and the three Phase 16C did.
+ * One step of a running approval: the four columns Phase 16B added, the three Phase 16C did, and the
+ * one Phase 16D did.
  *
  * **`approver_membership_id` stays `not null` here**, and that asymmetry with the template is the
  * whole of the snapshot rule. A template may name a list or a manager; a running step never does,
@@ -127,6 +128,14 @@ export const instanceValues = (state: WorkflowInstanceState, tenantId: string): 
  * from so "why was I asked?" has an answer; it carries no foreign key, so editing or deleting that
  * list cannot reach an approval already under way.
  *
+ * **`escalated_at` is the second provenance on this row**, and it is the one the branch tally reads.
+ * Null means the instance snapshotted this approver when it started; an instant means an escalation
+ * added them afterwards. The tally counts the null ones, which is what keeps the assigned denominator
+ * from moving when somebody is added to a branch already under way — so a mapper that dropped this
+ * column would not merely lose a timestamp, it would silently enlarge the denominator of every
+ * escalated branch on the next read. It is stored and returned exactly as `awaiting_at` is, and for
+ * the same reason: nothing here generates it, derives it or reads a clock for it.
+ *
  * `branch_rule`, `quorum` and `condition` are **copies**, taken from the template at the start, which
  * is what makes a running approval keep the rule it began under when the definition is edited.
  */
@@ -144,6 +153,7 @@ export interface StepRow {
   readonly service_level_count: number | null;
   readonly service_level_unit: string | null;
   readonly awaiting_at: Date | null;
+  readonly escalated_at: Date | null;
   readonly version: number;
 }
 
@@ -162,6 +172,7 @@ export const stepColumns = (alias: string): string =>
     `${alias}.service_level_count`,
     `${alias}.service_level_unit`,
     `${alias}.awaiting_at`,
+    `${alias}.escalated_at`,
     `${alias}.version`,
   ].join(', ');
 
@@ -180,6 +191,10 @@ export const stepState = (row: StepRow): WorkflowStepState => ({
     // A `timestamptz` the driver hands back as a `Date` holding an absolute instant, passed through
     // untouched. Null on every step not yet reached, and on every step that predates Phase 16C.
     awaitingAt: row.awaiting_at,
+    // The same treatment, and null means something different: not "not yet" but "this approver was
+    // in the set the approval started with". Absent rather than null in the domain, so
+    // `escalatedAt === undefined` is the predicate the tally filters the denominator on.
+    escalatedAt: row.escalated_at,
   }),
   ...serviceLevelOf(row.service_level_count, row.service_level_unit),
   // Separately, because a `jsonb` column arrives parsed rather than as a scalar `presentOf` can pass
@@ -203,6 +218,7 @@ export const stepValues = (state: WorkflowStepState, tenantId: string): RowValue
   condition: state.condition === undefined ? null : JSON.stringify(state.condition),
   ...serviceLevelValues(state.serviceLevel),
   awaiting_at: orNull(state.awaitingAt),
+  escalated_at: orNull(state.escalatedAt),
 });
 
 // ------------------------------------------------------------------------------------------------
