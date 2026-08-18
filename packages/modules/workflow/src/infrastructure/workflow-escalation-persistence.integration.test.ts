@@ -4,7 +4,7 @@ import {
   APPROVER,
   CONNECTION,
   DEPUTY,
-  REQUESTER,
+  OUTSIDER,
   SECOND_APPROVER,
   TENANT_A,
   TENANT_B,
@@ -106,15 +106,15 @@ suite('an escalated approver, through PostgreSQL', () => {
     it('stores null for a snapshotted approver and an instant for an escalated one', async () => {
       const instanceId = await runningBranch('majority');
 
-      expect((await escalate(instanceId, REQUESTER)).ok).toBe(true);
+      expect((await escalate(instanceId, OUTSIDER)).ok).toBe(true);
 
       // Read back through the **repository**, not through raw SQL and not through the published
       // view: the question is whether the mapper returns what the column holds, and `escalatedAt` is
       // deliberately not on `WorkflowStepView` — no contract publishes it and this checkpoint adds
       // none.
       const steps = await stepsOf(instanceId);
-      const added = steps.find((step) => step.approverMembershipId === REQUESTER);
-      const original = steps.filter((step) => step.approverMembershipId !== REQUESTER);
+      const added = steps.find((step) => step.approverMembershipId === OUTSIDER);
+      const original = steps.filter((step) => step.approverMembershipId !== OUTSIDER);
 
       expect(original).toHaveLength(3);
       // Absent, not null: `escalatedAt === undefined` is the predicate the tally filters on.
@@ -131,15 +131,15 @@ suite('an escalated approver, through PostgreSQL', () => {
     it('returns the same instant the command wrote', async () => {
       const instanceId = await runningBranch('majority');
 
-      expect((await escalate(instanceId, REQUESTER)).ok).toBe(true);
+      expect((await escalate(instanceId, OUTSIDER)).ok).toBe(true);
 
       const added = (await stepsOf(instanceId)).find(
-        (step) => step.approverMembershipId === REQUESTER,
+        (step) => step.approverMembershipId === OUTSIDER,
       );
       const { rows } = await fixture.admin.query<{ escalated_at: Date }>(
         `select escalated_at from workflow_step
           where tenant_id = $1 and approver_membership_id = $2`,
-        [TENANT_A, REQUESTER],
+        [TENANT_A, OUTSIDER],
       );
 
       expect(added?.escalatedAt?.toISOString()).toBe(rows[0]?.escalated_at.toISOString());
@@ -160,7 +160,7 @@ suite('an escalated approver, through PostgreSQL', () => {
     const instanceId = await runningBranch('majority');
     const before = await branchTally(instanceId);
 
-    expect((await escalate(instanceId, REQUESTER)).ok).toBe(true);
+    expect((await escalate(instanceId, OUTSIDER)).ok).toBe(true);
 
     const after = await live.detailOf(instanceId);
     const tally = await branchTally(instanceId);
@@ -176,11 +176,11 @@ suite('an escalated approver, through PostgreSQL', () => {
   it('lets an escalated approval count fully toward a majority', async () => {
     const instanceId = await runningBranch('majority');
 
-    expect((await escalate(instanceId, REQUESTER)).ok).toBe(true);
+    expect((await escalate(instanceId, OUTSIDER)).ok).toBe(true);
 
     // Both decisions are made by the *members*, which is how a decision is addressed: the escalated
     // approver answers their own step and an assigned approver answers theirs.
-    await live.decide(instanceId, REQUESTER, 'approved');
+    await live.decide(instanceId, OUTSIDER, 'approved');
     await live.decide(instanceId, APPROVER, 'approved');
 
     const tally = await branchTally(instanceId);
@@ -198,7 +198,7 @@ suite('an escalated approver, through PostgreSQL', () => {
 
   it('refuses a unanimous branch and leaves the database exactly as it was', async () => {
     const instanceId = await runningBranch('unanimous', [APPROVER, SECOND_APPROVER]);
-    const refused = await escalate(instanceId, REQUESTER);
+    const refused = await escalate(instanceId, OUTSIDER);
 
     expect(refused.ok).toBe(false);
 
@@ -220,7 +220,7 @@ suite('an escalated approver, through PostgreSQL', () => {
     it('records exactly one step-escalated and rewrites no decision', async () => {
       const instanceId = await runningBranch('majority');
 
-      expect((await escalate(instanceId, REQUESTER)).ok).toBe(true);
+      expect((await escalate(instanceId, OUTSIDER)).ok).toBe(true);
 
       const { rows } = await fixture.admin.query<{ event: string; actor_membership_id: string }>(
         `select event, actor_membership_id from workflow_history
@@ -253,7 +253,7 @@ suite('an escalated approver, through PostgreSQL', () => {
     it('hides an escalated step and its timeline from the neighbouring tenant', async () => {
       const instanceId = await runningBranch('majority');
 
-      expect((await escalate(instanceId, REQUESTER)).ok).toBe(true);
+      expect((await escalate(instanceId, OUTSIDER)).ok).toBe(true);
 
       const seen = await fixture.asTenant(TENANT_B, async (client) => {
         const steps = await client.query<{ count: string }>(
@@ -276,7 +276,7 @@ suite('an escalated approver, through PostgreSQL', () => {
           commandName: 'workflow.escalate-branch',
           instanceId,
           ordinal: 1,
-          approverMembershipId: REQUESTER,
+          approverMembershipId: OUTSIDER,
         },
         APPROVER,
         TENANT_B,
@@ -299,7 +299,7 @@ suite('an escalated approver, through PostgreSQL', () => {
       const mine = await runningBranch('majority');
       const theirs = await runningBranch('majority', BRANCH, TENANT_B);
 
-      expect((await escalate(mine, REQUESTER)).ok).toBe(true);
+      expect((await escalate(mine, OUTSIDER)).ok).toBe(true);
       expect(
         (
           await live.attempt(
@@ -307,7 +307,7 @@ suite('an escalated approver, through PostgreSQL', () => {
               commandName: 'workflow.escalate-branch',
               instanceId: theirs,
               ordinal: 1,
-              approverMembershipId: REQUESTER,
+              approverMembershipId: OUTSIDER,
             },
             APPROVER,
             TENANT_B,
@@ -329,8 +329,8 @@ suite('an escalated approver, through PostgreSQL', () => {
   it('refuses the same escalation twice and leaves one row', async () => {
     const instanceId = await runningBranch('majority');
 
-    expect((await escalate(instanceId, REQUESTER)).ok).toBe(true);
-    expect((await escalate(instanceId, REQUESTER)).ok).toBe(false);
+    expect((await escalate(instanceId, OUTSIDER)).ok).toBe(true);
+    expect((await escalate(instanceId, OUTSIDER)).ok).toBe(false);
 
     const { rows } = await fixture.admin.query<{ count: string }>(
       `select count(*)::text as count from workflow_step

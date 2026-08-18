@@ -42,10 +42,10 @@ export const MANAGER = '01930000-0000-7000-8000-0000000000e4';
 /**
  * The membership an administrator added to a stuck branch in Phase 16D, and the one who added them.
  *
- * The added approver arrives as an **ordinary membership step** — `WorkflowStepView` publishes no
- * escalation marker, so nothing in the steps table sets this row apart from `DEPUTY` beside it. That
- * is the contract as it stands, and the fixture is faithful to it rather than to what a screen might
- * want: the only published trace of the escalation is the timeline entry below.
+ * The added approver arrives as an ordinary membership step carrying **one extra fact**: `escalated`,
+ * approved as D-16D-09 and published since. Before that approval the row was indistinguishable from
+ * `DEPUTY`'s, and the fixture recorded the gap; the marker closed it. What is still absent is the
+ * *when* and the *who*, which live only in the timeline entry below.
  */
 export const ESCALATED = '01930000-0000-7000-8000-0000000000e5';
 export const ADMINISTRATOR = '01930000-0000-7000-8000-0000000000e6';
@@ -153,6 +153,7 @@ export const anInstanceDetail = (): WorkflowInstanceDetailView => ({
       approverKind: 'membership',
       approverMembershipId: APPROVER,
       status: 'approved',
+      escalated: false,
       version: 2,
     },
     awaitingStep(),
@@ -217,6 +218,7 @@ const aResolvedManagerStep = (): WorkflowStepView => ({
   approverKind: 'membership',
   approverMembershipId: MANAGER,
   status: 'pending',
+  escalated: false,
   version: 1,
   serviceLevel: {
     count: 48,
@@ -232,9 +234,10 @@ const aResolvedManagerStep = (): WorkflowStepView => ({
  * The approver an administrator added, exactly as the API publishes them.
  *
  * `membership`, `awaiting`, the branch's own target — the same shape as `awaitingStep()` beside it,
- * with a different person. There is deliberately no field here saying this one was escalated: the
- * view has none to set, and inventing one in a fixture would let a screen appear to render a
- * distinction the server never sends.
+ * with a different person and **one field's difference**. `escalated` is that field: approved as
+ * D-16D-09 and published since, it is the only thing that distinguishes this row from `DEPUTY`'s.
+ * Nothing here says *when* it was escalated or *who* asked, because the view carries neither; the
+ * timeline entry below is still the only published record of that.
  */
 const anEscalatedStep = (): WorkflowStepView => ({
   stepId: '01930000-0000-7000-8000-000000000094',
@@ -243,6 +246,8 @@ const anEscalatedStep = (): WorkflowStepView => ({
   approverKind: 'membership',
   approverMembershipId: ESCALATED,
   status: 'awaiting',
+  // The one step on this page an administrator added (D-16D-09).
+  escalated: true,
   version: 1,
   serviceLevel: {
     count: 2,
@@ -260,6 +265,7 @@ const awaitingStep = (): WorkflowStepView => ({
   approverKind: 'membership',
   approverMembershipId: DEPUTY,
   status: 'awaiting',
+  escalated: false,
   version: 1,
   // Within its target, so there is no overdue count to render rather than a zero.
   serviceLevel: {

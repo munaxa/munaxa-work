@@ -8,14 +8,20 @@ import type { WorkflowInstanceState, WorkflowStepState } from './instance.js';
  * The escalation **act**: what it refuses, what asking twice does, and what it never touches.
  *
  * Split from `workflow-escalation-tally.test.ts` at the file-size budget, on the seam the capability
- * itself has. This file is about the *command* — five named refusals, a duplicate that is judged on
- * an identity written down, and the fact that its whole output is one new step nobody has answered.
+ * itself has. This file is about the *command* — the five refusals that existed before Phase 16D's
+ * eligibility approvals, a duplicate that is judged on an identity written down, and the fact that
+ * its whole output is one new step nobody has answered.
  * The arithmetic that step must not disturb is next door, because "the denominator did not move" is
  * a claim about the tally rather than about the act.
  *
  * The five refusals are five different situations for five different people to act on. A suite that
  * proved only that escalation "fails" on a bad request would let two of them collapse into one, and
  * an administrator would be sent to fix the wrong thing.
+ *
+ * **There are seven now.** D-16D-13 and D-16D-14 added the requester rule and instance-wide D-5, and
+ * both live in `workflow-escalation-eligibility.test.ts` beside the fixture that can express them —
+ * a second ordinal, which the single-ordinal branch below cannot build. The distinctness of all
+ * seven together is asserted there rather than split across the two files.
  */
 
 const AT = new Date('2026-08-18T09:00:00.000Z');

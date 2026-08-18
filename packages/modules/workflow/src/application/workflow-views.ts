@@ -192,6 +192,10 @@ export const asStepView = (state: WorkflowStepState, asAt: Date): WorkflowStepVi
   approverKind: state.approverKind,
   approverMembershipId: state.approverMembershipId,
   status: state.status,
+  // Outside `definedOf` deliberately: the field is required, so `false` must be published rather than
+  // dropped. A step whose marker went missing would read as "not escalated" to a consumer that could
+  // not tell the difference (D-16D-09).
+  escalated: state.escalatedAt !== undefined,
   version: state.version,
   ...definedOf({
     sourceGroupId: state.sourceGroupId,

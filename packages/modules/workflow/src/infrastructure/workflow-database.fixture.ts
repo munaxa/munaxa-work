@@ -84,6 +84,15 @@ export const APPROVER = '01930000-0000-7000-8000-00000000b001';
 export const SECOND_APPROVER = '01930000-0000-7000-8000-00000000b002';
 export const DEPUTY = '01930000-0000-7000-8000-00000000b003';
 export const REQUESTER = '01930000-0000-7000-8000-00000000b004';
+/**
+ * Somebody on neither the branch nor the request — the only membership an escalation may name.
+ *
+ * A fifth identifier exists because Phase 16D's eligibility rules left no room for a fourth. The
+ * other four are all ineligible by construction now: three are assigned to the branch, and
+ * `REQUESTER` raised the approval, which D-16D-13 refuses. A suite that escalated to any of them
+ * would be testing a refusal while meaning to test a success.
+ */
+export const OUTSIDER = '01930000-0000-7000-8000-00000000b005';
 export const CORRELATION = '01930000-0000-7000-8000-00000000c001';
 
 export const SUBJECT_TYPE = 'recruitment.requisition';

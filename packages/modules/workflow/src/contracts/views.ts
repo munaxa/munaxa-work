@@ -234,6 +234,27 @@ export interface WorkflowStepView {
   readonly status: WorkflowStepStatus;
   /** The group this approver was snapshotted from, when they came from one. */
   readonly sourceGroupId?: string;
+  /**
+   * Whether this approver was **added by escalation** rather than snapshotted when the approval
+   * started (D-16D-09).
+   *
+   * **Required rather than optional, and that is the point.** An absent field cannot be told apart
+   * from an older server, so "absent" would drift into meaning "probably not escalated" — the exact
+   * ambiguity this exists to remove. It is total over every step ever written: rows from before the
+   * escalation migration have no marker in the database and read `false`, correctly, because
+   * escalation did not exist when they were written. Nothing was backfilled.
+   *
+   * **It publishes that, never when, who or why.** The instant lives in the database and stays there;
+   * the actor and the moment are in the timeline, under `step-escalated`, where a permission decides
+   * who may read them.
+   *
+   * **It is a projection, not a second source of truth.** The domain already computes
+   * `assignedOf = members.filter(m => m.escalatedAt === undefined)`, and this is that same predicate
+   * seen from outside. It changes no arithmetic: `assigned`, `threshold`, `outstanding`, `outcome`
+   * and `quorum` are the tally's, and the tally remains the only published authority on the
+   * denominator. **A consumer must never count these to recompute one.**
+   */
+  readonly escalated: boolean;
   readonly branchRule?: BranchRule;
   readonly quorum?: number;
   readonly condition?: readonly BranchConditionView[];

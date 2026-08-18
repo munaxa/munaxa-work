@@ -162,6 +162,9 @@ const aBranchStep = (approver: string, status: 'approved' | 'awaiting'): Workflo
   approverKind: 'membership',
   approverMembershipId: approver,
   status,
+  // From a group, not from an escalation. The two provenances are independent, and this fixture is
+  // the one that would catch a screen collapsing them.
+  escalated: false,
   sourceGroupId: GROUP_ID,
   branchRule: 'majority',
   quorum: 2,
@@ -176,5 +179,6 @@ const aSecondBranchStep = (): WorkflowStepView => ({
   approverKind: 'membership',
   approverMembershipId: THIRD,
   status: 'pending',
+  escalated: false,
   version: 1,
 });

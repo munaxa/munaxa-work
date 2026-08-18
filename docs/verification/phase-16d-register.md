@@ -1,11 +1,13 @@
 # Phase 16D — Decision Register
 
-**Status of every decision below: `OPEN — awaiting explicit approval`. No approval date exists for
-any of them.** No option has been selected, and none may be inferred from a recommendation.
+**All eight decisions were APPROVED by the owner on 2026-08-18.** The approved selections, their
+constraints and the final eligibility rule are recorded in [**APPROVED — 2026-08-18**](#approved--2026-08-18)
+at the end of this document.
 
-**No implementation was performed.** No production code was modified: no Identity port, no
-`WorkflowStepView` change, no API change, no Admin change, no domain, schema, migration, permission
-or authentication change.
+**Each entry below is preserved exactly as it stood while open**, including its question, evidence,
+options and **rejected alternatives** — that is the record of what was not chosen and why, and it is
+not rewritten now that a choice exists. Where an entry says "OPEN", read it as the state at the time
+it was written; the approval section is authoritative for current status.
 
 This register consolidates decisions D-16D-09 through D-16D-16 in one place. It **supersedes
 nothing** — the analysis behind each entry is preserved unmodified in its source document, which the
@@ -25,14 +27,14 @@ entry cites. Earlier decisions D-16D-01 through D-16D-08 remain recorded in
 
 | ID | Decision | Options | Status |
 |---|---|---|---|
-| D-16D-09 | Public escalation marker | APPROVE / AMEND / DECLINE | **OPEN** |
-| D-16D-10 | Admin authentication | CONFIRM OUTSIDE 16D / AMEND | **OPEN** |
-| D-16D-11 | Eligible-membership architecture | APPROVE AMENDED WORDING / AMEND | **OPEN** |
-| D-16D-12 | Active membership requirement | A / B / AMEND | **OPEN** |
-| D-16D-13 | Requester self-approval | A / B / C / AMEND | **OPEN** |
-| D-16D-14 | D-5 terminal-approver rule | A / B / C / AMEND | **OPEN** |
-| D-16D-15 | Delegation interaction | A / B / C / D / AMEND | **OPEN** |
-| D-16D-16 | Result bound / ordering | A / B / C / D / AMEND | **OPEN** |
+| D-16D-09 | Public escalation marker | APPROVE / AMEND / DECLINE | **A** approved |
+| D-16D-10 | Admin authentication | CONFIRM OUTSIDE 16D / AMEND | **A** approved |
+| D-16D-11 | Eligible-membership architecture | APPROVE AMENDED WORDING / AMEND | **B** approved |
+| D-16D-12 | Active membership requirement | A / B / AMEND | **A** approved |
+| D-16D-13 | Requester self-approval | A / B / C / AMEND | **B** approved |
+| D-16D-14 | D-5 terminal-approver rule | A / B / C / AMEND | **A** approved |
+| D-16D-15 | Delegation interaction | A / B / C / D / AMEND | **D** approved |
+| D-16D-16 | Result bound / ordering | A / B / C / D / AMEND | **A** approved |
 
 ---
 
@@ -323,3 +325,99 @@ is above** — the approval date, the selected option, the rejected alternatives
 each entry), and the constraints attached to the approval. Until then the entry reads **OPEN**.
 
 **No approval date is recorded for any decision in this register.**
+
+---
+
+# APPROVED — 2026-08-18
+
+The owner entered explicit decisions on **2026-08-18**. The approved selections are recorded below,
+appended rather than substituted: every entry above keeps its question, evidence, options and
+**rejected alternatives**, which remain the record of what was not chosen and why.
+
+| Decision | Approved option | Approval date |
+|---|---|---|
+| D-16D-09 | **A** — publish `WorkflowStepView.escalated: boolean` | 2026-08-18 |
+| D-16D-10 | **A** — authentication confirmed **outside** Phase 16D | 2026-08-18 |
+| D-16D-11 | **B** — predicate / validation model, bounded Identity port | 2026-08-18 |
+| D-16D-12 | **A** — active membership is a **command-side invariant** | 2026-08-18 |
+| D-16D-13 | **B** — the requester may **not** be escalated | 2026-08-18 |
+| D-16D-14 | **A** — D-5 applies exactly; terminal = `approved`, `rejected`; **`skipped` is not terminal** | 2026-08-18 |
+| D-16D-15 | **D** — delegation affects decision execution only | 2026-08-18 |
+| D-16D-16 | **A** — **no** membership enumeration contract in Phase 16D | 2026-08-18 |
+
+## Constraints attached to each approval
+
+**D-16D-09 (A).** Publish only the boolean. Never `escalatedAt`, actor, reason, or
+employment/reporting-line information. No tally arithmetic change, no persistence, query, repository,
+permission or route change, no backfill. Pre-migration rows must read `false` naturally. The API leak
+test is narrowed **only after this approval is recorded**, and a positive assertion that the marker
+exists is added. It is a projection of an existing domain predicate, **not a second source of truth**.
+
+**D-16D-10 (A).** Platform owns authentication; Work owns business authorization. Do not implement
+authentication in Work; do not invent token acquisition, browser-held credentials, service
+credentials, cookies, sessions or CSRF handling; do not bypass authentication or weaken the per-user
+permission model; do not assign an owner for Platform authentication. Admin mutation architecture
+stays blocked until Platform provides the approved contract. **This approval does not authorize an
+unauthenticated Admin mutation.**
+
+**D-16D-11 (B).** A bounded Identity port validating **one supplied membership**. No broad membership
+directory, no unbounded enumeration, no new broad Identity permission, no direct Identity database
+access. ADR-0043 bounded cross-module port pattern. Narrow and purpose-specific. No N+1, no arbitrary
+ordering, no arbitrary pagination. **Not to be implemented until D-16D-12…16 are recorded and
+reconciled.** No additional eligibility criteria may be invented.
+
+**D-16D-12 (A).** Active membership is authoritative business validation on the **command/write
+path**. The bounded Identity port may be called for it. A named refusal for an inactive membership is
+required. **Identity failure must fail the command** rather than silently treating the membership as
+active. A future Admin picker may additionally filter, but the picker is never the authority. A
+weaker UI-only interpretation must not be implemented.
+
+**D-16D-13 (B).** Enforced in the **domain**, with a dedicated escalation refusal. **Do not reuse
+`manager-is-the-requester`.** Not a UI-only restriction. No Identity query is required, because the
+requester membership is already available to the command. All existing manager semantics preserved.
+
+**D-16D-14 (A).** Enforced in the **domain**, inspecting the complete instance step set the command
+already loads — **no additional query**. Dedicated refusal. Terminal means `approved` or `rejected`
+only; **`skipped` is not terminal for this rule.** D-5 is not reinterpreted anywhere else. Branch
+isolation preserved. The locked D-16D-08 denominator semantics preserved.
+
+**D-16D-15 (D).** Do not consult `DelegationPort` during escalation eligibility; do not block
+escalation for an active delegation; do not use delegation to select an escalated approver; do not
+add delegation checks to the escalation command. Existing delegation semantics unchanged. **No new
+Identity dependency is created by this decision.**
+
+**D-16D-16 (A).** No membership enumeration contract in Phase 16D. Escalation accepts one explicitly
+supplied `approverMembershipId`. No candidate list, arbitrary limit, arbitrary ordering, pagination,
+UUID ordering, physical ordering, broad Identity directory or new membership-list query. **Admin
+cannot build a candidate picker from this phase alone, and that is intentional.** The API remains
+able to accept a known membership identifier; the Admin candidate-selection problem stays blocked
+until a future approved contract exists.
+
+## The final eligibility rule
+
+The escalation command must ultimately enforce all of the following, and **no other criterion may be
+added**:
+
+1. the branch is eligible for escalation under D-16D-08;
+2. `unanimous` branches remain refused;
+3. the supplied membership is not already assigned on the branch;
+4. the supplied membership is not already escalated onto the branch;
+5. the supplied membership is **active**;
+6. the supplied membership is not the **requester**;
+7. the supplied membership has not already been **terminal** on the same instance under D-5, where
+   terminal means `approved` or `rejected`;
+8. **no** delegation check is performed;
+9. **no** enumeration or ordering is performed;
+10. the snapshotted assigned denominator remains unchanged;
+11. escalated steps remain excluded from `assigned`;
+12. escalated votes count according to the already-approved D-16D-08 rule;
+13. `unanimous` remains refused;
+14. branch isolation remains intact.
+
+## D-16D-08 remains LOCKED
+
+Explicitly recorded: **D-16D-08 is not reopened by any approval above.** No approved option alters
+the snapshotted assigned denominator, the stable assigned set, the exclusion of escalated steps from
+`assigned`, `majority`, `first-response`, the `unanimous` refusal, quorum, condition behaviour,
+threshold calculation, outstanding semantics, tally semantics, branch isolation or snapshot
+semantics.

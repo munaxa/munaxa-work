@@ -117,11 +117,19 @@ suite('escalating a branch over HTTP', () => {
     });
 
     /**
-     * **Nothing about the provenance reaches the wire.**
+     * **The fact is published; the provenance still is not.**
      *
-     * The escalated step is durable and marked in the database; the response is the ordinary public
-     * step. Scanning the whole body rather than one field, because the question is whether *any*
-     * shape of it leaked — a timestamp under another name would pass a check on `escalatedAt` alone.
+     * This scan forbade the substring `escalated` outright until D-16D-09 was approved, and it was
+     * narrowed rather than deleted for the one reason that justifies moving a negative assertion: the
+     * approved public contract changed. `WorkflowStepView.escalated` is now a published boolean, so a
+     * blanket ban on the word would forbid the contract itself.
+     *
+     * **What it must still catch is unchanged**, and the list below is what "provenance" actually
+     * meant: the instant, who asked for it, why, and anything organizational. `escalatedat` is
+     * spelled out because it is the near-miss — a field one character away from the approved one and
+     * carrying the thing that was deliberately withheld. Scanning the whole body rather than one
+     * field, because the question is whether *any* shape of it leaked; a timestamp under another name
+     * would pass a check on `escalatedAt` alone.
      */
     it('publishes no escalation provenance anywhere in the response', async () => {
       const instanceId = await runningBranch('majority', 'subject-2');
@@ -135,8 +143,12 @@ suite('escalating a branch over HTTP', () => {
       const body = JSON.stringify(detail).toLowerCase();
 
       for (const leaked of [
-        'escalated',
-        'escalation',
+        'escalatedat',
+        'escalatedon',
+        'escalatedby',
+        'escalatedbymembershipid',
+        'escalationreason',
+        'escalationactor',
         'sourcegroupid',
         'employment',
         'reporting',
@@ -144,6 +156,49 @@ suite('escalating a branch over HTTP', () => {
       ]) {
         expect([leaked, body.includes(leaked)]).toStrictEqual([leaked, false]);
       }
+    });
+
+    /**
+     * And the positive half, which is what stops the narrowing above from being a quiet deletion.
+     *
+     * Every step carries the marker, the escalated one is the only `true`, and the count of `true`
+     * values is asserted rather than merely its presence — a mapper publishing `true` for everybody
+     * would satisfy "the escalated step is marked" and be catastrophically wrong.
+     */
+    it('publishes the approved marker on every step, true for exactly the escalated one', async () => {
+      const instanceId = await runningBranch('majority', 'subject-marker');
+
+      must(
+        await escalate(instanceId, { ordinal: 1, approverMembershipId: OUTSIDER }),
+        'escalating',
+      );
+
+      const detail = must(await get(application, `/instances/${instanceId}`), 'reading it');
+      const steps = (detail as { steps: readonly Record<string, unknown>[] }).steps;
+
+      expect(steps).toHaveLength(3);
+      // Present on all three, and a boolean on all three: an absent field would read as "not
+      // escalated" to a consumer that could not tell the difference.
+      expect(steps.every((step) => typeof step['escalated'] === 'boolean')).toBe(true);
+      expect(steps.filter((step) => step['escalated'] === true)).toHaveLength(1);
+
+      const marked = steps.find((step) => step['escalated'] === true);
+      const assigned = steps.filter((step) => step['escalated'] === false);
+
+      expect(marked?.['approverMembershipId']).toBe(OUTSIDER);
+      expect(assigned.map((step) => step['approverMembershipId']).sort()).toStrictEqual(
+        [APPROVER, DEPUTY].sort(),
+      );
+    });
+
+    /** A branch nobody escalated publishes the marker too, and every one of them is `false`. */
+    it('marks an approval that was never escalated as false throughout', async () => {
+      const instanceId = await runningBranch('majority', 'subject-untouched');
+      const detail = must(await get(application, `/instances/${instanceId}`), 'reading it');
+      const steps = (detail as { steps: readonly Record<string, unknown>[] }).steps;
+
+      expect(steps).toHaveLength(2);
+      expect(steps.map((step) => step['escalated'])).toStrictEqual([false, false]);
     });
 
     /** The tally the read publishes is the domain's, and the denominator did not move. */

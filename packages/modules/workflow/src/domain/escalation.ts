@@ -1,7 +1,7 @@
 import { branchAt, branchOf } from './branch.js';
 import { accept, refuse, type WorkflowResult } from './workflow-rejection.js';
 import { definedOf } from './defined.js';
-import type { WorkflowHistoryEvent } from './workflow-vocabulary.js';
+import type { WorkflowHistoryEvent, WorkflowStepStatus } from './workflow-vocabulary.js';
 import type { WorkflowInstanceState, WorkflowStepState } from './instance.js';
 
 /**
@@ -69,11 +69,77 @@ export interface EscalateBranchRequest {
 }
 
 /**
+ * The statuses that make somebody **terminal on an instance** for D-5's purposes (D-16D-14, A).
+ *
+ * `approved` and `rejected` only. **`skipped` is deliberately not here**, and the distinction is the
+ * whole of the decision: a skipped step is what happens to steps after a rejection or a cancellation,
+ * and to steps a condition excluded, so the person it names never had a say. Counting it would refuse
+ * somebody on the grounds that the process passed them by — a refusal they could do nothing about and
+ * that no reading of "already terminal" supports.
+ */
+const TERMINAL_ON_THE_INSTANCE: readonly WorkflowStepStatus[] = ['approved', 'rejected'];
+
+/**
+ * Whether this person may be asked, and if not, which of the four refusals says why.
+ *
+ * Extracted from `escalateBranch` so each half stays inside the function budget and, more usefully,
+ * so the branch's own eligibility and the *person's* eligibility read as the two separate questions
+ * they are. Returns the refusal reason or `undefined`, and the order is the approved order.
+ */
+const personRefusal = (
+  instance: WorkflowInstanceState,
+  steps: readonly WorkflowStepState[],
+  branch: readonly WorkflowStepState[],
+  approverMembershipId: string,
+): string | undefined => {
+  const held = branch.filter((step) => step.approverMembershipId === approverMembershipId);
+
+  // Already snapshotted into this branch: they are assigned, they may answer, and there is nothing to
+  // add. Distinct from the case below because the fix is different — this one is "you already asked
+  // them", and asking twice would give one person two votes.
+  if (held.some((step) => step.escalatedAt === undefined)) {
+    return 'escalation-approver-already-assigned';
+  }
+  // Already escalated onto this branch. **This is the duplicate**, and it is what makes repeating a
+  // request safe: the same escalation asked twice refuses the second time rather than adding a second
+  // step. See the note below on what this does and does not prove.
+  if (held.length > 0) return 'escalation-already-escalated';
+
+  // **The requester may not be asked to approve their own request** (D-16D-13, B).
+  //
+  // Its own name rather than `manager-is-the-requester`: that refusal belongs to manager routing and
+  // means "your reporting line points at you", which is somebody's data to fix. This one means "you
+  // chose yourself", which is the request to fix — the same principle reaching a different mistake,
+  // and an administrator sent to the reporting line by this refusal would find nothing wrong there.
+  if (approverMembershipId === instance.requestedByMembershipId) {
+    return 'escalation-approver-is-the-requester';
+  }
+  // **16A's D-5, applied to escalation** (D-16D-14, A): a step may not name an approver already
+  // terminal on the same *instance*, not merely on this branch. Somebody who has already approved or
+  // rejected at another ordinal has had their say on this approval, and adding them to a later branch
+  // would hand the same person a second one. Scanned over every step of the instance, which the
+  // command already loads — this needs no query and no repository change.
+  const decided = steps.some(
+    (step) =>
+      step.approverMembershipId === approverMembershipId &&
+      TERMINAL_ON_THE_INSTANCE.includes(step.status),
+  );
+
+  return decided ? 'escalation-approver-already-decided' : undefined;
+};
+
+/**
  * Adds one approver to a branch that is currently being asked, or refuses by name.
  *
- * The five refusals are five different situations for five different people to act on, and each is
+ * The seven refusals are seven different situations for different people to act on, and each is
  * checked in the order that makes its message true: an approval that has ended is not a branch
  * problem, and a branch nobody is waiting on is not a rule problem.
+ *
+ * **Three of them are about the branch and four about the person**, which is the seam `personRefusal`
+ * is split along. What is deliberately *not* here is any check on whether the membership is active:
+ * that is a fact Identity owns, it is approved as a command invariant (D-16D-12, A), and a pure
+ * function cannot ask. It arrives resolved, exactly as a manager does — see the note in
+ * `escalation.use-case.ts` on why the escalation half of that is not yet wired.
  */
 export const escalateBranch = (
   instance: WorkflowInstanceState,
@@ -93,18 +159,9 @@ export const escalateBranch = (
   }
   if (branchOf(first).rule === 'unanimous') return refuse('escalation-branch-is-unanimous');
 
-  const held = branch.filter((step) => step.approverMembershipId === request.approverMembershipId);
+  const refused = personRefusal(instance, steps, branch, request.approverMembershipId);
 
-  // Already snapshotted into this branch: they are assigned, they may answer, and there is nothing to
-  // add. Distinct from the case below because the fix is different — this one is "you already asked
-  // them", and asking twice would give one person two votes.
-  if (held.some((step) => step.escalatedAt === undefined)) {
-    return refuse('escalation-approver-already-assigned');
-  }
-  // Already escalated onto this branch. **This is the duplicate**, and it is what makes repeating a
-  // request safe: the same escalation asked twice refuses the second time rather than adding a second
-  // step. See the note below on what this does and does not prove.
-  if (held.length > 0) return refuse('escalation-already-escalated');
+  if (refused !== undefined) return refuse(refused);
 
   return accept({
     stepId: request.stepId,
