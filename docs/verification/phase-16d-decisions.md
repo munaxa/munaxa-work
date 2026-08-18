@@ -331,3 +331,110 @@ approved. A recommendation being technically attractive is not approval.
 
 When an owner explicitly approves any of them, this document gains the approval date, the approved
 option, the rejected alternatives and the constraints — appended, never by rewriting what is above.
+
+---
+
+## 8. Decision table — status as at 2026-08-18
+
+Appended, not substituted for anything above. **No approval has been recorded.** The instruction that
+produced this section states its own recommendations and then says *"Do not infer approval from the
+recommendations"* and *"Update the decision register only after explicit approval"*; the response
+template it supplies carries `OPEN` in every row. All three therefore remain open.
+
+| Decision | Recommendation | Approved? | Constraints |
+|---|---|---|---|
+| D-16D-09 | `WorkflowStepView.escalated: boolean` | **OPEN** — awaiting explicit approval | narrow marker only; no timestamp, actor, reason, employment, reporting line or internal provenance; alters no tally value; no schema, query, repository, permission or route change; no backfill; leak test narrowed, never deleted, and only after approval |
+| D-16D-10 | Platform authentication remains outside 16D | **OPEN** — awaiting confirmation as `OPEN / PLATFORM-OWNED / OUTSIDE PHASE 16D` | no Work-side authentication invention; no service credential, shared token, guard bypass, browser-held credential or Workflow-specific mechanism; per-user permission model intact; twelve sub-decisions remain unanswered; no owner assigned beyond ADR-0001 and ADR-0019 |
+| D-16D-11 | Bounded Identity port for active eligible memberships | **OPEN** — awaiting explicit approval | no broad directory, search, role directory, org chart or people directory; no `identity.membership.read` or other broad Identity permission; ADR-0043 bounded pattern; caller holds `workflow.approval.escalate` only; tenant ambient; bounded, ordered, no N+1; excludes memberships already on the branch; no client-supplied UUID as source of truth; **exact contract not yet defined — see §9** |
+
+**Approval date: none.** No decision below has been approved, amended or declined, and nothing has
+been written into the Phase 16D decision register as approved. Rejected alternatives and constraints
+for each decision are preserved in §2, §3 and §4 above and are not restated here in reduced form.
+
+**Consequence for sequencing.** D-16D-09 is independent and is the only one that could proceed on
+approval alone. D-16D-10 blocks D-16D-11's implementation regardless of D-16D-11's own status. No
+workaround for either blocker has been invented.
+
+---
+
+## 9. D-16D-11 pre-work — eligibility criteria identified from existing Workflow rules
+
+The instruction asks, before implementation: *"Do NOT assume that all active memberships are
+eligible… If additional eligibility criteria are required by the existing Workflow rules, identify
+them before implementation."* This section is that identification. **It is not a contract**, and it
+resolves nothing — it reports what the domain enforces today and what it does not.
+
+### 9.1 What `escalateBranch` enforces today
+
+`packages/modules/workflow/src/domain/escalation.ts`, in the order the refusals fire:
+
+**Branch-level preconditions** — these decide whether an escalation picker should be *offered at
+all*, not who appears in it:
+
+| Rule | Refusal |
+|---|---|
+| The approval is running | `escalation-instance-not-running` |
+| The branch at this ordinal exists and at least one step is `awaiting` | `escalation-branch-not-awaiting` |
+| The branch's rule is not `unanimous` (D-16D-08) | `escalation-branch-is-unanimous` |
+
+**Per-membership exclusions** — the actual eligibility predicate, and it has exactly two clauses:
+
+| Rule | Refusal |
+|---|---|
+| Not already assigned on **this branch** (`escalatedAt === undefined`) | `escalation-approver-already-assigned` |
+| Not already escalated onto **this branch** | `escalation-already-escalated` |
+
+Both are scoped to the branch, so the query needs `instanceId` **and** `ordinal` to compute the
+exclusion set — meaning it must read Workflow's own steps *and* consult the Identity port. The
+composition shape is itself a decision.
+
+### 9.2 Five criteria the recommendation assumes that the domain does **not** enforce
+
+Each is an open question, not a defect claim. I cannot tell from the code whether any was a
+deliberate exemption or an omission, and I have not guessed.
+
+**(a) Active status is not checked anywhere.** `escalateBranch` never asks whether the membership is
+active, or whether it exists at all. `approval-group.use-case.ts:92-93` states the position
+module-wide: *"The membership is taken as given and never resolved. Workflow does not ask Identity
+whether this person exists."* An active-only picker would therefore be **stricter than the command it
+feeds**. Two coherent resolutions, and they are not equivalent:
+
+- *(i)* the picker is advisory and the command stays permissive — an accepted, documented divergence
+  in which a caller can still escalate to an inactive membership through the API;
+- *(ii)* the command gains an active-membership check — a **domain change**, a sixth refusal, and a
+  new port dependency on the write path, requiring its own approval.
+
+This choice cannot be made silently, because it determines whether the port is consulted on read
+only or on write as well.
+
+**(b) The requester is eligible, and the manager path says they should not be.** `resolveManager`
+refuses `manager-is-the-requester` (`domain/manager.ts:104-106`), on stated grounds: *"Somebody who
+manages themselves… would otherwise be asked to approve their own request, and the approval would
+look like a process while being a formality."* `escalateBranch` applies no such rule — escalating to
+`instance.requestedByMembershipId` is currently permitted. Is escalation intentionally exempt from
+the self-approval rule, or is this a gap?
+
+**(c) 16A's D-5 cycle rule is not applied.** D-5 is recorded as *"a step may not name an approver
+already terminal on the same instance"* (`domain/manager.ts:86-87`). `escalateBranch` inspects only
+the **branch**, never the instance. Escalating to somebody who already approved or rejected at an
+earlier ordinal is therefore permitted today, and gives that person a second, later say on the same
+approval. Whether escalation is exempt from D-5 is unresolved.
+
+**(d) Delegation is not considered.** Escalation is deliberately not delegable, but a delegate of an
+already-assigned approver is not "already assigned" — the domain compares `approverMembershipId`
+only. Escalating to a delegate would give one approver's authority two seats on the same branch.
+
+**(e) Bounds and ordering have no approved rule.** Tenant membership count is unbounded; nothing
+establishes a maximum result size or a deterministic order.
+
+### 9.3 Consequence
+
+Points (b) and (c) matter beyond the picker: if either is answered *"should have been refused"*, then
+the **shipped** `workflow.escalate-branch` command has a gap, and the fix belongs in the domain
+rather than in a query that hides it. Per the standing rule for a discovered defect, I have stopped
+and reported rather than changed anything.
+
+**Even if D-16D-11 is approved, its exact membership eligibility contract remains ambiguous on five
+counts, so implementation stops here** — which is the stop condition the instruction sets out.
+Defining the port contract (method, input, output, eligibility predicate, maximum result size,
+ordering, authorization, tenancy, failure semantics) requires (a)–(e) to be answered first.
