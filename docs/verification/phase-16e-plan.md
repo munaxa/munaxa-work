@@ -247,6 +247,12 @@ its own, before implementation.** None is proposed here.
 
 ## 11. Decision register — all `OPEN`
 
+> **Canonical numbering lives in [`phase-16e-register.md`](phase-16e-register.md).** That register
+> was written after this document and renumbers these decisions: the actor problem below is raised
+> here as its own D-16E-05, and the register folds it into **D-16E-02**, shifting the capability
+> decisions by one and making idempotency **D-16E-09**. The register carries the crosswalk. Nothing
+> was dropped, and no finding changed meaning — this section is preserved as written.
+
 No option is recommended; none was requested. Decisions are tiered because they are not independent —
 answering a lower tier before its higher tier would be answering a question whose premise is undecided.
 
