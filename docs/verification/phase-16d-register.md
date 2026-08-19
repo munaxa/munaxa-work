@@ -650,3 +650,44 @@ D-16D-12 stays `BLOCKED` until 8C.
 Locked and untouched by this work: D-16D-08 · D-16D-13 · D-16D-14 · D-16D-15 · D-16D-16 · escalation
 provenance · tally semantics · outstanding semantics · the `unanimous` refusal · escalation
 idempotency.
+
+---
+
+# APPROVED — Checkpoint 8C authorized
+
+Checkpoint 8B is complete and verified (`59ab032`; 108/108 tasks, 3,962 passed). The owner authorized
+Checkpoint 8C, which implements three decisions already approved on 2026-08-18 and re-affirmed now.
+
+| ID | Approved | Implementation |
+|---|---|---|
+| **D-16D-12** | Option A — active membership is a **command-side invariant** | **authorized now** |
+| **D-16D-11** | Option B — bounded Identity port, consuming the 8B contract as published | **authorized now** |
+| **D-16D-17** | Option A — **one** refusal, `escalation-approver-not-eligible` | **authorized now** |
+
+## The approved mapping
+
+Identity continues to distinguish **active**, **inactive** and **missing**. Workflow collapses two of
+them and only two:
+
+| Identity answers | Workflow |
+|---|---|
+| `{ active: true }` | the escalation proceeds |
+| `{ active: false }` | `escalation-approver-not-eligible` |
+| `not_found` | `escalation-approver-not-eligible` |
+| raises | **raises** — never a business refusal, never `active: false` |
+
+*Rejected and preserved:* Option B, two refusals (`escalation-approver-inactive` /
+`escalation-approver-not-found`); Option C, amend.
+
+## Scope
+
+Exactly two implementation goals: the bounded `MembershipStandingPort`, and the seventh eligibility
+rule on the escalation write path. **No candidate enumeration, no Admin picker, no authentication, no
+API change, no schema change, no new permission.**
+
+The caller still needs only `workflow.approval.escalate`; the adapter's service grant names only
+`identity.membership.read`; escalation stays out of `DELEGABLE_SCOPES`.
+
+Locked and unchanged: D-16D-08 · D-16D-13 · D-16D-14 · D-16D-15 · D-16D-16 · D-16D-09's marker ·
+denominator · assigned set · threshold · outstanding · unresolved · tally · provenance · the
+`unanimous` refusal · idempotency · history semantics.
