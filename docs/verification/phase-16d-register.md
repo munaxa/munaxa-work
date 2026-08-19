@@ -483,3 +483,104 @@ because collapsing them there would remove the choice. That distinction is speci
 `phase-16d-identity-contract.md` §6.
 
 *Blocks.* The implementation of D-16D-12, alongside the Identity contract approval itself.
+
+---
+
+# CHECKPOINT 8A — APPROVAL GATE · **all three items OPEN**
+
+The instruction dated 2026-08-18 **requests** three approvals and grants none. Recorded here as open
+so the register is complete before any implementation, per the rule that the register is committed
+before production code. **No option is selected, and none may be inferred from a recommendation,
+prior discussion, or silence.**
+
+| # | Item | Register ID | Status |
+|---|---|---|---|
+| Approval 1 | The Identity contract `identity.membership-standing` | **D-16D-18** | `OPEN` |
+| Approval 2 | Refusal mapping for an ineligible membership | **D-16D-17** | `OPEN` |
+| Approval 3 | Authorization to modify the completed Identity module | **D-16D-19** | `OPEN` |
+
+**All three are required together.** Approving the contract is explicitly *not* authorization to
+write it (Approval 3), and the contract cannot be integrated without the refusal mapping
+(Approval 2).
+
+## Checkpoint structure, recorded because the plan requires it
+
+| Checkpoint | Scope | Gated by |
+|---|---|---|
+| **8A** | this approval gate — decisions only | — |
+| **8B** | the Identity query, its view, its handler, its tests | D-16D-18 **and** D-16D-19 |
+| **8C** | the Workflow bounded port and the domain rule | 8B complete and verified, **and** D-16D-17 |
+
+8B and 8C must not start without their corresponding approvals.
+
+## D-16D-18 — Identity contract `identity.membership-standing` · `OPEN`
+
+*Question.* Approve / Amend / Decline the contract specified in
+[`phase-16d-identity-contract.md`](phase-16d-identity-contract.md).
+
+*Proposed, in full.* Query `identity.membership-standing`; input `{ membershipId }`; output
+`{ active: boolean }`; permission `identity.membership.read`; ambient tenant and **no `tenantId`
+argument**; active → `{ active: true }`; inactive (`suspended`, `ended`) → `{ active: false }`;
+missing → `not_found`; a membership of another tenant → `not_found`, indistinguishable from missing;
+infrastructure failure → **raises**, never `{ active: false }` and never `not_found`.
+
+*Locked rationale, amendable only by explicit amendment.* The contract publishes the **predicate**,
+not the status, because Identity already owns `isActingMembership(status)` and Workflow must not hold
+a second definition of "active". Therefore `active === isActingMembership(membership.status)`, and
+Workflow receives only the result.
+
+*Must not return.* status · profile · preferences · portals · employments · delegations · roles ·
+person · tenant · organization · reporting line · employment identifiers.
+
+*Constraints.* No new permission · no migration, schema, table, column or index · no route · no
+directory · no search · no pagination · no enumeration · no broad membership view · ADR-0043 bounded
+service grant mandatory · uses the existing `TenantMembershipStore.byId` and the existing
+`isActingMembership`.
+
+*Rejected alternatives, preserved.* Reuse `identity.describe-member` — its payload is a member's whole
+page and a permission does not narrow a payload · `identity.list-memberships` — enumeration, forbidden
+by D-16D-16 (A) · `identity.search-members` — a directory search · `identity.active-memberships-for-employment`
+— keyed by employment, the wrong key · narrowing an existing query — would change a published
+contract's established meaning and break its consumers · returning the status instead of the predicate
+— would put a second definition of "active" in Workflow.
+
+*Open sub-item.* The name. `identity.membership-standing` is proposed; `identity.acting-membership`
+also fits the established vocabulary. Both are consistent with Identity's naming conventions.
+
+## D-16D-17 — Refusal mapping · `OPEN`
+
+*Question.* When escalation is given a membership that is ineligible because it is **inactive** or
+**missing**, does Workflow publish one refusal or two? Identity distinguishes the two cases
+regardless — see D-16D-18 — so this decides only what Workflow exposes.
+
+*Options, in the owner's vocabulary.*
+- **A — one Workflow refusal.** Both Identity results map to a single escalation refusal, e.g.
+  `escalation-approver-not-eligible`. Identity still distinguishes them internally; Workflow does not
+  publish the distinction as separate business outcomes.
+- **B — two Workflow refusals.** Inactive → `escalation-approver-inactive`; missing →
+  `escalation-approver-not-found`. The distinction becomes part of Workflow's refusal vocabulary.
+- **C — amend.** A different mapping, supplied by the owner.
+
+*Not recommended.* Neither option is endorsed here. The considerations recorded earlier stand on both
+sides: a single refusal is simpler and both cases mean "you cannot ask this person"; two refusals
+match this module's stated principle that one refusal *"would send all of them to the same person"*,
+and the manager path already splits this way with `manager-not-a-member`.
+
+*Blocks.* Checkpoint 8C.
+
+## D-16D-19 — Authorization to modify the Identity module · `OPEN`
+
+*Question.* Explicitly authorize adding the approved query and its tests to Identity, a completed
+module.
+
+*Why it is separate.* Approving a contract is not authorization to write it. This is recorded as its
+own decision because the current instruction says so in as many words, and because Identity is
+complete: the `reportingLine` precedent requires a completed module's change to be *"built and
+verified on its own side first."*
+
+*Scope if granted.* One query contract · one narrow view · one handler · reuse of the existing
+`TenantMembershipStore.byId` · reuse of the existing `isActingMembership` · reuse of the existing
+`identity.membership.read` · tests. **Nothing else** — no permission, migration, schema, index, route,
+directory, search, pagination or broad membership view.
+
+*Blocks.* Checkpoint 8B, and therefore 8C, and therefore D-16D-12 and D-16D-11.
