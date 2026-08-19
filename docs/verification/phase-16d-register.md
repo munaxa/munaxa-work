@@ -584,3 +584,69 @@ verified on its own side first."*
 directory, search, pagination or broad membership view.
 
 *Blocks.* Checkpoint 8B, and therefore 8C, and therefore D-16D-12 and D-16D-11.
+
+---
+
+# APPROVED — 2026-08-19 · Checkpoint 8A resolved
+
+The owner explicitly approved all three items on **2026-08-19**. The OPEN records above and the whole
+investigation history are preserved unchanged; nothing has been rewritten.
+
+| ID | Decision | Approved | Date |
+|---|---|---|---|
+| **D-16D-18** | Identity contract `identity.membership-standing` | **APPROVED**, exactly as specified | 2026-08-19 |
+| **D-16D-17** | Refusal mapping | **APPROVED — Option A**, one refusal | 2026-08-19 |
+| **D-16D-19** | Authorization to modify the Identity module | **APPROVED**, scoped to D-16D-18 | 2026-08-19 |
+
+## D-16D-18 — approved constraints, in full
+
+Query `identity.membership-standing` · input `{ membershipId: string }` · output
+`{ active: boolean }` · permission `identity.membership.read`.
+
+**Semantics.** `active: true` when `isActingMembership(status)` is true · `active: false` when the
+membership exists but is not acting · missing → `not_found` · cross-tenant → `not_found` ·
+infrastructure failure → **raises** · tenant ambient.
+
+**Forbidden.** `tenantId` input · broad member payload · profile · preferences · portals ·
+employments · delegations · roles · organization data · **status string** · enumeration · search ·
+pagination · new permission · schema change · migration · index.
+
+**Must use the existing** `TenantMembershipStore.byId` and `isActingMembership`.
+
+**Must not reuse or narrow** `identity.describe-member` · `identity.list-memberships` ·
+`identity.search-members` · `identity.active-memberships-for-employment`.
+
+**Locked rationale.** The predicate is returned rather than the raw status because **Identity owns the
+definition of an acting membership and Workflow must not create a second one.** The bounded
+cross-module pattern follows ADR-0043 and the existing `WorkflowReportingLine` precedent.
+
+*Rejected alternatives* are preserved in the D-16D-18 OPEN record above and are not restated here.
+
+## D-16D-17 — approved: Option A
+
+Inactive **and** missing memberships produce **one** Workflow escalation refusal:
+`escalation-approver-not-eligible`.
+
+**Identity must still distinguish active, inactive and missing internally** — the collapse happens in
+Workflow's refusal vocabulary, never in Identity's contract. Existing Identity failure semantics are
+unchanged, and **infrastructure failure remains an infrastructure failure and must raise.**
+
+*Rejected:* **Option B**, two refusals (`escalation-approver-inactive` and
+`escalation-approver-not-found`) — the distinction does not become part of Workflow's published
+refusal vocabulary. **Option C**, amend.
+
+## D-16D-19 — approved scope
+
+Authorized: `identity.membership-standing`, its view, its handler, the wiring the existing Identity
+architecture requires, its tests, and the necessary exports. **No unrelated Identity work is
+authorized.**
+
+## Checkpoint boundaries
+
+**8B — Identity only**, authorized now. **8C — the Workflow `MembershipStandingPort` and the domain
+rule — is NOT authorized by these approvals** and must not be started. D-16D-11 remains downstream;
+D-16D-12 stays `BLOCKED` until 8C.
+
+Locked and untouched by this work: D-16D-08 · D-16D-13 · D-16D-14 · D-16D-15 · D-16D-16 · escalation
+provenance · tally semantics · outstanding semantics · the `unanimous` refusal · escalation
+idempotency.
