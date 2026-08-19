@@ -5,6 +5,7 @@ import { systemClock } from '@work/payroll';
 import type { Asking } from '../payroll/asking.js';
 import type { Sending } from './sending.js';
 import { WorkflowDelegations } from './workflow-sources.js';
+import { WorkflowMembershipStanding } from './workflow-membership-standing.js';
 import { WorkflowReportingLine } from './workflow-reporting-line.js';
 import { RecruitmentDecisions } from './recruitment-decisions.js';
 import { WorkflowApprovals } from './workflow-approvals.js';
@@ -79,6 +80,9 @@ export const workflowModuleFor = (
     // could supply it honestly before Identity's own contract existed; both halves exist now, so a
     // manager step resolves through the real seam rather than failing closed on an unwired port.
     reportingLine: new WorkflowReportingLine(reader),
+    // Phase 16D. The same `reader`: asking whether somebody may act must never be able to change
+    // whether they may.
+    membershipStanding: new WorkflowMembershipStanding(reader),
     businessDecision: new RecruitmentDecisions(writer),
     permissions,
     clock: systemClock,

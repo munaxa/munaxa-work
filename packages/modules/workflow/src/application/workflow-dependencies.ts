@@ -6,6 +6,7 @@ import type {
   DelegationPort,
   WorkflowStores,
 } from './workflow-ports.js';
+import type { MembershipStandingPort } from './workflow-membership-standing.js';
 import type { ReportingLinePort } from './workflow-reporting-line.js';
 
 /**
@@ -58,6 +59,15 @@ export interface WorkflowDependencies {
    * property the composition doc has relied on since 16A: a dependency cannot be forgotten quietly.
    */
   readonly reportingLine: ReportingLinePort;
+  /**
+   * Whether the membership an administrator wants to escalate to may act at all (D-16D-12).
+   *
+   * **Required, like every other field here.** An optional port would be a rule that silently stops
+   * being enforced in whichever composition forgot it — and this one is a *write-path* invariant, so
+   * the composition that forgot it would accept escalations the approved rule refuses. Asked once,
+   * for the one membership named on the command, and never for anybody already on the branch.
+   */
+  readonly membershipStanding: MembershipStandingPort;
   /**
    * Where a terminal decision goes.
    *

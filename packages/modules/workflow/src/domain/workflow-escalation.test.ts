@@ -72,6 +72,9 @@ const escalate = (steps: readonly WorkflowStepState[], membership = 'membership-
     ordinal: 1,
     approverMembershipId: membership,
     at: LATER,
+    // Active, so these suites keep testing the rule each was written for. The eligibility rule has
+    // its own suite; a fixture that defaulted to inactive would refuse here for the wrong reason.
+    approverIsActive: true,
   });
 
 const added = (steps: readonly WorkflowStepState[], membership = 'membership-new') => {
@@ -92,6 +95,7 @@ describe('what escalation refuses', () => {
         ordinal: 1,
         approverMembershipId: 'membership-new',
         at: LATER,
+        approverIsActive: true,
       });
 
       expect([status, refusal(result)]).toStrictEqual([status, 'escalation-instance-not-running']);
@@ -129,6 +133,7 @@ describe('what escalation refuses', () => {
           ordinal: 1,
           approverMembershipId: 'membership-new',
           at: LATER,
+          approverIsActive: true,
         }),
       ),
       refusal(escalate(original.map((step) => ({ ...step, status: 'approved' as const })))),

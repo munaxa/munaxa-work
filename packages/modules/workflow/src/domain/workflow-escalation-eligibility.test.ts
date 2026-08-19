@@ -79,6 +79,9 @@ const escalate = (
     ordinal,
     approverMembershipId: membership,
     at: LATER,
+    // Active, so these suites keep testing the rule each was written for. The eligibility rule has
+    // its own suite; a fixture that defaulted to inactive would refuse here for the wrong reason.
+    approverIsActive: true,
   });
 
 const reasonOf = (
@@ -247,5 +250,97 @@ describe('every escalation refusal, distinct', () => {
       'escalation-approver-already-decided',
     ]);
     expect(new Set(named).size).toBe(7);
+  });
+});
+
+/**
+ * The seventh rule: the person must be able to act at all (D-16D-12, A).
+ *
+ * The fact is Identity's and arrives resolved, so what the domain owns — and what these assert — is
+ * only what it *means*: one refusal for both of Identity's negative answers (D-16D-17, A), checked
+ * after everything the branch could already have said.
+ */
+describe('an approver who may not act', () => {
+  const inactive = (steps: readonly WorkflowStepState[], membership: string) =>
+    escalateBranch(instance(), steps, {
+      stepId: 'step-new',
+      ordinal: 2,
+      approverMembershipId: membership,
+      at: LATER,
+      approverIsActive: false,
+    });
+
+  it('refuses by the approved single name', () => {
+    const outcome = inactive(running('skipped'), 'membership-new');
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.error.reason).toBe('escalation-approver-not-eligible');
+  });
+
+  /**
+   * **The same refusal whichever way Identity said no**, which is the whole of D-16D-17 (A).
+   *
+   * Both of Identity's negative answers — a membership that exists and may not act, and an identifier
+   * naming nobody — reach the domain as `false`, and the domain has one name for the pair. Asserting
+   * the *name* rather than merely "it refused" is what stops a later reader splitting it back into
+   * two without a decision.
+   */
+  it('says nothing about which of the two reasons applied', () => {
+    const outcome = inactive(running('skipped'), 'membership-stranger');
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.error.reason).toBe('escalation-approver-not-eligible');
+      for (const split of ['inactive', 'suspended', 'ended', 'not-found', 'missing']) {
+        expect([split, outcome.error.reason.includes(split)]).toStrictEqual([split, false]);
+      }
+    }
+  });
+
+  /**
+   * **Checked last**, so a branch problem is still reported as a branch problem.
+   *
+   * An inactive membership named on a `unanimous` branch is refused for the branch: that request has
+   * no valid form at all, and telling an administrator to pick somebody else would send them to solve
+   * the wrong problem. The same holds for somebody already on the branch.
+   */
+  it.each([
+    [
+      'a unanimous branch',
+      [{ ...step('step-u', 'membership-u', 2, 'awaiting'), branchRule: 'unanimous' as const }],
+      'membership-new',
+      'escalation-branch-is-unanimous',
+    ],
+    [
+      'somebody already assigned',
+      running('skipped'),
+      'membership-1',
+      'escalation-approver-already-assigned',
+    ],
+    ['the requester', running('skipped'), REQUESTER, 'escalation-approver-is-the-requester'],
+  ])('yields to %s', (_what, steps, membership, expected) => {
+    const outcome = inactive(steps, membership);
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.error.reason).toBe(expected);
+  });
+
+  /** And all eight refusals are still distinct from one another. */
+  it('is an eighth name, not a rename of an existing one', () => {
+    const named = [
+      reasonOf(running('skipped'), 'membership-new', 2, 'cancelled'),
+      reasonOf(running('skipped'), 'membership-new', 9),
+      reasonOf(
+        [{ ...step('step-u', 'membership-u', 2, 'awaiting'), branchRule: 'unanimous' }],
+        'membership-new',
+      ),
+      reasonOf(running('skipped'), 'membership-1'),
+      reasonOf(running('skipped'), REQUESTER),
+      reasonOf(running('approved'), 'membership-earlier'),
+      'escalation-approver-not-eligible',
+    ];
+
+    expect(new Set(named).size).toBe(7);
+    expect(named).toContain('escalation-approver-not-eligible');
   });
 });

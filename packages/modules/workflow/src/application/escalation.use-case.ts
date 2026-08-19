@@ -63,14 +63,29 @@ export const escalateBranchHandler = (
 
       const steps = await dependencies.stores.steps.forInstance(transaction, command.instanceId);
       const at = dependencies.clock.now();
+      // **One Identity read, for the one membership named on the command** (D-16D-12, A). Never for
+      // anybody already on the branch, never in a loop, and never for a list — the person being added
+      // is the only one whose standing this command has any business asking about.
+      //
+      // Asked **unconditionally**, before the domain runs, because `escalateBranch` is a pure
+      // function and the answer is one of its inputs. So a request the domain would refuse for some
+      // other reason still costs this one read; the alternative is evaluating the branch rules out
+      // here to decide whether to ask, which would put a second copy of them in the handler to save a
+      // single bounded lookup. Which refusal *wins* is still the domain's, and it prefers the branch.
+      //
+      // It **raises** rather than answering when Identity cannot be reached, and that is the whole
+      // reason the call is here rather than folded into a boolean somewhere: an outage must abort the
+      // command before anything is written, not arrive at the domain disguised as "not eligible".
+      const standing = await dependencies.membershipStanding.standing(command.approverMembershipId);
       const escalated = escalateBranch(held, steps, {
         stepId: uuidV7(),
         ordinal: command.ordinal,
         approverMembershipId: command.approverMembershipId,
         at,
+        approverIsActive: standing.active,
       });
 
-      // Five distinct refusals, passed through as themselves. Collapsing them would tell an
+      // Seven distinct refusals, passed through as themselves. Collapsing them would tell an
       // administrator to fix the wrong thing — "this branch is unanimous" and "you already asked
       // them" are different problems with different answers.
       if (!escalated.ok) return refusedBy(escalated.error);

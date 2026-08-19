@@ -4,6 +4,7 @@ import { workflowModule } from '../application/workflow-module.js';
 import {
   FakeBusinessDecisions,
   FakeDelegation,
+  FakeMembershipStanding,
   FakeReportingLine,
   FixedClock,
 } from '../application/workflow-test-harness.js';
@@ -32,6 +33,7 @@ import { NOW, aCode } from './workflow-states.js';
 export interface Live {
   readonly dispatcher: Dispatcher;
   readonly delegation: FakeDelegation;
+  readonly membershipStanding: FakeMembershipStanding;
   /**
    * Employment and Identity, answering who somebody's manager is.
    *
@@ -241,11 +243,13 @@ const liveModule = (fixture: WorkflowFixture): Live => {
   const dispatcher = new Dispatcher(permissions);
   const delegation = new FakeDelegation();
   const reportingLine = new FakeReportingLine();
+  const membershipStanding = new FakeMembershipStanding();
   const business = new FakeBusinessDecisions();
   const module = workflowModule({
     unitOfWork: fixture.unitOfWork,
     stores: fixture.stores,
     delegation,
+    membershipStanding,
     reportingLine,
     businessDecision: business,
     permissions,
@@ -258,6 +262,7 @@ const liveModule = (fixture: WorkflowFixture): Live => {
   return {
     dispatcher,
     delegation,
+    membershipStanding,
     reportingLine,
     business,
     as: (tenantId, membershipId, work) =>

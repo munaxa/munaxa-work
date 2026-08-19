@@ -66,6 +66,22 @@ export interface EscalateBranchRequest {
   readonly ordinal: number;
   readonly approverMembershipId: string;
   readonly at: Date;
+  /**
+   * Whether the membership being added may act at all — **resolved before this is called**
+   * (D-16D-12, A).
+   *
+   * A parameter rather than a lookup, for the same reason `ManagerResolution` is: this function is
+   * pure, the fact belongs to Identity, and a domain that reached across a module boundary to get it
+   * would be the coupling ADR-0023 exists to prevent. The application asks; this decides what the
+   * answer means.
+   *
+   * **`false` covers two Identity answers.** A membership that exists and may not act, and an
+   * identifier that names nobody, both arrive here as `false` — D-16D-17 (option A) approved one
+   * Workflow refusal for both. Identity still tells them apart; Workflow does not publish the
+   * difference. An Identity *failure* never reaches this parameter at all: the application raises
+   * before calling, because "we could not ask" is not "the answer is no".
+   */
+  readonly approverIsActive: boolean;
 }
 
 /**
@@ -90,8 +106,9 @@ const personRefusal = (
   instance: WorkflowInstanceState,
   steps: readonly WorkflowStepState[],
   branch: readonly WorkflowStepState[],
-  approverMembershipId: string,
+  request: EscalateBranchRequest,
 ): string | undefined => {
+  const approverMembershipId = request.approverMembershipId;
   const held = branch.filter((step) => step.approverMembershipId === approverMembershipId);
 
   // Already snapshotted into this branch: they are assigned, they may answer, and there is nothing to
@@ -125,7 +142,13 @@ const personRefusal = (
       TERMINAL_ON_THE_INSTANCE.includes(step.status),
   );
 
-  return decided ? 'escalation-approver-already-decided' : undefined;
+  if (decided) return 'escalation-approver-already-decided';
+
+  // **The seventh rule, and the only one whose fact is not Workflow's** (D-16D-12, A). Checked last
+  // so that a branch problem is still reported as a branch problem: an inactive membership named on
+  // a unanimous branch is refused for the branch, because that request has no valid form at all and
+  // telling an administrator to pick somebody else would send them to solve the wrong one.
+  return request.approverIsActive ? undefined : 'escalation-approver-not-eligible';
 };
 
 /**
@@ -135,11 +158,11 @@ const personRefusal = (
  * checked in the order that makes its message true: an approval that has ended is not a branch
  * problem, and a branch nobody is waiting on is not a rule problem.
  *
- * **Three of them are about the branch and four about the person**, which is the seam `personRefusal`
- * is split along. What is deliberately *not* here is any check on whether the membership is active:
- * that is a fact Identity owns, it is approved as a command invariant (D-16D-12, A), and a pure
- * function cannot ask. It arrives resolved, exactly as a manager does — see the note in
- * `escalation.use-case.ts` on why the escalation half of that is not yet wired.
+ * **Three of them are about the branch and five about the person**, which is the seam `personRefusal`
+ * is split along. The last of the five is whether the membership may act at all: a fact Identity owns
+ * and a pure function cannot ask, so it **arrives resolved** on the request, exactly as a manager
+ * does. It is checked last on purpose — the other six are answered from steps already in hand, so a
+ * request refused by one of them never needed a cross-module read.
  */
 export const escalateBranch = (
   instance: WorkflowInstanceState,
@@ -159,7 +182,7 @@ export const escalateBranch = (
   }
   if (branchOf(first).rule === 'unanimous') return refuse('escalation-branch-is-unanimous');
 
-  const refused = personRefusal(instance, steps, branch, request.approverMembershipId);
+  const refused = personRefusal(instance, steps, branch, request);
 
   if (refused !== undefined) return refuse(refused);
 

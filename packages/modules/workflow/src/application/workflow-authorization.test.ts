@@ -9,6 +9,7 @@ import {
   ADMINISTRATOR,
   FixedClock,
   FakeDelegation,
+  FakeMembershipStanding,
   FakeReportingLine,
   NOW,
   TENANT,
@@ -38,6 +39,7 @@ const dependenciesFor = (granted: readonly string[]) => ({
   },
   stores: inMemoryWorkflowStores(),
   delegation: new FakeDelegation(),
+  membershipStanding: new FakeMembershipStanding(),
   reportingLine: new FakeReportingLine(),
   businessDecision: {
     apply: (): Promise<ApprovalDelivery> => Promise.resolve({ kind: 'not-adopted' }),

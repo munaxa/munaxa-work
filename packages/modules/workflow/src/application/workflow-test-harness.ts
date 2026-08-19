@@ -20,6 +20,7 @@ import type {
   DelegationPort,
   TerminalApproval,
 } from './workflow-ports.js';
+import type { MembershipStanding, MembershipStandingPort } from './workflow-membership-standing.js';
 import type { ReportingLinePort } from './workflow-reporting-line.js';
 import type { ManagerResolution } from '../domain/manager.js';
 
@@ -168,6 +169,38 @@ export class FakeReportingLine implements ReportingLinePort {
 }
 
 /**
+ * Whether the person being escalated to may act, for the application suites.
+ *
+ * **Active by default**, so every suite that is not about eligibility keeps testing what it was
+ * written to test. The two interesting behaviours are set explicitly: `inactiveFor` covers both
+ * Identity answers the adapter collapses — a suspended member and an identifier naming nobody —
+ * because D-16D-17 (A) makes them one Workflow refusal, and `failsWith` covers the case that must
+ * **raise** rather than answer.
+ *
+ * `asked` is recorded so a suite can prove the read happened **once, for the named membership** —
+ * and, just as usefully, that it did not happen at all when an earlier rule refused first.
+ */
+export class FakeMembershipStanding implements MembershipStandingPort {
+  public readonly asked: string[] = [];
+  private inactive = new Set<string>();
+  private failure: Error | undefined;
+
+  public inactiveFor(membershipId: string): void {
+    this.inactive.add(membershipId);
+  }
+
+  public failsWith(error: Error): void {
+    this.failure = error;
+  }
+
+  public standing(membershipId: string): Promise<MembershipStanding> {
+    this.asked.push(membershipId);
+    if (this.failure !== undefined) return Promise.reject(this.failure);
+    return Promise.resolve({ active: !this.inactive.has(membershipId) });
+  }
+}
+
+/**
  * The adopting module, for the application suites.
  *
  * **It records and refuses, and it never pretends to be a database.** What the application layer has
@@ -197,6 +230,7 @@ export interface Harness {
   readonly dispatcher: Dispatcher;
   readonly clock: FixedClock;
   readonly delegation: FakeDelegation;
+  readonly membershipStanding: FakeMembershipStanding;
   readonly reportingLine: FakeReportingLine;
   readonly business: FakeBusinessDecisions;
   readonly stores: ReturnType<typeof inMemoryWorkflowStores>;
@@ -224,6 +258,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
   const dispatcher = new Dispatcher(permissions);
   const clock = new FixedClock(NOW);
   const delegation = new FakeDelegation();
+  const membershipStanding = new FakeMembershipStanding();
   const reportingLine = new FakeReportingLine();
   const business = new FakeBusinessDecisions();
   const stores = inMemoryWorkflowStores();
@@ -232,6 +267,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     unitOfWork: new InMemoryUnitOfWork(tenantId),
     stores,
     delegation,
+    membershipStanding,
     reportingLine,
     businessDecision: business,
     permissions,
@@ -262,6 +298,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     dispatcher,
     clock,
     delegation,
+    membershipStanding,
     reportingLine,
     business,
     stores,

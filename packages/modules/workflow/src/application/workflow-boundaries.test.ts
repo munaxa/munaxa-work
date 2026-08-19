@@ -7,7 +7,13 @@ import { workflowModule } from './workflow-module.js';
 import type { ApprovalDelivery } from './workflow-ports.js';
 import { inMemoryWorkflowStores } from './in-memory-stores.js';
 import { ALL_WORKFLOW_PERMISSIONS, DELEGABLE_SCOPES } from './workflow-permissions.js';
-import { FakeDelegation, FakeReportingLine, FixedClock, NOW } from './workflow-test-harness.js';
+import {
+  FakeDelegation,
+  FakeMembershipStanding,
+  FakeReportingLine,
+  FixedClock,
+  NOW,
+} from './workflow-test-harness.js';
 
 /**
  * What the application layer deliberately does not contain, asserted three ways.
@@ -53,6 +59,7 @@ const dependencies = {
   },
   stores: inMemoryWorkflowStores(),
   delegation: new FakeDelegation(),
+  membershipStanding: new FakeMembershipStanding(),
   businessDecision: {
     apply: (): Promise<ApprovalDelivery> => Promise.resolve({ kind: 'not-adopted' }),
   },
@@ -115,19 +122,26 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
   });
 
   /**
-   * Seven dependencies, and the list is the capability surface.
+   * Eight dependencies, and the list is the capability surface.
    *
    * The unit of work, the stores, Identity's delegation read, the permission checker, a clock, the
-   * one outbound seam through which a terminal decision reaches the module that asked for it — and,
-   * since Phase 16C, one reporting-line read. An eighth would be the beginning of a capability this
-   * phase refuses, and the names below are the ones that would announce it: a scheduler, a notifier,
-   * a blob store, an index, a role directory.
+   * one outbound seam through which a terminal decision reaches the module that asked for it, one
+   * reporting-line read since Phase 16C — and, since Phase 16D, one membership-standing read. A
+   * ninth would be the beginning of a capability this phase refuses, and the names below are the ones
+   * that would announce it: a scheduler, a notifier, a blob store, an index, a role directory.
    *
-   * **`reportingLine` is not `directory`, and that word is still on the forbidden list below.** A
-   * directory answers questions *about* people — who holds this role, who is in this department, who
-   * reports to me. This port answers one: who is this one person's manager, on this one day. It is
-   * the same distinction that let an approval group exist in 16B, and it is asserted here rather than
-   * merely argued.
+   * **The count moved from seven to eight, and only because a decision moved it.** `membershipStanding`
+   * is D-16D-11 and D-16D-12, approved 2026-08-18 and implemented in Checkpoint 8C. This assertion is
+   * an exact set rather than a count precisely so that a port arriving *without* a decision fails
+   * here — which is what it did when this one was added, and the reason the failure was the right
+   * kind. The companion test below asserts the new port is present and one method wide, so widening
+   * the set could not be mistaken for dropping the guarantee.
+   *
+   * **Neither `reportingLine` nor `membershipStanding` is a `directory`, and that word is still on the
+   * forbidden list below.** A directory answers questions *about* people — who holds this role, who is
+   * in this department, who reports to me. These answer one each: who is this one person's manager on
+   * this one day, and may this one person act at all. It is the same distinction that let an approval
+   * group exist in 16B, and it is asserted here rather than merely argued.
    *
    * `businessDecision` is checked by name rather than by pattern because "approval" appears in it
    * only in the honest sense — it carries an approval that has already been decided — while the
@@ -138,6 +152,7 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
       'businessDecision',
       'clock',
       'delegation',
+      'membershipStanding',
       'permissions',
       'reportingLine',
       'stores',
@@ -145,6 +160,35 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
     ]);
     for (const forbidden of ['job', 'notification', 'storage', 'search', 'directory', 'outbox']) {
       expect(Object.keys(dependencies).join(' ').toLowerCase()).not.toContain(forbidden);
+    }
+  });
+
+  /**
+   * And the approved eighth port is exactly as narrow as the decision that authorized it.
+   *
+   * The positive half of the change above. One method, and it takes **one membership identifier** —
+   * no tenant, no page, no term, no filter and no list. A port that grew a second method, or a first
+   * one taking a query, would be the member directory D-16D-16 refused, arriving through the seam
+   * D-16D-11 opened for something much smaller.
+   *
+   * Asserted against the **port's own source** rather than against the test double implementing it:
+   * a fake carries helpers a real adapter never will, so its prototype would answer a question about
+   * the harness instead of about the contract.
+   */
+  it('exposes the approved membership-standing port and nothing wider', () => {
+    const port = codeOf('workflow-membership-standing.ts');
+    const declaration = port.slice(port.indexOf('interface MembershipStandingPort'));
+
+    // One method, and its whole parameter list is one identifier.
+    expect(declaration.match(/^\s{2}\w+\(/gm)).toStrictEqual(['  standing(']);
+    expect(declaration).toContain('standing(membershipId: string): Promise<MembershipStanding>');
+
+    // And nothing a directory would need, in the file that defines the seam.
+    for (const wider of ['[]', 'page', 'size', 'term', 'filter', 'search', 'list', 'tenantId']) {
+      expect([wider, port.toLowerCase().includes(wider.toLowerCase())]).toStrictEqual([
+        wider,
+        false,
+      ]);
     }
   });
 

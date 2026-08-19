@@ -187,3 +187,146 @@ describe('delegation stays out of escalation', () => {
     asked.mockRestore();
   });
 });
+
+/**
+ * The active-membership rule, on the write path (D-16D-12, A).
+ *
+ * **The command is the authority, and these are the assertions that say so.** A refusal here leaves
+ * no step, no timeline entry and no moved tally — and an Identity that cannot answer aborts the whole
+ * command rather than arriving at the domain disguised as "not eligible".
+ */
+describe('an approver Identity says may not act', () => {
+  let harness: Harness;
+  let instanceId: string;
+
+  beforeEach(async () => {
+    harness = harnessFor();
+
+    const process = await harness.as(ADMINISTRATOR, () =>
+      publishedBranches(harness, branchOf([APPROVER, SECOND_APPROVER]), 'eligibility-active'),
+    );
+
+    instanceId = await startedOn(harness, process, 'requisition-active');
+  });
+
+  const detail = () =>
+    harness.as(ADMINISTRATOR, () =>
+      ask<{
+        steps: readonly unknown[];
+        tallies?: readonly { assigned: number; outstanding: number }[];
+      }>(harness, { queryName: 'workflow.read-instance', instanceId }),
+    );
+
+  const timeline = () =>
+    harness.as(ADMINISTRATOR, () =>
+      ask<{ items: readonly { event: string }[] }>(harness, {
+        queryName: 'workflow.read-history',
+        instanceId,
+        page: 1,
+        size: 50,
+      }),
+    );
+
+  it('refuses by the approved single name', async () => {
+    harness.membershipStanding.inactiveFor(OUTSIDER);
+
+    expect(failureOf(await escalate(harness, instanceId, OUTSIDER))).toBe(
+      'workflow.rejection.escalation-approver-not-eligible',
+    );
+  });
+
+  it('admits somebody Identity says may act', async () => {
+    expect((await escalate(harness, instanceId, OUTSIDER)).ok).toBe(true);
+  });
+
+  /** A refusal writes nothing at all — no step, no entry, and the branch is exactly what it was. */
+  it('writes no step, no history and moves no tally', async () => {
+    harness.membershipStanding.inactiveFor(OUTSIDER);
+
+    const before = await detail();
+
+    expect((await escalate(harness, instanceId, OUTSIDER)).ok).toBe(false);
+
+    const after = await detail();
+    const events = (await timeline()).items.map((item) => item.event);
+
+    expect(after.steps).toHaveLength(before.steps.length);
+    expect(after.tallies?.[0]).toStrictEqual(before.tallies?.[0]);
+    expect(events).not.toContain('step-escalated');
+  });
+
+  /**
+   * **Exactly one Identity read, for exactly the membership named.**
+   *
+   * Not for the approvers already on the branch, not for the requester, and not twice. The budget is
+   * asserted as a whole array rather than a length, so a second read of the same person would fail
+   * as visibly as a read of somebody else.
+   */
+  it('asks Identity once, about the person being added and nobody else', async () => {
+    await escalate(harness, instanceId, OUTSIDER);
+
+    expect(harness.membershipStanding.asked).toStrictEqual([OUTSIDER]);
+  });
+
+  /**
+   * Still exactly one read when some other rule is the one that refuses.
+   *
+   * `escalateBranch` is pure, so its inputs are gathered before it runs and the read is
+   * unconditional — the alternative would be a second copy of the branch rules in the handler,
+   * deciding whether to ask. What must not happen is the read multiplying, or reaching anybody other
+   * than the person named, and that is what this asserts on the path where the domain refuses for a
+   * different reason entirely.
+   */
+  it('still asks exactly once, about only the named person, when another rule refuses', async () => {
+    expect(failureOf(await escalate(harness, instanceId, APPROVER))).toBe(
+      'workflow.rejection.escalation-approver-already-assigned',
+    );
+    expect(harness.membershipStanding.asked).toStrictEqual([APPROVER]);
+  });
+});
+
+describe('when Identity cannot answer', () => {
+  let harness: Harness;
+  let instanceId: string;
+
+  beforeEach(async () => {
+    harness = harnessFor();
+
+    const process = await harness.as(ADMINISTRATOR, () =>
+      publishedBranches(harness, branchOf([APPROVER, SECOND_APPROVER]), 'eligibility-outage'),
+    );
+
+    instanceId = await startedOn(harness, process, 'requisition-outage');
+  });
+
+  /**
+   * **It raises. It is not a refusal and it is not "not eligible".**
+   *
+   * The one case where a wrong choice fails open in one direction and silently in the other: treating
+   * an outage as ineligible would refuse every escalation in the tenant while telling each
+   * administrator to inspect a membership that is perfectly fine.
+   */
+  it('raises rather than refusing', async () => {
+    harness.membershipStanding.failsWith(new Error('identity unavailable'));
+
+    await expect(escalate(harness, instanceId, OUTSIDER)).rejects.toThrow('identity unavailable');
+  });
+
+  /** And nothing was written on the way out. */
+  it('commits no step and no timeline entry', async () => {
+    harness.membershipStanding.failsWith(new Error('identity unavailable'));
+
+    await expect(escalate(harness, instanceId, OUTSIDER)).rejects.toThrow();
+
+    const timeline = await harness.as(ADMINISTRATOR, () =>
+      ask<{ items: readonly { event: string }[] }>(harness, {
+        queryName: 'workflow.read-history',
+        instanceId,
+        page: 1,
+        size: 50,
+      }),
+    );
+
+    expect(timeline.items.map((item) => item.event)).not.toContain('step-escalated');
+  });
+});
