@@ -16,6 +16,7 @@ import {
   listMembershipsHandler,
   searchMembersHandler,
 } from './identity-queries.js';
+import { membershipStandingHandler } from './membership-standing.query.js';
 import { inviteMemberHandler, revokeInvitationHandler } from './invite-member.use-case.js';
 import { admitMemberHandler, changeMembershipHandler } from './membership-lifecycle.use-case.js';
 import { reviseProfileHandler, revisePreferenceHandler } from './member-profile.use-case.js';
@@ -61,6 +62,7 @@ export const identityModule = (dependencies: IdentityDependencies): WorkModule =
     activeDelegationsForHandler(dependencies),
     activeMembershipsForEmploymentHandler(dependencies),
     primaryEmploymentForMembershipHandler(dependencies),
+    membershipStandingHandler(dependencies),
   ] as readonly QueryHandler<Query, unknown>[],
 
   eventHandlers: [onMembershipEnded(dependencies)],

@@ -99,3 +99,22 @@ export interface UserPreferenceView {
   /** Derived from the language. Included so a client never has to know the RTL list. */
   readonly direction: 'ltr' | 'rtl';
 }
+
+/**
+ * Whether one membership may act in this tenant right now — and nothing else about them.
+ *
+ * **One field, and the field is a conclusion rather than a fact.** `isActingMembership` is Identity's
+ * rule for what "acting" means, and this view is that rule already applied. Publishing the raw status
+ * instead would hand every consumer the job of re-deciding whether `suspended` counts, and the second
+ * consumer to answer that differently from the first is the one nobody notices.
+ *
+ * **The absences are the contract.** No status, no profile, no preferences, no portals, no
+ * employments, no delegations, no roles, no organization, no person, no tenant. A caller that needs
+ * any of those is asking a different question and has a different query to ask — this one is for a
+ * consumer that has a membership identifier and needs to know only whether it can be asked to do
+ * something. Widening it would turn a predicate into the member directory this module deliberately
+ * does not publish.
+ */
+export interface MembershipStandingView {
+  readonly active: boolean;
+}

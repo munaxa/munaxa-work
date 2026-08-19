@@ -1,4 +1,4 @@
-import { uuidV7 } from '@work/kernel';
+import { runInContext, uuidV7 } from '@work/kernel';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +9,8 @@ import {
   requireDatabaseInCi,
   type IdentityFixture,
 } from './identity-database.fixture.js';
+import { membershipStandingHandler } from '../application/membership-standing.query.js';
+import { ConfiguredTenantSettingsForTest } from '../application/test-settings.js';
 
 /**
  * Tenant isolation, per entity, against a real PostgreSQL (ADR-0030).
@@ -263,5 +265,67 @@ describeWithDatabase('Workforce Identity tenant isolation', () => {
         ),
       ).toBeUndefined();
     });
+  });
+});
+
+/**
+ * `identity.membership-standing`, against real row-level security.
+ *
+ * The store-level assertion above already proves `byId` hides a neighbour's row by exact identifier.
+ * This proves the **handler's mapping of that absence**: `undefined` becomes `not_found`, and the
+ * caller cannot tell a membership that belongs to somebody else from one that never existed.
+ *
+ * Run through the real `PostgresUnitOfWork` as the unprivileged suite role, so `app.tenant_id` is
+ * genuinely set on the transaction and the policy is genuinely the thing doing the hiding.
+ */
+describeWithDatabase('the standing query, across a tenant boundary', () => {
+  let fixture: IdentityFixture;
+
+  beforeAll(async () => {
+    fixture = await openIdentityFixture('work_standing_test');
+  });
+
+  afterAll(async () => {
+    await fixture.close();
+  });
+
+  beforeEach(async () => {
+    await fixture.truncate();
+  });
+
+  const handler = (): ReturnType<typeof membershipStandingHandler> =>
+    membershipStandingHandler({
+      unitOfWork: fixture.unitOfWork,
+      stores: fixture.stores,
+      settings: new ConfiguredTenantSettingsForTest(),
+      clock: { now: () => new Date('2026-08-19T00:00:00.000Z') },
+    });
+
+  const askAs = (tenantId: string, membershipId: string) =>
+    runInContext({ tenantId, correlationId: uuidV7(), actor: 'user:test' }, () =>
+      handler().handle({ queryName: 'identity.membership-standing', membershipId }),
+    );
+
+  it('answers for a membership of the asking tenant', async () => {
+    const membership = await fixture.seedMembership(TENANT_A, await fixture.seedUser('platform-1'));
+    const outcome = await askAs(TENANT_A, membership);
+
+    expect(outcome).toStrictEqual({ ok: true, value: { active: true } });
+  });
+
+  /**
+   * The same identifier, one tenant over: **`not_found`, never `forbidden` and never `active:false`.**
+   *
+   * `forbidden` would confirm the membership exists somewhere, and `active:false` would answer a
+   * question about a person the caller has no business knowing about. Both are probes; absence is not.
+   */
+  it('hides a membership of another tenant behind the same answer as one that never existed', async () => {
+    const membership = await fixture.seedMembership(TENANT_A, await fixture.seedUser('platform-2'));
+    const foreign = await askAs(TENANT_B, membership);
+    const absent = await askAs(TENANT_B, uuidV7());
+
+    expect(foreign).toStrictEqual(absent);
+    expect(foreign.ok).toBe(false);
+    if (!foreign.ok) expect(foreign.error.kind).toBe('not_found');
   });
 });
