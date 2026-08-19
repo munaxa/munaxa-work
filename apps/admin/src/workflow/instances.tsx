@@ -108,6 +108,7 @@ export const InstanceStepsSection = ({
         headers={[
           'ordinal',
           'approver',
+          'approverOrigin',
           'status',
           'sourceGroup',
           'branchRule',
@@ -120,6 +121,18 @@ export const InstanceStepsSection = ({
           <tr key={step.stepId}>
             <td>{count(step.ordinal)}</td>
             <td>{member(step.approverMembershipId)}</td>
+            {/* **The published boolean, read and nothing else** (D-16D-09). Not the row count, not
+                `sourceGroupId`, and not a join against the timeline: an approver added to a running
+                approval is marked by the server, and this cell prints the mark. A screen that
+                inferred it would call the fourth row of a branch escalated whenever a branch had
+                four rows, which is exactly what the snapshotted denominator makes possible. */}
+            <td>
+              <Term
+                t={t}
+                group="approverOrigin"
+                value={step.escalated ? 'escalated' : 'assigned'}
+              />
+            </td>
             <td>
               <Term t={t} group="stepStatus" value={step.status} />
             </td>

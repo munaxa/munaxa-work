@@ -254,3 +254,31 @@ not a change.
    picker draws from. Requirement 3a is blocked on it.
 3. **An `apps/admin` mutation architecture decision** — the first write path in the application.
    Requirement 3b is blocked on it, and it is not Workflow's to make.
+
+---
+
+## Checkpoint 9 — requirement 2 delivered
+
+Recorded here because §2 of this document reported requirement 2 as **STOPPED** on an API contract
+gap. That gap was closed by D-16D-09, approved 2026-08-18 and shipped in `2bbf019`; Checkpoint 9
+renders it. **The stop report above stands as written** — it was true when written, and it is the
+record of why the field exists.
+
+**What changed.** One column on the instance steps table, `How added`, printing
+`step.escalated ? 'escalated' : 'assigned'` through the existing `<Term>` component. Two vocabulary
+entries and one label, in both catalogues. Nothing else.
+
+**What did not.** No API change was needed — `WorkflowStepView.escalated` and its mapper shipped with
+D-16D-09, and the leak scan was narrowed and paired with positive assertions then. No new request, no
+new endpoint, no fixture change: `anInstanceDetail()` already carried an escalated step and a branch
+whose row count exceeds its denominator.
+
+**The forbidden-heading assertion was not weakened.** `notices.test.tsx` still forbids `escalat` in
+any `<h1>`, `<h2>`, `<th>` or `<dt>`, and it still passes: the column header is *How added* and the
+word appears only as a **cell value**. That is the distinction the assertion was built on — a heading
+claims a capability, a cell describes a row — and it is the same shape as `Status` heading a column
+whose values are *Approved* and *Rejected*.
+
+**Still not built, and still not authorized:** the escalation picker, any Admin mutation, Admin
+authentication (D-16D-10), and candidate enumeration (D-16D-16). Escalation remains an API act, which
+is what `workflow.notice.actionsAreApi` and `workflow.provided.escalation` tell the reader.

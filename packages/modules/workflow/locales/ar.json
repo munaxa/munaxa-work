@@ -40,6 +40,7 @@
       "ordinal": "الترتيب",
       "approver": "المعتمِد المطلوب",
       "approverKind": "نوع المعتمِد",
+      "approverOrigin": "كيف أُضيف",
       "serviceLevel": "المدة المتوقعة",
       "serviceLevelState": "مقابل المستهدف",
       "awaitingOn": "وقت الطلب",
@@ -226,6 +227,10 @@
         "membership": "عضو محدّد",
         "group": "مجموعة اعتماد",
         "manager": "مدير مقدّم الطلب"
+      },
+      "approverOrigin": {
+        "assigned": "مُسنَد",
+        "escalated": "مُصعَّد"
       },
       "historyEvent": {
         "instance-started": "رُفع طلب الاعتماد",

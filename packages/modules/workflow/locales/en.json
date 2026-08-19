@@ -40,6 +40,7 @@
       "ordinal": "Position",
       "approver": "Approver asked",
       "approverKind": "Approver kind",
+      "approverOrigin": "How added",
       "serviceLevel": "Expected to take",
       "serviceLevelState": "Against target",
       "awaitingOn": "Asked at",
@@ -226,6 +227,10 @@
         "membership": "A named member",
         "group": "An approval group",
         "manager": "The requester’s manager"
+      },
+      "approverOrigin": {
+        "assigned": "Assigned",
+        "escalated": "Escalated"
       },
       "historyEvent": {
         "instance-started": "Approval raised",
