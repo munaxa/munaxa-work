@@ -147,8 +147,18 @@ running. It is still **not a directory**: the two Identity queries take one iden
 answer, `identity.membership.read` was not granted, and nothing enumerates memberships, resolves a
 role or traverses more than a single level.
 
-**Escalation, scheduled firing, approval expiry as a written state, and role approvers are owned by
-nobody**, because no module implements them — the row above records that as an absence rather than
+Phase 16D added one capability and, again, moved no fact across a boundary. **Escalation is wholly
+Workflow's**: adding an approver to a running approval is an act on Workflow's own steps, recorded in
+Workflow's own history, and nothing about it is another module's to know. The one fact it needs that
+Workflow does not own is **whether a membership may act at all**, and that stays `identity`'s — asked
+through a bounded port that takes one identifier and returns one boolean, under
+`identity.membership.read` held by no user and reached only through a service grant (ADR-0043).
+Identity applies its own rule and Workflow receives the answer, so there is exactly one definition of
+an acting membership and it lives where the field does. This is still **not a directory**: nothing
+enumerates memberships, and no candidate list exists.
+
+**Scheduled firing, approval expiry as a written state, automatic escalation and role approvers are
+owned by nobody**, because no module implements them — the row above records that as an absence rather than
 leaving a reader to infer an owner. The kernel's `JobPort` is a contract with no adapter anywhere, and
 no phase yet owns a durable runner for it.
 

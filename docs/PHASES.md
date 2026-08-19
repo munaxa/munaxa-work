@@ -413,11 +413,55 @@ plans (which no module had ever planned), the measured performance at 500, 10,00
 approvals with **one workload missing its budget** — the tier C unfiltered instance listing at 124 ms,
 carried from 16B where it measured 91.4 ms and unaffected by this phase — the carried-forward debt
 register and the twenty-two `NOT VERIFIED` capabilities are in
-[`verification/phase-16c-final-report.md`](verification/phase-16c-final-report.md). **Phase 16D — Time
-in Workflow — is not started**: no scheduler, no timer, no expiry transition and no escalation
-execution exists. Notification delivery is Phase 17's and analytics is Phase 20's, by those phases' own
+[`verification/phase-16c-final-report.md`](verification/phase-16c-final-report.md). The Definition of
+Ready for what follows, its fourteen contradictions and its blocking decisions are in
+[`verification/phase-16d-plan.md`](verification/phase-16d-plan.md).
+
+Phase 16D completed on 2026-08-19: **escalation** — one additive migration, one nullable column, one
+partial unique index, one history event, one command, one route, one permission and one column on one
+screen. It is a much smaller phase than its name promised, and deliberately so: 16D opened as *Time in
+Workflow* — escalation, expiry, business days, scheduled execution — and its Definition of Ready found
+that most of that was **already delivered by 16C, decided against, or blocked on infrastructure nobody
+owns**, and stopped on three conditions before any code was written. What survived approval is one
+capability: **a person adds an approver to a branch that is stuck**. **Nothing escalates by itself** —
+there is no scheduler, no timer, no `JobPort` consumer and no automatic trigger of any kind, and the
+command exists only at the end of a request somebody made. **Escalation adds; it never replaces.**
+Nobody is removed, no recorded decision is touched, no clock restarts, and the target the branch was
+given is the target it keeps — which is why the locked 16B denominator survives untouched: the
+snapshotted assigned set is filtered by a marker on the row, so a branch of three that gains a fourth
+approver still needs two approvals and not three (D-16D-08, never reopened). **`unanimous` refuses
+escalation by name**, because for that rule the threshold *is* the denominator and the only two ways
+to proceed were to let a branch complete while an assigned approver had never answered, or to move
+the denominator; the approval rejected both. **Eight refusals, each its own name** — three about the
+branch and five about the person — because each sends a different person to fix a different thing.
+Two of the five were found by asking whether rules the module already held applied here: **the
+requester may not be asked to approve their own request** (D-16D-13) and **an approver already
+terminal on the same instance may not be asked again** (D-16D-14, where `skipped` is deliberately
+*not* terminal — a skipped step means the person never had a say). Neither needed a query: the
+command already loads every step of the instance. The seventh rule did need one, and it is the only
+fact in the phase that Workflow does not own: **a membership must be able to act**. Identity gained
+**one narrow query** on a permission it already had — `identity.membership-standing`, one identifier
+in, `{ active: boolean }` out — reached through a bounded service grant (ADR-0043) that names exactly
+`identity.membership.read`, which **no user holds**. It publishes the predicate rather than the status
+on purpose: Identity owns what "acting" means, and returning the raw status would have put a second
+definition of it in another module. A membership belonging to another tenant is **indistinguishable
+from one that never existed**, so an identifier is not a probe. **What a step now publishes is that it
+was escalated, never when, by whom or why**: `escalated: boolean` and nothing else, with the timestamp
+staying in the database and the actor staying in the timeline where a permission decides who reads it.
+The Admin screen gained **one column** and remains read-only. **Escalation is reachable through the
+API and not from the portal**, and that is a decision rather than an omission: Admin authentication is
+Platform's under ADR-0001 and ADR-0019 and was confirmed **outside this phase** (D-16D-10), and no
+candidate list exists to pick from because none was approved (D-16D-16). Twenty-three capabilities
+remain `NOT VERIFIED`, none with a placeholder anywhere. **No production defect was found** by the
+closing audit; its one finding was a stale sentence in a comment, carried as debt. The eight refusals,
+the eleven approved decisions and the four that remain open, the bounded Identity contract, the
+concurrency protection, the tenancy proofs under an unprivileged role, the recomputed scope and the
+twenty-three `NOT VERIFIED` capabilities are in
+[`verification/phase-16d-final-report.md`](verification/phase-16d-final-report.md). **Phase 16E is not
+started.** Notification delivery is Phase 17's and analytics is Phase 20's, by those phases' own
 specifications; a durable job runner for the kernel's `JobPort` — which has existed as an interface
-since Phase 0 and has never had an adapter — **is owned by no phase yet**, and 16C did not assign one.
+since Phase 0 and has never had an adapter — **is owned by no phase yet**, and neither 16C nor 16D
+assigned one.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

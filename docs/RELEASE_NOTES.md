@@ -5,6 +5,47 @@ and what is still missing.
 
 ---
 
+## Phase 16D — Bringing somebody else in when an approval is stuck
+
+One thing an approval process can now do: **an administrator can add another approver to an approval
+that is already running**.
+
+**It adds somebody. It replaces nobody.** The people already asked stay asked, nothing anyone has
+already decided is touched, no clock restarts, and the time the step was expected to take does not
+change. The new person is simply also asked.
+
+**It does not make the approval harder to finish.** If a stage needed two of three people to approve,
+it still needs two after you add a fourth. Adding somebody widens who *may* answer; it does not raise
+the bar. Their approval counts fully.
+
+**Except where "everyone" is the rule.** If a stage is set so that *everybody* must approve, the
+product refuses to add anyone, and says so. There would be only two possible meanings — either the new
+person's approval lets the stage finish while somebody who was originally asked never answered, or
+everybody now means one more person than it did a moment ago — and neither is what anyone asking for
+"everyone must approve" meant.
+
+**Nothing does this on a timer.** There is no automatic escalation, no reminder, no deadline that
+fires. A person decides to bring somebody in, and that is the only way it happens. A step that is past
+its expected time is still shown as past it, and still nothing follows.
+
+**It will not let you make a mistake it can see.** You cannot add somebody who is already on that
+stage, or who you already added, or the person who raised the request in the first place, or somebody
+who has already approved or rejected this same approval elsewhere in it, or somebody whose membership
+of your organization is suspended or ended. Each of those is refused with its own message, because
+each is a different thing to go and fix.
+
+**You can see who was added.** The approvals screen now shows, for each approver, whether they were
+**assigned** when the approval started or **escalated** in afterwards. The timeline records when it
+happened and who asked for it.
+
+**What is still missing.** You cannot do this from the admin screen — it is available through the API
+only, because signing in to the admin portal is not built yet and belongs to the platform rather than
+to this product. There is also **no list of people to choose from**: whoever calls it has to know the
+membership they want to add. Nothing here is automatic, nothing sends a notification, nothing expires,
+and nothing counts working days.
+
+---
+
 ## Phase 16C — Routing to a manager, and how long a step should take
 
 Two things an approval process can now do: **ask the requester's manager**, and **say how long a step
