@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { TenantIsolationException } from '../errors/domain-exception.js';
 import { uuidV7 } from '../identity/uuid-v7.js';
@@ -119,24 +119,31 @@ describe('the pipeline under a machine context', () => {
   const commandName = 'probe.run';
   const permission = 'probe.run';
 
-  const handler = (ran: { value: boolean }): CommandHandler<{ commandName: string }, string> => ({
+  /** Records that the handler body was reached, which is what the refusal tests need to deny. */
+  const handlerRecording = (
+    onRun: () => void,
+  ): CommandHandler<{ commandName: string }, string> => ({
     commandName,
     permission,
     handle: () => {
-      ran.value = true;
+      onRun();
       return Promise.resolve(success('ran'));
     },
   });
 
   it('admits a machine that holds the permission', async () => {
-    const ran = { value: false };
+    let ran = false;
     const dispatcher = new Dispatcher({ holds: () => Promise.resolve(true) });
 
-    dispatcher.registerCommand(handler(ran));
+    dispatcher.registerCommand(
+      handlerRecording(() => {
+        ran = true;
+      }),
+    );
 
     const outcome = await runInContext(machine(), () => dispatcher.send({ commandName }));
 
-    expect([outcome.ok, ran.value]).toStrictEqual([true, true]);
+    expect([outcome.ok, ran]).toStrictEqual([true, true]);
   });
 
   /**
@@ -145,22 +152,26 @@ describe('the pipeline under a machine context', () => {
    * be — it does not hold the permission — so there is one place authorization is decided.
    */
   it('refuses a machine that does not, exactly as it refuses a person', async () => {
-    const ran = { value: false };
+    let ran = false;
     const dispatcher = new Dispatcher({ holds: () => Promise.resolve(false) });
 
-    dispatcher.registerCommand(handler(ran));
+    dispatcher.registerCommand(
+      handlerRecording(() => {
+        ran = true;
+      }),
+    );
 
     const outcome = await runInContext(machine(), () => dispatcher.send({ commandName }));
 
     expect(outcome.ok).toBe(false);
     expect(outcome.ok ? undefined : outcome.error).toStrictEqual({ kind: 'forbidden', permission });
-    expect(ran.value).toBe(false);
+    expect(ran).toBe(false);
   });
 
   it('still refuses the system context, which has no tenant to run in', async () => {
     const dispatcher = new Dispatcher({ holds: () => Promise.resolve(true) });
 
-    dispatcher.registerCommand(handler({ value: false }));
+    dispatcher.registerCommand(handlerRecording(() => undefined));
 
     await expect(
       runInContext({ system: true, reason: 'migration', correlationId: uuidV7() }, () =>
@@ -230,10 +241,14 @@ describe('the machine context is not reachable by accident', () => {
   });
 
   it('does not leak out of its own scope', () => {
-    const spy = vi.fn();
+    const seen: string[] = [];
+    const context = machine();
 
-    runInContext(machine(), () => spy(currentTenantId()));
+    runInContext(context, () => {
+      seen.push(currentTenantId());
+    });
+
+    expect(seen).toStrictEqual([context.tenantId]);
     expect(currentContext()).toBeUndefined();
-    expect(spy).toHaveBeenCalledOnce();
   });
 });

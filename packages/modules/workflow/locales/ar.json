@@ -239,6 +239,7 @@
         "step-rejected": "رُفضت الخطوة",
         "step-skipped": "تُجووزت الخطوة",
         "step-escalated": "أُضيف معتمد",
+        "step-reminded": "أُرسل تذكير",
         "instance-completed": "اكتمل الاعتماد",
         "instance-rejected": "رُفض الطلب",
         "instance-cancelled": "أُلغي الطلب"

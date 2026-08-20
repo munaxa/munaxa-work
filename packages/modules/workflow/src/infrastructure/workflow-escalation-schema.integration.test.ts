@@ -130,7 +130,7 @@ suite('the escalation column', () => {
   });
 });
 
-suite('the history vocabulary, after the ninth event', () => {
+suite('the history vocabulary, after the tenth event', () => {
   let fixture: WorkflowFixture;
 
   beforeAll(async () => {
@@ -180,7 +180,7 @@ suite('the history vocabulary, after the ninth event', () => {
     });
   });
 
-  it('declares exactly nine, in the constraint itself', async () => {
+  it('declares exactly ten, in the constraint itself', async () => {
     const { rows } = await fixture.admin.query<{ definition: string }>(
       `select pg_get_constraintdef(oid) as definition from pg_constraint
         where conname = 'workflow_history_event_check'`,
@@ -191,7 +191,7 @@ suite('the history vocabulary, after the ninth event', () => {
       expect([event, definition.includes(`'${event}'`)]).toStrictEqual([event, true]);
     }
     // Nine quoted values and no tenth: counting them catches a widening nobody meant to make.
-    expect(definition.match(/'[a-z-]+'::character varying/g)).toHaveLength(9);
+    expect(definition.match(/'[a-z-]+'::character varying/g)).toHaveLength(10);
   });
 
   /**

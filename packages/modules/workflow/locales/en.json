@@ -239,6 +239,7 @@
         "step-rejected": "Step rejected",
         "step-skipped": "Step skipped",
         "step-escalated": "Approver added",
+        "step-reminded": "Reminder sent",
         "instance-completed": "Approval completed",
         "instance-rejected": "Approval rejected",
         "instance-cancelled": "Approval cancelled"

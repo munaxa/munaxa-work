@@ -101,7 +101,7 @@ describe('who may escalate', () => {
       (permission) => permission !== 'workflow.approval.escalate',
     );
 
-    expect(withoutEscalate).toHaveLength(9);
+    expect(withoutEscalate).toHaveLength(10);
 
     const permitted = harnessFor();
     const instanceId = await runningBranch(permitted, 'majority');

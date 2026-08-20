@@ -5437,6 +5437,12 @@ model WorkflowHistory {
   ordinal                    Int?
   actor_membership_id        String?   @db.Uuid
   on_behalf_of_membership_id String?   @db.Uuid
+  /// Which automatic execution produced this entry, for the entries no person produced. Null on
+  /// every human event, and never the actor: the actor columns stay empty when a machine acted.
+  execution_identity         String?   @db.VarChar(255)
+  execution_correlation_id   String?   @db.VarChar(255)
+  execution_job_id           String?   @db.VarChar(255)
+  execution_attempt          Int?
   metadata                   Json
   created_at                 DateTime  @db.Timestamptz(6)
   created_by                 String    @db.VarChar(255)

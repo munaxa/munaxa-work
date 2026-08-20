@@ -1,24 +1,34 @@
 # Phase 16E — Decision Register
 
-**Twelve decisions are `APPROVED`; one, D-16E-12, is `OPEN`.** Implementation of the approved
-reminder is **authorized and blocked**: G-1, G-2 and G-3 are absent from Platform and D-16E-12 is
-open, so Step 1's preconditions fail. The owner's explicit decisions are recorded in
+**Thirteen decisions are `APPROVED` and D-16E-12 is resolved.** The approved automatic service-level
+reminder is **implemented, tested and verified** — see
+[`phase-16e-reminder-implementation.md`](phase-16e-reminder-implementation.md). One dependency
+remains genuinely outside this repository: no job runner exists in Platform, so nothing *invokes* the
+reminder on a schedule yet. The owner's explicit decisions are recorded in
 [§ Owner approvals](#owner-approvals) below, appended rather than substituted: everything beneath
 that section is the **pre-approval record**, preserved word for word, because the reasoning that
 produced the questions is what makes the answers auditable a year from now.
 
-**Phase 16E EXISTS**, and implementation is nevertheless **blocked**. Every approved capability stops
-at a contract boundary that the approval itself designates as a STOP — eight of them, recorded with
-evidence in [`phase-16e-contract-gaps.md`](phase-16e-contract-gaps.md). **No production capability
-has been added**, and Phase 16D is untouched.
+*The three paragraphs that follow are the record as it stood at each earlier checkpoint, kept because
+the reasoning is what makes the outcome auditable. Where a statement has since been overtaken, the
+correction follows it rather than replacing it.*
+
+**Phase 16E EXISTS**, and implementation was **blocked** at every approved capability's contract
+boundary — eight of them, recorded with evidence in
+[`phase-16e-contract-gaps.md`](phase-16e-contract-gaps.md). *Overtaken:* six of the eight were closed
+by the work recorded in [`phase-16e-reminder-implementation.md`](phase-16e-reminder-implementation.md);
+the two that remain are named there.
 
 The owner then resolved those gaps in a second instruction, recorded in
 [§ Contract-gap resolutions](#gap-resolutions). Two of its nine decisions are **amendments** that
-narrow an earlier approval. The resolutions do not unblock implementation: the first two steps of the
-dependency order they impose belong to **a repository this one may never modify**.
+narrow an earlier approval. *Overtaken in one respect:* the dependency order's first two steps were
+read as belonging to a repository this one may never modify. Investigation found the machine
+*principal* and its *capability* already implemented in Platform and simply unconsumed, while the
+`ExecutionContext` they feed is this repository's own kernel — so the context was built here and the
+principal remains Platform's. What is genuinely absent is a **job runner**, and it still is.
 
-State verified at the time of writing: HEAD `7740817`, working tree clean, **zero production changes
-since `730502a`** (`git diff 730502a HEAD -- packages apps prisma` is empty).
+State at the earlier checkpoints: HEAD `7740817`, working tree clean, zero production changes since
+`730502a`. **That is no longer true, and deliberately so** — the approved reminder is implemented.
 
 The evidence behind every entry is in [`phase-16e-plan.md`](phase-16e-plan.md), which is preserved
 unchanged in substance; this register is the canonical status table.
@@ -40,7 +50,7 @@ unchanged in substance; this register is the canonical status table.
 | D-16E-09 | Idempotency | **APPROVED** | Owner, record dated 2026-08-20 |
 | D-16E-10 | The first automatic business action | **APPROVED** | Owner — automatic service-level reminder |
 | D-16E-11 | The reminder's history event — its **existence** | **APPROVED** | Owner |
-| D-16E-12 | Authorization to modify Identity for the recipient contract | **OPEN** | None |
+| D-16E-12 | Authorization to modify Identity for the recipient contract | **RESOLVED** | Covered by the D-16E-13 directive; no new permission required |
 | D-16E-13 | The **concrete** reminder history contract | **APPROVED** | Owner |
 
 **The approval transition.** All nine stood `OPEN` from `2150f19` — the commit that recorded them —

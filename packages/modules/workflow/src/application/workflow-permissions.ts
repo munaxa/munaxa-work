@@ -73,6 +73,29 @@ export const WorkflowPermissions = {
    */
   approvalEscalate: 'workflow.approval.escalate',
 
+  /**
+   * Running the automatic service-level reminder. The eleventh, and the first that no person holds.
+   *
+   * **It is separate from every human permission, and that separation is the whole of D-16E-02.** An
+   * automatic action authorized by a permission somebody already holds would be an action a person
+   * could be made to appear to have taken; and one authorized by nothing at all would be an action
+   * outside the pipeline. So the reminder is authorized exactly as a human operation is — declared
+   * here, checked centrally, granted by Platform — and to a principal that is not a member.
+   *
+   * **Deliberately not `approval.escalate`, `approval.decide`, `instance.start`, `instance.cancel` or
+   * `group.manage`.** Each was near enough to be tempting and each is wrong: they authorize changing
+   * who approves, answering on somebody's behalf, raising an approval, ending one, and editing the
+   * people a process asks. This authorizes sending one message and changing nothing.
+   *
+   * **Nothing implies it and it implies nothing.** Holding every other Workflow permission does not
+   * open it, and holding it opens nothing else — a machine that could remind cannot decide, escalate,
+   * start or cancel, and the authorization suite asserts that one permission at a time.
+   *
+   * It is deliberately **not** in `DELEGABLE_SCOPES`. A delegation lets somebody act in your place,
+   * and there is no place to act in: no person holds this.
+   */
+  reminderExecute: 'workflow.reminder.execute',
+
   /** Reading the approval groups a tenant keeps, and who is on them. */
   groupRead: 'workflow.group.read',
   /** Naming a list, and changing who is on it. Never implied by `definition.manage`. */

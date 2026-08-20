@@ -227,11 +227,11 @@ describe('what escalation never touches', () => {
    * so the assertion moved with them: the event is now one of nine, and still none of the three
    * decisions.
    */
-  it('names an event that is one of the nine and none of the three decisions', () => {
+  it('names an event that is one of the ten and none of the three decisions', () => {
     for (const decision of ['step-approved', 'step-rejected', 'step-skipped']) {
       expect(ESCALATION_EVENT).not.toBe(decision);
     }
     expect([...WORKFLOW_HISTORY_EVENTS]).toContain(ESCALATION_EVENT);
-    expect([...WORKFLOW_HISTORY_EVENTS]).toHaveLength(9);
+    expect([...WORKFLOW_HISTORY_EVENTS]).toHaveLength(10);
   });
 });

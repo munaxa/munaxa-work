@@ -300,6 +300,10 @@ export const REACHABLE_APPROVAL_STATES = ['pending', 'approved', 'rejected', 'ca
  * **An escalation is not a decision.** `step-escalated` says an approver was added to a branch, and
  * it is deliberately none of `step-approved`, `step-rejected` or `step-skipped`: recording it as one
  * of those would put an answer in the timeline that nobody gave.
+ *
+ * **A reminder is not an escalation, and it is not a state.** `step-reminded` says the system told an
+ * approver their step had passed its service level: nobody was added, nothing was decided, and no
+ * step became overdue *as a stored fact*. It records the action, never the condition.
  */
 export const WORKFLOW_HISTORY_EVENTS = [
   'instance-started',
@@ -308,6 +312,7 @@ export const WORKFLOW_HISTORY_EVENTS = [
   'step-rejected',
   'step-skipped',
   'step-escalated',
+  'step-reminded',
   'instance-completed',
   'instance-rejected',
   'instance-cancelled',

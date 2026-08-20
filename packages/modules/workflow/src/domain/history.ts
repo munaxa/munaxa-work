@@ -1,4 +1,5 @@
 import { ESCALATION_EVENT } from './escalation.js';
+import { REMINDER_EVENT, type DueReminder } from './reminder.js';
 import type { WorkflowHistoryEvent } from './workflow-vocabulary.js';
 import type { DecidedStep } from './decision.js';
 import type { CancelledInstance, StartedInstance, WorkflowStepState } from './instance.js';
@@ -24,6 +25,29 @@ import { definedOf } from './defined.js';
  * produce the entries.
  */
 
+/**
+ * Which automatic execution caused an entry, for the entries nobody caused.
+ *
+ * **A separate shape rather than four loose fields**, because they are one fact: an entry either was
+ * produced by an automatic execution and can name it in full, or was produced by a person and has
+ * none of it. Splitting them would admit an entry that named a job and no execution.
+ *
+ * It is deliberately **not** the actor. The actor columns stay empty for automatic entries, because
+ * no membership acted and writing one would be the fake human every approved decision refuses; this
+ * answers the different question of *what ran*.
+ *
+ * **`jobId` and `attempt` are optional within it.** An execution that was not scheduled — invoked
+ * directly by an operator's tooling, say — still has an identity and a correlation, and inventing a
+ * job number for it would be inventing a job.
+ */
+export interface ExecutionProvenance {
+  /** The non-human subject the platform authenticated — `service:<clientId>`. Never a membership. */
+  readonly executionIdentity: string;
+  readonly correlationId: string;
+  readonly jobId?: string;
+  readonly attempt?: number;
+}
+
 export interface WorkflowHistoryState {
   readonly historyId: string;
   readonly instanceId: string;
@@ -35,6 +59,8 @@ export interface WorkflowHistoryState {
   /** The membership that acted. Absent when nothing human did — a step merely becoming current. */
   readonly actorMembershipId?: string;
   readonly onBehalfOfMembershipId?: string;
+  /** Present exactly when a machine produced the entry, and absent for every human one. */
+  readonly execution?: ExecutionProvenance;
   readonly version: number;
 }
 
@@ -278,3 +304,35 @@ export const escalationHistory = (
     ordinal: step.ordinal,
     actorMembershipId,
   });
+
+/**
+ * The single entry a reminder writes: the system told this step's approver it was overdue.
+ *
+ * **Both actor columns stay empty, and that is the honest record.** No membership did this. The
+ * approver named on the step is the *recipient*, and writing them into the actor column would say
+ * they had done something when the whole point is that they have not. `step-awaiting` already sets
+ * the precedent for an entry nobody performed.
+ *
+ * **The provenance is required here, unlike an escalation's actor.** An automatic entry that could
+ * not say which execution produced it would be the one row in this timeline that nothing accounts
+ * for — so the parameter is not optional, and there is no path that writes one without it.
+ *
+ * **It records the reminder, not the overdue-ness.** The step is not marked, no state moves, and the
+ * service level remains a question answered on every read.
+ */
+export const reminderHistory = (
+  reminder: DueReminder,
+  at: Date,
+  historyId: string,
+  execution: ExecutionProvenance,
+): WorkflowHistoryState => ({
+  ...entry({
+    historyId,
+    instanceId: reminder.instanceId,
+    event: REMINDER_EVENT,
+    occurredAt: at,
+    stepId: reminder.stepId,
+    ordinal: reminder.ordinal,
+  }),
+  execution,
+});

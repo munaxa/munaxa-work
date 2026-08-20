@@ -80,7 +80,13 @@ describe('what is still not present', () => {
     // primary line (P-1 to P-4) — so a chain, a depth or a functional line would all be new.
     ['manager chains beyond one level', ['reportsTo', 'reportingLine', 'functional', 'levelsUp']],
     ['role and external approvers', ['roleId', 'permissionHolder', 'externalApprover']],
-    ['notification', ['notify', 'notification', 'recipient', 'reminder']],
+    // `reminder` left this row in Phase 16E **by authorization** (D-16E-10), exactly as `escalat`
+    // left the row above it in 16D. The domain decides *whether* a reminder is due — a pure function
+    // of two columns and an instant — and holds nothing whatever about *telling* anybody: no port, no
+    // recipient, no channel, no template. So the three words that would mean otherwise stay, and the
+    // companion test below asserts the rule is present, so the removal cannot pass for an
+    // abandonment.
+    ['notification', ['notify', 'notification', 'recipient', 'channel', 'deliver']],
     ['analytics', ['analytic', 'aggregate', 'distribution', 'percentile']],
   ];
 
@@ -93,6 +99,23 @@ describe('what is still not present', () => {
       expect(present).toStrictEqual([]);
     });
   }
+
+  /**
+   * The reminder rule is present, and it decides only whether — never who to tell or how.
+   *
+   * The positive half of narrowing the notification row above. `reminderDue` exists and is a function
+   * of an instance, a step and an instant; what it returns is the membership **already on the step**,
+   * which is why no word about recipients or channels appears in this layer at all.
+   */
+  it('has the reminder rule, and nothing in it about telling anybody', () => {
+    // `code` has its string literals stripped, so these are identifiers rather than values — the
+    // value itself is asserted by the vocabulary test above and by the schema parity suite.
+    expect(code).toContain('reminderDue');
+    expect(code).toContain('REMINDER_EVENT');
+    for (const absent of ['NotificationPort', 'notify(', 'workforceUserId', 'templateKey']) {
+      expect([absent, code.includes(absent)]).toStrictEqual([absent, false]);
+    }
+  });
 
   /**
    * The three approver kinds this module ships, and the two it does not.
@@ -207,6 +230,12 @@ describe('history records routing and not business facts', () => {
       // the three decision events above: recording an escalation as an approval, a rejection or a
       // skip would put an answer in the timeline that nobody gave.
       'step-escalated',
+      // Phase 16E's tenth, added with the database constraint in the same migration for the same
+      // reason. It says the system **told** a step's approver that the step had passed its service
+      // level: nobody was added, nothing was decided, and no step became overdue as a stored fact.
+      // It is deliberately neither `step-escalated`, which means a human widened an approval, nor
+      // any of the three decision events.
+      'step-reminded',
       'instance-completed',
       'instance-rejected',
       'instance-cancelled',

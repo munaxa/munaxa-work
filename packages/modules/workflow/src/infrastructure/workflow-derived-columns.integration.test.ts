@@ -67,7 +67,13 @@ suite('what the module stores about time it does not', () => {
           'remaining',
           'elapsed',
           'schedul',
-          'job',
+          // `job` gave way to the narrower pair when Phase 16E added `execution_job_id`, and for the
+          // same reason `escalat` gave way in 16D: that column is **provenance, not a derived value**
+          // — it records which job produced an entry that has already happened, on an immutable row,
+          // and nothing ever maintains it. What stays forbidden is a column that would make something
+          // happen *later*, which is what a queue or a next-run time would be.
+          'job_queue',
+          'next_job',
           // `escalat` gave way to the narrower pair when Phase 16D added `escalated_at`. That column
           // is **provenance, not a derived value**: it says an approver was added rather than
           // snapshotted, and its absence is what the branch tally counts. What stays forbidden is a
@@ -75,6 +81,9 @@ suite('what the module stores about time it does not', () => {
           // escalation level nothing moves.
           'escalate_at',
           'escalation_level',
+          // `notif` stays: Workflow emits an intent and stores nothing about notifications — no
+          // delivery record, no channel, no retry count, no "notified_at" flag that something would
+          // have to maintain.
           'notif',
           'sla',
         ].some((word) => row.column_name.includes(word)),

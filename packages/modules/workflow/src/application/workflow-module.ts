@@ -10,6 +10,7 @@ import {
 import { addStepHandler } from './step.use-case.js';
 import { cancelInstanceHandler, startInstanceHandler } from './instance.use-case.js';
 import { escalateBranchHandler } from './escalation.use-case.js';
+import { remindStepHandler } from './remind-step.use-case.js';
 import {
   addGroupMemberHandler,
   createApprovalGroupHandler,
@@ -103,6 +104,7 @@ const commandsOf = (
     decideStepHandler(dependencies),
     cancelInstanceHandler(dependencies),
     escalateBranchHandler(dependencies),
+    remindStepHandler(dependencies),
   ] as readonly CommandHandler<Command, unknown>[];
 
 const queriesOf = (dependencies: WorkflowDependencies): readonly QueryHandler<Query, unknown>[] =>

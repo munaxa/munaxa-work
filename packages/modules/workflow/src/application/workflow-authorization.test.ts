@@ -1,3 +1,4 @@
+import { RecordingNotificationPort } from '@work/kernel';
 import { describe, expect, it } from 'vitest';
 
 import { workflowModule } from './workflow-module.js';
@@ -10,6 +11,7 @@ import {
   FixedClock,
   FakeDelegation,
   FakeMembershipStanding,
+  FakeReminderRecipient,
   FakeReportingLine,
   NOW,
   TENANT,
@@ -40,6 +42,10 @@ const dependenciesFor = (granted: readonly string[]) => ({
   stores: inMemoryWorkflowStores(),
   delegation: new FakeDelegation(),
   membershipStanding: new FakeMembershipStanding(),
+
+  reminderRecipient: new FakeReminderRecipient(),
+
+  notifications: new RecordingNotificationPort(),
   reportingLine: new FakeReportingLine(),
   businessDecision: {
     apply: (): Promise<ApprovalDelivery> => Promise.resolve({ kind: 'not-adopted' }),
@@ -51,11 +57,11 @@ const dependenciesFor = (granted: readonly string[]) => ({
 describe('every Workflow handler declares a permission', () => {
   const module = workflowModule(dependenciesFor(ALL_WORKFLOW_PERMISSIONS));
 
-  it('registers thirteen commands and ten queries, each with one', () => {
+  it('registers fourteen commands and ten queries, each with one', () => {
     // Nine and eight in 16A; Phase 16B adds three group commands and two group reads; Phase 16D adds
     // one escalation command. Counted here so a handler that arrives without a permission — or
     // without a decision behind it — fails.
-    expect(module.commands).toHaveLength(13);
+    expect(module.commands).toHaveLength(14);
     expect(module.queries).toHaveLength(10);
 
     const declared = [
@@ -72,9 +78,15 @@ describe('every Workflow handler declares a permission', () => {
     }
   });
 
-  it('publishes exactly the ten permissions it declares, and no more', () => {
-    // The two Phase 16B adds are the two the plan authorized, and Phase 16D's is the one the second
-    // half of D-16D-02 approved by name. Nothing else came with any of them.
+  it('publishes exactly the eleven permissions it declares, and no more', () => {
+    // The two Phase 16B adds are the two the plan authorized, Phase 16D's is the one the second half
+    // of D-16D-02 approved by name, and Phase 16E's is the one D-16E-02 approved for the automatic
+    // reminder. Nothing else came with any of them.
+    //
+    // `workflow.reminder.execute` is the first that no *person* holds, and it is on this list for
+    // exactly the same reason as the other ten: Munaxa Work declares what a handler requires so that
+    // Platform has something to grant. A machine capability granted anywhere else would be
+    // authorization this product had built for itself.
     expect([...ALL_WORKFLOW_PERMISSIONS].sort()).toStrictEqual(
       [
         'workflow.approval.decide',
@@ -87,6 +99,7 @@ describe('every Workflow handler declares a permission', () => {
         'workflow.instance.cancel',
         'workflow.instance.read',
         'workflow.instance.start',
+        'workflow.reminder.execute',
       ].sort(),
     );
     expect(module.permissions).toStrictEqual(ALL_WORKFLOW_PERMISSIONS);

@@ -1,3 +1,4 @@
+import { RecordingNotificationPort } from '@work/kernel';
 import type { PermissionChecker, UnitOfWork, WorkModule } from '@work/kernel';
 import { postgresWorkflowStores, workflowModule } from '@work/workflow';
 import { systemClock } from '@work/payroll';
@@ -6,6 +7,7 @@ import type { Asking } from '../payroll/asking.js';
 import type { Sending } from './sending.js';
 import { WorkflowDelegations } from './workflow-sources.js';
 import { WorkflowMembershipStanding } from './workflow-membership-standing.js';
+import { WorkflowReminderRecipient } from './workflow-reminder-recipient.js';
 import { WorkflowReportingLine } from './workflow-reporting-line.js';
 import { RecruitmentDecisions } from './recruitment-decisions.js';
 import { WorkflowApprovals } from './workflow-approvals.js';
@@ -83,6 +85,12 @@ export const workflowModuleFor = (
     // Phase 16D. The same `reader`: asking whether somebody may act must never be able to change
     // whether they may.
     membershipStanding: new WorkflowMembershipStanding(reader),
+    // Phase 16E. The same `reader` again, and the same reasoning: learning who to address a reminder
+    // to must never be able to change anything about them.
+    reminderRecipient: new WorkflowReminderRecipient(reader),
+    // The intent seam, and the only thing that leaves this module when nobody asked. Recording rather
+    // than delivering: Phase 17 owns transport, and no adapter here sends anything.
+    notifications: new RecordingNotificationPort(),
     businessDecision: new RecruitmentDecisions(writer),
     permissions,
     clock: systemClock,

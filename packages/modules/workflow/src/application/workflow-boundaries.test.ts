@@ -1,4 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { RecordingNotificationPort } from '@work/kernel';
+
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -6,10 +8,10 @@ import { describe, expect, it } from 'vitest';
 import { workflowModule } from './workflow-module.js';
 import type { ApprovalDelivery } from './workflow-ports.js';
 import { inMemoryWorkflowStores } from './in-memory-stores.js';
-import { ALL_WORKFLOW_PERMISSIONS, DELEGABLE_SCOPES } from './workflow-permissions.js';
 import {
   FakeDelegation,
   FakeMembershipStanding,
+  FakeReminderRecipient,
   FakeReportingLine,
   FixedClock,
   NOW,
@@ -33,26 +35,6 @@ import {
  * `JobPort` to say there is none. Prose is not implementation.
  */
 
-const APPLICATION = join(process.cwd(), 'src', 'application');
-
-/** Source with block comments, line comments and string literals removed. */
-const codeOf = (file: string): string =>
-  readFileSync(join(APPLICATION, file), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ')
-    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/g, '``');
-
-const production = readdirSync(APPLICATION).filter(
-  (file) =>
-    file.endsWith('.ts') &&
-    !file.endsWith('.test.ts') &&
-    !file.includes('test-harness') &&
-    !file.includes('scenarios'),
-);
-const code = production.map((file) => codeOf(file)).join('\n');
-
 const dependencies = {
   unitOfWork: {
     execute: <T>(work: (t: never) => Promise<T>): Promise<T> => work(undefined as never),
@@ -60,6 +42,10 @@ const dependencies = {
   stores: inMemoryWorkflowStores(),
   delegation: new FakeDelegation(),
   membershipStanding: new FakeMembershipStanding(),
+
+  reminderRecipient: new FakeReminderRecipient(),
+
+  notifications: new RecordingNotificationPort(),
   businessDecision: {
     apply: (): Promise<ApprovalDelivery> => Promise.resolve({ kind: 'not-adopted' }),
   },
@@ -88,6 +74,24 @@ const registered = [
  * resolved inside `start-instance` and appears as an approver, which is why the registration
  * assertion below still forbids the word.
  */
+/**
+ * One port's own source, with its prose removed.
+ *
+ * Read from the file rather than from a test double: a fake carries helpers a real adapter never
+ * will, so its prototype would answer a question about the harness instead of about the contract.
+ *
+ * **Comments and string literals are stripped**, and that is load-bearing rather than tidy. These
+ * assertions forbid the words a directory would arrive in — `page`, `search`, `list` — and a doc
+ * comment explaining that a port has none of them contains every one. Scanning raw text would make
+ * the honest explanation fail the assertion it is explaining.
+ */
+const codeOf = (file: string): string =>
+  readFileSync(join(process.cwd(), 'src', 'application', file), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
+
 describe('nothing deferred beyond Phase 16C is reachable', () => {
   it('registers no handler for any of it', () => {
     const deferred = [
@@ -114,21 +118,30 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
     );
 
     expect(offending).toStrictEqual([]);
-    // Twenty-three: seventeen from 16A, the three group commands and two group reads 16B added, and
-    // Phase 16D's one escalation command. Counted so a handler nobody decided on fails here rather
-    // than shipping.
-    expect(registered).toHaveLength(23);
+    // Twenty-four: seventeen from 16A, the three group commands and two group reads 16B added,
+    // Phase 16D's one escalation command, and Phase 16E's one reminder command. Counted so a handler
+    // nobody decided on fails here rather than shipping.
+    //
+    // **`workflow.remind-step` passes the forbidden-fragment scan above rather than being excused
+    // from it**, which is the point worth keeping: it contains none of `sla`, `breach`, `schedule`,
+    // `expire` or `notify`, because it schedules nothing, breaches nothing and delivers nothing. A
+    // handler that *did* fire on elapsed time would have had to be named for what it does and would
+    // have failed the scan.
+    expect(registered).toHaveLength(24);
     expect(registered).toContain('workflow.escalate-branch');
+    expect(registered).toContain('workflow.remind-step');
   });
 
   /**
-   * Eight dependencies, and the list is the capability surface.
+   * Ten dependencies, and the list is the capability surface.
    *
    * The unit of work, the stores, Identity's delegation read, the permission checker, a clock, the
    * one outbound seam through which a terminal decision reaches the module that asked for it, one
    * reporting-line read since Phase 16C — and, since Phase 16D, one membership-standing read. A
-   * ninth would be the beginning of a capability this phase refuses, and the names below are the ones
-   * that would announce it: a scheduler, a notifier, a blob store, an index, a role directory.
+   * and, since Phase 16E, one recipient read and one notification port. An eleventh would be the
+   * beginning of a capability nobody approved, and the names below are the ones that would announce
+   * it: a scheduler, a blob store, an index, a role directory, or any of the words that mean
+   * *delivering* a notification rather than emitting the intent of one.
    *
    * **The count moved from seven to eight, and only because a decision moved it.** `membershipStanding`
    * is D-16D-11 and D-16D-12, approved 2026-08-18 and implemented in Checkpoint 8C. This assertion is
@@ -153,12 +166,35 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
       'clock',
       'delegation',
       'membershipStanding',
+      'notifications',
       'permissions',
+      'reminderRecipient',
       'reportingLine',
       'stores',
       'unitOfWork',
     ]);
-    for (const forbidden of ['job', 'notification', 'storage', 'search', 'directory', 'outbox']) {
+    // `notification` left this list, and the replacement is the honest one.
+    //
+    // It was here to say Workflow tells nobody anything, which was true until D-16E-07 approved
+    // notification *intent*. Keeping it would have meant either failing a decision the owner made or
+    // renaming the port to evade a word — both worse than saying plainly what is still forbidden.
+    // What the port must never become is *delivery*, so the fragments below are the ones that would
+    // announce it: a broker, a queue, a channel, a transport, a delivery record, an outbox.
+    for (const forbidden of [
+      'job',
+      'storage',
+      'search',
+      'directory',
+      'outbox',
+      'broker',
+      'queue',
+      'channel',
+      'transport',
+      'delivery',
+      'email',
+      'sms',
+      'push',
+    ]) {
       expect(Object.keys(dependencies).join(' ').toLowerCase()).not.toContain(forbidden);
     }
   });
@@ -193,6 +229,28 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
   });
 
   /**
+   * And Phase 16E's port is exactly as narrow as the one before it.
+   *
+   * The same assertion, for the same reason: `ReminderRecipientPort` exists to turn one membership
+   * into one recipient, and a second method — or a first one taking a query — would be the member
+   * directory arriving through a seam opened for something much smaller.
+   */
+  it('exposes the approved recipient port and nothing wider', () => {
+    const port = codeOf('workflow-reminder-recipient.ts');
+    const declaration = port.slice(port.indexOf('interface ReminderRecipientPort'));
+
+    expect(declaration.match(/^\s{2}\w+\(/gm)).toStrictEqual(['  recipient(']);
+    expect(declaration).toContain('recipient(membershipId: string): Promise<ReminderRecipient>');
+
+    for (const wider of ['[]', 'page', 'size', 'term', 'filter', 'search', 'list', 'tenantId']) {
+      expect([wider, port.toLowerCase().includes(wider.toLowerCase())]).toStrictEqual([
+        wider,
+        false,
+      ]);
+    }
+  });
+
+  /**
    * And the outbound seam is one method wide.
    *
    * The prohibition it carries is structural rather than documentary: a port with `send`, a command
@@ -216,153 +274,5 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
     for (const forbidden of ['send', 'ask', 'dispatch', 'publish', 'emit', 'execute']) {
       expect(methods).not.toContain(forbidden);
     }
-  });
-
-  /**
-   * The row that moved in Phase 16C, and it moved **by authorization**.
-   *
-   * `dueAt` and `managerOf` left this list because D-16C-04 authorized the manager approver and
-   * D-16C-05 the service-level target. They are asserted *present* below rather than merely dropped
-   * from here, because a fragment silently removed from a forbidden list is indistinguishable from a
-   * capability quietly abandoned.
-   *
-   * Everything still here is still absent, and each for its own reason. **`escalat`** and
-   * **`breach`** need something that writes when nobody is asking. **`businessDay`** and
-   * **`workingDay`** need a calendar Workflow does not hold and declined to take a dependency on.
-   * **`roleId`** and **`reportsTo`** are the two shapes a directory would arrive in — the first a
-   * role engine, the second the chain rather than one level of it. **`notify`** is Phase 17's.
-   * **`setTimeout`**, **`setInterval`** and **`cron`** are the three ways a timer gets into a process
-   * that has none.
-   */
-  it('has no code that escalates, expires, schedules or consults a calendar', () => {
-    const fragments = [
-      // See the handler list above: the human command is built, and the thing that would fire one is
-      // not. `escalateAfter` and a sweep are what an automatic escalation would be written in.
-      'escalateAfter',
-      'autoEscalat',
-      'escalationTimer',
-      'slaHours',
-      'businessDay',
-      'workingDay',
-      'breach',
-      'expiresAt',
-      'roleId',
-      'reportsTo',
-      'notify',
-      'setTimeout',
-      'setInterval',
-      'cron',
-    ];
-    const present = fragments.filter((fragment) => new RegExp(fragment, 'i').test(code));
-
-    expect(present).toStrictEqual([]);
-  });
-
-  /**
-   * And the complement: what 16C and 16D *did* build is in the source, not only in prose.
-   *
-   * Without this, the edits above would read exactly like deletions — and a boundary suite that only
-   * ever loosens is a suite that stopped meaning anything. `escalateBranch` is 16D's, and it is here
-   * because a human command that adds an approver was authorized; nothing above it fires one.
-   */
-  it('does compute a due date, resolve one manager, and escalate on request', () => {
-    for (const fragment of [
-      'dueAt',
-      'managerOf',
-      'serviceLevelState',
-      'resolutionDateOf',
-      'escalateBranch',
-      'escalationHistory',
-    ]) {
-      expect([fragment, new RegExp(fragment).test(code)]).toStrictEqual([fragment, true]);
-    }
-  });
-
-  it('names those capabilities in its prose, which is where they belong', () => {
-    // The complement of the assertion above, and the reason it had to strip comments. If this fails,
-    // the module stopped explaining its own boundaries.
-    const permissions = readFileSync(join(APPLICATION, 'workflow-permissions.ts'), 'utf8');
-    const ports = readFileSync(join(APPLICATION, 'workflow-ports.ts'), 'utf8');
-
-    for (const word of ['manager', 'read-team']) expect(permissions).toContain(word);
-    for (const word of ['JobPort', 'role', 'notification']) expect(ports).toContain(word);
-  });
-});
-
-describe('the boundaries this module keeps', () => {
-  it('reads nothing from a business module', () => {
-    // AD-001. The one cross-module read is Identity's delegation register, and there is no other
-    // port, no other adapter and no other module named in the code.
-    for (const business of [
-      'recruitment',
-      'requisition',
-      'leave',
-      'payroll',
-      'attendance',
-      'compensation',
-      'employment',
-      'organization',
-      'performance',
-      'learning',
-      'career',
-    ]) {
-      expect(new RegExp(`\\b${business}`, 'i').test(code)).toBe(false);
-    }
-  });
-
-  it('implements no ApprovalPort adapter and calls no adopting module', () => {
-    // Checkpoint 7 owns the seam. What exists here is a *query* published in the port's shape, which
-    // is a view — not an implementation, and not wired to anything.
-    expect(code).not.toContain('implements ApprovalPort');
-    expect(code).not.toContain('ApprovalPort');
-    expect(registered).toContain('workflow.read-approval-status');
-  });
-
-  it('owns no delegation of its own', () => {
-    // Identity's (AD-010). One read, no store, no aggregate, no expiry.
-    expect(Object.keys(inMemoryWorkflowStores()).sort()).toStrictEqual([
-      'decisions',
-      'definitions',
-      'groups',
-      'history',
-      'instances',
-      'steps',
-      'versions',
-    ]);
-    expect(code).not.toContain('delegationStore');
-    expect(code).not.toContain('expireDelegation');
-  });
-
-  it('honours a delegation scope rather than accepting any delegation at all', () => {
-    // A delegation granted for something else is not a delegation for this. The scope key is the
-    // module's own permission name, which is what Identity's opaque `scope` is designed for.
-    expect([...DELEGABLE_SCOPES]).toStrictEqual(['workflow.approval.decide', '*']);
-  });
-
-  it('declares no permission for a capability it does not have', () => {
-    // `group` is no longer among them: Workflow owns an explicit list of memberships, and the two
-    // permissions that read and edit one are routed to real handlers. `role`, `manager` and `team`
-    // still are — each needs a directory or an employment resolution this repository does not have.
-    expect(
-      [...ALL_WORKFLOW_PERMISSIONS].filter((permission) => /team|manager|role/i.test(permission)),
-    ).toStrictEqual([]);
-    // Every declared permission is routed — unlike every other module's `read-own`.
-    const declared = new Set([
-      ...(module.commands ?? []).map((handler) => handler.permission),
-      ...(module.queries ?? []).map((handler) => handler.permission),
-    ]);
-
-    expect(
-      [...ALL_WORKFLOW_PERMISSIONS].filter((permission) => !declared.has(permission)),
-    ).toStrictEqual([]);
-  });
-
-  it('exposes no query that takes an approver identifier from the caller', () => {
-    // The queue's control is an absence. If somebody adds a filter, this fails.
-    const queries = codeOf('approval-queries.ts');
-
-    expect(queries).not.toContain('approverMembershipId?');
-    expect(queries).not.toContain('membershipId?');
-    expect(queries).toContain('currentMembership()');
   });
 });

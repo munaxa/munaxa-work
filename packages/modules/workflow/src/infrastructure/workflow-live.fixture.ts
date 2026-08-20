@@ -1,10 +1,18 @@
-import { Dispatcher, runInContext, uuidV7, type HandlerFailure, type Result } from '@work/kernel';
+import {
+  Dispatcher,
+  RecordingNotificationPort,
+  runInContext,
+  uuidV7,
+  type HandlerFailure,
+  type Result,
+} from '@work/kernel';
 
 import { workflowModule } from '../application/workflow-module.js';
 import {
   FakeBusinessDecisions,
   FakeDelegation,
   FakeMembershipStanding,
+  FakeReminderRecipient,
   FakeReportingLine,
   FixedClock,
 } from '../application/workflow-test-harness.js';
@@ -34,6 +42,8 @@ export interface Live {
   readonly dispatcher: Dispatcher;
   readonly delegation: FakeDelegation;
   readonly membershipStanding: FakeMembershipStanding;
+  readonly reminderRecipient: FakeReminderRecipient;
+  readonly notifications: RecordingNotificationPort;
   /**
    * Employment and Identity, answering who somebody's manager is.
    *
@@ -244,12 +254,16 @@ const liveModule = (fixture: WorkflowFixture): Live => {
   const delegation = new FakeDelegation();
   const reportingLine = new FakeReportingLine();
   const membershipStanding = new FakeMembershipStanding();
+  const reminderRecipient = new FakeReminderRecipient();
+  const notifications = new RecordingNotificationPort();
   const business = new FakeBusinessDecisions();
   const module = workflowModule({
     unitOfWork: fixture.unitOfWork,
     stores: fixture.stores,
     delegation,
     membershipStanding,
+    reminderRecipient,
+    notifications,
     reportingLine,
     businessDecision: business,
     permissions,
@@ -263,6 +277,8 @@ const liveModule = (fixture: WorkflowFixture): Live => {
     dispatcher,
     delegation,
     membershipStanding,
+    reminderRecipient,
+    notifications,
     reportingLine,
     business,
     as: (tenantId, membershipId, work) =>

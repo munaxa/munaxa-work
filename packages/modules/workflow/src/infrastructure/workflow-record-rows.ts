@@ -1,5 +1,6 @@
 import type { WorkflowDecisionState } from '../domain/decision.js';
-import type { WorkflowHistoryState } from '../domain/history.js';
+import { definedOf } from '../domain/defined.js';
+import type { ExecutionProvenance, WorkflowHistoryState } from '../domain/history.js';
 import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instance.js';
 import type { BranchCondition } from '../domain/condition.js';
 import type {
@@ -295,6 +296,10 @@ export interface HistoryRow {
   readonly ordinal: number | null;
   readonly actor_membership_id: string | null;
   readonly on_behalf_of_membership_id: string | null;
+  readonly execution_identity: string | null;
+  readonly execution_correlation_id: string | null;
+  readonly execution_job_id: string | null;
+  readonly execution_attempt: number | null;
   readonly version: number;
 }
 
@@ -308,8 +313,31 @@ export const historyColumns = (alias: string): string =>
     `${alias}.ordinal`,
     `${alias}.actor_membership_id`,
     `${alias}.on_behalf_of_membership_id`,
+    `${alias}.execution_identity`,
+    `${alias}.execution_correlation_id`,
+    `${alias}.execution_job_id`,
+    `${alias}.execution_attempt`,
     `${alias}.version`,
   ].join(', ');
+
+/**
+ * The four provenance columns, read back as the one fact they are.
+ *
+ * `execution_identity` is the discriminator, and the database agrees: the check constraint ties the
+ * correlation to it, the job to the correlation and the attempt to the job. So a row either has an
+ * execution to describe or has none, and there is no half-populated case to represent.
+ */
+const executionOf = (row: HistoryRow): ExecutionProvenance | undefined =>
+  row.execution_identity === null || row.execution_correlation_id === null
+    ? undefined
+    : {
+        executionIdentity: row.execution_identity,
+        correlationId: row.execution_correlation_id,
+        ...presentOf({
+          jobId: row.execution_job_id,
+          attempt: row.execution_attempt === null ? null : asNumber(row.execution_attempt),
+        }),
+      };
 
 export const historyState = (row: HistoryRow): WorkflowHistoryState => ({
   historyId: row.id,
@@ -323,6 +351,7 @@ export const historyState = (row: HistoryRow): WorkflowHistoryState => ({
     actorMembershipId: row.actor_membership_id,
     onBehalfOfMembershipId: row.on_behalf_of_membership_id,
   }),
+  ...definedOf({ execution: executionOf(row) }),
 });
 
 export const historyValues = (state: WorkflowHistoryState, tenantId: string): RowValues => ({
@@ -335,4 +364,8 @@ export const historyValues = (state: WorkflowHistoryState, tenantId: string): Ro
   ordinal: orNull(state.ordinal),
   actor_membership_id: orNull(state.actorMembershipId),
   on_behalf_of_membership_id: orNull(state.onBehalfOfMembershipId),
+  execution_identity: orNull(state.execution?.executionIdentity),
+  execution_correlation_id: orNull(state.execution?.correlationId),
+  execution_job_id: orNull(state.execution?.jobId),
+  execution_attempt: orNull(state.execution?.attempt),
 });

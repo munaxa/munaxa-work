@@ -86,7 +86,13 @@ suite('what the Workflow schema deliberately does not contain', () => {
       // is what the branch tally counts as the snapshotted denominator. What stays forbidden is a
       // column nothing would maintain — a scheduled escalation time, or a level to climb.
       ['automatic escalation', ['escalate_at', 'escalation_level', 'escalation_due']],
-      ['scheduling', ['cron', 'schedule', 'run_at', 'next_run', 'job_']],
+      // `job_` was on this row until Phase 16E and came off **by authorization** (D-16E-13):
+      // `workflow_history.execution_job_id` records *which job produced an entry that already
+      // happened*, which is provenance and the opposite of scheduling. What still must not exist is
+      // a column that would make something happen later — a cron expression, a next-run time, a
+      // due time — and those all stay. The companion assertion below requires the provenance columns
+      // to be present, so a fragment leaving this list cannot pass for a capability abandoned.
+      ['scheduling', ['cron', 'schedule', 'run_at', 'next_run', 'job_queue', 'scheduled_for']],
       // A tally is **derived** from the decisions that exist. A stored count would be a second
       // source of truth that disagrees with `workflow_decision` the moment two approvers commit at
       // once, and the decision table is the one an auditor reads.
@@ -212,7 +218,7 @@ suite('what the Workflow schema deliberately does not contain', () => {
       .filter((entry) => /^\d{14}_/.test(entry))
       .sort();
 
-    expect(directories.at(-1)).toBe('20260818100000_workflow_escalation');
+    expect(directories.at(-1)).toBe('20260820100000_workflow_reminder');
     // One per phase that needed one, and no phase needed two. 16A built the module, 16B the routing
     // core, 16C the routing resolution, and 16D one column, one widened vocabulary and one index.
     expect(directories.filter((entry) => entry.includes('workflow'))).toStrictEqual([
@@ -220,6 +226,7 @@ suite('what the Workflow schema deliberately does not contain', () => {
       '20260815100000_workflow_routing',
       '20260816100000_workflow_routing_resolution',
       '20260818100000_workflow_escalation',
+      '20260820100000_workflow_reminder',
     ]);
   });
 
@@ -346,7 +353,7 @@ suite('what the Workflow schema deliberately does not contain', () => {
       // several steps, and `workflow-parallel.integration.test.ts` asserts what they permit instead —
       // and one more than 16C had, because Phase 16D's escalation index is the thing that makes
       // asking the same person onto one branch twice impossible rather than merely unlikely.
-      expect(rows).toHaveLength(17);
+      expect(rows).toHaveLength(18);
       expect(rows.map((row) => row.indexname)).toContain('workflow_step_escalation_idx');
     });
   });
