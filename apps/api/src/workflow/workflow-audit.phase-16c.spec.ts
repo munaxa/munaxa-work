@@ -192,16 +192,47 @@ suite('the delivered schema, read from the database rather than from a report', 
    * and its absence is what the branch tally counts as the denominator. What the pattern still
    * forbids is a column nothing would maintain: an escalation level to climb, or a time at which the
    * product would escalate by itself.
+   *
+   * **`job` narrowed the same way in Phase 16E**, when `workflow_history.execution_job_id` arrived.
+   * That column records *which job produced an entry that has already happened*, on a row the
+   * database refuses to update or delete — the opposite of scheduling. So the pattern now names the
+   * two shapes a scheduling column would actually take, `job_queue` and `next_job`, and the companion
+   * assertion below requires the provenance columns to be present so the narrowing cannot pass for a
+   * capability abandoned.
    */
   it('grew no column for anything derived, scheduled or organizational', async () => {
     const { rows } = await pool.query<{ named: string }>(
       `select table_name || '.' || column_name as named
          from information_schema.columns
         where table_schema = 'public' and table_name like 'workflow%'
-          and column_name ~ 'due|expir|breach|escalation_level|escalate_at|manager|employment|overdue|elapsed|business|notif|schedul|job|cron|timer'`,
+          and column_name ~ 'due|expir|breach|escalation_level|escalate_at|manager|employment|overdue|elapsed|business|notif|schedul|job_queue|next_job|cron|timer'`,
     );
 
     expect(rows.map((row) => row.named)).toStrictEqual([]);
+  });
+
+  /**
+   * And the four provenance columns Phase 16E added are present, on the one table that carries them.
+   *
+   * The positive half of narrowing `job` above. These are nullable and null on every one of the nine
+   * human events; what they answer is which automatic execution produced an automatic entry, which is
+   * the question D-16E-13 requires history to be able to answer at all.
+   */
+  it('carries execution provenance on history, and on no other table', async () => {
+    const { rows } = await pool.query<{ named: string }>(
+      `select table_name || '.' || column_name as named
+         from information_schema.columns
+        where table_schema = 'public' and table_name like 'workflow%'
+          and column_name like 'execution%'
+        order by column_name`,
+    );
+
+    expect(rows.map((row) => row.named)).toStrictEqual([
+      'workflow_history.execution_attempt',
+      'workflow_history.execution_correlation_id',
+      'workflow_history.execution_identity',
+      'workflow_history.execution_job_id',
+    ]);
   });
 
   /**

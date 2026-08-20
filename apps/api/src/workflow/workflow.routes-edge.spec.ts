@@ -184,11 +184,11 @@ suite('what a Workflow controller must not do', () => {
    * the two permissions are composed and enforced by their handlers while being unreachable over
    * HTTP. That is why this counts the application's permissions rather than the controllers'.
    */
-  it('introduces no permission beyond the ten the application declares', () => {
+  it('introduces no permission beyond the eleven the application declares', () => {
     const sources = CONTROLLER_FILES.map(codeOf).join('\n');
     const mentioned = sources.match(/'workflow\.[a-z.-]+'/g) ?? [];
 
-    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(10);
+    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(11);
     // Controllers name commands and queries, never permissions: the handler declares the permission
     // and the pipeline enforces it, so a route cannot quietly widen or narrow one.
     for (const name of mentioned) {

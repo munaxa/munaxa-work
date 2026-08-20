@@ -67,6 +67,23 @@ describe('the Workflow module, audited whole', () => {
    * a timer, a queue and a notification. A target that nothing fires on and a manager read once are
    * exactly as far as this phase went.
    */
+  /**
+   * And the one capability that *was* approved is present, exactly once.
+   *
+   * The positive half of dropping `notify(` below. A fragment silently removed from a forbidden list
+   * is indistinguishable from a capability quietly abandoned — and, worse here, from one that grew:
+   * counting the call is what stops "Workflow emits an intent" drifting into "Workflow notifies
+   * people about things".
+   */
+  it('emits notification intent exactly once, in the one handler approved to', () => {
+    const calls = PRODUCTION.flatMap(
+      (file) => codeOf(file).match(/notifications\.notify\(/g) ?? [],
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(codeOf('application/remind-step.use-case.ts')).toContain('templateKey');
+  });
+
   it('implements none of the capabilities the phase defers', () => {
     for (const file of PRODUCTION) {
       const code = codeOf(file);
@@ -75,12 +92,21 @@ describe('the Workflow module, audited whole', () => {
         'setTimeout',
         'setInterval',
         'JobPort',
-        'NotificationPort',
+        // `NotificationPort` left this list in Phase 16E **by authorization** (D-16E-07), exactly as
+        // `escalate` left it in 16D and for the same reason: the capability was approved and built,
+        // and a fragment kept here after that would forbid the thing the owner asked for. Workflow
+        // emits notification *intent*; what it still must not do is deliver, and the delivery words
+        // below say so. `JobPort` stays — Workflow schedules nothing.
         'StoragePort',
         'SearchPort',
         'cron',
         'scheduler',
         'schedule(',
+        // Delivery, in every shape it would arrive in. Intent is approved; none of this is.
+        'smtp',
+        'sendEmail',
+        'deliveryStatus',
+        'notificationChannel',
         // `escalate` and `escalation` left this list in Phase 16D, by authorization rather than by
         // attrition (D-16D-02, D-16D-05), exactly as three names left it in 16C. What remains
         // forbidden is the half nobody approved: escalation that fires **on its own**. A human
@@ -96,7 +122,10 @@ describe('the Workflow module, audited whole', () => {
         'reportsTo',
         'roleDirectory',
         'externalApprover',
-        'notify(',
+        // `notify(` left this list with `NotificationPort` above and for the same reason: the one
+        // approved automatic action emits exactly one intent, and the assertion below counts it. What
+        // stays forbidden is `sendNotification` — the verb that would mean Workflow had stopped
+        // saying *what happened* and started saying *how to tell somebody*.
         'sendNotification',
         'expireAt',
         'expiresAt',
@@ -199,6 +228,7 @@ describe('the permissions, after 16B', () => {
     'workflow.definition.manage',
     'workflow.instance.read',
     'workflow.instance.start',
+    'workflow.reminder.execute',
     'workflow.instance.cancel',
     'workflow.approval.decide',
     'workflow.approval.read-own',
@@ -209,7 +239,7 @@ describe('the permissions, after 16B', () => {
     'workflow.group.manage',
   ];
 
-  it('is exactly the ten the phase declares', () => {
+  it('is exactly the eleven the phase declares', () => {
     expect([...ALL_WORKFLOW_PERMISSIONS].sort()).toStrictEqual([...EXPECTED].sort());
   });
 
@@ -244,7 +274,7 @@ describe('the permissions, after 16B', () => {
   it('keeps reading a list and editing one apart', () => {
     expect(ALL_WORKFLOW_PERMISSIONS).toContain('workflow.group.read');
     expect(ALL_WORKFLOW_PERMISSIONS).toContain('workflow.group.manage');
-    expect(new Set(ALL_WORKFLOW_PERMISSIONS).size).toBe(10);
+    expect(new Set(ALL_WORKFLOW_PERMISSIONS).size).toBe(11);
   });
 
   it('declares no permission for a capability the phase does not have', () => {

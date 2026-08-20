@@ -132,9 +132,10 @@ suite('the Workflow API surface', () => {
     const commands = dispatched.filter((name) => name.startsWith('commandName'));
     const queries = dispatched.filter((name) => name.startsWith('queryName'));
 
-    // Thirteen writes and ten reads. Phase 16D added one command and **no query**: escalation is
-    // something somebody does, not something anybody asks about, and reading a branch already
-    // answers what it did.
+    // Thirteen writes and ten reads over HTTP. Phase 16D added one command and **no query**:
+    // escalation is something somebody does, not something anybody asks about, and reading a branch
+    // already answers what it did. Phase 16E added a fourteenth *handler* and no route at all — see
+    // the reconciliation below — so these two numbers are unchanged by it.
     expect(commands).toHaveLength(13);
     expect(queries).toHaveLength(10);
   });
@@ -172,12 +173,36 @@ suite('the Workflow API surface', () => {
     // Every route reaches a handler: a controller dispatching a name nothing registers is a 404 in
     // production and always a defect.
     expect([...dispatched].filter((name) => !registered.has(name))).toStrictEqual([]);
-    // And every handler is reachable. **The list is empty again**, which is the point of having
-    // asserted the exact set rather than skipping the direction: Checkpoint 4 registered
-    // `workflow.escalate-branch` without a route and named it here, and Checkpoint 6's route emptied
-    // it in the same change that added the route. A handler nobody can reach cannot hide in this
-    // assertion, and neither can a stale exemption.
-    expect([...registered].filter((name) => !dispatched.has(name))).toStrictEqual([]);
+    // And every handler is reachable **except one, named**. The exact set rather than an emptiness
+    // check is the point of the direction: Checkpoint 4 registered `workflow.escalate-branch` without
+    // a route and named it here, and Checkpoint 6's route emptied it in the same change that added
+    // the route. So a handler nobody can reach cannot hide here, and neither can a stale exemption.
+    //
+    // **`workflow.remind-step` has no route, and must not.** It runs under a machine execution
+    // context a job runner supplies; an HTTP request produces a *person's* context, and the handler
+    // refuses that outright because there is no execution to attribute the history entry to. A route
+    // could therefore only ever answer 422 — and offering one would invite somebody to wire
+    // authentication to it later and make it mean something. The refusal is asserted below, so this
+    // exemption is a property of the handler rather than a note in a list.
+    expect([...registered].filter((name) => !dispatched.has(name))).toStrictEqual([
+      'workflow.remind-step',
+    ]);
+  });
+
+  /**
+   * And the unrouted handler is unrouted **because it could not work over HTTP**, not because nobody
+   * got round to a controller.
+   *
+   * The positive half of the exemption above. No controller mentions it under any spelling, and no
+   * path exists that could reach it — so the exemption is a fact about the surface rather than a name
+   * on a list that could go stale.
+   */
+  it('exposes no route for the automatic reminder, under any spelling', () => {
+    const source = CONTROLLER_FILES.map(codeOf).join('\n');
+
+    for (const spelling of ['remind', 'reminder', 'reminded', 'sla', 'overdue']) {
+      expect([spelling, source.toLowerCase().includes(spelling)]).toStrictEqual([spelling, false]);
+    }
   });
 
   /**

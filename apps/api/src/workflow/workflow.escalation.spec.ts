@@ -342,7 +342,7 @@ suite('escalating a branch over HTTP', () => {
         (permission) => permission !== 'workflow.approval.escalate',
       );
 
-      expect(withoutEscalate).toHaveLength(9);
+      expect(withoutEscalate).toHaveLength(10);
 
       const instanceId = await runningBranch('majority', 'subject-forbidden');
       const restricted = await fixture.applicationFor(

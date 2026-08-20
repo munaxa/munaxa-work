@@ -69,14 +69,17 @@ describe('workflow composition', () => {
 
     expect(workflow.name).toBe('workflow');
     // Nine and eight in 16A; twelve and ten after Phase 16B's three group commands and two group
-    // reads; thirteen since Phase 16D added one escalation command. **That one has no HTTP route** —
-    // its API checkpoint has not run — so this counts what is *composed*, and
-    // `workflow.routes.spec.ts` counts what is reachable over HTTP and names the gap. The two
-    // numbers differing is the honest state of a half-built phase.
-    expect(workflow.commands ?? []).toHaveLength(13);
+    // reads; thirteen after Phase 16D's escalation command; **fourteen** since Phase 16E's reminder.
+    //
+    // **The fourteenth has no HTTP route, and never will.** It runs under a machine execution context
+    // a job runner supplies, and an HTTP request produces a person's context, which the handler
+    // refuses outright — so a route could only ever answer 422. This counts what is *composed*;
+    // `workflow.routes.spec.ts` counts what is reachable over HTTP and names that one by hand. The
+    // two numbers differing is the design rather than a gap.
+    expect(workflow.commands ?? []).toHaveLength(14);
     expect(workflow.queries ?? []).toHaveLength(10);
     expect(workflow.permissions).toEqual(ALL_WORKFLOW_PERMISSIONS);
-    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(10);
+    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(11);
   });
 
   /** Every handler declares one permission, and none of them is a wildcard or a prefix. */
@@ -86,7 +89,7 @@ describe('workflow composition', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(23);
+    expect(declared).toHaveLength(24);
     for (const permission of declared) {
       expect(ALL_WORKFLOW_PERMISSIONS).toContain(permission);
       expect(permission).not.toContain('*');
@@ -110,7 +113,26 @@ describe('workflow composition', () => {
     expect(source).toContain('new RecruitmentDecisions(writer)');
     expect(source).not.toContain('inMemory');
     expect(source).not.toContain('AutoApproving');
-    expect(source).not.toContain('Recording');
+    // `Recording` left this list in Phase 16E **by authorization**, and the precedent is Performance's:
+    // `RecordingNotificationPort` is what the kernel provides and what production has, because
+    // **intent is a real record and delivery is a missing dependency** (D-16E-07, and D-21 before it).
+    // It was forbidden here while Workflow notified nobody at all; now that it emits intent, keeping
+    // it would forbid the correct adapter. What must never appear is something that *delivers* — and
+    // the assertion below is the one that says so.
+    expect(source).toContain('new WorkflowReminderRecipient(reader)');
+    expect(source).toContain('RecordingNotificationPort');
+    for (const delivery of [
+      'Smtp',
+      'Email',
+      'Sms',
+      'Push',
+      'Broker',
+      'Queue',
+      'Outbox',
+      'Twilio',
+    ]) {
+      expect([delivery, source.includes(delivery)]).toStrictEqual([delivery, false]);
+    }
   });
 
   /**
@@ -275,7 +297,8 @@ describe('workflow composition', () => {
    *
    * The write seam is the one place Workflow can corrupt a completed module, so the audit is
    * structural: no Prisma, no repository, no SQL, no entity, and none of the machinery this phase
-   * refused.
+   * refused. `JobPort` in particular stays forbidden — Workflow schedules nothing, and the runner
+   * that will one day invoke the reminder belongs on the other side of this boundary (D-16E-03).
    */
   it('reaches Recruitment only through its published contracts', () => {
     for (const file of [
@@ -294,7 +317,10 @@ describe('workflow composition', () => {
         'select ',
         'insert into',
         'JobPort',
-        'NotificationPort',
+        // `NotificationPort` left this list in Phase 16E, by the same authorization as `Recording`
+        // above: the composition now wires one, because Workflow emits intent (D-16E-07). Delivery is
+        // what must never appear, and the forbidden words for it are asserted in the composition test
+        // above rather than duplicated here.
         'StoragePort',
         'SearchPort',
         'outbox',
