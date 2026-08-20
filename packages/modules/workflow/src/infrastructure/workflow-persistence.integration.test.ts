@@ -318,6 +318,10 @@ suite('workflow persistence', () => {
         return fixture.stores.steps.forInstance(transaction, started.instance.instanceId);
       });
 
+      // **Red at the end of Phase 16C Checkpoint 4**, for the one reason set out at length beside the
+      // round-trip assertion in `workflow-branch-persistence.integration.test.ts`: the first step now
+      // carries the instant it became awaiting, and the mapper that would persist it is Checkpoint
+      // 5's. The status assertion below is unaffected and still passes.
       expect(steps).toEqual(started.steps);
       expect(steps.map((step) => step.status)).toEqual(['awaiting', 'pending', 'pending']);
     });

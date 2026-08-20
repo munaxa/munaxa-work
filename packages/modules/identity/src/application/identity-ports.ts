@@ -40,6 +40,24 @@ export interface MembershipQuery {
 
 export interface TenantMembershipStore {
   byId(transaction: Transaction, id: string): Promise<TenantMembershipState | undefined>;
+  /**
+   * The memberships that may act now and are linked to one employment — the reverse of
+   * `EmploymentLinkStore.forMembership`, and the whole of Phase 16C's authorized addition.
+   *
+   * **Keyed by a single employment, never by a tenant.** There is no filter, no page, no term and
+   * no ordering parameter, because the question is "who is this one job's holder" rather than "who
+   * works here". A store that could be asked the second is a directory, and this product does not
+   * build one.
+   *
+   * Returns a list rather than one membership because `employment_link` permits several: its
+   * uniqueness is per `(membership, employment)` pair, so nothing stops two memberships being
+   * linked to one job. Identity reports what it holds; choosing between two is a decision nobody
+   * has taken, and this store does not take it by returning the first.
+   */
+  activeForEmployment(
+    transaction: Transaction,
+    employmentId: string,
+  ): Promise<readonly TenantMembershipState[]>;
   byUser(
     transaction: Transaction,
     workforceUserId: string,

@@ -2,6 +2,7 @@ import { PostgresDefinitionRepository } from './definition.repository.js';
 import { PostgresVersionRepository } from './version.repository.js';
 import { PostgresInstanceRepository, PostgresStepRepository } from './instance.repository.js';
 import { PostgresDecisionRepository, PostgresHistoryRepository } from './record.repository.js';
+import { PostgresApprovalGroupRepository } from './group.repository.js';
 import type { WorkflowStores } from '../application/workflow-ports.js';
 
 /**
@@ -14,11 +15,12 @@ import type { WorkflowStores } from '../application/workflow-ports.js';
  * which this function could return an in-memory fallback for one table and real persistence for the
  * rest.
  *
- * Six repositories over the seven tables Checkpoint 3 created. The counts differ by one because
- * `workflow_step_template` has no life outside its version: a template is created only while the
- * version is a draft, frozen when it publishes, and **copied** rather than referenced when an
- * instance starts. It is an entity of the version aggregate, so `PostgresVersionRepository` owns
- * both tables and there is no separate template store a handler could use to reach past the version.
+ * Seven repositories over the nine tables the module owns, and the counts differ by two for the
+ * same reason twice. `workflow_step_template` has no life outside its version — a template is
+ * created only while the version is a draft, frozen when it publishes, and **copied** rather than
+ * referenced when an instance starts — so `PostgresVersionRepository` owns both tables and there is
+ * no separate template store a handler could use to reach past the version. A group member has no
+ * life outside its group for the same reason, and `PostgresApprovalGroupRepository` owns both.
  *
  * **Nothing here opens a transaction.** Each repository takes the `Transaction` the application
  * layer's unit of work established, so a command that writes an instance, its steps and its history
@@ -31,42 +33,5 @@ export const postgresWorkflowStores = (): WorkflowStores => ({
   steps: new PostgresStepRepository(),
   decisions: new PostgresDecisionRepository(),
   history: new PostgresHistoryRepository(),
-  groups: notYetPersisted(),
+  groups: new PostgresApprovalGroupRepository(),
 });
-
-/**
- * The approval-group store, **declared and not yet written**.
- *
- * The two group tables exist and hold their invariants; the repository that reads and writes them is
- * the next checkpoint's, and the application layer that needs it is this one's. That gap is real for
- * exactly one checkpoint, and there are three ways to represent it. Leaving `groups` off this object
- * would make the composition root stop compiling and take the whole module out of the API with it.
- * Returning an in-memory store would be worse than either: the API would serve group reads and writes
- * from process memory, one server would disagree with the next, and every test would pass.
- *
- * So it throws, by name, on every method. A call fails loudly at the one place the capability is
- * missing rather than quietly succeeding somewhere it should not, and the failure names the
- * checkpoint that closes it. Every other Workflow capability is unaffected: nothing else in the
- * module reaches this store unless a version actually names a group.
- */
-const notYetPersisted = (): WorkflowStores['groups'] => {
-  const absent = (): never => {
-    throw new Error(
-      'Workflow approval groups have no PostgreSQL repository yet — the schema exists and the ' +
-        'repository is Phase 16B Checkpoint 5. Nothing may read or write a group through this ' +
-        'store until then.',
-    );
-  };
-
-  return {
-    byId: absent,
-    byCode: absent,
-    search: absent,
-    insert: absent,
-    membersOf: absent,
-    membersOfAll: absent,
-    insertMember: absent,
-    memberById: absent,
-    removeMember: absent,
-  };
-};

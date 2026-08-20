@@ -78,7 +78,8 @@ export const assertRowLevelSecurityForced = async (admin, tables) => {
     // PostgreSQL stores `PUBLIC` as the pseudo-role oid 0, so `{0}` is the whole-world grant and
     // anything else is a policy scoped to named roles — which somebody could sidestep by connecting
     // as a different one.
-    if (row.roles !== '{0}') faults.push(`policy applies to roles ${String(row.roles)}, expected PUBLIC`);
+    if (row.roles !== '{0}')
+      faults.push(`policy applies to roles ${String(row.roles)}, expected PUBLIC`);
     if (row.using_expr !== expected) faults.push(`using ${String(row.using_expr)}`);
     if (row.check_expr !== expected) faults.push(`with check ${String(row.check_expr)}`);
 
@@ -107,9 +108,7 @@ export const assertNoCrossModuleForeignKeys = async (admin, tables) => {
       order by 1, 3`,
     [tables],
   );
-  const leaving = rows.filter(
-    (row) => !tables.includes(row.child) || !tables.includes(row.parent),
-  );
+  const leaving = rows.filter((row) => !tables.includes(row.child) || !tables.includes(row.parent));
 
   if (leaving.length > 0) {
     throw new Error(
@@ -144,7 +143,16 @@ export const assertVocabularyParity = async (admin, vocabularies) => {
     if (rows.length !== 1) {
       throw new Error(`${constraint}: expected exactly one check constraint by that name.`);
     }
-    const found = [...rows[0].definition.matchAll(/'([a-z-]+)'::character varying/g)].map(
+    /**
+     * The literals in the constraint, in **both** of the shapes PostgreSQL renders.
+     *
+     * A vocabulary of several values comes back as `= ANY (ARRAY['a'::character varying, …])`, and
+     * one of a single value comes back as `= 'a'::text` — no array and no cast to the column's own
+     * type. A pattern that knew only the first found nothing in the second and reported the domain's
+     * only value as missing, which is what `workflow_step_approver_kind_check` did: a running step
+     * names a person and never a list, so its vocabulary is one word long.
+     */
+    const found = [...rows[0].definition.matchAll(/'([a-z-]+)'::(?:character varying|text)/g)].map(
       (match) => match[1],
     );
     const missing = expected.filter((value) => !found.includes(value));
@@ -187,122 +195,6 @@ export const assertNoInexactColumns = async (admin, tables) => {
   console.log(
     `No numeric, real, double precision, bigint, money or date column in Workflow. ` +
       `Types used: ${kinds.map((row) => row.data_type).join(', ')}.`,
-  );
-};
-
-/**
- * Neither tenant can reach the other's rows **or the other's totals**.
- *
- * The totals matter as much as the rows. A count computed without the tenant predicate discloses how
- * many approvals are waiting elsewhere even when no row comes back, and on an approvals screen that
- * number is itself a fact about another organization.
- *
- * The reads run through the **production repositories** in the neighbour's tenant context, asking
- * for identifiers that belong to this one — which is the shape a real cross-tenant attempt takes.
- */
-export const assertIsolation = async (stores, asTenant, other, mine) => {
-  const found = await asTenant(other, async (transaction) => ({
-    definition: await stores.definitions.byId(transaction, mine.definition),
-    version: await stores.versions.byId(transaction, mine.version),
-    instance: await stores.instances.byId(transaction, mine.running),
-    open: await stores.instances.openForSubject(transaction, mine.subjecttype, mine.subject),
-    steps: await stores.steps.forInstance(transaction, mine.running),
-    decisions: await stores.decisions.forInstance(transaction, mine.finished),
-    history: await stores.history.forInstance(transaction, mine.running, PAGE),
-    templates: await stores.versions.templatesFor(transaction, mine.version),
-    bySubject: await stores.instances.search(
-      transaction,
-      { subjectType: mine.subjecttype, subjectId: mine.subject },
-      PAGE,
-    ),
-  }));
-  const leaks = [];
-
-  // A uuid belongs to one tenant, so reading one of A's by identifier from B must find nothing.
-  for (const key of ['definition', 'version', 'instance']) {
-    if (found[key] !== undefined) leaks.push(`${key} readable by exact identifier`);
-  }
-  for (const key of ['steps', 'decisions', 'templates']) {
-    if (found[key].length > 0) leaks.push(`${key}: ${String(found[key].length)} rows`);
-  }
-  if (found.history.total !== 0) leaks.push(`history total ${String(found.history.total)}`);
-
-  /**
-   * The subject is the harder case, and the assertion is different in kind.
-   *
-   * Both tenants raise approvals about `SUBJ-00000001`, because a subject identifier belongs to the
-   * business module rather than to Workflow and two organizations numbering their own records from
-   * one is the ordinary situation. So the honest question is not "does B find nothing" — B has its
-   * own approval about that subject and should find it — but **"does B find its own, and never A's"**.
-   * An assertion expecting nothing would have been satisfied by a boundary that simply had no rows
-   * on the other side of it.
-   */
-  if (found.open === undefined) leaks.push('the neighbour cannot see its own approval by subject');
-  if (found.open?.instanceId === mine.running) leaks.push(`open-for-subject returned A's approval`);
-  if (found.bySubject.total !== 1) {
-    leaks.push(`subject search returned ${String(found.bySubject.total)} rows, expected B's one`);
-  }
-  if (found.bySubject.items.some((row) => row.instanceId === mine.running)) {
-    leaks.push(`subject search returned A's approval`);
-  }
-
-  if (leaks.length > 0) throw new Error(`Tenant isolation broken: ${leaks.join('; ')}.`);
-
-  // And the neighbour's own queue, for the membership identifier the two tenants share, returns
-  // only the neighbour's steps — the case a benchmark with disjoint identifiers cannot test at all.
-  const theirs = await asTenant(other, (transaction) =>
-    stores.steps.awaitingFor(transaction, mine.approver, PAGE),
-  );
-  const ours = await asTenant(other, (transaction) =>
-    stores.decisions.decidedBy(transaction, mine.decider, PAGE),
-  );
-
-  console.log(
-    `Isolation: no definition, version, instance, step, decision, template or history row of ` +
-      `tenant A is reachable from tenant B by identifier, and its history total is 0. The subject ` +
-      `both tenants share resolves to B's own approval and never A's. The approver identifier both ` +
-      `tenants share returns ${String(theirs.total)} of B's own awaiting steps and ` +
-      `${String(ours.total)} of B's own decisions.`,
-  );
-};
-
-/**
- * The values Workflow must carry back unchanged, read through the production repositories.
- *
- * Identifiers stay strings, whole numbers stay whole, the localized description round-trips as an
- * object rather than as the string somebody stored it with, and an instant is a `Date` the mapper
- * produced rather than a string a consumer must parse.
- */
-export const assertExactValues = async (stores, asTenant, tenant, mine) => {
-  const read = await asTenant(tenant, async (transaction) => ({
-    definition: await stores.definitions.byId(transaction, mine.definition),
-    version: await stores.versions.byId(transaction, mine.version),
-    instance: await stores.instances.byId(transaction, mine.running),
-    steps: await stores.steps.forInstance(transaction, mine.running),
-  }));
-  const faults = [];
-
-  if (typeof read.definition?.definitionId !== 'string') faults.push('definitionId is not a string');
-  if (read.definition?.definitionId !== mine.definition) faults.push('definitionId changed');
-  if (typeof read.definition?.description?.en !== 'string') {
-    faults.push('description did not round-trip as localized text');
-  }
-  if (!Number.isInteger(read.version?.versionNumber)) faults.push('versionNumber is not an integer');
-  if (!Number.isInteger(read.instance?.version)) faults.push('row version is not an integer');
-  if (!(read.instance?.startedAt instanceof Date)) faults.push('startedAt is not a Date');
-  if (read.instance?.completedAt !== undefined) faults.push('a running approval carries a completion');
-  for (const step of read.steps) {
-    if (!Number.isInteger(step.ordinal)) faults.push(`ordinal ${String(step.ordinal)} is not whole`);
-  }
-  const ordinals = read.steps.map((step) => step.ordinal);
-
-  if (ordinals.join(',') !== [...ordinals].sort((a, b) => a - b).join(',')) {
-    faults.push('steps are not returned in ordinal order');
-  }
-  if (faults.length > 0) throw new Error(`Exactness broken: ${faults.join('; ')}.`);
-  console.log(
-    `Exactness: identifiers are strings, ordinals and versions are whole, the localized ` +
-      `description round-trips as an object, and instants arrive as dates.`,
   );
 };
 
@@ -350,11 +242,18 @@ export const explain = async (asTenant, stores, tenant, mine) => {
  * accompanies it — the query most likely to differ from the page it belongs to.
  */
 const planned = (stores, mine) => [
+  // Phase 16B. A group page ordered by code, the members of one list, and the single statement that
+  // resolves every list at once — the read a branched approval start would otherwise make per group.
+  ['approval group listing', (tx) => stores.groups.search(tx, PAGE)],
+  ['members of one group', (tx) => stores.groups.membersOf(tx, mine.group)],
+  ['members of every group at once', (tx) => stores.groups.membersOfAll(tx, mine.groupIds)],
+  ['queue for a branch approver', (tx) => stores.steps.awaitingFor(tx, mine.branchApprover, PAGE)],
   ['pending queue for one member', (tx) => stores.steps.awaitingFor(tx, mine.approver, PAGE)],
   ['decided approvals for one member', (tx) => stores.decisions.decidedBy(tx, mine.decider, PAGE)],
   [
     'instances by subject',
-    (tx) => stores.instances.search(tx, { subjectType: mine.subjecttype, subjectId: mine.subject }, PAGE),
+    (tx) =>
+      stores.instances.search(tx, { subjectType: mine.subjecttype, subjectId: mine.subject }, PAGE),
   ],
   ['running instances', (tx) => stores.instances.search(tx, { status: 'running' }, PAGE)],
   [
@@ -363,5 +262,98 @@ const planned = (stores, mine) => [
   ],
   ['timeline for one approval', (tx) => stores.history.forInstance(tx, mine.running, PAGE)],
   ['current published version', (tx) => stores.versions.currentPublished(tx, mine.definition)],
-  ['definition listing (active)', (tx) => stores.definitions.search(tx, { status: 'active' }, PAGE)],
+  [
+    'definition listing (active)',
+    (tx) => stores.definitions.search(tx, { status: 'active' }, PAGE),
+  ],
+];
+
+/**
+ * And the **statistics** removed, which `truncate` and `vacuum analyze` between them do not do.
+ *
+ * `vacuum analyze` on an emptied table sets `reltuples` to zero and leaves the per-column histograms
+ * in `pg_statistic` exactly as this fixture wrote them: an empty table gives `ANALYZE` nothing with
+ * which to replace them. The repository's plan suite then plans a five-row fixture against a hundred
+ * thousand rows' worth of selectivity and watches PostgreSQL choose a different — and equally
+ * correct — index from the one it names.
+ *
+ * That is what happened during the Phase 16B audit, exactly as this file's header warned it would.
+ * The header's remedy was to re-migrate a fresh database; deleting the nine tables' statistics is
+ * the same restoration without dropping anything, so the benchmark now cleans up after itself.
+ *
+ * It needs a superuser and says so rather than failing when it is not one: the run's *figures* do
+ * not depend on this, only the next suite's plans do.
+ */
+export const forgetStatistics = async (admin, tables) => {
+  try {
+    const relations = tables.map((table) => `'${table}'::regclass`).join(', ');
+
+    await admin.query(`delete from pg_statistic where starelid in (${relations})`);
+    return ' and its planner statistics with it';
+  } catch {
+    return ' — but its planner statistics remain; re-migrate a fresh database before the plan suites';
+  }
+};
+
+/**
+ * Every closed vocabulary the domain declares, checked against the constraint that enforces it.
+ *
+ * Named by constraint rather than by column: `workflow_version` has two check constraints that
+ * mention `status`, and matching on the column would compare the domain's list against whichever
+ * one the catalogue returned first.
+ */
+export const VOCABULARIES = [
+  ['workflow_definition_status_check', 'definition status', ['active', 'retired']],
+  ['workflow_version_status_check', 'version status', ['draft', 'published', 'archived']],
+  [
+    'workflow_instance_status_check',
+    'instance status',
+    ['running', 'completed', 'rejected', 'cancelled'],
+  ],
+  [
+    'workflow_step_status_check',
+    'step status',
+    ['pending', 'awaiting', 'approved', 'rejected', 'skipped'],
+  ],
+  ['workflow_decision_kind_check', 'decision', ['approved', 'rejected']],
+  // Phase 16B. A **template** may name a person or a list; a running **step** never names a list,
+  // because the list was resolved into its members before the row existed. The two constraints are
+  // deliberately different and are checked as two.
+  //
+  // Phase 16C widened the **template** constraint by one value and left the **step** constraint
+  // exactly as it was, which is the whole shape of manager routing in the database: a template may
+  // say `manager`, and a running step never can, because the kind was resolved into a concrete
+  // membership before the row existed. That the step list below is still one value long is the
+  // load-bearing half of this pair.
+  [
+    'workflow_step_template_approver_kind_check',
+    'template approver kind',
+    ['membership', 'group', 'manager'],
+  ],
+  ['workflow_step_approver_kind_check', 'step approver kind', ['membership']],
+  [
+    'workflow_step_template_branch_rule_check',
+    'template branch rule',
+    ['unanimous', 'majority', 'first-response'],
+  ],
+  [
+    'workflow_step_branch_rule_check',
+    'step branch rule',
+    ['unanimous', 'majority', 'first-response'],
+  ],
+  ['workflow_decision_authority_check', 'decision authority', ['assigned', 'delegated']],
+  [
+    'workflow_history_event_check',
+    'history event',
+    [
+      'instance-started',
+      'step-awaiting',
+      'step-approved',
+      'step-rejected',
+      'step-skipped',
+      'instance-completed',
+      'instance-rejected',
+      'instance-cancelled',
+    ],
+  ],
 ];

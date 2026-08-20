@@ -5,10 +5,13 @@ import type {
 } from '../domain/definition.js';
 import type {
   ApproverKind,
+  BranchRule,
   LocalizedName,
   WorkflowDefinitionStatus,
   WorkflowVersionStatus,
 } from '../domain/workflow-vocabulary.js';
+import type { BranchCondition } from '../domain/condition.js';
+import { serviceLevelOf, serviceLevelValues } from './workflow-service-level-columns.js';
 import { asNumber, orNull, presentOf, type RowValues } from './row-writer.js';
 
 /**
@@ -136,18 +139,59 @@ export const versionValues = (state: WorkflowVersionState, tenantId: string): Ro
   published_by: orNull(state.publishedBy),
 });
 
+/**
+ * One step of a version: the four columns Phase 16B added to it, and the two Phase 16C did.
+ *
+ * **`approver_membership_id` is nullable now**, because a `group` template names no person. The
+ * pairing is not left loose: `workflow_step_template_approver_check` requires exactly the field the
+ * kind implies, which is stricter per row than `not null` was — and it generalized to `manager` for
+ * free, since a manager template names **neither** identifier and both of that constraint's
+ * biconditionals are false for it. There is no manager column here and no row shape that would want
+ * one: whose manager a template means is the requester's, fixed rather than configured.
+ *
+ * **`service_level_count` and `service_level_unit` are two columns rather than one interval**,
+ * because "two days" and "forty-eight hours" are the same duration and not the same sentence — an
+ * administrator typed one of them and a screen has to show it back. They travel together: the
+ * database's `workflow_step_template_service_level_check` requires both or neither, and the mapper
+ * assembles them into one value object or omits it entirely.
+ *
+ * **`condition` is `jsonb` and is passed through in both directions.** The mapper stringifies on the
+ * way in and hands the parsed array back on the way out, and does nothing else — it does not read a
+ * key, check an operator or evaluate anything. The database checks the *shape*
+ * (`app_workflow_condition_shaped`), the domain decides the *meaning*, and a repository that
+ * interpreted a condition would be the third place the rule lived.
+ */
 export interface TemplateRow {
   readonly id: string;
   readonly workflow_version_id: string;
   readonly ordinal: number;
   readonly name: unknown;
   readonly approver_kind: string;
-  readonly approver_membership_id: string;
+  readonly approver_membership_id: string | null;
+  readonly approver_group_id: string | null;
+  readonly branch_rule: string | null;
+  readonly quorum: number | null;
+  readonly condition: unknown;
+  readonly service_level_count: number | null;
+  readonly service_level_unit: string | null;
   readonly version: number;
 }
 
-export const TEMPLATE_COLUMNS =
-  'id, workflow_version_id, ordinal, name, approver_kind, approver_membership_id, version';
+export const TEMPLATE_COLUMNS = [
+  'id',
+  'workflow_version_id',
+  'ordinal',
+  'name',
+  'approver_kind',
+  'approver_membership_id',
+  'approver_group_id',
+  'branch_rule',
+  'quorum',
+  'condition',
+  'service_level_count',
+  'service_level_unit',
+  'version',
+].join(', ');
 
 export const templateState = (row: TemplateRow): WorkflowStepTemplateState => ({
   stepTemplateId: row.id,
@@ -155,8 +199,15 @@ export const templateState = (row: TemplateRow): WorkflowStepTemplateState => ({
   ordinal: asNumber(row.ordinal),
   name: localized(row.name),
   approverKind: row.approver_kind as ApproverKind,
-  approverMembershipId: row.approver_membership_id,
   version: asNumber(row.version),
+  ...presentOf({
+    approverMembershipId: row.approver_membership_id,
+    approverGroupId: row.approver_group_id,
+    branchRule: row.branch_rule as BranchRule | null,
+    quorum: row.quorum === null ? null : asNumber(row.quorum),
+  }),
+  ...conditionOf(row.condition),
+  ...serviceLevelOf(row.service_level_count, row.service_level_unit),
 });
 
 export const templateValues = (state: WorkflowStepTemplateState, tenantId: string): RowValues => ({
@@ -166,5 +217,22 @@ export const templateValues = (state: WorkflowStepTemplateState, tenantId: strin
   ordinal: state.ordinal,
   name: JSON.stringify(state.name),
   approver_kind: state.approverKind,
-  approver_membership_id: state.approverMembershipId,
+  approver_membership_id: orNull(state.approverMembershipId),
+  approver_group_id: orNull(state.approverGroupId),
+  branch_rule: orNull(state.branchRule),
+  quorum: orNull(state.quorum),
+  condition: state.condition === undefined ? null : JSON.stringify(state.condition),
+  ...serviceLevelValues(state.serviceLevel),
 });
+
+/**
+ * A `jsonb` condition, as the domain's own list.
+ *
+ * Separate from `presentOf` because a `jsonb` column arrives as a parsed value rather than as a
+ * scalar the helper can pass through — the same treatment a definition's `description` gets. An
+ * **empty array is kept**: `[]` is a branch that always runs, and dropping it to `undefined` would be
+ * indistinguishable from a step nobody configured a condition on. They mean the same thing to
+ * `conditionsOf`, and the mapper's job is to return what was stored rather than what is equivalent.
+ */
+const conditionOf = (value: unknown): { condition?: readonly BranchCondition[] } =>
+  value === null || value === undefined ? {} : { condition: value as readonly BranchCondition[] };

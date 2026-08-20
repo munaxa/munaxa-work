@@ -1,13 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  APPROVER,
   CONNECTION,
   openWorkflowFixture,
   requireDatabaseInCi,
-  WORKFLOW_MAPPED_TABLES,
+  WORKFLOW_TABLES,
   type WorkflowFixture,
 } from './workflow-database.fixture.js';
-import { aDefinition, aStartedInstance, anApproval } from './workflow-states.js';
+import {
+  aDefinition,
+  aGroup,
+  aGroupMember,
+  aStartedInstance,
+  anApproval,
+} from './workflow-states.js';
+import { groupColumns, groupValues, memberColumns, memberValues } from './workflow-group-rows.js';
 import {
   TEMPLATE_COLUMNS,
   definitionColumns,
@@ -52,6 +60,26 @@ const AUDIT = ['created_at', 'created_by', 'updated_at', 'updated_by', 'version'
 /** Columns the database fills in itself, so a mapper is not required to. */
 const DEFAULTED = ['id', 'metadata'];
 
+/**
+ * The columns infrastructure owns, which no domain mapper reads and none should.
+ *
+ * `tenant_id` is written by every mapper and read by none — row-level security answers the question
+ * it would answer, and a domain state carrying a tenant identifier would be a second place tenancy
+ * lived. `metadata` and the four soft-delete and audit pairs belong to the shared `Repository` base.
+ * Everything **not** on this list is a domain column, and the assertion below requires a mapper to
+ * read it.
+ */
+const INFRASTRUCTURE = new Set([
+  'tenant_id',
+  'metadata',
+  'created_at',
+  'created_by',
+  'updated_at',
+  'updated_by',
+  'deleted_at',
+  'deleted_by',
+]);
+
 interface ColumnFacts {
   readonly type: string;
   readonly required: boolean;
@@ -85,7 +113,7 @@ suite('mapper and schema parity', () => {
       `select table_name, column_name, data_type, is_nullable, column_default
          from information_schema.columns
         where table_schema = 'public' and table_name = any($1::text[])`,
-      [WORKFLOW_MAPPED_TABLES],
+      [WORKFLOW_TABLES],
     );
 
     catalogue = new Map();
@@ -112,6 +140,7 @@ suite('mapper and schema parity', () => {
     const [step] = seed.steps;
     const [entry] = seed.history;
     const [template] = seed.templates;
+    const group = aGroup();
 
     if (step === undefined || entry === undefined || template === undefined) {
       throw new Error('The fixture produced an incomplete approval.');
@@ -156,23 +185,33 @@ suite('mapper and schema parity', () => {
         read: columnsOf(historyColumns('h')),
         written: historyValues(entry, tenantId),
       },
+      {
+        table: 'workflow_approval_group',
+        read: columnsOf(groupColumns('g')),
+        written: groupValues(group, tenantId),
+      },
+      {
+        table: 'workflow_approval_group_member',
+        read: columnsOf(memberColumns('m')),
+        written: memberValues(aGroupMember(group, APPROVER), tenantId),
+      },
     ];
   };
 
   /**
-   * The seven tables a mapper covers, which is deliberately not the nine the module owns.
+   * All nine tables the module owns.
    *
-   * Phase 16B Checkpoint 3 is schema only: `workflow_approval_group` and its member table exist,
-   * carry their policies and hold their invariants, and **no repository reads or writes them yet**
-   * — that is Checkpoint 5. Comparing mappers against all nine would fail for a reason that has
-   * nothing to do with drift, which is the one thing this suite exists to detect.
+   * It was seven for one checkpoint: the two group tables existed with their policies and their
+   * invariants and had no repository, which Checkpoint 4 recorded as a deliberate gap rather than
+   * hiding. Checkpoint 5 closed it, and the list is the whole module again — so a table that
+   * acquires columns without a mapper fails here rather than on its first insert.
    */
-  it('covers every table a repository maps', () => {
+  it('covers all nine tables', () => {
     expect(
       mapped()
         .map((one) => one.table)
         .sort(),
-    ).toEqual([...WORKFLOW_MAPPED_TABLES].sort());
+    ).toEqual([...WORKFLOW_TABLES].sort());
   });
 
   it('reads no column the database does not have', () => {
@@ -212,6 +251,61 @@ suite('mapper and schema parity', () => {
     });
 
     expect(unsupplied).toEqual([]);
+  });
+
+  /**
+   * The fourth direction — and it was missing, which is a defect this checkpoint found in its own
+   * audit tool.
+   *
+   * The three assertions above run *from the mapper outwards*: nothing read that is absent, nothing
+   * written that is absent, nothing required that is unsupplied. All three stay green when the
+   * **database** grows a column no mapper touches — so when Checkpoint 3 added
+   * `service_level_count`, `service_level_unit` and `awaiting_at`, this suite reported parity for a
+   * checkpoint and a half while three columns were invisible to the application. It was a step
+   * round-trip assertion that eventually caught it, not this file.
+   *
+   * A column silently unmapped is the worst of the four failures precisely because it is the quiet
+   * one: everything inserts, everything selects, and the value simply never arrives. So the direction
+   * is closed here. A new column must be mapped, or named on `INFRASTRUCTURE` by somebody who decided
+   * it should not be.
+   */
+  it('reads every domain column the database has, so none is silently unmapped', () => {
+    const unmapped = mapped().flatMap((one) => {
+      const read = new Set(one.read);
+
+      return [...(catalogue.get(one.table) ?? new Map<string, ColumnFacts>())]
+        .map(([column]) => column)
+        .filter((column) => !INFRASTRUCTURE.has(column) && !read.has(column))
+        .map((column) => `${one.table}.${column}`);
+    });
+
+    expect(unmapped).toEqual([]);
+  });
+
+  /**
+   * And the three Phase 16C columns by name, so a rename cannot pass the assertion above by being
+   * dropped from the schema and the mapper at once.
+   */
+  it('maps the three columns Phase 16C added, on both tables that carry them', () => {
+    const byTable = new Map(mapped().map((one) => [one.table, one]));
+
+    for (const [table, column] of [
+      ['workflow_step_template', 'service_level_count'],
+      ['workflow_step_template', 'service_level_unit'],
+      ['workflow_step', 'service_level_count'],
+      ['workflow_step', 'service_level_unit'],
+      ['workflow_step', 'awaiting_at'],
+    ] as const) {
+      const one = byTable.get(table);
+
+      expect([table, column, catalogue.get(table)?.has(column)]).toEqual([table, column, true]);
+      expect([table, column, one?.read.includes(column)]).toEqual([table, column, true]);
+      expect([table, column, Object.keys(one?.written ?? {}).includes(column)]).toEqual([
+        table,
+        column,
+        true,
+      ]);
+    }
   });
 
   it('reads back every column it writes, so nothing is written and then invisible', () => {

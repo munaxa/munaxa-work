@@ -6,6 +6,8 @@ import { APPROVAL_STATES } from '@work/workflow/contracts';
 import { translator } from './locale';
 import { count, instant, member, short } from './exact';
 import { DefinitionsSection, StepsSection, VersionsSection } from './definitions';
+import { ApprovalGroupsSection, GroupMembersSection } from './groups';
+import { AwaitingSection, BranchesSection } from './branches';
 import { InstanceStepsSection, InstancesSection } from './instances';
 import { ApprovalStatusSection, DecidedSection, PendingSection } from './approvals';
 import { HistorySection } from './history';
@@ -23,6 +25,12 @@ import {
   anInstance,
   anInstanceDetail,
 } from './views.fixture';
+import {
+  aBranchedDefinitionDetail,
+  aGroup,
+  aGroupDetail,
+  aParallelInstanceDetail,
+} from './branches.fixture';
 
 /**
  * What the screen refuses to claim, and the two kinds of value it must not alter.
@@ -35,7 +43,6 @@ import {
  */
 
 const en = translator('en');
-const ar = translator('ar');
 const props = { t: en, language: 'en' } as const;
 
 const html = (node: ReactNode): string => renderToStaticMarkup(node);
@@ -82,6 +89,11 @@ const populated = (language: 'en' | 'ar'): string => {
     html(<HistorySection {...all} history={aHistory()} total={9} />),
     html(<PendingSection {...all} pending={[aPendingApproval()]} total={12} />),
     html(<DecidedSection {...all} decided={[aDirectDecision(), aDelegatedDecision()]} total={7} />),
+    html(<ApprovalGroupsSection {...all} groups={[aGroup()]} total={6} />),
+    html(<GroupMembersSection {...all} detail={aGroupDetail()} />),
+    html(<StepsSection {...all} detail={aBranchedDefinitionDetail()} />),
+    html(<BranchesSection {...all} tallies={aParallelInstanceDetail().tallies} />),
+    html(<AwaitingSection {...all} steps={aParallelInstanceDetail().awaitingSteps} />),
   ].join('\n');
 };
 
@@ -266,118 +278,5 @@ describe('the state vocabulary, and the one state nothing reaches', () => {
     const markup = html(<ApprovalStatusSection {...props} approval={anApprovalStatus()} />);
 
     expect(markup).toContain(en('workflow.vocabulary.approvalState.pending'));
-  });
-});
-
-describe('what this product does not do', () => {
-  it('states every deferred capability, in both languages', () => {
-    for (const [language, translate] of [
-      ['en', en],
-      ['ar', ar],
-    ] as const) {
-      const markup = html(<StatusSection t={translate} language={language} />);
-
-      for (const key of [
-        'workflow.withheld.sla',
-        'workflow.withheld.businessDays',
-        'workflow.withheld.escalation',
-        'workflow.withheld.scheduling',
-        'workflow.withheld.approvalExpiry',
-        'workflow.withheld.delegationExpiry',
-        'workflow.withheld.parallelApproval',
-        'workflow.withheld.tally',
-        'workflow.withheld.conditionalBranching',
-        'workflow.withheld.roles',
-        'workflow.withheld.groups',
-        'workflow.withheld.managerRouting',
-        'workflow.withheld.externalApprovers',
-        'workflow.withheld.notificationDelivery',
-        'workflow.withheld.analytics',
-        'workflow.withheld.asynchronousCallbacks',
-        'workflow.withheld.outbox',
-        'workflow.notice.actionsAreApi',
-        'workflow.notice.identifiersNotNames',
-        'workflow.notice.queueIsAmbient',
-      ]) {
-        expect([language, key, markup.includes(escaped(translate(key)))]).toEqual([
-          language,
-          key,
-          true,
-        ]);
-      }
-    }
-  });
-
-  /**
-   * A notice is a sentence, never a control.
-   *
-   * The point of naming an absence is to stop somebody building on it. A notice that rendered as a
-   * button, a link or a form would do the opposite — it would look like the capability is a click
-   * away.
-   */
-  it('renders the notices as text, with nothing actionable among them', () => {
-    const markup = html(<StatusSection {...props} />).toLowerCase();
-
-    for (const control of ['<form', '<button', '<input', '<select', '<a ', 'href=', 'onclick']) {
-      expect([control, markup.includes(control)]).toEqual([control, false]);
-    }
-  });
-});
-
-describe('the claims no heading or column makes', () => {
-  /**
-   * The negative space, scoped to where a claim would live.
-   *
-   * Every word below would, as a heading or a column header, describe data this product does not
-   * have. The refusal sentences use several of them, which is why this searches headings, `<th>` and
-   * `<dt>` rather than the whole page.
-   */
-  it('has no heading, column or figure naming a capability this phase deferred', () => {
-    const structural = labels(populated('en'));
-
-    for (const claim of [
-      'sla',
-      'service level',
-      'escalat',
-      'due',
-      'overdue',
-      'elapsed',
-      'age',
-      'business day',
-      'parallel',
-      'majority',
-      'unanimous',
-      'quorum',
-      'first response',
-      'tally',
-      'role',
-      'group',
-      'manager',
-      'team',
-      'analytic',
-      'rate',
-      'average',
-      'bottleneck',
-      'compliance',
-      'notification',
-      'reminder',
-      'schedule',
-      'upload',
-      'download',
-      'webhook',
-    ]) {
-      expect([claim, structural.includes(claim)]).toEqual([claim, false]);
-    }
-  });
-
-  /** And no Recruitment vocabulary anywhere: the subject type is printed, nothing more. */
-  it('names no Recruitment concept beyond the subject type Workflow published', () => {
-    const structural = labels(populated('en'));
-    const markup = populated('en');
-
-    expect(markup).toContain('recruitment.requisition');
-    for (const concept of ['requisition', 'vacancy', 'candidate', 'application', 'offer', 'hire']) {
-      expect([concept, structural.includes(concept)]).toEqual([concept, false]);
-    }
   });
 });

@@ -10,16 +10,24 @@ import {
 import { InMemoryUnitOfWork } from '@work/testing';
 
 import { inMemoryWorkflowStores } from './in-memory-stores.js';
+import {
+  FakeBusinessDecisions,
+  FakeDelegation,
+  FakeMembershipStanding,
+  FakeReportingLine,
+} from './workflow-module-fakes.js';
+import { FakeNotifications, FakeReminderRecipient } from './workflow-reminder-fakes.js';
+
+export {
+  FakeBusinessDecisions,
+  FakeDelegation,
+  FakeMembershipStanding,
+  FakeReportingLine,
+} from './workflow-module-fakes.js';
+export { FakeNotifications, FakeReminderRecipient } from './workflow-reminder-fakes.js';
 import { workflowModule } from './workflow-module.js';
 import { ALL_WORKFLOW_PERMISSIONS } from './workflow-permissions.js';
-import type {
-  ApprovalDelivery,
-  BusinessDecisionPort,
-  Clock,
-  DelegationGrant,
-  DelegationPort,
-  TerminalApproval,
-} from './workflow-ports.js';
+import type { Clock } from './workflow-ports.js';
 
 /**
  * The harness the application suites run against: the real module, the real dispatcher, the real
@@ -39,6 +47,11 @@ import type {
  * **There is no notification recorder, no job runner and no role directory here**, because there is
  * no port for any of them. Faking one would let the suites demonstrate a capability production does
  * not have, which is the most expensive kind of green.
+ *
+ * **The reporting-line double is the exception that proves the rule.** There *is* a port for it, with
+ * a shape narrow enough to state in one line, and the double answers exactly what that port declares
+ * — one manager or one of four named absences, never a chain, a team or a directory. What it stands
+ * in for is the adapter, which is Checkpoint 7's and does not exist yet.
  */
 
 export const TENANT = uuidV7();
@@ -68,104 +81,31 @@ export class FixedClock implements Clock {
   }
 }
 
-interface Arrangement {
-  readonly delegatorMembershipId: string;
-  readonly delegateMembershipId: string;
-  readonly scope: string;
-  readonly effectiveFrom: Date;
-  readonly effectiveTo: Date;
-  revoked: boolean;
-}
-
-/**
- * Identity, answering who is currently acting for whom.
- *
- * The period test is Identity's own: **half-open**, inclusive at the start and exclusive at the end,
- * and a revoked arrangement is never in force whatever its dates say. Identity's aggregate computes
- * this from the period rather than from a stored status, because *"a status is only as fresh as the
- * last job that updated it"* — and there is no such job.
- */
-export class FakeDelegation implements DelegationPort {
-  private readonly arrangements: Arrangement[] = [];
-
-  public grant(
-    delegator: string,
-    delegate: string,
-    period: { readonly from: Date; readonly to: Date },
-    scope = 'workflow.approval.decide',
-  ): void {
-    this.arrangements.push({
-      delegatorMembershipId: delegator,
-      delegateMembershipId: delegate,
-      scope,
-      effectiveFrom: period.from,
-      effectiveTo: period.to,
-      revoked: false,
-    });
-  }
-
-  public revokeAll(): void {
-    for (const arrangement of this.arrangements) arrangement.revoked = true;
-  }
-
-  public activeFor(
-    delegateMembershipId: string,
-    atInstant: Date,
-  ): Promise<readonly DelegationGrant[]> {
-    return Promise.resolve(
-      this.arrangements
-        .filter(
-          (arrangement) =>
-            arrangement.delegateMembershipId === delegateMembershipId &&
-            !arrangement.revoked &&
-            arrangement.effectiveFrom.getTime() <= atInstant.getTime() &&
-            atInstant.getTime() < arrangement.effectiveTo.getTime(),
-        )
-        .map((arrangement) => ({
-          delegatorMembershipId: arrangement.delegatorMembershipId,
-          delegateMembershipId: arrangement.delegateMembershipId,
-          scope: arrangement.scope,
-        })),
-    );
-  }
-}
-
-/**
- * The adopting module, for the application suites.
- *
- * **It records and refuses, and it never pretends to be a database.** What the application layer has
- * to be right about is the *order*: the owning module is asked before Workflow writes anything, and a
- * refusal from it leaves no decision row. Whether a requisition may legally move is Recruitment's
- * question, proved against the real module in the cross-module suites.
- *
- * The default answer is `not-adopted`, which is the honest default: ten of the eleven modules that
- * could route approvals have not adopted Workflow, and their subjects reach this seam and go no
- * further.
- */
-export class FakeBusinessDecisions implements BusinessDecisionPort {
-  public readonly delivered: TerminalApproval[] = [];
-  private answer: ApprovalDelivery = { kind: 'not-adopted' };
-
-  public answers(delivery: ApprovalDelivery): void {
-    this.answer = delivery;
-  }
-
-  public apply(approval: TerminalApproval): Promise<ApprovalDelivery> {
-    this.delivered.push(approval);
-    return Promise.resolve(this.answer);
-  }
-}
-
 export interface Harness {
   readonly dispatcher: Dispatcher;
   readonly clock: FixedClock;
   readonly delegation: FakeDelegation;
+  readonly membershipStanding: FakeMembershipStanding;
+  readonly reminderRecipient: FakeReminderRecipient;
+  readonly notifications: FakeNotifications;
+  readonly reportingLine: FakeReportingLine;
   readonly business: FakeBusinessDecisions;
   readonly stores: ReturnType<typeof inMemoryWorkflowStores>;
   /** Runs work as a named membership, in this harness's tenant. */
   as<TResult>(membershipId: string, work: () => Promise<TResult>): Promise<TResult>;
   /** Runs work in a context that resolved **no** membership — a job, a migration, a fixture. */
   withoutMembership<TResult>(work: () => Promise<TResult>): Promise<TResult>;
+  /**
+   * Runs work as a **machine**: tenant-scoped, non-human, holding no membership.
+   *
+   * Deliberately not a variant of `as` with a funny membership identifier. The whole property under
+   * test is that automatic execution is a *different kind of context*, so a helper that faked it with
+   * a person's context would test nothing.
+   */
+  asMachine<TResult>(
+    work: () => Promise<TResult>,
+    execution?: { readonly jobId?: string; readonly attempt?: number },
+  ): Promise<TResult>;
   inTenant<TResult>(
     tenantId: string,
     membershipId: string,
@@ -178,37 +118,30 @@ export interface HarnessOptions {
   readonly tenantId?: string;
 }
 
-export const harnessFor = (options: HarnessOptions = {}): Harness => {
-  const granted = options.permissions ?? ALL_WORKFLOW_PERMISSIONS;
-  const permissions: PermissionChecker = {
-    holds: (permission) => Promise.resolve(granted.includes(permission)),
-  };
-  const dispatcher = new Dispatcher(permissions);
-  const clock = new FixedClock(NOW);
-  const delegation = new FakeDelegation();
-  const business = new FakeBusinessDecisions();
-  const stores = inMemoryWorkflowStores();
-  const tenantId = options.tenantId ?? TENANT;
-  const module = workflowModule({
-    unitOfWork: new InMemoryUnitOfWork(tenantId),
-    stores,
-    delegation,
-    businessDecision: business,
-    permissions,
-    clock,
-  });
+/** The doubles a harness composes, built together so the composition below stays one screen. */
+const fakesFor = () => ({
+  clock: new FixedClock(NOW),
+  delegation: new FakeDelegation(),
+  membershipStanding: new FakeMembershipStanding(),
+  reportingLine: new FakeReportingLine(),
+  reminderRecipient: new FakeReminderRecipient(),
+  notifications: new FakeNotifications(),
+  business: new FakeBusinessDecisions(),
+  stores: inMemoryWorkflowStores(),
+});
 
-  for (const handler of module.commands ?? []) dispatcher.registerCommand(handler);
-  for (const handler of module.queries ?? []) dispatcher.registerQuery(handler);
-
-  const run = <TResult>(
-    tenant: string,
-    membershipId: string | undefined,
-    work: () => Promise<TResult>,
-  ): Promise<TResult> =>
+/**
+ * Running work as somebody, or as nobody.
+ *
+ * Split out so the two kinds of caller sit side by side: a person's context carries an actor and a
+ * membership, a machine's carries neither and an execution identity instead. Reading them together is
+ * most of what makes the difference legible.
+ */
+const contextsFor = (tenantId: string) => ({
+  asPerson: <TResult>(membershipId: string | undefined, work: () => Promise<TResult>) =>
     runInContext(
       {
-        tenantId: tenant,
+        tenantId,
         correlationId: uuidV7(),
         // The actor is the workforce user, as the middleware sets it. The membership is a separate
         // field, as the middleware now sets it. The suites keep them distinguishable on purpose.
@@ -216,17 +149,56 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
         ...(membershipId === undefined ? {} : { membershipId }),
       },
       work,
-    );
+    ),
+  asMachine: <TResult>(
+    work: () => Promise<TResult>,
+    execution: { readonly jobId?: string; readonly attempt?: number },
+  ) =>
+    runInContext(
+      {
+        machine: true,
+        tenantId,
+        executionIdentity: 'service:workflow-reminders',
+        correlationId: uuidV7(),
+        ...(execution.jobId === undefined ? {} : { jobId: execution.jobId }),
+        ...(execution.attempt === undefined ? {} : { attempt: execution.attempt }),
+      },
+      work,
+    ),
+});
+
+export const harnessFor = (options: HarnessOptions = {}): Harness => {
+  const granted = options.permissions ?? ALL_WORKFLOW_PERMISSIONS;
+  const permissions: PermissionChecker = {
+    holds: (permission) => Promise.resolve(granted.includes(permission)),
+  };
+  const dispatcher = new Dispatcher(permissions);
+  const tenantId = options.tenantId ?? TENANT;
+  const fakes = fakesFor();
+  const contexts = contextsFor(tenantId);
+  const module = workflowModule({
+    unitOfWork: new InMemoryUnitOfWork(tenantId),
+    stores: fakes.stores,
+    delegation: fakes.delegation,
+    membershipStanding: fakes.membershipStanding,
+    reminderRecipient: fakes.reminderRecipient,
+    notifications: fakes.notifications,
+    reportingLine: fakes.reportingLine,
+    businessDecision: fakes.business,
+    permissions,
+    clock: fakes.clock,
+  });
+
+  for (const handler of module.commands ?? []) dispatcher.registerCommand(handler);
+  for (const handler of module.queries ?? []) dispatcher.registerQuery(handler);
 
   return {
+    ...fakes,
     dispatcher,
-    clock,
-    delegation,
-    business,
-    stores,
-    as: (membershipId, work) => run(tenantId, membershipId, work),
-    withoutMembership: (work) => run(tenantId, undefined, work),
-    inTenant: (tenant, membershipId, work) => run(tenant, membershipId, work),
+    as: (membershipId, work) => contexts.asPerson(membershipId, work),
+    asMachine: (work, execution = {}) => contexts.asMachine(work, execution),
+    withoutMembership: (work) => contexts.asPerson(undefined, work),
+    inTenant: (tenant, membershipId, work) => contextsFor(tenant).asPerson(membershipId, work),
   };
 };
 

@@ -68,14 +68,18 @@ describe('workflow composition', () => {
     const workflow = composed();
 
     expect(workflow.name).toBe('workflow');
-    // Nine and eight in 16A; twelve and ten since Phase 16B's application layer added three group
-    // commands and two group reads. **Five of them have no HTTP route yet** — the API surface is
-    // Checkpoint 6 — so this counts what is *composed*, and `workflow.routes.spec.ts` counts what is
-    // reachable over HTTP. The two numbers differing is the honest state of a half-built phase.
-    expect(workflow.commands ?? []).toHaveLength(12);
+    // Nine and eight in 16A; twelve and ten after Phase 16B's three group commands and two group
+    // reads; thirteen after Phase 16D's escalation command; **fourteen** since Phase 16E's reminder.
+    //
+    // **The fourteenth has no HTTP route, and never will.** It runs under a machine execution context
+    // a job runner supplies, and an HTTP request produces a person's context, which the handler
+    // refuses outright — so a route could only ever answer 422. This counts what is *composed*;
+    // `workflow.routes.spec.ts` counts what is reachable over HTTP and names that one by hand. The
+    // two numbers differing is the design rather than a gap.
+    expect(workflow.commands ?? []).toHaveLength(14);
     expect(workflow.queries ?? []).toHaveLength(10);
     expect(workflow.permissions).toEqual(ALL_WORKFLOW_PERMISSIONS);
-    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(9);
+    expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(11);
   });
 
   /** Every handler declares one permission, and none of them is a wildcard or a prefix. */
@@ -85,7 +89,7 @@ describe('workflow composition', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(22);
+    expect(declared).toHaveLength(24);
     for (const permission of declared) {
       expect(ALL_WORKFLOW_PERMISSIONS).toContain(permission);
       expect(permission).not.toContain('*');
@@ -109,7 +113,26 @@ describe('workflow composition', () => {
     expect(source).toContain('new RecruitmentDecisions(writer)');
     expect(source).not.toContain('inMemory');
     expect(source).not.toContain('AutoApproving');
-    expect(source).not.toContain('Recording');
+    // `Recording` left this list in Phase 16E **by authorization**, and the precedent is Performance's:
+    // `RecordingNotificationPort` is what the kernel provides and what production has, because
+    // **intent is a real record and delivery is a missing dependency** (D-16E-07, and D-21 before it).
+    // It was forbidden here while Workflow notified nobody at all; now that it emits intent, keeping
+    // it would forbid the correct adapter. What must never appear is something that *delivers* — and
+    // the assertion below is the one that says so.
+    expect(source).toContain('new WorkflowReminderRecipient(reader)');
+    expect(source).toContain('RecordingNotificationPort');
+    for (const delivery of [
+      'Smtp',
+      'Email',
+      'Sms',
+      'Push',
+      'Broker',
+      'Queue',
+      'Outbox',
+      'Twilio',
+    ]) {
+      expect([delivery, source.includes(delivery)]).toStrictEqual([delivery, false]);
+    }
   });
 
   /**
@@ -136,38 +159,54 @@ describe('workflow composition', () => {
   });
 
   /**
-   * **The exact grant set: three permissions, in three grants, across two adapters.**
+   * **The exact grant set: five permissions, in six grants, across three adapters.**
    *
-   * One to read Identity's delegations, and two — read and approve — for the one module Workflow
-   * writes into. Counted from source rather than asserted as a sentence, because a fourth grant, a
-   * widened `permits`, a wildcard or a prefix is exactly the change that would pass every behavioural
-   * test in this repository.
+   * It was three and three until Phase 16C. The reporting-line adapter added three grants of two
+   * permissions — one Identity read used twice, at the two ends of the manager chain, and one
+   * Employment read in the middle. Counted from source rather than asserted as a sentence, because a
+   * seventh grant, a widened `permits`, a wildcard or a prefix is exactly the change that would pass
+   * every behavioural test in this repository.
+   *
+   * **What is not here is the point.** `identity.membership.read` would have reached the requester's
+   * employment through `identity.describe-member` — and handed the approvals engine the tenant's
+   * member register to read one identifier. B-2 authorized a second narrow Identity query instead,
+   * so both of Workflow's Identity grants stay employment-scoped, and the forbidden list below names
+   * the register explicitly.
    */
-  it('holds exactly three cross-module grants, of exactly three permissions', () => {
+  it('holds exactly six cross-module grants, of exactly five permissions', () => {
     const delegations = codeOf('workflow-sources.ts');
     const decisions = codeOf('recruitment-decisions.ts');
-    const both = `${delegations}\n${decisions}`;
-    const grants = both.match(/runWithServiceGrant\(/g) ?? [];
-    const permits = both.match(/permits: \[[^\]]*\]/g) ?? [];
+    const reporting = codeOf('workflow-reporting-line.ts');
+    const all = `${delegations}\n${decisions}\n${reporting}`;
+    const grants = all.match(/runWithServiceGrant\(/g) ?? [];
+    const permits = all.match(/permits: \[[^\]]*\]/g) ?? [];
 
-    expect(grants).toHaveLength(3);
+    expect(grants).toHaveLength(6);
     expect(permits).toEqual([
       'permits: [DELEGATION_READ]',
       'permits: [REQUISITION_READ]',
       'permits: [REQUISITION_APPROVE]',
+      'permits: [EMPLOYMENT_LINK_READ]',
+      'permits: [EMPLOYMENT_READ]',
+      'permits: [EMPLOYMENT_LINK_READ]',
     ]);
     expect(delegations).toContain("const DELEGATION_READ = 'identity.delegation.read';");
     expect(decisions).toContain("const REQUISITION_READ = 'recruitment.requisition.read';");
     expect(decisions).toContain("const REQUISITION_APPROVE = 'recruitment.requisition.approve';");
+    expect(reporting).toContain("const EMPLOYMENT_LINK_READ = 'identity.employment-link.read';");
+    expect(reporting).toContain("const EMPLOYMENT_READ = 'employment.employment.read';");
     // No wildcard, no prefix, and no grant permitting two things at once.
-    expect(both).not.toMatch(/'[a-z]+\.\*'/);
-    expect(both).not.toMatch(/permits: \[[^\]]*,/);
+    expect(all).not.toMatch(/'[a-z]+\.\*'/);
+    expect(all).not.toMatch(/permits: \[[^\]]*,/);
+    // And above all, not the member register.
+    expect(all).not.toContain('identity.membership.read');
   });
 
-  /** Three published contracts in total, each named in full, and nothing else reachable. */
-  it('consumes exactly three published contracts', () => {
+  /** Six published contracts in total, each named in full, and nothing else reachable. */
+  it('consumes exactly six published contracts', () => {
     const delegations = codeOf('workflow-sources.ts');
     const decisions = codeOf('recruitment-decisions.ts');
+    const reporting = codeOf('workflow-reporting-line.ts');
     const names = (source: string): readonly string[] => [
       ...new Set(source.match(/(?:queryName|commandName): '[a-z.-]+'/g) ?? []),
     ];
@@ -177,16 +216,26 @@ describe('workflow composition', () => {
       "commandName: 'recruitment.decide-requisition'",
       "queryName: 'recruitment.read-requisition'",
     ]);
-    // The broad reads that would answer the same questions less honestly.
+    // Three, in the order the manager chain asks them, and no command anywhere: this adapter reads.
+    expect(names(reporting)).toEqual([
+      "queryName: 'identity.primary-employment-for-membership'",
+      "queryName: 'employment.read-employment'",
+      "queryName: 'identity.active-memberships-for-employment'",
+    ]);
+    // The broad reads that would answer the same questions less honestly. `employment.` left this
+    // list in Phase 16C — the manager chain asks Employment one bounded question — and is replaced
+    // by the reads that would make it a directory or a search.
     for (const forbidden of [
       'identity.list-memberships',
       'identity.search-members',
+      'identity.describe-member',
       'recruitment.search-requisitions',
       'recruitment.search-candidates',
-      'employment.',
+      'employment.search',
+      'employment.export-workforce',
       'organization.',
     ]) {
-      expect(`${delegations}\n${decisions}`).not.toContain(forbidden);
+      expect(`${delegations}\n${decisions}\n${reporting}`).not.toContain(forbidden);
     }
   });
 
@@ -248,7 +297,8 @@ describe('workflow composition', () => {
    *
    * The write seam is the one place Workflow can corrupt a completed module, so the audit is
    * structural: no Prisma, no repository, no SQL, no entity, and none of the machinery this phase
-   * refused.
+   * refused. `JobPort` in particular stays forbidden — Workflow schedules nothing, and the runner
+   * that will one day invoke the reminder belongs on the other side of this boundary (D-16E-03).
    */
   it('reaches Recruitment only through its published contracts', () => {
     for (const file of [
@@ -267,7 +317,10 @@ describe('workflow composition', () => {
         'select ',
         'insert into',
         'JobPort',
-        'NotificationPort',
+        // `NotificationPort` left this list in Phase 16E, by the same authorization as `Recording`
+        // above: the composition now wires one, because Workflow emits intent (D-16E-07). Delivery is
+        // what must never appear, and the forbidden words for it are asserted in the composition test
+        // above rather than duplicated here.
         'StoragePort',
         'SearchPort',
         'outbox',

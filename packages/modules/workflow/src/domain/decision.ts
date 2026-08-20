@@ -185,7 +185,7 @@ export const decide = (
   // exactly the right subset would be the only thing standing between that and a wrong outcome.
   const branch = branchAt(steps, step.ordinal);
   const inBranch = new Set(branch.map((other) => other.stepId));
-  const tally = tallyOf(branchOf(step), branch.length, [
+  const tally = tallyOf(branchOf(step), branch, [
     ...votes.filter((vote) => inBranch.has(vote.stepId) && vote.stepId !== step.stepId),
     { stepId: step.stepId, decision: request.decision, decidedAt: request.at },
   ]);
@@ -307,7 +307,14 @@ const approvedOutcome = ({
   return accept({
     decision,
     step,
-    next: chosen.value.running.map((following) => ({ ...following, status: 'awaiting' })),
+    // The branch that opens starts its clock now, at the instant this decision was made (P-5), and
+    // every step of it starts together. A step's own `awaitingAt` is written once and never moved:
+    // nothing here touches the instant on the step just decided, or on any step already open.
+    next: chosen.value.running.map((following) => ({
+      ...following,
+      status: 'awaiting',
+      awaitingAt: at,
+    })),
     skipped,
     instance,
     tally,

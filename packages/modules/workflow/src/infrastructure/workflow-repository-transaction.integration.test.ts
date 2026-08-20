@@ -13,7 +13,7 @@ import {
   type PoolLike,
   type WorkflowFixture,
 } from './workflow-database.fixture.js';
-import { aStartedInstance, anApproval } from './workflow-states.js';
+import { aGroup, aGroupMember, aStartedInstance, anApproval } from './workflow-states.js';
 
 /**
  * Who owns the transaction.
@@ -80,6 +80,49 @@ suite('the transaction belongs to the application', () => {
 
     return Number(rows[0]?.total ?? '0');
   };
+
+  /**
+   * The same guarantee for the two tables Phase 16B added.
+   *
+   * A group and the people on it are written by one command — three inserts across two tables — and
+   * a list that committed without its members would be an approval group that silently asks nobody.
+   * The failure is provoked *after* the members, so a repository committing on its own would leave
+   * exactly that.
+   */
+  it('commits a list and its members together, and rolls both back together', async () => {
+    const group = aGroup();
+    const members = [APPROVER, SECOND_APPROVER].map((membershipId) =>
+      aGroupMember(group, membershipId),
+    );
+    const write = async (transaction: Transaction): Promise<void> => {
+      await fixture.stores.groups.insert(transaction, group);
+      for (const member of members) {
+        await fixture.stores.groups.insertMember(transaction, member);
+      }
+    };
+
+    await expect(
+      inA(async (transaction) => {
+        await write(transaction);
+        throw new Error('the handler refused after writing');
+      }),
+    ).rejects.toThrow('the handler refused after writing');
+
+    const gone = await fixture.asTenant(TENANT_A, async (client) => ({
+      groups: await countIn(client, 'workflow_approval_group'),
+      members: await countIn(client, 'workflow_approval_group_member'),
+    }));
+
+    expect(gone).toEqual({ groups: 0, members: 0 });
+
+    await inA(write);
+
+    const committed = await inA((transaction) =>
+      fixture.stores.groups.membersOf(transaction, group.approvalGroupId),
+    );
+
+    expect(committed).toHaveLength(2);
+  });
 
   it('commits writes across four tables together', async () => {
     const seed = started();

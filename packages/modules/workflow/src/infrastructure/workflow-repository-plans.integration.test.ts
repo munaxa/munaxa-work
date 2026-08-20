@@ -124,13 +124,39 @@ suite('repository query plans', () => {
     expect(explained.statement).toMatch(/limit \$3 offset \$4/);
   });
 
-  it('reaches the status index when instances are searched by status', async () => {
+  /**
+   * **This asserts reachability, not which index wins — and that is a correction.**
+   *
+   * It named `workflow_instance_status_idx` until Phase 16C, and passed for as long as the planner
+   * happened to prefer it. Two indexes can answer a filter on tenant and status:
+   * `workflow_instance_status_idx` — `(tenant_id, status, started_at, id)`, which also satisfies
+   * this query's ordering — and `workflow_instance_subject_idx` — `(tenant_id, subject_type,
+   * subject_id, status)`, which does not. At fixture size their costs are indistinguishable, so the
+   * name that came back was a tie-break rather than a property, and the suite eventually failed on
+   * a database where the coin landed the other way.
+   *
+   * `workflow-schema-boundaries.integration.test.ts` had already written this rule down — *"which of
+   * two equally-costed indexes the planner picks is not a property worth pinning at fixture size"* —
+   * and this assertion was the one place in the module that ignored it. What is pinned now is what a
+   * fixture-sized table can honestly answer: an index is reachable, the tenant is inside its
+   * condition rather than filtered after it, nothing scans, and the bound is in the statement.
+   * Index *choice* at real volume is the benchmark's question.
+   *
+   * The queue assertion above still names its index, and legitimately: `workflow_step_queue_idx` is
+   * partial on exactly `status = 'awaiting'`, so it is the only candidate rather than the winner of
+   * a tie.
+   */
+  it('reaches an index, within the tenant, when instances are searched by status', async () => {
     const explained = await planOf((transaction) =>
       fixture.stores.instances.search(transaction, { status: 'running' }, { limit: 20, offset: 0 }),
     );
 
-    expect(explained.plan).toMatch(/workflow_instance_status_idx/);
+    expect(explained.plan).toMatch(/Index (Only )?Scan/);
+    expect(explained.plan).toMatch(/Index Cond: \(\(?tenant_id =/);
     expect(explained.plan).not.toMatch(/Seq Scan/);
+    // The bound is in the statement rather than applied to a fetched list afterwards.
+    expect(explained.plan).toMatch(/Limit/);
+    expect(explained.statement).toMatch(/limit \$\d+ offset \$\d+/);
   });
 
   it('reaches the subject index for the duplicate-convergence read', async () => {

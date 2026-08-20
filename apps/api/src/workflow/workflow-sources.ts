@@ -1,6 +1,5 @@
 import {
-  currentContext,
-  isSystemContext,
+  currentMembershipId,
   runWithServiceGrant,
   type HandlerFailure,
   type Query,
@@ -47,15 +46,10 @@ const DELEGATION_READ = 'identity.delegation.read';
  * module and publishing it would put `notFound`, `forbidden` and the rest of a handler's toolkit on
  * Workflow's public surface for the sake of one field.
  *
- * A system context names no member on purpose: nothing running without a human behind it is acting
- * under anybody's delegation.
+ * A system context names no member on purpose, and neither does a machine one: nothing running
+ * without a human behind it is acting under anybody's delegation.
  */
-const membershipOnThisRequest = (): string | undefined => {
-  const context = currentContext();
-
-  if (context === undefined || isSystemContext(context)) return undefined;
-  return context.membershipId;
-};
+const membershipOnThisRequest = (): string | undefined => currentMembershipId();
 
 /** The dispatcher's `ask`, with the query's own shape kept for the compiler to check. */
 const asking = <TResult, TQuery extends Query>(

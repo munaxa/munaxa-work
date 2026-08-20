@@ -330,9 +330,138 @@ one UI defect with their original failing evidence, the three fixture defects th
 by building a database from the migrations alone, the measured performance at 500, 10,000 and 100,000
 approvals with **all eighteen workloads within budget at every tier**, the query plans, the nine
 verified races, the twenty-two `NOT VERIFIED` capabilities and the carried-forward debt register are
-in [`verification/phase-16a-final-report.md`](verification/phase-16a-final-report.md). **Phase 16B —
-parallel approval, tallies, conditional branching, roles, groups, SLA, escalation and scheduling — is
-not started**: no column, no port, no route, no screen.
+in [`verification/phase-16a-final-report.md`](verification/phase-16a-final-report.md).
+
+Phase 16B completed on 2026-08-16: the **routing core** — two tables, one additive migration, and the
+capability to ask several people at once and choose which people to ask. An **approval group** is an
+explicit list of memberships a tenant writes down, with a code unique per tenant and a bilingual
+name; a step may name a list instead of a person, and the list is resolved into individual steps
+**once, when the approval starts**, each recording which list it came from. **This is not a
+directory**: there is still no role directory and no group directory in this product, nothing
+resolves a department, a position or a membership query, and a member of a list is Identity's
+identifier held as an opaque value. **Several steps may share one ordinal and are asked at the same
+moment**, and how that branch ends is the tenant's choice of `unanimous`, `majority` or
+`first-response`, optionally gated by a **quorum** — a whole number of responses, never a proportion,
+which gates a rejection exactly as it gates an approval, approves nothing by itself, and leaves the
+branch awaiting when it cannot be reached. A **majority is strictly more than half**, so a tie is not
+an approval, and the denominator is the set of approvers **snapshotted at start**: a non-response is
+outstanding and never subtracted. A branch may carry **conditions** in a closed `(key, operator,
+value)` form with five operators combined only by `all-of`; a condition that cannot be evaluated is a
+**refusal and never a silent `false`**, because the request not carrying a value is somebody's
+mistake to fix rather than routing that worked. The **tally is computed from the decisions at read
+time and stored nowhere**, so there is no counter to disagree with the decisions when two approvers
+commit at once. Editing a list **never reaches an approval already running** — somebody removed today
+still decides what they were asked yesterday — while the next approval sees the new membership. The
+group tables use **composite tenant-aware foreign keys**, because PostgreSQL checks a foreign key
+without consulting row-level security and a single-column reference would let one tenant's row point
+at another's list. Row-level security is enabled **and forced** on all **nine** tables, one permissive
+policy each. **Two permissions were added and nothing else**: `workflow.group.read` and
+`workflow.group.manage`, neither implied by the other or by `workflow.definition.manage`. The Admin
+screen gained five read-only sections and its honesty section **shrank**, because six capabilities it
+had listed as absent are now real. **Nothing was scheduled, escalated, expired, notified, measured or
+routed to a manager**: `JobPort` still has no adapter, no completed module was modified, no
+cross-module contract was added, and the Recruitment seam is unchanged. Twenty-four capabilities
+remain `NOT VERIFIED`, none with a placeholder anywhere. The four production defects — a localized
+name accepted in one language, a branch skip overwriting recorded decisions, a vote counted outside
+its own branch, and a group's members outliving the group — with their original failing evidence, the
+measured performance at 500, 10,000 and 100,000 approvals with **all twenty-six workloads within
+budget at every tier**, the query plans, the ten verified races, the locked tally arithmetic, the
+carried-forward debt register and the twenty-four `NOT VERIFIED` capabilities are in
+[`verification/phase-16b-final-report.md`](verification/phase-16b-final-report.md). The Definition of
+Ready for what follows, its six contradictions and its fourteen blocking decisions are in
+[`verification/phase-16c-plan.md`](verification/phase-16c-plan.md).
+
+Phase 16C completed on 2026-08-18: **routing resolution** — one additive migration, five columns, no
+new table, no new index, no new route, no new permission and no new screen. A step can now route to
+**the requester's manager**, and a step can carry **a service-level target**. Nothing else was added,
+and two capabilities the 16B record had named as 16C's were *decided against* rather than deferred:
+approval expiry is **observed and derived, never written** (D-16C-06) and escalation is defined as a
+future bounded command that adds an approver (D-16C-07), so neither adds a domain state and the phase
+reduces to those two things. **The manager is resolved once, when the approval starts**, by composing
+three published contracts across two modules — the requester's primary employment, the primary
+reporting line in force on that day, and who actually holds the manager's employment — and the answer
+is copied onto the running step. A **manager template names nobody**: whose manager it means is the
+requester, fixed rather than configured, and the database enforces it — a template may say `manager`
+and a running step may not, because the kind is resolved into a person before anybody is asked. So a
+running approval still names a concrete membership and depends on no live organizational lookup, which
+is 16B's invariant preserved rather than a happy accident: a reporting line that moves afterwards does
+not move a running approval, and the *next* approval reaches the new manager. **Five outcomes fail
+closed** and none silently skips a configured approver — no primary employment, no manager on the
+primary line, nobody holds the manager's employment, **two or more people hold it**, or the requester
+turns out to be their own manager. That fourth is kept distinct from the third deliberately: one means
+nobody holds the job and the other means two do, they are opposite problems for different people to
+fix, and there is **no rule for choosing between two candidates** — no ordering, no `is_primary`, no
+first-of, no fallback. **This is still not a directory.** Identity gained two narrow queries on a
+permission it already had, `identity.membership.read` was **not** granted, and nothing enumerates
+memberships, resolves a role, reads an organization chart or traverses more than one level. A
+**service level is elapsed time in whole hours or days** (D-16C-05) — never business days, because
+Workflow holds no calendar and the approval declined an Organization dependency for one — configured
+on the template, copied onto the step, counted from the instant **that step** became awaiting, so each
+step of a parallel branch starts its own clock and nothing restarts one. **Due-ness, state and overdue
+minutes are derived on every read** from the target, that instant and an explicit reading instant the
+caller supplies, and **stored nowhere**: there is no `due_at`, no `expired`, no `breached` and no
+escalation column, because a stored due time would be a second record able to disagree with its own
+inputs and a stored `expired` would need something to write it — a scheduler this phase does not have
+or a synthetic actor ADR-0045 refuses. Exactly at the target is **within** it, a step three seconds
+past is overdue by **zero** minutes, and every number is a truncated integer. **Nothing was scheduled,
+escalated, expired, notified, measured or routed to a role**: `JobPort` still has no adapter anywhere.
+Twenty-two capabilities remain `NOT VERIFIED`, none with a placeholder anywhere, and two left that
+list by delivery rather than by attrition. **No production defect was found by the closing audit** —
+its findings were two benchmark defects and three test-coverage gaps, all fixed or closed within it.
+The manager chain end to end, the five refusals, the boundary arithmetic, the three cross-module query
+plans (which no module had ever planned), the measured performance at 500, 10,000 and 100,000
+approvals with **one workload missing its budget** — the tier C unfiltered instance listing at 124 ms,
+carried from 16B where it measured 91.4 ms and unaffected by this phase — the carried-forward debt
+register and the twenty-two `NOT VERIFIED` capabilities are in
+[`verification/phase-16c-final-report.md`](verification/phase-16c-final-report.md). The Definition of
+Ready for what follows, its fourteen contradictions and its blocking decisions are in
+[`verification/phase-16d-plan.md`](verification/phase-16d-plan.md).
+
+Phase 16D completed on 2026-08-19: **escalation** — one additive migration, one nullable column, one
+partial unique index, one history event, one command, one route, one permission and one column on one
+screen. It is a much smaller phase than its name promised, and deliberately so: 16D opened as *Time in
+Workflow* — escalation, expiry, business days, scheduled execution — and its Definition of Ready found
+that most of that was **already delivered by 16C, decided against, or blocked on infrastructure nobody
+owns**, and stopped on three conditions before any code was written. What survived approval is one
+capability: **a person adds an approver to a branch that is stuck**. **Nothing escalates by itself** —
+there is no scheduler, no timer, no `JobPort` consumer and no automatic trigger of any kind, and the
+command exists only at the end of a request somebody made. **Escalation adds; it never replaces.**
+Nobody is removed, no recorded decision is touched, no clock restarts, and the target the branch was
+given is the target it keeps — which is why the locked 16B denominator survives untouched: the
+snapshotted assigned set is filtered by a marker on the row, so a branch of three that gains a fourth
+approver still needs two approvals and not three (D-16D-08, never reopened). **`unanimous` refuses
+escalation by name**, because for that rule the threshold *is* the denominator and the only two ways
+to proceed were to let a branch complete while an assigned approver had never answered, or to move
+the denominator; the approval rejected both. **Eight refusals, each its own name** — three about the
+branch and five about the person — because each sends a different person to fix a different thing.
+Two of the five were found by asking whether rules the module already held applied here: **the
+requester may not be asked to approve their own request** (D-16D-13) and **an approver already
+terminal on the same instance may not be asked again** (D-16D-14, where `skipped` is deliberately
+*not* terminal — a skipped step means the person never had a say). Neither needed a query: the
+command already loads every step of the instance. The seventh rule did need one, and it is the only
+fact in the phase that Workflow does not own: **a membership must be able to act**. Identity gained
+**one narrow query** on a permission it already had — `identity.membership-standing`, one identifier
+in, `{ active: boolean }` out — reached through a bounded service grant (ADR-0043) that names exactly
+`identity.membership.read`, which **no user holds**. It publishes the predicate rather than the status
+on purpose: Identity owns what "acting" means, and returning the raw status would have put a second
+definition of it in another module. A membership belonging to another tenant is **indistinguishable
+from one that never existed**, so an identifier is not a probe. **What a step now publishes is that it
+was escalated, never when, by whom or why**: `escalated: boolean` and nothing else, with the timestamp
+staying in the database and the actor staying in the timeline where a permission decides who reads it.
+The Admin screen gained **one column** and remains read-only. **Escalation is reachable through the
+API and not from the portal**, and that is a decision rather than an omission: Admin authentication is
+Platform's under ADR-0001 and ADR-0019 and was confirmed **outside this phase** (D-16D-10), and no
+candidate list exists to pick from because none was approved (D-16D-16). Twenty-three capabilities
+remain `NOT VERIFIED`, none with a placeholder anywhere. **No production defect was found** by the
+closing audit; its one finding was a stale sentence in a comment, carried as debt. The eight refusals,
+the eleven approved decisions and the four that remain open, the bounded Identity contract, the
+concurrency protection, the tenancy proofs under an unprivileged role, the recomputed scope and the
+twenty-three `NOT VERIFIED` capabilities are in
+[`verification/phase-16d-final-report.md`](verification/phase-16d-final-report.md). **Phase 16E is not
+started.** Notification delivery is Phase 17's and analytics is Phase 20's, by those phases' own
+specifications; a durable job runner for the kernel's `JobPort` — which has existed as an interface
+since Phase 0 and has never had an adapter — **is owned by no phase yet**, and neither 16C nor 16D
+assigned one.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

@@ -41,7 +41,12 @@ const migrationAt = (directory: string): string =>
 
 /** Phase 16A's, and the routing migration Phase 16B Checkpoint 3 adds beside it. */
 const ROUTING_MIGRATION = migrationAt('20260815100000_workflow_routing');
-const MIGRATIONS = [migrationAt('20260814100000_workflow'), ROUTING_MIGRATION];
+const RESOLUTION_MIGRATION = migrationAt('20260816100000_workflow_routing_resolution');
+const MIGRATIONS = [
+  migrationAt('20260814100000_workflow'),
+  ROUTING_MIGRATION,
+  RESOLUTION_MIGRATION,
+];
 
 suite('what the Workflow schema deliberately does not contain', () => {
   let fixture: WorkflowFixture;
@@ -76,8 +81,18 @@ suite('what the Workflow schema deliberately does not contain', () => {
         'SLA and business days',
         ['sla', 'due_at', 'due_on', 'business_day', 'working_day', 'breach'],
       ],
-      ['escalation', ['escalat']],
-      ['scheduling', ['cron', 'schedule', 'run_at', 'next_run', 'job_']],
+      // `escalat` gave way to the narrower pair when Phase 16D added `escalated_at`, which is
+      // provenance rather than a capability: it records that an approver was added, and its absence
+      // is what the branch tally counts as the snapshotted denominator. What stays forbidden is a
+      // column nothing would maintain — a scheduled escalation time, or a level to climb.
+      ['automatic escalation', ['escalate_at', 'escalation_level', 'escalation_due']],
+      // `job_` was on this row until Phase 16E and came off **by authorization** (D-16E-13):
+      // `workflow_history.execution_job_id` records *which job produced an entry that already
+      // happened*, which is provenance and the opposite of scheduling. What still must not exist is
+      // a column that would make something happen later — a cron expression, a next-run time, a
+      // due time — and those all stay. The companion assertion below requires the provenance columns
+      // to be present, so a fragment leaving this list cannot pass for a capability abandoned.
+      ['scheduling', ['cron', 'schedule', 'run_at', 'next_run', 'job_queue', 'scheduled_for']],
       // A tally is **derived** from the decisions that exist. A stored count would be a second
       // source of truth that disagrees with `workflow_decision` the moment two approvers commit at
       // once, and the decision table is the one an auditor reads.
@@ -185,17 +200,34 @@ suite('what the Workflow schema deliberately does not contain', () => {
     ];
 
     expect(created.sort()).toStrictEqual([...WORKFLOW_TABLES].sort());
-    // Phase 16B alters two of its own, and nothing else in the database.
+    // Phases 16B and 16C alter the same two of their own, and nothing else in the database. 16C
+    // created no table at all: the manager needed no column and the target needed no row.
     expect(altered.sort()).toStrictEqual(['workflow_step', 'workflow_step_template']);
   });
 
-  it('adds exactly one migration directory, alongside the twenty-one that came before', () => {
+  /**
+   * One migration per Workflow checkpoint that needed one, and no more.
+   *
+   * The count moved from two to three in Phase 16C — by authorization, and asserted as a count so a
+   * fourth appearing without one is a failure rather than a detail. What has not moved is that every
+   * Workflow migration is Workflow's: the assertion above proves none of them touches another
+   * module's table.
+   */
+  it('adds exactly one migration directory per Workflow phase that needed one', () => {
     const directories = readdirSync(join(process.cwd(), '..', '..', '..', 'prisma', 'migrations'))
       .filter((entry) => /^\d{14}_/.test(entry))
       .sort();
 
-    expect(directories.at(-1)).toBe('20260815100000_workflow_routing');
-    expect(directories.filter((entry) => entry.includes('workflow'))).toHaveLength(2);
+    expect(directories.at(-1)).toBe('20260820100000_workflow_reminder');
+    // One per phase that needed one, and no phase needed two. 16A built the module, 16B the routing
+    // core, 16C the routing resolution, and 16D one column, one widened vocabulary and one index.
+    expect(directories.filter((entry) => entry.includes('workflow'))).toStrictEqual([
+      '20260814100000_workflow',
+      '20260815100000_workflow_routing',
+      '20260816100000_workflow_routing_resolution',
+      '20260818100000_workflow_escalation',
+      '20260820100000_workflow_reminder',
+    ]);
   });
 
   describe('the indexes the engine is designed around are reachable', () => {
@@ -315,11 +347,14 @@ suite('what the Workflow schema deliberately does not contain', () => {
       );
 
       expect(rows.filter((row) => !row.valid)).toStrictEqual([]);
-      // Nine primary keys, the six partial unique indexes the invariants rest on, and the group's
-      // `(id, tenant_id)` key that lets a child reference carry a tenant. Two fewer partial ones than
-      // 16A had: an ordinal and an awaiting step stopped being unique when a branch became several
-      // steps, and `workflow-parallel.integration.test.ts` asserts what they permit instead.
-      expect(rows).toHaveLength(16);
+      // Nine primary keys, the **seven** partial unique indexes the invariants rest on, and the
+      // group's `(id, tenant_id)` key that lets a child reference carry a tenant. Two fewer partial
+      // ones than 16A had — an ordinal and an awaiting step stopped being unique when a branch became
+      // several steps, and `workflow-parallel.integration.test.ts` asserts what they permit instead —
+      // and one more than 16C had, because Phase 16D's escalation index is the thing that makes
+      // asking the same person onto one branch twice impossible rather than merely unlikely.
+      expect(rows).toHaveLength(18);
+      expect(rows.map((row) => row.indexname)).toContain('workflow_step_escalation_idx');
     });
   });
 });

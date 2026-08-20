@@ -5,6 +5,155 @@ and what is still missing.
 
 ---
 
+## Phase 16D — Bringing somebody else in when an approval is stuck
+
+One thing an approval process can now do: **an administrator can add another approver to an approval
+that is already running**.
+
+**It adds somebody. It replaces nobody.** The people already asked stay asked, nothing anyone has
+already decided is touched, no clock restarts, and the time the step was expected to take does not
+change. The new person is simply also asked.
+
+**It does not make the approval harder to finish.** If a stage needed two of three people to approve,
+it still needs two after you add a fourth. Adding somebody widens who *may* answer; it does not raise
+the bar. Their approval counts fully.
+
+**Except where "everyone" is the rule.** If a stage is set so that *everybody* must approve, the
+product refuses to add anyone, and says so. There would be only two possible meanings — either the new
+person's approval lets the stage finish while somebody who was originally asked never answered, or
+everybody now means one more person than it did a moment ago — and neither is what anyone asking for
+"everyone must approve" meant.
+
+**Nothing does this on a timer.** There is no automatic escalation, no reminder, no deadline that
+fires. A person decides to bring somebody in, and that is the only way it happens. A step that is past
+its expected time is still shown as past it, and still nothing follows.
+
+**It will not let you make a mistake it can see.** You cannot add somebody who is already on that
+stage, or who you already added, or the person who raised the request in the first place, or somebody
+who has already approved or rejected this same approval elsewhere in it, or somebody whose membership
+of your organization is suspended or ended. Each of those is refused with its own message, because
+each is a different thing to go and fix.
+
+**You can see who was added.** The approvals screen now shows, for each approver, whether they were
+**assigned** when the approval started or **escalated** in afterwards. The timeline records when it
+happened and who asked for it.
+
+**What is still missing.** You cannot do this from the admin screen — it is available through the API
+only, because signing in to the admin portal is not built yet and belongs to the platform rather than
+to this product. There is also **no list of people to choose from**: whoever calls it has to know the
+membership they want to add. Nothing here is automatic, nothing sends a notification, nothing expires,
+and nothing counts working days.
+
+---
+
+## Phase 16C — Routing to a manager, and how long a step should take
+
+Two things an approval process can now do: **ask the requester's manager**, and **say how long a step
+is expected to take**.
+
+**Route to my manager.** A stage in an approval process can be set to ask whoever the requester
+reports to, instead of naming a person. Nobody is named when it is configured — the stage says "the
+requester's manager" and works the person out when an approval is actually raised.
+
+**Worked out once, when the approval starts.** The product finds the requester's job, the manager on
+their reporting line that day, and who holds that manager's job — and then writes that person onto the
+approval. Reorganize afterwards and the approval already running still asks the person it asked at the
+start; they were genuinely asked, and it would be strange for it to change hands while somebody is
+looking at it. The **next** approval asks the new manager.
+
+**It stops rather than guesses.** If the requester has no job on record, or no manager on their
+reporting line, or nobody holds the manager's job, the approval **does not start** and says which of
+those it was. And if **two people** hold the manager's job, it stops and says *that* — rather than
+picking one. Those are opposite problems: one means nobody is in the role, the other means two people
+are, and they need different people to fix them. The product will not choose between two managers on
+your behalf.
+
+**This is still not a directory.** Nothing looks up a department, a job title or an organization
+chart. The product asks two narrow questions about one person's employment and stops there — it
+cannot list who reports to whom, and it never goes more than one level up.
+
+**How long a step should take.** A stage can carry a target: a whole number of hours or days. The
+clock starts when *that* stage begins waiting — not when the approval was raised — so in a chain the
+third stage's clock starts when the second is answered, and in a parallel stage everybody's starts
+together. Nothing restarts it.
+
+**A target is a target, not a deadline. Nothing happens when it passes.** Nobody is reminded, nothing
+escalates, nothing is reassigned and nothing expires. A step past its target sits exactly where it
+was, marked as overdue, until a person acts on it. If you need chasing, this product still does not do
+it, and the screen says so in as many words.
+
+**Elapsed time, weekends included.** "Two days" means forty-eight hours. It does not skip weekends or
+public holidays — the product holds no working calendar for approvals, and pretending otherwise would
+give a confidently wrong answer.
+
+**The count is never rounded up.** A step three seconds past its target is overdue by **zero**
+minutes, not one. A step exactly at its target is still within it: "two hours to approve" means two
+whole hours.
+
+**What an administrator can see.** The approvals screen now shows which stages route to a manager (and
+that they name nobody — the two blank columns are the configuration, not missing data), who a running
+approval actually resolved to, the target each stage carries in the unit it was typed in, when it
+falls due, whether it is within or past that, and by how many minutes. It shows the person as a
+member, not as "the manager", because the product knows the identifier and should not narrate where it
+came from. Nothing about the employment, reporting line, department or chain appears anywhere. No
+progress bars, no countdowns, no timers — the screen displays what the server worked out and works
+nothing out itself.
+
+**Still missing, and still deliberate.** Nothing escalates, nothing is scheduled, nothing expires and
+nothing is sent to anybody. There are no approval analytics. Nothing routes to a role or to somebody
+outside the company, and there is no working-day calculation. Every one of those is named on the
+screen itself rather than left to be discovered.
+
+---
+
+## Phase 16B — Approval groups, parallel approval and branching
+
+Approvals can now ask **several people at once**, and a company can decide **who** those people are
+by writing the list down.
+
+**A list of approvers.** A company can keep named lists — "capital approvers", "finance directors" —
+each an explicit set of members somebody chose, with a code and a name in both languages. A step in
+an approval process can name a list instead of a person, and when an approval is raised, everybody on
+that list is asked at the same moment.
+
+**This is a list, not a directory.** The product still has no role directory and no group directory.
+Nothing works out who is in a department, who reports to whom, or who holds a job title: a list
+contains exactly the people somebody put on it, and it changes only when somebody changes it.
+
+**How a stage ends is a choice.** A stage can require everybody asked to approve, a majority of them,
+or simply the first answer — whichever way that answer went. A majority means *more than half*: two
+of four is a tie, and a tie is not approval. A stage can also require a minimum number of replies
+before it is settled at all, which stops one quick answer from deciding something six people were
+asked about. That minimum blocks a rejection exactly as it blocks an approval, and if it can never be
+reached the stage simply keeps waiting rather than resolving itself.
+
+**Nobody is quietly dropped from the count.** The number a stage is measured against is the number of
+people asked when the approval started. Somebody who has not replied is counted as outstanding, never
+subtracted — so an approval never becomes easier to pass because a person stayed silent.
+
+**A stage can be skipped by a condition.** A stage can carry conditions on values the requesting
+record supplied — an amount over a threshold, a unit in a list — and is skipped when they do not
+hold. If a condition **cannot be worked out** (the request never supplied that value, or supplied one
+of the wrong kind), the approval **stops and says so**. It is never treated as "the condition was
+false", because those are different situations and only one of them is somebody's mistake to fix.
+
+**Changing a list does not change an approval already running.** An approval remembers the people it
+asked when it started. Take somebody off a list today and the approval raised yesterday still asks
+them — and they can still answer it, because they genuinely were asked. The *next* approval sees the
+new list.
+
+**What an administrator can see.** The approvals screen now shows the lists a company keeps, who is
+on one of them, every stage of an approval with its rule and its running count, and the people being
+asked right now. It shows conditions as they were configured and does not evaluate them. The screen
+reads and never writes, as every administration screen in this product does.
+
+**Still missing, and still deliberate.** Nothing has a service level, a due time or an age. Nothing
+escalates, nothing is scheduled, nothing expires and nothing is sent to anybody when they are asked
+to decide. There are no approval analytics. Nothing routes to a manager, a role, or somebody outside
+the company. Every one of those is named on the screen itself rather than left to be discovered.
+
+---
+
 ## Phase 16A — Approvals
 
 One module. It records the approval processes a company sets up, raises an approval about a record

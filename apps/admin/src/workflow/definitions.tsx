@@ -4,7 +4,9 @@ import type {
   WorkflowDefinitionView,
 } from '@work/workflow/contracts';
 
-import { count, instant, member } from './exact';
+import { count, instant, member, short } from './exact';
+import { Clauses } from './branches';
+import { Target } from './service-level';
 import { Empty, named, Section, Table, Term, type SectionProps } from './sections';
 
 /**
@@ -90,12 +92,26 @@ export const VersionsSection = ({
 );
 
 /**
- * The published chain, in ordinal order.
+ * The published chain, in ordinal order — with the branch each step belongs to.
  *
- * The approver named on a step is the member the tenant configured to be **asked**. It is not the
- * person reading this screen, it is not a role and it is not a group — Workflow has neither — and
- * whether somebody may act for them is Identity's answer at the moment of a decision rather than a
- * property of the configuration.
+ * The approver named on a step is the member or the **list** the tenant configured to be asked. It
+ * is not the person reading this screen and it is not a role: a group here is an explicit list of
+ * memberships somebody wrote down, and Workflow resolves no role, no position and no reporting line.
+ * Whether somebody may act for an approver is Identity's answer at the moment of a decision rather
+ * than a property of the configuration.
+ *
+ * **A step may name nobody at all, and that is the manager kind.** `Manager` means the manager of
+ * whoever raises the approval — which is fixed rather than configured — so both approver cells are
+ * empty and there is nothing missing about that. No employment, no reporting line and no person is
+ * shown here, because at configuration time no person has been chosen: one is worked out when an
+ * approval actually starts, and the approvals below are where it appears.
+ *
+ * **Several rows may share one position, and that is a branch rather than a mistake.** Everybody at
+ * one ordinal is asked at the same moment, and the rule, the quorum and the condition beside them
+ * say how that branch ends. A step configured before Phase 16B carries none of the three, and the
+ * cells are rendered as absent rather than filled with the defaults the domain would apply — a
+ * screen that printed `unanimous` on a step nobody configured that way would be reporting a decision
+ * the tenant never made.
  */
 export const StepsSection = ({
   t,
@@ -109,18 +125,49 @@ export const StepsSection = ({
       {steps.length === 0 ? (
         <Empty t={t} />
       ) : (
-        <Table t={t} headers={['ordinal', 'name', 'approverKind', 'approver']}>
-          {steps.map((step) => (
-            <tr key={step.stepTemplateId}>
-              <td>{count(step.ordinal)}</td>
-              <td>{named(step.name, language)}</td>
-              <td>
-                <Term t={t} group="approverKind" value={step.approverKind} />
-              </td>
-              <td>{member(step.approverMembershipId)}</td>
-            </tr>
-          ))}
-        </Table>
+        <>
+          <Table
+            t={t}
+            headers={[
+              'ordinal',
+              'name',
+              'approverKind',
+              'approver',
+              'approverGroup',
+              'branchRule',
+              'quorum',
+              'condition',
+              'serviceLevel',
+            ]}
+          >
+            {steps.map((step) => (
+              <tr key={step.stepTemplateId}>
+                <td>{count(step.ordinal)}</td>
+                <td>{named(step.name, language)}</td>
+                {/* Derived by the server from which identifier the step carries; this renders it. */}
+                <td>
+                  <Term t={t} group="approverKind" value={step.approverKind} />
+                </td>
+                <td>{member(step.approverMembershipId)}</td>
+                <td>{short(step.approverGroupId)}</td>
+                <td>
+                  <Term t={t} group="branchRule" value={step.branchRule} />
+                </td>
+                <td>{count(step.quorum)}</td>
+                <td>
+                  <Clauses t={t} condition={step.condition} />
+                </td>
+                {/* What was configured, in the unit it was configured in. Nothing converts it. */}
+                <td>
+                  <Target t={t} target={step.serviceLevel} />
+                </td>
+              </tr>
+            ))}
+          </Table>
+          <p className="text-xs opacity-60">{t('workflow.notice.conditionIsConfiguration')}</p>
+          <p className="text-xs opacity-60">{t('workflow.notice.managerIsConfiguredNotNamed')}</p>
+          <p className="text-xs opacity-60">{t('workflow.notice.serviceLevelIsElapsedTime')}</p>
+        </>
       )}
     </Section>
   );

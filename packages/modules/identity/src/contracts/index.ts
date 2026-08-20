@@ -31,6 +31,8 @@ export type {
   DelegationView,
   EmploymentLinkView,
   InvitationView,
+  MembershipRecipientView,
+  MembershipStandingView,
   PortalAssignmentView,
   TenantMembershipView,
   UserPreferenceView,

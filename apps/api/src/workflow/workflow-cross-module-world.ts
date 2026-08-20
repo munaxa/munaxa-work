@@ -29,6 +29,7 @@ export const APPROVER = '01930000-0000-7000-8000-00000000b001';
 export const DEPUTY = '01930000-0000-7000-8000-00000000b003';
 export const REQUESTER = '01930000-0000-7000-8000-00000000b004';
 /** Somebody in tenant A with no relationship to the step at all. */
+export const MANAGER = '01930000-0000-7000-8000-00000000b002';
 export const OUTSIDER = '01930000-0000-7000-8000-00000000b009';
 
 /** Tenant B's own people. Different memberships, because a membership belongs to one tenant. */
@@ -38,7 +39,7 @@ export const B_REQUESTER = '01930000-0000-7000-8000-00000000c004';
 
 /** Who belongs where, so the seed and the assertions cannot drift apart. */
 export const MEMBERSHIPS: Readonly<Record<string, readonly string[]>> = {
-  [TENANT_A]: [APPROVER, DEPUTY, REQUESTER, OUTSIDER],
+  [TENANT_A]: [APPROVER, MANAGER, DEPUTY, REQUESTER, OUTSIDER],
   [TENANT_B]: [B_APPROVER, B_DEPUTY, B_REQUESTER],
 };
 
@@ -97,4 +98,138 @@ export const seedIdentityWorld = async (admin: Pool): Promise<void> => {
       );
     }
   }
+};
+
+/** The employments the manager chain runs over: the requester's, and their manager's. */
+export const REQUESTER_EMPLOYMENT = '01930000-0000-7000-8000-00000000e001';
+export const MANAGER_EMPLOYMENT = '01930000-0000-7000-8000-00000000e002';
+export const B_REQUESTER_EMPLOYMENT = '01930000-0000-7000-8000-00000000e003';
+
+/**
+ * A reporting line, and the two employments and two links that make it mean something.
+ *
+ * Seeded as the owner, exactly as the memberships above are and for the same reason: another
+ * module's world is fixture work, and every assertion still runs through the unprivileged role.
+ * What is deliberately **real** here is the shape — a person is linked to an employment in Identity,
+ * that employment reports to another in Employment, and that one is linked back to a person. The
+ * manager chain has three links and this seeds all three, so a suite that passes is passing over the
+ * columns the adapter actually reads.
+ *
+ * `line` is optional: an employment with no reporting line is how "this requester has no manager"
+ * is arranged, and it is arranged by leaving a row out rather than by stubbing an answer.
+ */
+export const seedReportingLine = async (
+  admin: Pool,
+  chain: {
+    readonly tenantId: string;
+    readonly requesterMembershipId: string;
+    readonly requesterEmploymentId: string;
+    readonly line?: {
+      readonly managerEmploymentId: string;
+      readonly managerMembershipIds: readonly string[];
+      readonly lineType?: 'primary' | 'functional';
+      readonly effectiveFrom?: string;
+      readonly effectiveTo?: string;
+    };
+  },
+): Promise<void> => {
+  await seedEmployments(admin, chain.tenantId, [
+    chain.requesterEmploymentId,
+    ...(chain.line === undefined ? [] : [chain.line.managerEmploymentId]),
+  ]);
+  await linkEmployment(
+    admin,
+    chain.tenantId,
+    chain.requesterMembershipId,
+    chain.requesterEmploymentId,
+    true,
+  );
+
+  if (chain.line === undefined) return;
+
+  await admin.query(
+    `insert into employment_reporting_line
+       (id, tenant_id, employment_id, manager_employment_id, line_type, effective_from,
+        effective_to, ${AUDIT_COLUMNS})
+     values (gen_random_uuid(), $1, $2, $3, $4, $5::timestamptz, $6::timestamptz, ${AUDIT})`,
+    [
+      chain.tenantId,
+      chain.requesterEmploymentId,
+      chain.line.managerEmploymentId,
+      chain.line.lineType ?? 'primary',
+      chain.line.effectiveFrom ?? '2026-01-01T00:00:00Z',
+      chain.line.effectiveTo ?? null,
+    ],
+  );
+
+  for (const membershipId of chain.line.managerMembershipIds) {
+    // Primary for everybody except the requester, who already holds their own employment as their
+    // primary — `employment_link_one_primary_key` is unique per membership and would refuse a
+    // second. A requester who *also* holds their manager's employment is exactly the self-manager
+    // case, and it is representable precisely because `is_primary` is not what this query filters on.
+    await linkEmployment(
+      admin,
+      chain.tenantId,
+      membershipId,
+      chain.line.managerEmploymentId,
+      membershipId !== chain.requesterMembershipId,
+    );
+  }
+};
+
+/**
+ * The employments themselves, and the people they reference.
+ *
+ * An employment carries a real foreign key to a person, so one has to exist. The person is
+ * incidental to the manager chain — nothing on this path reads a name — but seeding it through the
+ * real column is what keeps the employment rows legal rather than contrived.
+ */
+const seedEmployments = async (
+  admin: Pool,
+  tenantId: string,
+  employmentIds: readonly string[],
+): Promise<void> => {
+  for (const [index, employmentId] of employmentIds.entries()) {
+    const personId = `${employmentId.slice(0, -4)}d${employmentId.slice(-3)}`;
+
+    await admin.query(
+      `insert into person
+         (id, tenant_id, person_number, status, metadata, ${AUDIT_COLUMNS})
+       values ($1, $2, $3, 'active', '{}'::jsonb, ${AUDIT})
+       on conflict (id) do nothing`,
+      [personId, tenantId, `P-${employmentId.slice(-4)}-${String(index)}`],
+    );
+    await admin.query(
+      `insert into employment
+         (id, tenant_id, person_id, employment_number, status, employment_type_code,
+          original_hire_date, start_date, metadata, ${AUDIT_COLUMNS})
+       values ($1, $2, $3, $4, 'active', 'permanent',
+               date '2026-01-01', date '2026-01-01', '{}'::jsonb, ${AUDIT})
+       on conflict (id) do nothing`,
+      [employmentId, tenantId, personId, `E-${employmentId.slice(-4)}-${String(index)}`],
+    );
+  }
+};
+
+/**
+ * One employment link, primary and live.
+ *
+ * `is_primary` is per **membership**, so two people may each hold the same employment as their
+ * primary — which is exactly the ambiguity the manager chain has to refuse rather than resolve, and
+ * seeding it truthfully is what lets a suite reach that case at all.
+ */
+const linkEmployment = async (
+  admin: Pool,
+  tenantId: string,
+  membershipId: string,
+  employmentId: string,
+  isPrimary: boolean,
+): Promise<void> => {
+  await admin.query(
+    `insert into employment_link
+       (id, tenant_id, membership_id, employment_id, is_primary, status, linked_at, ${AUDIT_COLUMNS})
+     values (gen_random_uuid(), $1, $2, $3, $4, 'linked', now(), ${AUDIT})
+     on conflict (tenant_id, membership_id, employment_id) do nothing`,
+    [tenantId, membershipId, employmentId, isPrimary],
+  );
 };

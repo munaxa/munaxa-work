@@ -99,3 +99,38 @@ export interface UserPreferenceView {
   /** Derived from the language. Included so a client never has to know the RTL list. */
   readonly direction: 'ltr' | 'rtl';
 }
+
+/**
+ * Whether one membership may act in this tenant right now — and nothing else about them.
+ *
+ * **One field, and the field is a conclusion rather than a fact.** `isActingMembership` is Identity's
+ * rule for what "acting" means, and this view is that rule already applied. Publishing the raw status
+ * instead would hand every consumer the job of re-deciding whether `suspended` counts, and the second
+ * consumer to answer that differently from the first is the one nobody notices.
+ *
+ * **The absences are the contract.** No status, no profile, no preferences, no portals, no
+ * employments, no delegations, no roles, no organization, no person, no tenant. A caller that needs
+ * any of those is asking a different question and has a different query to ask — this one is for a
+ * consumer that has a membership identifier and needs to know only whether it can be asked to do
+ * something. Widening it would turn a predicate into the member directory this module deliberately
+ * does not publish.
+ */
+export interface MembershipStandingView {
+  readonly active: boolean;
+}
+
+/**
+ * Who a membership is, for the one purpose of addressing them.
+ *
+ * One field, and the restraint is the contract: a notification is delivered to a *workforce user*
+ * because a person holding memberships in three tenants is one person with one set of channel
+ * preferences (ADR-0033), while the modules that ask for one address *memberships*. This crosses
+ * that boundary and does nothing else.
+ *
+ * It carries no name, address, locale or channel preference — Communications resolves how to reach
+ * somebody; this answers only who. Adding a field here would hand it to every consumer whether or
+ * not they needed it, which is the property that ruled out `describe-member` in the first place.
+ */
+export interface MembershipRecipientView {
+  readonly workforceUserId: string;
+}

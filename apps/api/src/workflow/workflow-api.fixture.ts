@@ -15,6 +15,7 @@ import {
   type PermissionChecker,
 } from '@work/kernel';
 import { PostgresUnitOfWork } from '@work/persistence';
+import { employmentModule, postgresEmploymentStores } from '@work/employment';
 import {
   ConfiguredTenantSettings,
   identityModule,
@@ -23,6 +24,7 @@ import {
 } from '@work/identity';
 import {
   WorkflowApprovalController,
+  WorkflowApprovalGroupController,
   WorkflowDefinitionController,
   WorkflowDispatcher,
   WorkflowInstanceController,
@@ -139,6 +141,15 @@ export interface WorkflowApiFixture {
     values?: readonly unknown[],
   ): Promise<TRow[]>;
   readonly pool: Pool;
+  /**
+   * The owner connection, for seeding another module's world only.
+   *
+   * Identity's memberships already go in this way; Phase 16C's employments and reporting lines join
+   * them. Both are written by their own modules' commands in production, and the unprivileged role
+   * these suites assert through cannot and should not bootstrap them. **No assertion uses this
+   * pool** — every security claim still runs through the application role.
+   */
+  readonly owner: Pool;
   truncate(): Promise<void>;
   close(): Promise<void>;
 }
@@ -158,12 +169,26 @@ const dispatcherFor = (application: Pool, checker: PermissionChecker): Dispatche
     settings: new ConfiguredTenantSettings(IDENTITY_DEFAULTS),
     clock: systemClock,
   });
+  // Employment's real module, for the one query the reporting-line adapter asks it. Its queries
+  // only, exactly as Identity's: Workflow reads both modules and writes to neither, so registering
+  // a command surface would offer these suites a capability the product does not give it.
+  const employment = employmentModule(
+    {
+      unitOfWork,
+      stores: postgresEmploymentStores(),
+      people: { find: () => Promise.resolve(undefined) },
+      organization: { unitExists: () => Promise.resolve(true) },
+      clock: systemClock,
+    },
+    { send: () => Promise.reject(new Error('Employment sends no command in this fixture.')) },
+  );
   const recruitmentSender = new DeferredRecruitmentSender();
   const recruitment = recruitmentModuleFor(unitOfWork, recruitmentSender);
 
   recruitmentSender.attach(dispatcher);
 
   for (const handler of identity.queries ?? []) dispatcher.registerQuery(handler);
+  for (const handler of employment.queries ?? []) dispatcher.registerQuery(handler);
   for (const module of [recruitment, workflowModuleFor(unitOfWork, asking, sending, checker)]) {
     for (const handler of module.commands ?? []) dispatcher.registerCommand(handler);
     for (const handler of module.queries ?? []) dispatcher.registerQuery(handler);
@@ -183,6 +208,7 @@ export const CONTROLLERS = [
   WorkflowVersionController,
   WorkflowInstanceController,
   WorkflowApprovalController,
+  WorkflowApprovalGroupController,
 ];
 
 const nestFor = async (
@@ -274,6 +300,8 @@ export const openWorkflowApi = async (): Promise<WorkflowApiFixture> => {
         opened.push(nest);
         return nest;
       }),
+
+    owner: admin,
 
     inspect: async (text, values) => {
       const read = await admin.query(text, values === undefined ? undefined : [...values]);

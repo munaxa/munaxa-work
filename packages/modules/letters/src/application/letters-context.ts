@@ -1,4 +1,5 @@
 import {
+  actorSubjectOf,
   currentContext,
   err,
   isSystemContext,
@@ -28,7 +29,7 @@ export const originOfCurrentRequest = (): EventOrigin => {
   return {
     tenantId: context.tenantId,
     correlationId: context.correlationId,
-    actor: context.actor,
+    actor: actorSubjectOf(context),
   };
 };
 

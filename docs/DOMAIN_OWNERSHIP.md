@@ -36,7 +36,9 @@ them afterwards.
 | Course, enrolment, certification          | `learning`      | Phase 14A     |
 | Career path, succession plan              | `career`        | Phase 15 ✅   |
 | Approval, workflow definition, version, instance, step, decision | `workflow` | Phase 16A ✅ |
-| Parallel approval, tally, branching, SLA, escalation | `workflow` | Phase 16B |
+| Approval group, group membership, parallel branch, branch rule, quorum, branch condition, branch tally | `workflow` | Phase 16B ✅ |
+| Service-level target, manager-routing resolution and snapshot | `workflow` | Phase 16C ✅ |
+| Escalation, scheduled firing, approval expiry as a written state, role approvers | — | not owned; no module implements any of them |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
 | Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |
@@ -123,6 +125,42 @@ nothing else owns one.
 key this module never resolves; an issued letter carries its frozen substituted values and no
 artefact. Both are missing dependencies rather than deferred features, and both are named in
 [`verification/phase-12-report.md`](verification/phase-12-report.md) §5.
+
+**`workflow` owns process and owns no business data.** It routes a decision about a subject it
+identifies by two opaque strings and never interprets, so there is no foreign key out of the module
+and no shape in which it could learn what a requisition is. Phase 16B added the **approval group** —
+and an approval group is an explicit list of memberships a tenant writes down, not a directory. This
+product owns no role directory and no group directory: nothing resolves a department, an
+organizational unit, a position or a membership query into a set of approvers, and a membership on a
+list is Identity's identifier held as an opaque value with no join behind it.
+
+A **delegation** is `identity`'s and stays there: Workflow asks whether one is in force at the
+instant a decision is made and stores none of its own.
+
+Phase 16C added two things to that picture and neither moved a fact across a boundary. A
+**service-level target** is wholly Workflow's: a whole number of hours or days on a step, and a state
+derived from it on every read and stored nowhere. **Manager routing** is Workflow's *orchestration
+only* — the reporting line remains `employment`'s and which member holds an employment remains
+`identity`'s, and Workflow asks each of them one bounded question, composes the answers, and copies
+the result onto the step. It caches nothing, joins nothing and re-reads nothing once an approval is
+running. It is still **not a directory**: the two Identity queries take one identifier and return one
+answer, `identity.membership.read` was not granted, and nothing enumerates memberships, resolves a
+role or traverses more than a single level.
+
+Phase 16D added one capability and, again, moved no fact across a boundary. **Escalation is wholly
+Workflow's**: adding an approver to a running approval is an act on Workflow's own steps, recorded in
+Workflow's own history, and nothing about it is another module's to know. The one fact it needs that
+Workflow does not own is **whether a membership may act at all**, and that stays `identity`'s — asked
+through a bounded port that takes one identifier and returns one boolean, under
+`identity.membership.read` held by no user and reached only through a service grant (ADR-0043).
+Identity applies its own rule and Workflow receives the answer, so there is exactly one definition of
+an acting membership and it lives where the field does. This is still **not a directory**: nothing
+enumerates memberships, and no candidate list exists.
+
+**Scheduled firing, approval expiry as a written state, automatic escalation and role approvers are
+owned by nobody**, because no module implements them — the row above records that as an absence rather than
+leaving a reader to infer an owner. The kernel's `JobPort` is a contract with no adapter anywhere, and
+no phase yet owns a durable runner for it.
 
 ## Rules
 

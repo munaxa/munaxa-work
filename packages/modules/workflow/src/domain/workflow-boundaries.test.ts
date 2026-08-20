@@ -48,22 +48,45 @@ const code = sources.map((file) => codeOf(file)).join('\n');
  * *rewritten* to assert what replaced them rather than deleted, which would have removed the guard
  * instead of moving it.
  *
- * What remains deferred is Phase 16C, and every fragment below would appear in the code if any of it
- * had been started.
+ * **It moved again in Phase 16C, on the same terms.** The requester's manager is now an approver kind
+ * and a step may carry an elapsed-time target — both against parameters approved one at a time
+ * (D-16C-04, D-16C-05, P-1 to P-6). So those two rows were rewritten to assert *what is still absent
+ * around them*, which is narrower and therefore harder to satisfy by accident: manager routing exists
+ * but only one level from the requester along the primary line, and a target exists but nothing
+ * measures it in business days and nothing turns it into a state.
+ *
+ * What remains deferred is Phase 16D and later, and every fragment below would appear in the code if
+ * any of it had been started.
  */
-describe('Phase 16C is not quietly present', () => {
+describe('what is still not present', () => {
   /**
    * Each entry is a capability 16C owns, and a fragment that would appear in the *code* if it had
    * been built. Deliberately narrow: `sla` rather than `s`, `escalat` rather than `level`, so an
    * ordinary word cannot trip them.
    */
   const deferred: readonly (readonly [string, readonly string[]])[] = [
-    ['SLA and business days', ['sla', 'businessDay', 'workingDay', 'dueAt', 'breach']],
-    ['escalation', ['escalat']],
+    // A target is elapsed time and nothing else: no calendar, and no state it turns into. `breach`
+    // and `expired` are the words a written terminal state would arrive under, and D-16C-06 refused
+    // one — a step is *read* as overdue and never stored that way.
+    ['business days or a breach state', ['sla', 'businessDay', 'workingDay', 'breach', 'expired']],
+    // `escalat` left this list in Phase 16D **by authorization, not by attrition** (D-16D-02,
+    // D-16D-05), exactly as `managerOf` and `slaDue` left it in 16C. What replaced it is narrower and
+    // sharper: escalation exists, and the *automatic* half of it still does not. The companion test
+    // below asserts the capability **present**, so a fragment removed from this list can never pass
+    // for a capability quietly abandoned.
+    ['automatic escalation', ['escalateAfter', 'autoEscalat', 'escalationTimer', 'sweep']],
     ['scheduling', ['JobPort', 'cron', 'schedule', 'enqueue']],
-    ['manager routing', ['manager', 'reportsTo', 'employmentId']],
+    // Manager routing exists; walking a hierarchy does not. One level, from the requester, along the
+    // primary line (P-1 to P-4) — so a chain, a depth or a functional line would all be new.
+    ['manager chains beyond one level', ['reportsTo', 'reportingLine', 'functional', 'levelsUp']],
     ['role and external approvers', ['roleId', 'permissionHolder', 'externalApprover']],
-    ['notification', ['notify', 'notification', 'recipient', 'reminder']],
+    // `reminder` left this row in Phase 16E **by authorization** (D-16E-10), exactly as `escalat`
+    // left the row above it in 16D. The domain decides *whether* a reminder is due — a pure function
+    // of two columns and an instant — and holds nothing whatever about *telling* anybody: no port, no
+    // recipient, no channel, no template. So the three words that would mean otherwise stay, and the
+    // companion test below asserts the rule is present, so the removal cannot pass for an
+    // abandonment.
+    ['notification', ['notify', 'notification', 'recipient', 'channel', 'deliver']],
     ['analytics', ['analytic', 'aggregate', 'distribution', 'percentile']],
   ];
 
@@ -78,14 +101,32 @@ describe('Phase 16C is not quietly present', () => {
   }
 
   /**
-   * The two approver kinds 16B ships, and the three it does not.
+   * The reminder rule is present, and it decides only whether — never who to tell or how.
    *
-   * A `group` is a list Workflow keeps and resolves once, at instance start. It is emphatically not
-   * a directory: `role` would need one, and this repository has committed never to build it.
+   * The positive half of narrowing the notification row above. `reminderDue` exists and is a function
+   * of an instance, a step and an instant; what it returns is the membership **already on the step**,
+   * which is why no word about recipients or channels appears in this layer at all.
    */
-  it('knows exactly two kinds of approver', () => {
-    expect([...APPROVER_KINDS]).toStrictEqual(['membership', 'group']);
-    for (const absent of ['manager', 'role', 'external']) {
+  it('has the reminder rule, and nothing in it about telling anybody', () => {
+    // `code` has its string literals stripped, so these are identifiers rather than values — the
+    // value itself is asserted by the vocabulary test above and by the schema parity suite.
+    expect(code).toContain('reminderDue');
+    expect(code).toContain('REMINDER_EVENT');
+    for (const absent of ['NotificationPort', 'notify(', 'workforceUserId', 'templateKey']) {
+      expect([absent, code.includes(absent)]).toStrictEqual([absent, false]);
+    }
+  });
+
+  /**
+   * The three approver kinds this module ships, and the two it does not.
+   *
+   * A `group` is a list Workflow keeps and resolves once, at instance start. A `manager` is the
+   * requester's immediate manager, resolved once at the same moment. Neither is a directory: `role`
+   * would need one, and this repository has committed never to build it.
+   */
+  it('knows exactly three kinds of approver', () => {
+    expect([...APPROVER_KINDS]).toStrictEqual(['membership', 'group', 'manager']);
+    for (const absent of ['role', 'external', 'dynamic']) {
       expect([absent, [...APPROVER_KINDS].includes(absent as never)]).toEqual([absent, false]);
     }
   });
@@ -103,6 +144,42 @@ describe('Phase 16C is not quietly present', () => {
         fragment,
         false,
       ]);
+    }
+  });
+
+  /**
+   * The control on every row above: what 16C *did* build is present.
+   *
+   * A negative suite alone cannot tell "refused" from "forgotten". These four fragments would be
+   * missing if the manager rule or the elapsed-time target had quietly not been written, and the
+   * rows above would then pass for the wrong reason.
+   */
+  it('does contain the manager rule and the elapsed-time target it was approved to build', () => {
+    for (const built of ['resolveManager', 'resolutionDateOf', 'serviceLevelTarget', 'dueAt']) {
+      expect([built, new RegExp(`\\b${built}\\b`).test(code)]).toEqual([built, true]);
+    }
+  });
+
+  /**
+   * And the same control for Phase 16D's one capability.
+   *
+   * `escalat` left the deferred list above by authorization; this is what stops that from being a
+   * hole. Escalation exists as a rule, the denominator is a set the tally can tell from its
+   * additions, the identity a duplicate is judged on is written down, and the history event is named
+   * — all four would be missing if the row above had simply been deleted.
+   *
+   * **Identifiers only.** The refusal names are string literals and this scanner strips those, on
+   * purpose: what it searches is code. That the `unanimous` refusal fires by its own name is asserted
+   * where it can be — against the function, in `workflow-escalation.test.ts`.
+   */
+  it('does contain the escalation rule Phase 16D was approved to build', () => {
+    for (const built of [
+      'escalateBranch',
+      'escalationIdentity',
+      'escalatedAt',
+      'ESCALATION_EVENT',
+    ]) {
+      expect([built, new RegExp(`\\b${built}\\b`).test(code)]).toEqual([built, true]);
     }
   });
 
@@ -148,6 +225,17 @@ describe('history records routing and not business facts', () => {
       'step-approved',
       'step-rejected',
       'step-skipped',
+      // Phase 16D's ninth, added with the database constraint in the same migration rather than
+      // before it. It says an approver was **added** to a branch, and it is deliberately not one of
+      // the three decision events above: recording an escalation as an approval, a rejection or a
+      // skip would put an answer in the timeline that nobody gave.
+      'step-escalated',
+      // Phase 16E's tenth, added with the database constraint in the same migration for the same
+      // reason. It says the system **told** a step's approver that the step had passed its service
+      // level: nobody was added, nothing was decided, and no step became overdue as a stored fact.
+      // It is deliberately neither `step-escalated`, which means a human widened an approval, nor
+      // any of the three decision events.
+      'step-reminded',
       'instance-completed',
       'instance-rejected',
       'instance-cancelled',

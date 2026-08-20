@@ -1,92 +1,34 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadWorkflow } from './api';
-import {
-  DEFINITION_ID,
-  INSTANCE_ID,
-  aDefinition,
-  aDefinitionDetail,
-  aDelegatedDecision,
-  aHistory,
-  aPendingApproval,
-  anApprovalStatus,
-  anInstance,
-  anInstanceDetail,
-} from './views.fixture';
+import { RESPONSES, requested, stubEmpty, stubFetch, stubFiftyRows } from './api.fixture';
+import { GROUP_ID } from './branches.fixture';
 
 /**
  * What the screen asks the API for, how many times, and — the security assertion — with what.
  *
- * **Mocked at the HTTP-client boundary and nowhere else.** `globalThis.fetch` is replaced; every
- * layer above it is the real one. Nothing here mocks a repository, a store, an application handler
- * or a domain rule — those are proved by the API suites against real PostgreSQL, and a UI test that
- * stubbed them would be asserting against a product nobody built.
- *
  * Two properties cannot be seen from any other suite. **The request count is bounded and does not
- * grow with the data**: a tenant with four thousand running approvals costs the same eight requests
+ * grow with the data**: a tenant with four thousand running approvals costs the same ten requests
  * as a tenant with one. And **no request names a person**: the two queue endpoints resolve the
  * caller from the authenticated request, so a membership on a query string would be this screen
  * asking to read somebody else's queue.
- */
-
-const BASE = 'http://127.0.0.1:3000/api/v1/workflow';
-
-/** Every path the screen is allowed to ask for, and what the API answers with. */
-const RESPONSES: Readonly<Record<string, unknown>> = {
-  '/definitions?page=1&size=50': { items: [aDefinition()], total: 4000 },
-  '/instances?page=1&size=50': { items: [anInstance()], total: 4000 },
-  [`/definitions/${DEFINITION_ID}`]: aDefinitionDetail(),
-  [`/instances/${INSTANCE_ID}`]: anInstanceDetail(),
-  [`/instances/${INSTANCE_ID}/history?page=1&size=50`]: { items: aHistory(), total: 9 },
-  [`/approvals/${INSTANCE_ID}/status`]: anApprovalStatus(),
-  '/approvals/pending?page=1&size=50': { items: [aPendingApproval()], total: 12 },
-  '/approvals/decided?page=1&size=50': { items: [aDelegatedDecision()], total: 7 },
-};
-
-let requested: string[] = [];
-
-/**
- * A fetch that answers from the table above and records what was asked.
  *
- * An unknown path answers 404 rather than throwing, because that is what a real API does for a route
- * this screen should not have called — and a test that threw would report "the screen crashed" where
- * the real defect is "the screen asked for something it should not have".
+ * What the screen *makes* of the answers is `api-payload.test.ts`; the stubbed API both suites run
+ * against is `api.fixture.ts`. Split at the file-size budget, on that seam.
  */
-const stubFetch = (missing: readonly string[] = []): void => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string) => {
-      const path = url.replace(BASE, '');
-
-      requested.push(path);
-
-      const body = missing.includes(path) ? undefined : RESPONSES[path];
-
-      return Promise.resolve({
-        ok: body !== undefined,
-        status: body === undefined ? 404 : 200,
-        json: () => Promise.resolve(body),
-      });
-    }),
-  );
-};
 
 describe('the requests the screen makes', () => {
-  beforeEach(() => {
-    requested = [];
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('asks for exactly the eight endpoints it needs, and no others', async () => {
+  it('asks for exactly the ten endpoints it needs, and no others', async () => {
     stubFetch();
 
     await loadWorkflow();
 
     expect([...requested].sort()).toEqual([...Object.keys(RESPONSES)].sort());
-    expect(requested).toHaveLength(8);
+    expect(requested).toHaveLength(10);
   });
 
   it('sends page and size on every collection request', async () => {
@@ -96,8 +38,8 @@ describe('the requests the screen makes', () => {
 
     const collections = requested.filter((path) => path.includes('?'));
 
-    // Two listings, the timeline and the two queues.
-    expect(collections).toHaveLength(5);
+    // Three listings — workflows, approvals and approval groups — the timeline and the two queues.
+    expect(collections).toHaveLength(6);
     for (const path of collections) {
       expect([path, path.includes('page=1')]).toEqual([path, true]);
       expect([path, path.includes('size=50')]).toEqual([path, true]);
@@ -112,7 +54,7 @@ describe('the requests the screen makes', () => {
 
     const unpaged = requested.filter((path) => !path.includes('?'));
 
-    expect(unpaged).toHaveLength(3);
+    expect(unpaged).toHaveLength(4);
     for (const path of unpaged) {
       expect([path, /\/[0-9a-f-]{36}(\/status)?$/.test(path)]).toEqual([path, true]);
     }
@@ -122,70 +64,60 @@ describe('the requests the screen makes', () => {
    * The N+1 assertion, made where an N+1 would actually appear.
    *
    * Each listing returns rows; a screen that read a detail per row would issue one request per
-   * workflow, per version, per approval, per queue entry and per history entry. Here the listings
-   * return **fifty rows each** and the request count is unchanged — which is the only way to
-   * distinguish "reads the first row" from "reads every row" without counting by hand.
+   * workflow, per version, per approval, per approval group, per queue entry and per history entry.
+   * Here the listings return **fifty rows each** and the request count is unchanged — which is the
+   * only way to distinguish "reads the first row" from "reads every row" without counting by hand.
+   *
+   * The approval groups are the newest way to get this wrong: the listing carries no member count,
+   * so a column showing one would take a detail read per row. Fifty groups, one detail read.
    */
   it('issues the same requests for fifty rows as for one', async () => {
-    const many = <TItem>(item: TItem): readonly TItem[] => Array.from({ length: 50 }, () => item);
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        const path = url.replace(BASE, '');
-
-        requested.push(path);
-
-        const single = RESPONSES[path] as { items?: readonly unknown[] } | undefined;
-        const body =
-          single?.items === undefined ? single : { ...single, items: many(single.items[0]) };
-
-        return Promise.resolve({
-          ok: body !== undefined,
-          status: body === undefined ? 404 : 200,
-          json: () => Promise.resolve(body),
-        });
-      }),
-    );
+    stubFiftyRows();
 
     await loadWorkflow();
 
-    // Fifty workflows, fifty approvals, fifty queue entries, fifty timeline entries — and still
-    // eight requests. A per-row read would have made this two hundred and fifty.
-    expect(requested).toHaveLength(8);
+    // Fifty workflows, fifty approvals, fifty groups, fifty queue entries, fifty timeline entries —
+    // and still ten requests. A per-row read would have made this three hundred.
+    expect(requested).toHaveLength(10);
     expect(requested.filter((path) => path.startsWith('/definitions/'))).toHaveLength(1);
     expect(requested.filter((path) => path.startsWith('/instances/'))).toHaveLength(2);
     expect(requested.filter((path) => path.includes('/status'))).toHaveLength(1);
+    // One group detail for fifty groups, and never one per row.
+    expect(requested.filter((path) => path.startsWith('/approval-groups/'))).toHaveLength(1);
   });
 
-  it('makes four requests for an empty tenant, because there is no first row to read', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        requested.push(url.replace(BASE, ''));
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ items: [], total: 0 }),
-        });
-      }),
-    );
+  /** A tenant with one group of everything: the detail read happens once, for that one row. */
+  it('reads one group’s members, and reads them from the first row of the listing', async () => {
+    stubFetch();
 
     const workflow = await loadWorkflow();
 
-    // The two listings and the two queues, and none of the four details.
-    expect(requested).toHaveLength(4);
+    expect(requested.filter((path) => path.startsWith('/approval-groups/'))).toEqual([
+      `/approval-groups/${GROUP_ID}`,
+    ]);
+    expect(workflow.group?.members).toHaveLength(2);
+    // The listing's total is the server's own count over the tenant, not the page it returned.
+    expect([workflow.groups.length, workflow.groupsTotal]).toEqual([1, 90]);
+  });
+
+  it('makes five requests for an empty tenant, because there is no first row to read', async () => {
+    stubEmpty();
+
+    const workflow = await loadWorkflow();
+
+    // The three listings and the two queues, and none of the four details.
+    expect(requested).toHaveLength(5);
     expect(workflow.unavailable).toBe(false);
     expect(workflow.definitionsTotal).toBe(0);
   });
 
-  /** One row is the ordinary case, and it costs the full eight — no more and no fewer. */
-  it('makes eight requests for a tenant with one of everything', async () => {
+  /** One row is the ordinary case, and it costs the full ten — no more and no fewer. */
+  it('makes ten requests for a tenant with one of everything', async () => {
     stubFetch();
 
     await loadWorkflow();
 
-    expect(requested).toHaveLength(8);
+    expect(requested).toHaveLength(10);
   });
 });
 
@@ -197,10 +129,6 @@ describe('the requests the screen makes', () => {
  * add without anything failing — so the check is here, over every request the screen makes.
  */
 describe('the identity the screen never sends', () => {
-  beforeEach(() => {
-    requested = [];
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -241,6 +169,38 @@ describe('the identity the screen never sends', () => {
     ]);
   });
 
+  /**
+   * And asks for **nothing about the manager or the target** beyond the rows it already has.
+   *
+   * Phase 16C is the shape that would make a per-row request tempting: a manager step names a
+   * membership, a step carries a service level, and a screen wanting either the person's name or the
+   * time left could reach for a lookup per row. Both arrive inside the reads above, so none of these
+   * paths is asked for — and a screen that started asking would fail here rather than in a
+   * production trace.
+   */
+  it('asks for no manager, reporting line or service-level lookup of its own', async () => {
+    stubFetch();
+
+    await loadWorkflow();
+
+    for (const path of requested) {
+      for (const lookup of [
+        'manager',
+        'reporting',
+        'my-manager',
+        'sla',
+        'service-level',
+        'routing',
+        'escalation',
+        'expiry',
+        'asOf',
+        'now=',
+      ]) {
+        expect([path, lookup, path.includes(lookup)]).toEqual([path, lookup, false]);
+      }
+    }
+  });
+
   it('never asks Recruitment, Identity or People for anything', async () => {
     stubFetch();
 
@@ -251,95 +211,5 @@ describe('the identity the screen never sends', () => {
         expect([path, module, path.includes(module)]).toEqual([path, module, false]);
       }
     }
-  });
-});
-
-describe('what the screen does with an answer it did not get', () => {
-  beforeEach(() => {
-    requested = [];
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('stops after the first read when the API will not answer at all', async () => {
-    stubFetch(['/definitions?page=1&size=50']);
-
-    const workflow = await loadWorkflow();
-
-    // One request, and the screen says the service did not answer rather than rendering a tenant
-    // with nothing in it. A wall of seven more failed requests would tell nobody anything.
-    expect(requested).toHaveLength(1);
-    expect(workflow.unavailable).toBe(true);
-  });
-
-  it('keeps a refused queue empty without claiming the tenant is', async () => {
-    stubFetch(['/approvals/pending?page=1&size=50']);
-
-    const workflow = await loadWorkflow();
-
-    expect(workflow.unavailable).toBe(false);
-    expect(workflow.pending).toEqual([]);
-    expect(workflow.pendingTotal).toBe(0);
-    // The rest of the page still answered, with the server's own totals.
-    expect(workflow.definitionsTotal).toBe(4000);
-    expect(workflow.decidedTotal).toBe(7);
-  });
-
-  it('survives a transport failure without turning it into data', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.reject(new Error('ECONNREFUSED'))),
-    );
-
-    const workflow = await loadWorkflow();
-
-    expect(workflow.unavailable).toBe(true);
-    expect(workflow.definitions).toEqual([]);
-  });
-});
-
-describe('the values the screen carries through', () => {
-  beforeEach(() => {
-    requested = [];
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('takes every total from the server rather than from the rows it received', async () => {
-    stubFetch();
-
-    const workflow = await loadWorkflow();
-
-    expect([workflow.definitions.length, workflow.definitionsTotal]).toEqual([1, 4000]);
-    expect([workflow.instances.length, workflow.instancesTotal]).toEqual([1, 4000]);
-    expect([workflow.pending.length, workflow.pendingTotal]).toEqual([1, 12]);
-    expect([workflow.decided.length, workflow.decidedTotal]).toEqual([1, 7]);
-    expect([workflow.history.length, workflow.historyTotal]).toEqual([3, 9]);
-  });
-
-  it('keeps the timeline in the order the API returned it', async () => {
-    stubFetch();
-
-    const workflow = await loadWorkflow();
-
-    expect(workflow.history.map((entry) => entry.event)).toEqual([
-      'instance-started',
-      'step-awaiting',
-      'step-approved',
-    ]);
-  });
-
-  it('keeps every identifier and instant exactly as the API sent them', async () => {
-    stubFetch();
-
-    const workflow = await loadWorkflow();
-
-    expect(workflow.instances[0]?.instanceId).toBe(INSTANCE_ID);
-    expect(workflow.instances[0]?.startedOn).toBe('2026-02-28T23:30:00.000Z');
-    expect(workflow.definitions[0]?.version).toBe(3);
   });
 });

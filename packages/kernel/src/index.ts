@@ -20,13 +20,22 @@ export { isUuidV7, timestampOf, uuidV7 } from './identity/uuid-v7.js';
 
 // Tenancy
 export {
+  actorSubjectOf,
   assertBelongsToCurrentTenant,
   currentContext,
+  currentMembershipId,
   currentTenantId,
+  isMachineContext,
   isSystemContext,
+  isTenantScoped,
   runInContext,
 } from './tenancy/tenant-context.js';
-export type { ExecutionContext, SystemContext, TenantContext } from './tenancy/tenant-context.js';
+export type {
+  ExecutionContext,
+  MachineContext,
+  SystemContext,
+  TenantContext,
+} from './tenancy/tenant-context.js';
 /**
  * The bounded service grant (ADR-0043): the narrow, named authority one module exercises inside
  * another while acting on a user's behalf. Empty unless a grant is open, and never a bypass.
@@ -124,6 +133,9 @@ export type {
   EmailPort,
   FeatureContext,
   FeatureFlagPort,
+  JobExecution,
+  JobHandler,
+  JobOutcome,
   JobPort,
   JobRequest,
   SearchDocument,

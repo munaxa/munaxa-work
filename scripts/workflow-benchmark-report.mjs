@@ -62,6 +62,19 @@ export const report = (dataset, seeded, measured, rowCounts) => {
   line('decided approvals for one member', measured.decidedQueue, queue);
   line('approval status (3 reads)', measured.approvalStatus, detail);
 
+  // Phase 16B — the lists a tenant keeps, and the read every branched approval start depends on.
+  line('approval group listing', measured.groupSearch, queue);
+  line('approval group lookup by code', measured.groupByCode, detail);
+  line('approval group lookup by id', measured.groupRead, detail);
+  line('members of one group', measured.groupMembers, detail);
+  // The one that would be an N+1 if it were written per group: every list in the tenant, at once.
+  line('members of every group (one statement)', measured.membersOfAll, detail);
+
+  // Phase 16B — a branch, which is several steps awaiting at one position rather than one.
+  line('steps of a branched approval', measured.branchSteps, detail);
+  line('branched approval detail (3 reads)', measured.branchDetail, detail);
+  line('queue for a branch approver', measured.branchQueue, queue);
+
   // The cohort shape, measured as the repository can actually answer it.
   //
   // The plan's §14 proposes "open instances for 200 subjects — one query for 200, never one per

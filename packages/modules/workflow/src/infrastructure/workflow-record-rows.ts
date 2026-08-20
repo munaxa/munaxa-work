@@ -1,14 +1,18 @@
 import type { WorkflowDecisionState } from '../domain/decision.js';
-import type { WorkflowHistoryState } from '../domain/history.js';
+import { definedOf } from '../domain/defined.js';
+import type { ExecutionProvenance, WorkflowHistoryState } from '../domain/history.js';
 import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instance.js';
+import type { BranchCondition } from '../domain/condition.js';
 import type {
   ApprovalDecisionKind,
   ApproverKind,
+  BranchRule,
   DecisionAuthority,
   WorkflowHistoryEvent,
   WorkflowInstanceStatus,
   WorkflowStepStatus,
 } from '../domain/workflow-vocabulary.js';
+import { serviceLevelOf, serviceLevelValues } from './workflow-service-level-columns.js';
 import { asNumber, orNull, presentOf, type RowValues } from './row-writer.js';
 
 /**
@@ -102,6 +106,40 @@ export const instanceValues = (state: WorkflowInstanceState, tenantId: string): 
   context: JSON.stringify(state.context),
 });
 
+/**
+ * One step of a running approval: the four columns Phase 16B added, the three Phase 16C did, and the
+ * one Phase 16D did.
+ *
+ * **`approver_membership_id` stays `not null` here**, and that asymmetry with the template is the
+ * whole of the snapshot rule. A template may name a list or a manager; a running step never does,
+ * because both were resolved into concrete memberships before this row existed. That is why
+ * `workflow_step_approver_kind_check` still enumerates `membership` alone: at the moment somebody is
+ * actually asked, there is only ever a person. **A manager-resolved step is therefore
+ * indistinguishable here from one a tenant typed** — which is the point, and the reason there is no
+ * manager column on this table and nothing in this file that knows a reporting line exists.
+ *
+ * **`awaiting_at` is ordinary persisted state, supplied by the application.** Nothing here generates
+ * it, reads a clock for it, or derives it from `created_at` or from the history table. The domain
+ * stamps it at the instant a step becomes `awaiting`, from the instant already flowing through the
+ * command; this mapper stores what it is given and hands it back. Several steps of one parallel
+ * branch legitimately share an instant, and a later step of a chain legitimately has a later one —
+ * there is no uniqueness anywhere near it.
+ *
+ * **`source_group_id` is provenance rather than a reference.** It records which list the person came
+ * from so "why was I asked?" has an answer; it carries no foreign key, so editing or deleting that
+ * list cannot reach an approval already under way.
+ *
+ * **`escalated_at` is the second provenance on this row**, and it is the one the branch tally reads.
+ * Null means the instance snapshotted this approver when it started; an instant means an escalation
+ * added them afterwards. The tally counts the null ones, which is what keeps the assigned denominator
+ * from moving when somebody is added to a branch already under way — so a mapper that dropped this
+ * column would not merely lose a timestamp, it would silently enlarge the denominator of every
+ * escalated branch on the next read. It is stored and returned exactly as `awaiting_at` is, and for
+ * the same reason: nothing here generates it, derives it or reads a clock for it.
+ *
+ * `branch_rule`, `quorum` and `condition` are **copies**, taken from the template at the start, which
+ * is what makes a running approval keep the rule it began under when the definition is edited.
+ */
 export interface StepRow {
   readonly id: string;
   readonly instance_id: string;
@@ -109,6 +147,14 @@ export interface StepRow {
   readonly approver_kind: string;
   readonly approver_membership_id: string;
   readonly status: string;
+  readonly source_group_id: string | null;
+  readonly branch_rule: string | null;
+  readonly quorum: number | null;
+  readonly condition: unknown;
+  readonly service_level_count: number | null;
+  readonly service_level_unit: string | null;
+  readonly awaiting_at: Date | null;
+  readonly escalated_at: Date | null;
   readonly version: number;
 }
 
@@ -120,6 +166,14 @@ export const stepColumns = (alias: string): string =>
     `${alias}.approver_kind`,
     `${alias}.approver_membership_id`,
     `${alias}.status`,
+    `${alias}.source_group_id`,
+    `${alias}.branch_rule`,
+    `${alias}.quorum`,
+    `${alias}.condition`,
+    `${alias}.service_level_count`,
+    `${alias}.service_level_unit`,
+    `${alias}.awaiting_at`,
+    `${alias}.escalated_at`,
     `${alias}.version`,
   ].join(', ');
 
@@ -131,6 +185,24 @@ export const stepState = (row: StepRow): WorkflowStepState => ({
   approverMembershipId: row.approver_membership_id,
   status: row.status as WorkflowStepStatus,
   version: asNumber(row.version),
+  ...presentOf({
+    sourceGroupId: row.source_group_id,
+    branchRule: row.branch_rule as BranchRule | null,
+    quorum: row.quorum === null ? null : asNumber(row.quorum),
+    // A `timestamptz` the driver hands back as a `Date` holding an absolute instant, passed through
+    // untouched. Null on every step not yet reached, and on every step that predates Phase 16C.
+    awaitingAt: row.awaiting_at,
+    // The same treatment, and null means something different: not "not yet" but "this approver was
+    // in the set the approval started with". Absent rather than null in the domain, so
+    // `escalatedAt === undefined` is the predicate the tally filters the denominator on.
+    escalatedAt: row.escalated_at,
+  }),
+  ...serviceLevelOf(row.service_level_count, row.service_level_unit),
+  // Separately, because a `jsonb` column arrives parsed rather than as a scalar `presentOf` can pass
+  // through — and because an empty array is a real stored value rather than an absent one.
+  ...(row.condition === null || row.condition === undefined
+    ? {}
+    : { condition: row.condition as readonly BranchCondition[] }),
 });
 
 export const stepValues = (state: WorkflowStepState, tenantId: string): RowValues => ({
@@ -141,6 +213,13 @@ export const stepValues = (state: WorkflowStepState, tenantId: string): RowValue
   approver_kind: state.approverKind,
   approver_membership_id: state.approverMembershipId,
   status: state.status,
+  source_group_id: orNull(state.sourceGroupId),
+  branch_rule: orNull(state.branchRule),
+  quorum: orNull(state.quorum),
+  condition: state.condition === undefined ? null : JSON.stringify(state.condition),
+  ...serviceLevelValues(state.serviceLevel),
+  awaiting_at: orNull(state.awaitingAt),
+  escalated_at: orNull(state.escalatedAt),
 });
 
 // ------------------------------------------------------------------------------------------------
@@ -217,6 +296,10 @@ export interface HistoryRow {
   readonly ordinal: number | null;
   readonly actor_membership_id: string | null;
   readonly on_behalf_of_membership_id: string | null;
+  readonly execution_identity: string | null;
+  readonly execution_correlation_id: string | null;
+  readonly execution_job_id: string | null;
+  readonly execution_attempt: number | null;
   readonly version: number;
 }
 
@@ -230,8 +313,31 @@ export const historyColumns = (alias: string): string =>
     `${alias}.ordinal`,
     `${alias}.actor_membership_id`,
     `${alias}.on_behalf_of_membership_id`,
+    `${alias}.execution_identity`,
+    `${alias}.execution_correlation_id`,
+    `${alias}.execution_job_id`,
+    `${alias}.execution_attempt`,
     `${alias}.version`,
   ].join(', ');
+
+/**
+ * The four provenance columns, read back as the one fact they are.
+ *
+ * `execution_identity` is the discriminator, and the database agrees: the check constraint ties the
+ * correlation to it, the job to the correlation and the attempt to the job. So a row either has an
+ * execution to describe or has none, and there is no half-populated case to represent.
+ */
+const executionOf = (row: HistoryRow): ExecutionProvenance | undefined =>
+  row.execution_identity === null || row.execution_correlation_id === null
+    ? undefined
+    : {
+        executionIdentity: row.execution_identity,
+        correlationId: row.execution_correlation_id,
+        ...presentOf({
+          jobId: row.execution_job_id,
+          attempt: row.execution_attempt === null ? null : asNumber(row.execution_attempt),
+        }),
+      };
 
 export const historyState = (row: HistoryRow): WorkflowHistoryState => ({
   historyId: row.id,
@@ -245,6 +351,7 @@ export const historyState = (row: HistoryRow): WorkflowHistoryState => ({
     actorMembershipId: row.actor_membership_id,
     onBehalfOfMembershipId: row.on_behalf_of_membership_id,
   }),
+  ...definedOf({ execution: executionOf(row) }),
 });
 
 export const historyValues = (state: WorkflowHistoryState, tenantId: string): RowValues => ({
@@ -257,4 +364,8 @@ export const historyValues = (state: WorkflowHistoryState, tenantId: string): Ro
   ordinal: orNull(state.ordinal),
   actor_membership_id: orNull(state.actorMembershipId),
   on_behalf_of_membership_id: orNull(state.onBehalfOfMembershipId),
+  execution_identity: orNull(state.execution?.executionIdentity),
+  execution_correlation_id: orNull(state.execution?.correlationId),
+  execution_job_id: orNull(state.execution?.jobId),
+  execution_attempt: orNull(state.execution?.attempt),
 });

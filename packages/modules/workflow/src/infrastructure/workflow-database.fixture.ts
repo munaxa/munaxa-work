@@ -70,19 +70,6 @@ export const WORKFLOW_TABLES = [
   'workflow_approval_group',
 ];
 
-/**
- * The seven a repository maps, which is a different list from the nine the module owns.
- *
- * Phase 16B Checkpoint 3 is schema only: the two group tables exist, carry their policies and hold
- * their invariants, and **no repository reads or writes them yet** — that is Checkpoint 5. The
- * mapper-parity suite compares mappers against the tables that have one, so it uses this list; every
- * suite that asserts a property of the *schema* — isolation, policies, forced row-level security —
- * uses `WORKFLOW_TABLES` and therefore covers all nine.
- */
-export const WORKFLOW_MAPPED_TABLES = WORKFLOW_TABLES.filter(
-  (table) => !table.startsWith('workflow_approval_group'),
-);
-
 /** The two whose rows are written once and never changed. */
 export const APPEND_ONLY_TABLES = ['workflow_decision', 'workflow_history'];
 
@@ -97,6 +84,15 @@ export const APPROVER = '01930000-0000-7000-8000-00000000b001';
 export const SECOND_APPROVER = '01930000-0000-7000-8000-00000000b002';
 export const DEPUTY = '01930000-0000-7000-8000-00000000b003';
 export const REQUESTER = '01930000-0000-7000-8000-00000000b004';
+/**
+ * Somebody on neither the branch nor the request — the only membership an escalation may name.
+ *
+ * A fifth identifier exists because Phase 16D's eligibility rules left no room for a fourth. The
+ * other four are all ineligible by construction now: three are assigned to the branch, and
+ * `REQUESTER` raised the approval, which D-16D-13 refuses. A suite that escalated to any of them
+ * would be testing a refusal while meaning to test a success.
+ */
+export const OUTSIDER = '01930000-0000-7000-8000-00000000b005';
 export const CORRELATION = '01930000-0000-7000-8000-00000000c001';
 
 export const SUBJECT_TYPE = 'recruitment.requisition';

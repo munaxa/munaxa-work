@@ -49,6 +49,11 @@ const WORKFLOW_TABLES = [
   'workflow_step',
   'workflow_decision',
   'workflow_history',
+  // 16B. The two group tables sit behind the same boundary as the other seven: a list of approvers
+  // is a tenant's own, and the routes that reach it in this checkpoint are covered here rather than
+  // trusted because the group suite passed.
+  'workflow_approval_group',
+  'workflow_approval_group_member',
 ];
 
 suite('Workflow API tenancy and identity', () => {
@@ -89,7 +94,7 @@ suite('Workflow API tenancy and identity', () => {
     expect(rows[0]).toEqual({ rolsuper: false, rolbypassrls: false });
   });
 
-  it('keeps row-level security enabled and forced on all seven tables', async () => {
+  it('keeps row-level security enabled and forced on all nine tables', async () => {
     const rows = await fixture.inspect<{
       relname: string;
       relrowsecurity: boolean;
@@ -100,7 +105,7 @@ suite('Workflow API tenancy and identity', () => {
       [WORKFLOW_TABLES],
     );
 
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(9);
     for (const row of rows) {
       expect([row.relname, row.relrowsecurity, row.relforcerowsecurity]).toEqual([
         row.relname,

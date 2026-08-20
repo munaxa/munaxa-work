@@ -139,6 +139,11 @@ export class Dispatcher {
 /**
  * Business operations run inside a tenant. The system context is for migrations and platform
  * maintenance, and reaching a business handler from it means a job forgot to adopt a tenant.
+ *
+ * A **machine** context passes, and passing here buys it nothing: it still has to hold the handler's
+ * declared permission, which the platform grants to a non-human principal explicitly or not at all.
+ * That is the whole design — automatic work goes through the *same* gate as a person, so there is
+ * one place authorization is decided rather than two that can disagree.
  */
 const assertTenantScoped = (operation: string): void => {
   const context = currentContext();

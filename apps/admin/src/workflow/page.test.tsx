@@ -67,6 +67,7 @@ describe('the /workflow route', () => {
     expect(markup).toContain('dir="ltr"');
     expect(markup).not.toContain('workflow.label.');
     expect(markup).not.toContain('workflow.withheld.');
+    expect(markup).not.toContain('workflow.provided.');
   });
 
   it('mounts every workspace on the page, not merely in the imports', async () => {
@@ -84,6 +85,11 @@ describe('the /workflow route', () => {
       'workflow.label.history',
       'workflow.label.pending',
       'workflow.label.decided',
+      'workflow.label.approvalGroups',
+      'workflow.label.groupMembers',
+      'workflow.label.branches',
+      'workflow.label.awaitingSteps',
+      'workflow.label.providedNotices',
       'workflow.label.statusNotices',
     ]) {
       expect([heading, markup.includes(en(heading))]).toEqual([heading, true]);

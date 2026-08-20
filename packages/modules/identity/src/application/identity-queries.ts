@@ -283,3 +283,112 @@ export const activeDelegationsForHandler = (
       return success(found.map(asDelegationView));
     }),
 });
+
+/**
+ * Who holds one employment — the reverse of "which jobs does this member hold", and the whole of
+ * the capability Phase 16C authorized on this module (D-16C-04).
+ *
+ * **It answers one question about one job.** Given an employment identifier a caller already holds,
+ * which memberships of this tenant are linked to it and may act. There is no filter, no page, no
+ * search term, no ordering parameter and no tenant argument — so it cannot be asked "who works
+ * here", "who holds role X" or "who is in this department". That narrowness is the authorization:
+ * D-16C-04 permitted this one reverse lookup precisely because it is not a directory, and a
+ * parameter that widened it would be a capability nobody approved.
+ *
+ * **Why Identity owns it.** `employment_link` is this module's table and the membership behind an
+ * employment is this module's fact. The consumer — Workflow, from Checkpoint 7 — holds an
+ * employment identifier it obtained from Employment and needs the person who may sign for it; the
+ * alternative was Workflow reading `employment_link` directly, which is the coupling a modular
+ * monolith exists to prevent.
+ *
+ * **What it deliberately does not do.** It does not resolve a reporting line, because Identity has
+ * none: `employment_reporting_line` is Employment's table and Employment already publishes the
+ * manager in force on a date through `employment.read-employment`. It does not walk a chain, does
+ * not take a depth, and does not know what a manager is. A caller composes those two published
+ * answers; this one supplies the last link and nothing more.
+ *
+ * **A list, and never a chosen one.** `employment_link` is unique per `(membership, employment)`
+ * pair, so nothing prevents two memberships holding one job. Identity returns everybody it finds
+ * in a stable order and leaves the choosing to a caller with approval to choose — collapsing two
+ * candidates to the first here would be a routing rule invented in a read.
+ *
+ * **Empty is a real answer**, and it is not the same answer as a caller getting no employment at
+ * all. A job whose holder's membership was suspended or ended returns nothing here while the
+ * employment plainly exists, which is exactly what lets a consumer tell "there is nobody to ask"
+ * from "there is no such job".
+ *
+ * Guarded by `identity.employment-link.read`, which already existed and already means this: who is
+ * linked to what. No permission was added for this query, and none was widened.
+ */
+export interface ActiveMembershipsForEmployment extends Query {
+  readonly queryName: 'identity.active-memberships-for-employment';
+  readonly employmentId: string;
+}
+
+export const activeMembershipsForEmploymentHandler = (
+  dependencies: IdentityDependencies,
+): QueryHandler<ActiveMembershipsForEmployment, readonly TenantMembershipView[]> => ({
+  queryName: 'identity.active-memberships-for-employment',
+  permission: IdentityPermissions.employmentLinkRead,
+
+  handle: async (query) =>
+    dependencies.unitOfWork.execute(async (transaction) => {
+      const found = await dependencies.stores.memberships.activeForEmployment(
+        transaction,
+        query.employmentId,
+      );
+
+      return success(found.map(asMembershipView));
+    }),
+});
+
+/**
+ * The one employment a member holds as their primary, and only if it is still live.
+ *
+ * The companion to the query above and the other half of what Phase 16C authorized (B-2, approved
+ * 2026-08-17). That one goes employment → holder; this one goes member → job. Between them a
+ * consumer that holds a membership can reach the employment it belongs to and back again, and
+ * nothing else about anybody.
+ *
+ * **It answers about one member and returns at most one link.** No list, no page, no filter, no
+ * search term and no tenant argument. `primaryFor` is the read behind it and it was already here —
+ * the application service has used it since Identity's own phase to demote an incumbent primary
+ * before promoting another. Publishing it adds a contract, not a capability.
+ *
+ * **Primary *and* linked, which is one predicate more than the name suggests.** `is_primary` alone
+ * would return the job somebody left, because a link keeps its flag until another is promoted. The
+ * pairing is exactly P-2's *"primary **active** employment"*, and it is the repository's predicate
+ * rather than a second definition written here.
+ *
+ * **Why this exists rather than a consumer reading `identity.describe-member`.** That query answers
+ * the whole of a member's page — profile, preferences, portals, links and delegations — and is
+ * guarded by `identity.membership.read`, the permission behind the member register. A consumer that
+ * needed one employment identifier would have had to hold the register to get it. This one is
+ * guarded by `identity.employment-link.read`, which is the permission for exactly this fact and the
+ * one its companion already uses.
+ *
+ * **Absent is a real answer.** A member with no employment at all, and a member whose links are all
+ * unlinked, both return nothing — and that is the fact a caller needs, not an error. Whether the
+ * membership itself exists is a different question, and this query does not conflate them.
+ */
+export interface PrimaryEmploymentForMembership extends Query {
+  readonly queryName: 'identity.primary-employment-for-membership';
+  readonly membershipId: string;
+}
+
+export const primaryEmploymentForMembershipHandler = (
+  dependencies: IdentityDependencies,
+): QueryHandler<PrimaryEmploymentForMembership, EmploymentLinkView | undefined> => ({
+  queryName: 'identity.primary-employment-for-membership',
+  permission: IdentityPermissions.employmentLinkRead,
+
+  handle: async (query) =>
+    dependencies.unitOfWork.execute(async (transaction) => {
+      const found = await dependencies.stores.employmentLinks.primaryFor(
+        transaction,
+        query.membershipId,
+      );
+
+      return success(found === undefined ? undefined : asEmploymentView(found));
+    }),
+});

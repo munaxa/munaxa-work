@@ -54,6 +54,47 @@ export const WorkflowPermissions = {
   approvalDecide: 'workflow.approval.decide',
   /** The caller's own queue, resolved from the membership on the request and from nothing else. */
   approvalReadOwn: 'workflow.approval.read-own',
+  /**
+   * Adding an approver to a branch that is stuck. The tenth, and it is implied by nothing.
+   *
+   * **It is the most powerful thing an administrator can do to a running approval short of ending
+   * one**, which is why it stands on its own rather than riding on a grant somebody already holds.
+   * `group.manage` changes who approves *the next* approval; this changes who approves *the one
+   * already under way*, after people have started answering it — and `instance.cancel` is the only
+   * other permission that reaches an approval in flight. That pair is the precedent, and the
+   * separation is the same one AD-0045 draws for Recruitment.
+   *
+   * **The actor's, never the added approver's.** The membership in the request is the person being
+   * brought in; whoever issues the command is resolved from the request context, and there is no
+   * field through which a caller could name themselves or anybody else as the actor.
+   *
+   * It is deliberately **not** in `DELEGABLE_SCOPES`. A delegation lets somebody decide in your
+   * place, and nobody approved letting somebody widen an approval in your place.
+   */
+  approvalEscalate: 'workflow.approval.escalate',
+
+  /**
+   * Running the automatic service-level reminder. The eleventh, and the first that no person holds.
+   *
+   * **It is separate from every human permission, and that separation is the whole of D-16E-02.** An
+   * automatic action authorized by a permission somebody already holds would be an action a person
+   * could be made to appear to have taken; and one authorized by nothing at all would be an action
+   * outside the pipeline. So the reminder is authorized exactly as a human operation is — declared
+   * here, checked centrally, granted by Platform — and to a principal that is not a member.
+   *
+   * **Deliberately not `approval.escalate`, `approval.decide`, `instance.start`, `instance.cancel` or
+   * `group.manage`.** Each was near enough to be tempting and each is wrong: they authorize changing
+   * who approves, answering on somebody's behalf, raising an approval, ending one, and editing the
+   * people a process asks. This authorizes sending one message and changing nothing.
+   *
+   * **Nothing implies it and it implies nothing.** Holding every other Workflow permission does not
+   * open it, and holding it opens nothing else — a machine that could remind cannot decide, escalate,
+   * start or cancel, and the authorization suite asserts that one permission at a time.
+   *
+   * It is deliberately **not** in `DELEGABLE_SCOPES`. A delegation lets somebody act in your place,
+   * and there is no place to act in: no person holds this.
+   */
+  reminderExecute: 'workflow.reminder.execute',
 
   /** Reading the approval groups a tenant keeps, and who is on them. */
   groupRead: 'workflow.group.read',

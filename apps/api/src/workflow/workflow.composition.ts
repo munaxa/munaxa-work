@@ -1,3 +1,4 @@
+import { RecordingNotificationPort } from '@work/kernel';
 import type { PermissionChecker, UnitOfWork, WorkModule } from '@work/kernel';
 import { postgresWorkflowStores, workflowModule } from '@work/workflow';
 import { systemClock } from '@work/payroll';
@@ -5,6 +6,9 @@ import { systemClock } from '@work/payroll';
 import type { Asking } from '../payroll/asking.js';
 import type { Sending } from './sending.js';
 import { WorkflowDelegations } from './workflow-sources.js';
+import { WorkflowMembershipStanding } from './workflow-membership-standing.js';
+import { WorkflowReminderRecipient } from './workflow-reminder-recipient.js';
+import { WorkflowReportingLine } from './workflow-reporting-line.js';
 import { RecruitmentDecisions } from './recruitment-decisions.js';
 import { WorkflowApprovals } from './workflow-approvals.js';
 
@@ -17,7 +21,7 @@ import { WorkflowApprovals } from './workflow-approvals.js';
  * `WorkflowDependencies` has no optional field. The in-memory stores exist for the application
  * suites and are reachable only from a test harness, never from this function.
  *
- * **Two adapters and two seams, pointing in opposite directions.**
+ * **Three adapters and two directions.**
  *
  * *Inbound* — `WorkflowApprovals` implements the kernel's `ApprovalPort` unchanged, so a business
  * module can ask Workflow to route a decision. It replaces `AutoApprovingPort`, which approved
@@ -29,9 +33,17 @@ import { WorkflowApprovals } from './workflow-approvals.js';
  * into another module, and it recognizes exactly one subject type; every other subject reaches it and
  * is answered `not-adopted`.
  *
- * *No adapter for any other module.* No Employment, Organization, People or Documents adapter — routing a decision needs none of
- * them. An approver is a membership the tenant named, and a subject is an opaque identifier its own
- * module understands (AD-001). Each is `NOT VERIFIED` rather than an adapter nothing calls.
+ * *Inbound, and new in Phase 16C* — `WorkflowReportingLine` answers who the requester's manager is,
+ * once, when an approval starts. It composes three published contracts — Identity's primary
+ * employment, Employment's primary reporting line on the day, Identity's holder of that employment —
+ * and holds two employment-scoped grants and no others. Notably **not**
+ * `identity.membership.read`: reaching the requester's employment through `identity.describe-member`
+ * would have handed the approvals engine the tenant's member register to read one identifier
+ * (B-2).
+ *
+ * *No Organization, People or Documents adapter.* Routing a decision needs none of them, and the
+ * manager did not change that: the reporting line is Employment's fact and the membership behind it
+ * is Identity's, so no third domain was consulted and no time zone or calendar was involved.
  *
  * *No notification port* — the specification's own Non Goals exclude delivery, so nothing here could
  * later be misread as "the approver was told". `NOT VERIFIED`.
@@ -40,8 +52,11 @@ import { WorkflowApprovals } from './workflow-approvals.js';
  * instant of a decision rather than expired on a timer, and SLA and escalation are Phase 16B.
  * `NOT VERIFIED`.
  *
- * *No role directory, no group directory, no manager resolution* — and no parameter here through
- * which one could be supplied.
+ * *No role directory and no group directory* — and no parameter here through which one could be
+ * supplied. Manager resolution is now wired, and is not one of them: it answers about one named
+ * person at a time and cannot be asked who holds a role, who is in a department, or who reports to
+ * somebody. It resolves **once**, when an instance starts, and a running approval never consults it
+ * again.
  *
  * `systemClock` comes from `@work/payroll` because it is the only exported system clock in the
  * repository and every module that needs one already uses it. In this module a disagreeing clock is
@@ -63,6 +78,19 @@ export const workflowModuleFor = (
     unitOfWork,
     stores: postgresWorkflowStores(),
     delegation: new WorkflowDelegations(reader),
+    // Real, from this checkpoint. Checkpoint 4 left `reportingLine` optional because no composition
+    // could supply it honestly before Identity's own contract existed; both halves exist now, so a
+    // manager step resolves through the real seam rather than failing closed on an unwired port.
+    reportingLine: new WorkflowReportingLine(reader),
+    // Phase 16D. The same `reader`: asking whether somebody may act must never be able to change
+    // whether they may.
+    membershipStanding: new WorkflowMembershipStanding(reader),
+    // Phase 16E. The same `reader` again, and the same reasoning: learning who to address a reminder
+    // to must never be able to change anything about them.
+    reminderRecipient: new WorkflowReminderRecipient(reader),
+    // The intent seam, and the only thing that leaves this module when nobody asked. Recording rather
+    // than delivering: Phase 17 owns transport, and no adapter here sends anything.
+    notifications: new RecordingNotificationPort(),
     businessDecision: new RecruitmentDecisions(writer),
     permissions,
     clock: systemClock,

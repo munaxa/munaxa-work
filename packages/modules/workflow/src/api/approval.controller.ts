@@ -15,7 +15,7 @@ import type {
 } from '../application/approval-queries.js';
 import type { DecideStepCommand } from '../application/decision.use-case.js';
 
-import { DecideStepBody } from './workflow.dto.js';
+import { DecideStepBody } from './workflow-approval.dto.js';
 import { WorkflowDispatcher } from './workflow-dispatcher.js';
 import { paged, present } from './search-filters.js';
 import { unwrapOrThrow } from './handler-result.js';
@@ -103,7 +103,9 @@ export class WorkflowApprovalController {
         instanceId,
         decision: body.decision,
         expectedVersion: body.expectedVersion,
-        ...present({ comment: body.comment }),
+        // `stepId` narrows the caller's own open steps and cannot widen them: the handler resolves
+        // what is theirs from the membership on the request first, and filters by this afterwards.
+        ...present({ comment: body.comment, stepId: body.stepId }),
       }),
     );
   }

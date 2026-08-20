@@ -8,7 +8,9 @@ import { DefinitionsSection, StepsSection, VersionsSection } from './definitions
 import { InstanceStepsSection, InstancesSection } from './instances';
 import { ApprovalStatusSection, DecidedSection, PendingSection } from './approvals';
 import { HistorySection } from './history';
-import { StatusSection } from './status';
+import { ApprovalGroupsSection, GroupMembersSection } from './groups';
+import { AwaitingSection, BranchesSection } from './branches';
+import { ProvidedSection, StatusSection } from './status';
 import {
   aDefinition,
   aDefinitionDetail,
@@ -21,6 +23,7 @@ import {
   anInstance,
   anInstanceDetail,
 } from './views.fixture';
+import { aGroup, aGroupDetail, aParallelInstanceDetail } from './branches.fixture';
 
 /**
  * What the screen actually renders, asserted against the markup rather than against a description
@@ -67,6 +70,7 @@ const everything = (
       html(
         <OverviewSection
           {...all}
+          groupsTotal={6}
           definitionsTotal={4000}
           instancesTotal={4000}
           pendingTotal={12}
@@ -87,6 +91,14 @@ const everything = (
     ['history', html(<HistorySection {...all} history={aHistory()} total={9} />)],
     ['pending', html(<PendingSection {...all} pending={[aPendingApproval()]} total={12} />)],
     ['decided', html(<DecidedSection {...all} decided={[aDelegatedDecision()]} total={7} />)],
+    ['approvalGroups', html(<ApprovalGroupsSection {...all} groups={[aGroup()]} total={6} />)],
+    ['groupMembers', html(<GroupMembersSection {...all} detail={aGroupDetail()} />)],
+    ['branches', html(<BranchesSection {...all} tallies={aParallelInstanceDetail().tallies} />)],
+    [
+      'awaitingSteps',
+      html(<AwaitingSection {...all} steps={aParallelInstanceDetail().awaitingSteps} />),
+    ],
+    ['providedNotices', html(<ProvidedSection {...all} />)],
     ['statusNotices', html(<StatusSection {...all} />)],
   ] as const;
 };
@@ -108,13 +120,18 @@ describe('the workspaces render', () => {
       'workflow.label.history',
       'workflow.label.pending',
       'workflow.label.decided',
+      'workflow.label.approvalGroups',
+      'workflow.label.groupMembers',
+      'workflow.label.branches',
+      'workflow.label.awaitingSteps',
+      'workflow.label.providedNotices',
       'workflow.label.statusNotices',
     ]) {
       expect([heading, markup.includes(escaped(en(heading)))]).toEqual([heading, true]);
     }
   });
 
-  /** The same eleven sections in Arabic — real Arabic, and never a catalogue key. */
+  /** The same sixteen sections in Arabic — real Arabic, and never a catalogue key. */
   it('renders every section in Arabic, with no untranslated key anywhere', () => {
     const markup = everything(ar, 'ar')
       .map(([, rendered]) => rendered)
@@ -129,6 +146,7 @@ describe('the workspaces render', () => {
     expect(markup).not.toContain('workflow.vocabulary.');
     expect(markup).not.toContain('workflow.notice.');
     expect(markup).not.toContain('workflow.withheld.');
+    expect(markup).not.toContain('workflow.provided.');
   });
 
   it('renders no catalogue key in English either', () => {
@@ -136,6 +154,7 @@ describe('the workspaces render', () => {
       expect([section, markup.includes('workflow.label.')]).toEqual([section, false]);
       expect([section, markup.includes('workflow.vocabulary.')]).toEqual([section, false]);
       expect([section, markup.includes('workflow.withheld.')]).toEqual([section, false]);
+      expect([section, markup.includes('workflow.provided.')]).toEqual([section, false]);
     }
   });
 });
@@ -153,6 +172,10 @@ describe('an empty tenant', () => {
       html(<HistorySection {...props} history={[]} total={0} />),
       html(<PendingSection {...props} pending={[]} total={0} />),
       html(<DecidedSection {...props} decided={[]} total={0} />),
+      html(<ApprovalGroupsSection {...props} groups={[]} total={0} />),
+      html(<GroupMembersSection {...props} detail={undefined} />),
+      html(<BranchesSection {...props} tallies={[]} />),
+      html(<AwaitingSection {...props} steps={[]} />),
     ];
 
     for (const [index, section] of markup.entries()) {
@@ -173,6 +196,7 @@ describe('an empty tenant', () => {
     const down = html(
       <OverviewSection
         {...props}
+        groupsTotal={0}
         definitionsTotal={0}
         instancesTotal={0}
         pendingTotal={0}
@@ -183,6 +207,7 @@ describe('an empty tenant', () => {
     const empty = html(
       <OverviewSection
         {...props}
+        groupsTotal={0}
         definitionsTotal={0}
         instancesTotal={0}
         pendingTotal={0}

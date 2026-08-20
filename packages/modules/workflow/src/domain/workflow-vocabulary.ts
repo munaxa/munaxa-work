@@ -116,20 +116,28 @@ export const WORKFLOW_VERSION_TRANSITIONS: Readonly<
 /**
  * What a **step template** may name as its approver.
  *
- * Two kinds, and the second is deliberately narrow. A `membership` is one person a tenant admitted.
- * A `group` is a list of them Workflow itself keeps — not a role, not a query, not a directory, and
- * not anything Identity owns.
+ * Three kinds, and each is deliberately narrow. A `membership` is one person a tenant admitted. A
+ * `group` is a list of them Workflow itself keeps — not a role, not a query, not a directory, and
+ * not anything Identity owns. A `manager` is **the requester's immediate manager**, and every word
+ * of that is a parameter somebody approved rather than a reading this module chose (P-1 to P-4).
+ *
+ * **`manager` names nobody, and that is what makes it different from the other two.** A membership
+ * and a group both carry an identifier on the template; a manager carries none, because whose
+ * manager it means is fixed — the person who raised the approval. There is no target field to
+ * configure, no previous-approver chain, and no depth: one level, the immediate manager, resolved as
+ * at the instant the approval started.
  *
  * **This vocabulary belongs to the template and not to a running step.** A group is resolved into
- * its members when an instance starts, so every step of a running approval names a membership and
- * `approverKind` on a step is always `membership`. That is why the step's own check constraint did
- * not change in 16B: at the moment somebody is actually asked, there is only ever a person.
+ * its members and a manager into one membership when an instance starts, so every step of a running
+ * approval names a membership and `approverKind` on a step is always `membership`. That is why the
+ * step's own check constraint did not change in 16B and does not change in 16C: at the moment
+ * somebody is actually asked, there is only ever a person.
  *
- * `manager`, `role` and `external` remain `NOT VERIFIED`. Each needs something this repository does
- * not have — a published employment→membership query, a role directory, and an identity model for a
- * party outside the tenant.
+ * `role` and `external` remain `NOT VERIFIED`. Each needs something this repository does not have —
+ * a role directory, and an identity model for a party outside the tenant — and the first was refused
+ * by decision rather than deferred.
  */
-export const APPROVER_KINDS = ['membership', 'group'] as const;
+export const APPROVER_KINDS = ['membership', 'group', 'manager'] as const;
 export type ApproverKind = (typeof APPROVER_KINDS)[number];
 
 /**
@@ -282,6 +290,20 @@ export const REACHABLE_APPROVAL_STATES = ['pending', 'approved', 'rejected', 'ca
  * A closed list, because history is Workflow's own audit of **routing** and must never restate a
  * business fact. "The requisition was approved" belongs to Recruitment; "step 2 of instance X was
  * approved by membership Y acting for membership Z" belongs here.
+ *
+ * **This list and `workflow_history_event_check` are one vocabulary in two places**, and the parity
+ * suite fails the moment they disagree. `step-escalated` was named by the Phase 16D domain a
+ * checkpoint before the constraint could carry it, and deliberately left out of this list until the
+ * migration widened the constraint — so the two moved together rather than the code claiming a value
+ * the database would refuse.
+ *
+ * **An escalation is not a decision.** `step-escalated` says an approver was added to a branch, and
+ * it is deliberately none of `step-approved`, `step-rejected` or `step-skipped`: recording it as one
+ * of those would put an answer in the timeline that nobody gave.
+ *
+ * **A reminder is not an escalation, and it is not a state.** `step-reminded` says the system told an
+ * approver their step had passed its service level: nobody was added, nothing was decided, and no
+ * step became overdue *as a stored fact*. It records the action, never the condition.
  */
 export const WORKFLOW_HISTORY_EVENTS = [
   'instance-started',
@@ -289,6 +311,8 @@ export const WORKFLOW_HISTORY_EVENTS = [
   'step-approved',
   'step-rejected',
   'step-skipped',
+  'step-escalated',
+  'step-reminded',
   'instance-completed',
   'instance-rejected',
   'instance-cancelled',

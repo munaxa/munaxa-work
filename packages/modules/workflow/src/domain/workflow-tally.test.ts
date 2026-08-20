@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { branchConfigurationIsUsable, tallyOf, thresholdFor, type BranchVote } from './branch.js';
+import {
+  branchConfigurationIsUsable,
+  tallyOf,
+  thresholdFor,
+  type BranchMember,
+  type BranchVote,
+} from './branch.js';
 import { BRANCH_RULES, type BranchRule } from './workflow-vocabulary.js';
 
 /**
@@ -29,12 +35,33 @@ const approvals = (count: number): readonly BranchVote[] =>
 const rejections = (count: number): readonly BranchVote[] =>
   Array.from({ length: count }, (_, index) => vote(`r${String(index)}`, 'rejected', index));
 
+/**
+ * The assigned approvers, as the set a tally is now computed over.
+ *
+ * Phase 16D made the denominator a **set** rather than a count, because a branch may be escalated and
+ * the snapshotted approvers have to stay countable after somebody is added to them. Nothing about the
+ * arithmetic below changed: these are `count` approvers, none of them escalated, and the ones who
+ * voted are named first so that every vote belongs to a member.
+ */
+const assignedMembers = (
+  count: number,
+  votes: readonly BranchVote[] = [],
+): readonly BranchMember[] =>
+  Array.from({ length: count }, (_, index) => ({
+    stepId: votes[index]?.stepId ?? `silent-${String(index)}`,
+  }));
+
 const outcomeOf = (
   rule: BranchRule,
   assigned: number,
   votes: readonly BranchVote[],
   quorum?: number,
-): string => tallyOf(quorum === undefined ? { rule } : { rule, quorum }, assigned, votes).outcome;
+): string =>
+  tallyOf(
+    quorum === undefined ? { rule } : { rule, quorum },
+    assignedMembers(assigned, votes),
+    votes,
+  ).outcome;
 
 describe('the majority threshold', () => {
   /** The approved table, exactly. `floor(assigned / 2) + 1` — strictly more than half. */
@@ -198,7 +225,8 @@ describe('a configuration a tenant could never satisfy', () => {
 
 describe('the tally itself', () => {
   it('reports the denominator, the counts and the threshold it used', () => {
-    const tally = tallyOf({ rule: 'majority' }, 5, [...approvals(2), ...rejections(1)]);
+    const cast = [...approvals(2), ...rejections(1)];
+    const tally = tallyOf({ rule: 'majority' }, assignedMembers(5, cast), cast);
 
     expect(tally).toMatchObject({
       rule: 'majority',
@@ -218,7 +246,7 @@ describe('the tally itself', () => {
   it('produces only integers', () => {
     for (const assigned of [1, 2, 3, 7, 99]) {
       for (const rule of BRANCH_RULES) {
-        const tally = tallyOf({ rule }, assigned, approvals(1));
+        const tally = tallyOf({ rule }, assignedMembers(assigned, approvals(1)), approvals(1));
 
         for (const value of [tally.assigned, tally.threshold, tally.outstanding, tally.quorum]) {
           expect([rule, assigned, Number.isInteger(value)]).toEqual([rule, assigned, true]);

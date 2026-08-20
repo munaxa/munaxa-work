@@ -17,15 +17,24 @@
  * delegate who acted *and* the approver whose authority they used, in two separate columns.
  * Delegation itself is Identity's (AD-010); this module consumes it and stores none.
  *
- * **This is Phase 16A.** Approval is one step at a time, in order. There is no role or group, no
- * manager routing, no SLA, no escalation, no branching, no tally and no notification — and no
- * vocabulary in the module in which to express any of them. Each is named in
- * `workflow-vocabulary.ts` with the reason it is absent, and each is Phase 16B or `NOT VERIFIED`.
+ * **What the module has grown, phase by phase, and what it still has not.** 16A approved one step at
+ * a time, in order. 16B added the **approval group**, the **parallel branch** and the **tally** that
+ * decides one. 16C added **manager routing**, resolved once when an approval starts, and a
+ * **service-level target** whose due-ness is derived on every read and stored nowhere. 16D adds
+ * **escalation**: a human bringing one more approver into a branch that is stuck.
+ *
+ * There is still no role directory and no group directory, no external approver, no notification, no
+ * business-day calculation, no written expiry state and nothing scheduled — `JobPort` has no adapter
+ * anywhere in this repository. Each is named in `workflow-vocabulary.ts` with the reason it is
+ * absent, and each is a later phase or `NOT VERIFIED`.
  */
 export * from './domain/workflow-vocabulary.js';
 export * from './domain/workflow-rejection.js';
 export * from './domain/defined.js';
 export * from './domain/definition.js';
+export * from './domain/manager.js';
+export * from './domain/service-level.js';
+export * from './domain/escalation.js';
 export * from './domain/instance.js';
 export * from './domain/decision.js';
 export * from './domain/history.js';
@@ -36,6 +45,9 @@ export * from './application/workflow-module.js';
 export * from './application/workflow-permissions.js';
 export * from './application/workflow-dependencies.js';
 export * from './application/workflow-ports.js';
+export * from './application/workflow-reporting-line.js';
+export * from './application/workflow-membership-standing.js';
+export * from './application/workflow-reminder-recipient.js';
 export * from './application/in-memory-stores.js';
 export * from './application/workflow-views.js';
 export * from './application/workflow-paging.js';
@@ -46,3 +58,4 @@ export { WorkflowDefinitionController } from './api/definition.controller.js';
 export { WorkflowVersionController } from './api/version.controller.js';
 export { WorkflowInstanceController } from './api/instance.controller.js';
 export { WorkflowApprovalController } from './api/approval.controller.js';
+export { WorkflowApprovalGroupController } from './api/approval-group.controller.js';
