@@ -118,3 +118,19 @@ export interface UserPreferenceView {
 export interface MembershipStandingView {
   readonly active: boolean;
 }
+
+/**
+ * Who a membership is, for the one purpose of addressing them.
+ *
+ * One field, and the restraint is the contract: a notification is delivered to a *workforce user*
+ * because a person holding memberships in three tenants is one person with one set of channel
+ * preferences (ADR-0033), while the modules that ask for one address *memberships*. This crosses
+ * that boundary and does nothing else.
+ *
+ * It carries no name, address, locale or channel preference — Communications resolves how to reach
+ * somebody; this answers only who. Adding a field here would hand it to every consumer whether or
+ * not they needed it, which is the property that ruled out `describe-member` in the first place.
+ */
+export interface MembershipRecipientView {
+  readonly workforceUserId: string;
+}

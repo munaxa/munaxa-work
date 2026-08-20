@@ -100,7 +100,15 @@ describe('machine context', () => {
 
     expect([running.jobId, running.attempt]).toStrictEqual(['job-1', 1]);
 
-    const { jobId: _jobId, attempt: _attempt, ...unscheduled } = running;
+    // A machine context with no runner behind it: the two scheduling fields are optional precisely
+    // because nothing schedules work yet, and a context that had to invent them would be inventing
+    // a job that does not exist.
+    const unscheduled: MachineContext = {
+      machine: true,
+      tenantId: running.tenantId,
+      executionIdentity: running.executionIdentity,
+      correlationId: running.correlationId,
+    };
 
     expect([unscheduled.jobId, unscheduled.attempt]).toStrictEqual([undefined, undefined]);
     expect(unscheduled.tenantId).toBe(running.tenantId);

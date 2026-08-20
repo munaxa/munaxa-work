@@ -1,5 +1,5 @@
 import { Repository } from '@work/persistence';
-import { currentContext, isSystemContext, type Transaction } from '@work/kernel';
+import { currentContext, isMachineContext, isSystemContext, type Transaction } from '@work/kernel';
 
 import type { AttendanceDayState } from '../domain/attendance-day-state.js';
 import type { DayQuery, DayStore, Page } from '../application/attendance-ports.js';
@@ -146,5 +146,7 @@ const actorOf = (): string => {
   const context = currentContext();
 
   if (context === undefined) return 'system:unknown';
-  return isSystemContext(context) ? `system:${context.reason}` : (context.userId ?? context.actor);
+  if (isSystemContext(context)) return `system:${context.reason}`;
+  if (isMachineContext(context)) return context.executionIdentity;
+  return context.userId ?? context.actor;
 };

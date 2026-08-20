@@ -1,5 +1,11 @@
 import type { Request, Response } from 'express';
-import { currentContext, uuidV7, type PlatformAuthenticationPort } from '@work/kernel';
+import {
+  actorSubjectOf,
+  currentContext,
+  isSystemContext,
+  uuidV7,
+  type PlatformAuthenticationPort,
+} from '@work/kernel';
 import type { ResolvedMembership, TenantMembershipDirectory } from '@work/identity';
 import { describe, expect, it } from 'vitest';
 
@@ -152,7 +158,12 @@ describe('TenantMiddleware', () => {
 
       await middleware.use(requestWith(AUTHORIZED), response, () => {
         const context = currentContext();
-        actor = context !== undefined && !('system' in context) ? context.actor : undefined;
+        actor =
+          context === undefined
+            ? undefined
+            : isSystemContext(context)
+              ? undefined
+              : actorSubjectOf(context);
       });
 
       expect(actor).toBe(`user:${membership.workforceUserId}`);

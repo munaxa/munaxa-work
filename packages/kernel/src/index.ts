@@ -20,6 +20,7 @@ export { isUuidV7, timestampOf, uuidV7 } from './identity/uuid-v7.js';
 
 // Tenancy
 export {
+  actorSubjectOf,
   assertBelongsToCurrentTenant,
   currentContext,
   currentMembershipId,

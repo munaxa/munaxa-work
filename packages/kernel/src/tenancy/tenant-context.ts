@@ -150,6 +150,21 @@ export const currentTenantId = (): string => {
 };
 
 /**
+ * Who to name as the actor of an event or an audit trail, given a context that has a tenant.
+ *
+ * **One rule, in one place, because it was in sixteen.** Every module's context file wrote
+ * `actor: context.actor`, which was right while there were only two kinds of caller and silently
+ * wrong the moment a third arrived — sixteen files would each have had to grow the same branch, and
+ * the one that was forgotten would have raised an event whose actor was `undefined`.
+ *
+ * A machine names the subject the platform authenticated. That is deliberately the same *shape* the
+ * audit columns write and deliberately not the shape a person's actor has, so a reader can tell an
+ * automatic event from a human one without joining anywhere to discover that the actor names nobody.
+ */
+export const actorSubjectOf = (context: TenantContext | MachineContext): string =>
+  isMachineContext(context) ? context.executionIdentity : context.actor;
+
+/**
  * The membership acting, when one is.
  *
  * `undefined` under a machine context, and that is not a gap to be filled later: a machine holds no

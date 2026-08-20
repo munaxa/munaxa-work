@@ -1,5 +1,7 @@
 import {
+  actorSubjectOf,
   currentContext,
+  currentMembershipId,
   currentTenantId,
   err,
   isSystemContext,
@@ -29,7 +31,7 @@ export const originOfCurrentRequest = (): EventOrigin => {
   return {
     tenantId: context.tenantId,
     correlationId: context.correlationId,
-    actor: context.actor,
+    actor: actorSubjectOf(context),
   };
 };
 
@@ -61,15 +63,16 @@ export const currentCorrelation = (): string => originOfCurrentRequest().correla
  * of throwing, and why `requireMembership` exists to turn it into a refusal at the one place that
  * needs it.
  *
+ * **A machine has none, by construction rather than by a check.** `MachineContext` carries no
+ * membership and offers no way to set one, so automatic execution answers `undefined` here and every
+ * operation that needs a member — deciding a step, escalating a branch — refuses it through
+ * `requireMembership` without anybody writing a rule about machines. That is why "a machine is never
+ * an approver" needs no guard in each of the places somebody might forget one.
+ *
  * **Never read from a command.** A caller who could supply this could read anybody's approval queue
  * and answer anybody's step by changing a field.
  */
-export const currentMembership = (): string | undefined => {
-  const context = currentContext();
-
-  if (context === undefined || isSystemContext(context)) return undefined;
-  return context.membershipId;
-};
+export const currentMembership = (): string | undefined => currentMembershipId();
 
 /**
  * A refused business rule becomes a `rejected` failure, which the API renders as 422: the request
