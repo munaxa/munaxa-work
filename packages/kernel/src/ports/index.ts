@@ -68,9 +68,66 @@ export interface JobRequest<TPayload> {
   readonly runAt?: Date;
 }
 
+/**
+ * One delivery of one job to the application, as the runner describes it.
+ *
+ * The **execution** half of this port, and it was missing: `enqueue` and `schedule` could submit
+ * work that nothing could ever deliver. What is here is the minimum a handler needs to run safely
+ * and be audited, and deliberately nothing about *how* it arrived — no lease token, no queue name,
+ * no broker cursor. A handler that could see those would eventually depend on one runner.
+ *
+ * **The tenant is here and not in the payload.** `JobRequest.tenantId` says which tenant the work
+ * was *submitted for*; this says which tenant it *runs as*, and only the runner may set it. A
+ * handler that took the tenant from `payload` would let whoever enqueued the job choose the tenant,
+ * which is the one thing tenancy may never allow (ADR-0030).
+ */
+export interface JobExecution<TPayload> {
+  readonly name: string;
+  readonly payload: TPayload;
+  readonly tenantId: string;
+  /** The job's durable identity — the `idempotencyKey` it was submitted with. Stable across retries. */
+  readonly jobId: string;
+  /** 1 for the first delivery, then 2, 3… A retry is a new attempt at the *same* `jobId`. */
+  readonly attempt: number;
+  readonly correlationId: string;
+  /** The non-human subject the platform authenticated for this run. Never a membership. */
+  readonly executionIdentity: string;
+}
+
+/**
+ * What a handler tells the runner, and the only two things it may say.
+ *
+ * `complete` means the work is done or was not needed — both are successes, because an execution
+ * that correctly did nothing has succeeded at the only thing it was asked to decide. `failed` asks
+ * for whatever retry policy the runner was configured with; the handler does not choose one, since
+ * a handler that scheduled its own retries would be a second scheduler.
+ */
+export type JobOutcome =
+  { readonly outcome: 'complete' } | { readonly outcome: 'failed'; readonly reason: string };
+
+export interface JobHandler<TPayload> {
+  readonly name: string;
+  run(execution: JobExecution<TPayload>): Promise<JobOutcome>;
+}
+
+/**
+ * Submitting work, and receiving it.
+ *
+ * **No implementation exists in this repository, and none may.** The concrete runner — the process
+ * that holds a queue, leases work, counts attempts and applies a retry policy — is the platform's,
+ * and a second one here would be the duplication ADR-0023 and the platform boundary both refuse.
+ * What belongs here is the shape the application is willing to be called in, so that when a runner
+ * arrives it has something to satisfy rather than something to negotiate.
+ *
+ * **Delivery is at-least-once and is stated as such.** No runner can promise otherwise across a
+ * crash, so every handler registered here must be safe to run twice — which, for the one handler
+ * this contract exists for, is a database uniqueness claim rather than a promise.
+ */
 export interface JobPort {
   enqueue<TPayload>(request: JobRequest<TPayload>): Promise<void>;
   schedule<TPayload>(request: JobRequest<TPayload>, cron: string): Promise<void>;
+  /** Registers what runs when a job of this name is delivered. Two handlers for one name is a defect. */
+  register<TPayload>(handler: JobHandler<TPayload>): void;
 }
 
 export interface FeatureContext {

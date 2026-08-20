@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { TenantIsolationException } from '../errors/domain-exception.js';
 
-import { currentContext, isSystemContext } from './tenant-context.js';
+import { currentContext, isMachineContext, isSystemContext } from './tenant-context.js';
 
 import type { PermissionChecker } from '../cqrs/pipeline.js';
 
@@ -29,7 +29,8 @@ import type { PermissionChecker } from '../cqrs/pipeline.js';
  * - **It requires a tenant context**, so nothing can run untenanted under it.
  * - **It does not touch the execution context.** The tenant, the actor and the correlation
  *   identifier stay exactly as the request set them, so every audit column and every event still
- *   names the human being who asked. A grant changes what is permitted, never who is acting.
+ *   names whoever asked — the human being, or the machine identity the platform authenticated. A
+ *   grant changes what is permitted, never who is acting.
  * - **Every use is observable**, so "what did Recruitment do inside People, and for whom" is a
  *   question with an answer.
  */
@@ -64,6 +65,10 @@ export const runWithServiceGrant = <TResult>(grant: ServiceGrant, work: () => TR
       `a ${grant.module} service grant entered without a tenant context`,
     );
   }
+  // A machine may hold a grant, and the reason is the same one that admits it to the pipeline: a
+  // grant widens what is permitted, never who is acting, and the elevation record below still names
+  // the executing identity. What a grant must never do is turn a machine into a person, and it
+  // cannot — `originOf` reads the actor the context already has.
   if (storage.getStore() !== undefined) {
     throw new Error(
       `A service grant for ${grant.module} was entered inside another. Authority is not composed.`,
@@ -134,7 +139,7 @@ const originOf = (): {
   }
   return {
     tenantId: context.tenantId,
-    actor: context.actor,
+    actor: isMachineContext(context) ? context.executionIdentity : context.actor,
     correlationId: context.correlationId,
   };
 };

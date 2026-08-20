@@ -1,6 +1,7 @@
 import {
   ConcurrencyException,
   currentContext,
+  isMachineContext,
   isSystemContext,
   type AuditInformation,
   type Transaction,
@@ -26,11 +27,22 @@ export interface AuditColumns {
   readonly version: number;
 }
 
+/**
+ * The string every audit column records, for each of the three kinds of caller there are.
+ *
+ * A machine writes the subject the platform authenticated — `service:<clientId>`, `apikey:<keyId>`,
+ * `system:<component>` — which is the same *shape* a system context already writes and deliberately
+ * not the shape a person does. So "who wrote this row" is answerable for automatic work without a
+ * membership existing anywhere, and a reader can tell the two apart at a glance rather than by
+ * joining somewhere else to find out that the actor names nobody.
+ */
 const actorOf = (): string => {
   const context = currentContext();
 
   if (context === undefined) return 'system:unknown';
-  return isSystemContext(context) ? `system:${context.reason}` : (context.userId ?? context.actor);
+  if (isSystemContext(context)) return `system:${context.reason}`;
+  if (isMachineContext(context)) return context.executionIdentity;
+  return context.userId ?? context.actor;
 };
 
 /** Audit values for a new row. Written by infrastructure; a caller cannot supply them. */
