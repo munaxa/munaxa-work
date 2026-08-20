@@ -1,6 +1,6 @@
 # Phase 16E — Decision Register
 
-**Ten decisions are `APPROVED`; two, D-16E-11 and D-16E-12, are `OPEN`.** The owner's explicit
+**Eleven decisions are `APPROVED`; two, D-16E-12 and D-16E-13, are `OPEN`.** The owner's explicit
 decisions are recorded in
 [§ Owner approvals](#owner-approvals) below, appended rather than substituted: everything beneath
 that section is the **pre-approval record**, preserved word for word, because the reasoning that
@@ -38,8 +38,9 @@ unchanged in substance; this register is the canonical status table.
 | D-16E-08 | Business-day SLA | **APPROVED** | Owner, record dated 2026-08-20 |
 | D-16E-09 | Idempotency | **APPROVED** | Owner, record dated 2026-08-20 |
 | D-16E-10 | The first automatic business action | **APPROVED** | Owner — automatic service-level reminder |
-| D-16E-11 | The reminder's history event | **OPEN** | None |
+| D-16E-11 | The reminder's history event — its **existence** | **APPROVED** | Owner |
 | D-16E-12 | Authorization to modify Identity for the recipient contract | **OPEN** | None |
+| D-16E-13 | The **concrete** reminder history contract | **OPEN** | None |
 
 **The approval transition.** All nine stood `OPEN` from `2150f19` — the commit that recorded them —
 until the owner's instruction. They were `OPEN` for the whole of that interval, and the earlier state
@@ -475,7 +476,9 @@ is not approved (D-16E-11).
 
 ---
 
-## D-16E-11 — The reminder's history event · **OPEN**
+## D-16E-11 — The reminder's history event · **APPROVED (existence only)**
+
+*Opened by the D-16E-10 contract and preserved below as it stood; the owner's resolution follows.*
 
 Opened by the D-16E-10 contract, as the approval directs: *"Create a decision record for the history
 event and leave it OPEN unless this instruction explicitly approves the exact event name."* **No
@@ -496,6 +499,72 @@ actor fields · execution/correlation fields · metadata · check-constraint cha
 append-only trigger implications · idempotency storage · concurrency behaviour.
 
 **No migration, index or code may be written until this is approved.**
+
+### The owner's resolution · **APPROVED, existence only**
+
+**D-16E-11 = APPROVED** for the **existence** of a dedicated Workflow history event meaning exactly:
+
+> Workflow automatically emitted a service-level reminder because an awaiting step passed its
+> configured elapsed-time service level.
+
+It is an **observation of an automatic notification-intent action**. It must not mean approver
+escalated · approved · rejected · skipped · approval expired · SLA permanently breached · workflow
+state changed.
+
+**Explicitly not approved**, and therefore all still OPEN under **D-16E-13**: the event identifier ·
+any column layout · any metadata shape · any provenance field name · any migration · any index · any
+idempotency implementation. Nor: Identity modification · Platform modification · `JobPort` ·
+scheduler · worker · notification delivery · outbox · broker · machine actor · service account ·
+authentication change.
+
+The investigation is [`phase-16e-reminder-history.md`](phase-16e-reminder-history.md), which traces
+domain → repository → PostgreSQL → repository → view → rendering and answers every required question.
+Its three most consequential findings:
+
+1. **The actor model needs no change and no fake human.** Both actor columns stay **null**, which is
+   the model's documented meaning — `domain/history.ts:35`, *"Absent when nothing human did"* — and
+   every `step-awaiting` entry already does it. Separately, `workflow_history.created_by` is
+   `not null` and comes from `actorOf()` in `packages/persistence/src/repository.ts:29-34`, which
+   already produces a non-human `system:<reason>` for system contexts. That makes it a **third call
+   site** the G-2 machine context must be represented at, alongside `assertTenantScoped` and
+   `currentTenantId` — in a shared package every module uses. Newly recorded.
+2. **Provenance must be dedicated columns, never `metadata`.** `metadata` is on the parity suite's
+   `INFRASTRUCTURE` exclusion set, read by no mapper and written by no mapper — provenance placed
+   there would be invisible to the application, the exact silent-unmapping failure that suite exists
+   to catch.
+3. **The history row can itself be the idempotency record**, because `workflow_history` is already
+   insert-only *in the database* (the `workflow_history_no_mutation` trigger refuses update and
+   delete) and already RLS-protected. So a claim can never be released, and no second table is
+   needed.
+
+**Proposed and not adopted:** `step-reminded`, with `step-service-level-reminded` offered as a
+runner-up so the choice stays the owner's.
+
+---
+
+## D-16E-13 — The concrete reminder history contract · **OPEN**
+
+D-16E-11 approved the event's **existence**; this decision is its **concrete shape**, and nothing in
+it may be inferred from that approval:
+
+- the exact **event identifier** — proposed `step-reminded`, runner-up
+  `step-service-level-reminded`, neither adopted;
+- the exact **provenance columns** — four are needed (execution identity, job identity, execution
+  attempt, correlation identity), and their names, types and nullability **cannot be fixed until G-2
+  defines what the machine execution context carries**. Tenant, instance and step are not duplicated;
+- the exact **index predicate** — proposed
+  `unique (tenant_id, step_id) where event = '<value>' and deleted_at is null`;
+- the exact **migration** — additive: widen the check to ten values, add the columns, add the index;
+- the **transaction-ordering trade-off**: `claim → notify → commit` risks a **duplicate** reminder on
+  a crash; `claim → commit → notify` risks a **permanently lost** one, because the claim is committed
+  and history is immutable, so no retry can ever re-emit it. There is no outbox and inventing one is
+  forbidden, so one window is unavoidable. The investigation *recommends* the first — a redundant
+  message is cheaper than a silence for an action whose whole effect is one message, and
+  `NotificationRequest.idempotencyKey` gives Communications a second chance to suppress it — but
+  **the choice is the owner's**.
+
+**No migration, index, column or code exists.** Twelve change points are enumerated in the
+investigation; none is implemented.
 
 ---
 
