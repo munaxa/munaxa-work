@@ -1,7 +1,7 @@
 # Phase 16E — Decision Register
 
-**Nine decisions are `APPROVED`; a tenth, [D-16E-10](#d-16e-10--the-first-automatic-business-action--open),
-is `OPEN`.** The owner's explicit decisions are recorded in
+**Ten decisions are `APPROVED`; two, D-16E-11 and D-16E-12, are `OPEN`.** The owner's explicit
+decisions are recorded in
 [§ Owner approvals](#owner-approvals) below, appended rather than substituted: everything beneath
 that section is the **pre-approval record**, preserved word for word, because the reasoning that
 produced the questions is what makes the answers auditable a year from now.
@@ -37,7 +37,9 @@ unchanged in substance; this register is the canonical status table.
 | D-16E-07 | Notification intent | **APPROVED** | Owner, record dated 2026-08-20 |
 | D-16E-08 | Business-day SLA | **APPROVED** | Owner, record dated 2026-08-20 |
 | D-16E-09 | Idempotency | **APPROVED** | Owner, record dated 2026-08-20 |
-| D-16E-10 | The first automatic business action | **OPEN** | None |
+| D-16E-10 | The first automatic business action | **APPROVED** | Owner — automatic service-level reminder |
+| D-16E-11 | The reminder's history event | **OPEN** | None |
+| D-16E-12 | Authorization to modify Identity for the recipient contract | **OPEN** | None |
 
 **The approval transition.** All nine stood `OPEN` from `2150f19` — the commit that recorded them —
 until the owner's instruction. They were `OPEN` for the whole of that interval, and the earlier state
@@ -384,7 +386,10 @@ and no specific automatic action has been defined.
 
 ---
 
-## D-16E-10 — The first automatic business action · **OPEN**
+## D-16E-10 — The first automatic business action · **APPROVED**
+
+*The investigation that produced this decision is preserved below exactly as it stood while the
+decision was OPEN; the owner's resolution follows it.*
 
 The tenth decision, added after D-16E-09. **Nothing above it is renumbered, and no approved decision
 changes status.** It exists because the G-5 and G-6 amendments withhold implementation until the
@@ -435,6 +440,83 @@ the alternative only**, where the intent *is* the action.
 must, the finding is that **no such action can be defined today** without reopening a closed 16D
 decision or introducing new configuration. That is the owner's choice and is not resolved by
 inference.
+
+### The owner's resolution · **APPROVED**
+
+**D-16E-10 = APPROVED.** The first automatic business action is the **automatic service-level
+reminder**:
+
+> When an awaiting workflow step with a configured service level passes its due instant, the system
+> emits exactly one notification intent for the approver assigned to that step, and makes no workflow
+> decision and no state transition.
+
+**Automatic escalation is rejected as the first automatic action**, and this approval must not be
+reinterpreted as approving it. The recommendation to DECLINE it stands with its reasoning intact
+above; nothing in it is withdrawn.
+
+The approval defines the **business action only**. It authorizes inventing nothing — no machine actor,
+scheduler, worker, `JobPort` execution, Platform authentication, Platform machine authorization,
+generic automation engine, generic SLA action enum, generic expiry framework, service credential,
+impersonation or permission bypass.
+
+The full contract is [`phase-16e-reminder-contract.md`](phase-16e-reminder-contract.md): the exact
+trigger (existing SLA semantics, strictly `>`, no business days, nothing persisted about the
+condition), the state predicate, the intent, the recipient, the provenance, the idempotency identity
+**`(tenant_id, step_id)`**, the transaction boundary, stale-execution and concurrency behaviour, the
+Platform and Identity dependencies, and the sixteen explicit non-goals.
+
+**Locked by this approval and not reopened:** D-16D-08 · D-16D-09 · D-16D-13 · D-16D-14 · D-16D-15 ·
+D-16D-16 · D-16D-17 · D-16D-18 · D-16D-19 · D-16E-01…09 as approved and amended · G-1 · G-2 · G-3 ·
+G-4 · G-7 · G-8.
+
+**Three stop conditions are live**, so implementation has not begun: the Platform execution contract
+is absent (G-2, G-1, G-3) · the Identity recipient contract is absent (D-16E-12) · the history event
+is not approved (D-16E-11).
+
+---
+
+## D-16E-11 — The reminder's history event · **OPEN**
+
+Opened by the D-16E-10 contract, as the approval directs: *"Create a decision record for the history
+event and leave it OPEN unless this instruction explicitly approves the exact event name."* **No
+event name was supplied, so none is proposed and none is invented.**
+
+The vocabulary is closed at nine values in two places asserted to agree —
+`WORKFLOW_HISTORY_EVENTS` and `workflow_history_event_check`. The event must distinguish *an automatic
+service-level reminder was emitted* from *a human escalated a branch*, and **`step-escalated` must not
+be reused**: the domain defines it as a human act, and recording one act under another's name would
+put an answer in the timeline nobody gave.
+
+The decision also covers the **two provenance columns** — execution identity and correlation identity
+— which G-4 requires move in the same change as the event value; `workflow_history` has neither today,
+and `metadata` is not an acceptable home.
+
+*Second checkpoint*, not started: `phase-16e-reminder-history.md` — event name · domain meaning ·
+actor fields · execution/correlation fields · metadata · check-constraint change · RLS implications ·
+append-only trigger implications · idempotency storage · concurrency behaviour.
+
+**No migration, index or code may be written until this is approved.**
+
+---
+
+## D-16E-12 — Authorization to modify Identity for the recipient contract · **OPEN**
+
+The bounded Identity contract itself is approved in principle by **G-8**. Permission to modify the
+Identity module is a **separate** decision, exactly as **D-16D-19** was for
+`identity.membership-standing`, and it is not inferred from G-8.
+
+*Why a contract is needed at all:* `NotificationRecipient` requires a workforce-user identity;
+Workflow addresses memberships and contains zero `userId` occurrences in production code.
+`identity.membership-standing` returns `{ active }` and cannot answer it; `identity.describe-member`
+is ruled out.
+
+*The minimum contract, specified in `phase-16e-reminder-contract.md` §13 and **not created**:* one
+membership identifier in · tenant-scoped from the execution context · only the recipient identity
+`NotificationPort` requires · declares the **existing** `identity.membership.read`, so **no new
+permission** · no enumeration · no profile, employment, reporting or delegation data · a second narrow
+query rather than a widening of an existing one.
+
+*Third checkpoint*, not started. Identity has not been modified.
 
 ---
 
