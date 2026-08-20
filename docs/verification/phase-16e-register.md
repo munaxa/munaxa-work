@@ -10,7 +10,12 @@ at a contract boundary that the approval itself designates as a STOP — eight o
 evidence in [`phase-16e-contract-gaps.md`](phase-16e-contract-gaps.md). **No production capability
 has been added**, and Phase 16D is untouched.
 
-State verified at the time of writing: HEAD `2150f19`, working tree clean, **zero production changes
+The owner then resolved those gaps in a second instruction, recorded in
+[§ Contract-gap resolutions](#gap-resolutions). Two of its nine decisions are **amendments** that
+narrow an earlier approval. The resolutions do not unblock implementation: the first two steps of the
+dependency order they impose belong to **a repository this one may never modify**.
+
+State verified at the time of writing: HEAD `7740817`, working tree clean, **zero production changes
 since `730502a`** (`git diff 730502a HEAD -- packages apps prisma` is empty).
 
 The evidence behind every entry is in [`phase-16e-plan.md`](phase-16e-plan.md), which is preserved
@@ -222,6 +227,158 @@ Eight were discovered, and each is a stop condition the approval names:
 is not withheld, the prerequisites are absent. No production code was written, because no part of the
 approved scope is reachable without crossing one of the eight — and a stop condition may not be
 resolved by making a smaller undocumented change.
+
+---
+
+<a id="gap-resolutions"></a>
+
+## Contract-gap resolutions — owner decisions
+
+Recorded from the owner's second instruction. **Seven approvals and two amendments.** The amendments
+*narrow* what the first instruction approved, and the narrowing is the substance: they withdraw
+permission to build the general mechanism and require a named business action first.
+
+### G-2 — Machine execution context · APPROVED
+
+**Platform must provide it.** It must be tenant-scoped · infrastructure-provided · distinct from the
+`TenantContext` human actors use · distinct from `SystemContext` · non-impersonating ·
+non-membership-based · incapable of being supplied by a user · carrying deterministic job/execution
+identity · carrying execution attempt identity · carrying correlation identity where required.
+
+No fake `TenantMembership`. No fake `system:auto-approval` membership. No human actor field used for
+machine execution. **Workflow must not invent this context.**
+
+*Attached stop clause:* "If Platform's existing context model cannot support this, document the
+minimum Platform contract required and STOP."
+
+### G-1 — Machine authorization · APPROVED
+
+**Machine authorization belongs to Platform.** Munaxa Work must not implement a role engine or a
+permission engine. The automatic executor is authorized through an explicit **Platform-owned
+machine-execution capability**. Human Workflow permissions must not be reused as machine
+authorization. No wildcard permissions · no impersonation · no service credentials inside Work · no
+permission bypass · **no deployment-only hidden authorization**.
+
+*Attached condition:* "The exact Platform authorization contract must be documented before Workflow
+consumes it."
+
+### G-3 — `JobPort` · APPROVED, with extension
+
+**Platform owns the concrete job runner.** The existing `JobPort` **remains** the Workflow-facing
+abstraction and is to be extended *only as necessary* to support: deterministic job identity ·
+scheduling · delivery · execution attempt · retry · acknowledgement/completion · safe duplicate
+delivery · cancellation where required.
+
+Workflow must not implement a worker or a scheduler. No second `JobPort`. No process-local queues. No
+sleeps or polling loops as a substitute.
+
+*Attached condition:* "If changing JobPort affects other modules, document the impact before
+implementation." → **it does**; the impact is measured in `phase-16e-contract-gaps.md`.
+
+### G-5 — SLA action · **AMENDED**
+
+**The previous approval is narrowed.** A generic "SLA breach executes an action" framework must
+**not** be implemented. SLA **remains a derived condition**.
+
+An automatic action may be implemented **only when a specific business action has been explicitly
+defined and approved**. The first implementation must identify: the exact triggering condition · the
+exact workflow state · the exact action · the exact history event · the idempotency identity · the
+notification intent, if applicable.
+
+**Do not infer an action from `serviceLevel`. Do not create a generic action enum capable of
+arbitrary future actions.**
+
+*What changed:* D-16E-05 approved "automatic SLA action execution" limited to actions defined by
+Workflow rules. There were none, and this amendment resolves that not by defining one but by
+**withholding implementation until the owner names one**. No such action has been named.
+
+### G-6 — Expiry · **AMENDED**
+
+**Expiry stays derived.** No `expired` persistence column. **No automatic expiry action until the
+exact expiry behaviour is explicitly defined.** If the product decision is to automatically
+transition, close, reject or skip something on expiry, *that exact action* must be recorded as a
+**separate explicit decision before implementation**.
+
+*What changed:* D-16E-06 approved "automatic expiry execution" and set out a seven-step sequence for
+it. This amendment suspends the execution half pending a named action. No such action has been named.
+
+### G-4 — Automatic history · APPROVED in requirement, **withheld in vocabulary**
+
+The architectural requirement is approved: automatic actions require auditable history carrying the
+action · the workflow instance · the affected entity/step · the **execution identity** · the
+**execution/correlation identity** · the occurred timestamp.
+
+**The vocabulary is not.** Because the current history vocabulary is closed, any new automatic-action
+history event **requires explicit approval before migration or code**. An existing human event must
+**not** be reused merely because it is semantically close. If new columns are required, execution and
+correlation provenance move **together with** the history change.
+
+### G-7 — Organization calendar · APPROVED, bounded
+
+A bounded cross-module contract is approved. Organization remains the owner of calendars, holidays
+and calendar-day semantics. Workflow consumes a **narrow** contract only — no direct table access, no
+duplicated calendar data, no broad Organization directory or calendar API. The minimum contract
+answers **only** the facts needed to determine whether a date is a business day, following the
+existing bounded-port precedent.
+
+*Attached stop clause:* "If a new Organization permission is required, STOP and report it before
+implementation." → **not required.** `organization.calendar.read` already exists and is already
+grantable; see the correction recorded in `phase-16e-contract-gaps.md`.
+
+### G-8 — Notification recipient · APPROVED, bounded
+
+A bounded Identity contract is approved. `identity.describe-member` must **not** be reused. No full
+member profiles. No Workflow access to Identity persistence. The contract resolves **only** the
+recipient information the approved `NotificationPort` contract requires. Workflow addresses
+memberships; **Identity owns the mapping** from membership to notification recipient / user identity.
+
+*Attached stop clause:* "If a new Identity permission is required, stop and request explicit approval
+rather than inventing one." → **not required.** `identity.membership.read` already exists and is what
+`identity.membership-standing` already uses.
+
+**Notification delivery and an outbox are not authorized in Phase 16E** unless separately approved.
+
+### Dependency order imposed by the resolutions
+
+1. Platform machine execution context
+2. Platform machine authorization
+3. `JobPort` execution semantics
+4. **Define specific automatic business action(s)**
+5. Define corresponding history event(s)
+6. Organization business-day contract, if required
+7. Identity notification-recipient contract, if required
+8. Workflow automation integration
+9. PostgreSQL idempotency and concurrency verification
+
+**"Do not skip ahead because a later layer is technically easy."**
+
+### Stop conditions attached to the resolutions
+
+Platform context cannot represent machine execution safely · machine authorization is undefined ·
+`JobPort` semantics require an unapproved architectural change · **a specific automatic action has
+not been defined** · a new history event is required but not approved · a new permission is required
+· a cross-module contract exceeds the approved bounded scope · a fake user or membership would be
+necessary · impersonation would be necessary · idempotency cannot be enforced transactionally.
+
+**No stop condition may be solved with a workaround.**
+
+### Where the resolutions leave the phase
+
+| Step | Owner | Status |
+|---|---|---|
+| 1 · machine execution context | **Platform** | **Cannot be done here.** Platform is the separate repository `munaxa/munaxa-platform`; MASTER_INSTRUCTIONS: *"Munaxa Work never duplicates Platform functionality, and never modifies Platform."* |
+| 2 · machine authorization | **Platform** | **Cannot be done here**, same reason. The contract must be documented before Workflow consumes it, and it does not exist |
+| 3 · `JobPort` execution semantics | kernel (this repository) | **Blocked by step 1.** Delivery must hand the handler the machine execution context; that type does not exist, so the delivery half cannot be typed |
+| 4 · specific automatic action(s) | **the owner** | **Not defined.** G-5 and G-6 both withhold implementation until one is named. This is the next owner decision |
+| 5 · history event(s) | the owner | Blocked by step 4, and the vocabulary is withheld until then |
+| 6 · Organization business-day contract | Organization | Blocked by order; **no new permission needed** |
+| 7 · Identity recipient contract | Identity | Blocked by order; **no new permission needed** |
+| 8 · Workflow automation | Workflow | Blocked by 1–7 |
+| 9 · PostgreSQL verification | Workflow | Blocked by 8 |
+
+**Checkpoint 2 remains authorized and not started.** Three stop conditions are live: Platform context
+cannot represent machine execution (nothing here can supply it), machine authorization is undefined,
+and no specific automatic action has been defined.
 
 ---
 

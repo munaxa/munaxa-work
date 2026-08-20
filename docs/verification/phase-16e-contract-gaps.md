@@ -326,6 +326,113 @@ one is the "second messaging system" the approval forbids.
 
 ---
 
+## 3a. After the owner's gap resolutions
+
+The owner resolved all eight gaps in a second instruction (recorded in
+[`phase-16e-register.md`](phase-16e-register.md#gap-resolutions)) and imposed a nine-step dependency
+order. This section records what the follow-up investigation found, including **two corrections to
+§3 above**. Nothing in §3 is deleted; where it was wrong, it is corrected here and the original
+stands so the error is visible.
+
+### The decisive finding: steps 1 and 2 cannot be performed in this repository
+
+The resolutions assign the machine execution context (**G-2**) and machine authorization (**G-1**) to
+**Platform**, and place them first and second in the dependency order. Platform is **not part of this
+repository**:
+
+> Munaxa Work consumes the shared platform repository. Platform owns authentication, authorization,
+> the design system, design tokens, the RBAC framework, shared components, shared utilities and
+> shared infrastructure.
+>
+> **Munaxa Work never duplicates Platform functionality, and never modifies Platform.** If something
+> shared is missing, it is added to [munaxa-platform](https://github.com/munaxa/munaxa-platform).
+>
+> — `docs/MASTER_INSTRUCTIONS.md:28-37`
+
+Confirmed structurally: `packages/` holds `config`, `contracts`, `country-packs`, `kernel`,
+`modules`, `persistence`, `sdk`, `testing`; `packages/modules/` holds the sixteen business modules
+and no platform module; `apps/` holds `admin`, `api`, `employee-portal`, `manager-portal`, `mobile`
+and no worker. The ADR series in this repository begins at **0021** — ADR-0001 and ADR-0019, which
+assign authentication and authorization to Platform, live in the platform repository and are cited
+here, never defined here.
+
+So the first two steps of the dependency order are work in another repository, which this project is
+forbidden to modify and this session is not scoped to. **That is not a gap in Munaxa Work.** It is
+the correct architecture producing the correct answer: the machine execution identity and the machine
+capability that authorizes it are Platform's to define, and Workflow may consume them only once they
+exist. The minimum contracts each must satisfy are stated in **G-2** and **G-1** above, and they are
+the deliverable to hand to Platform.
+
+*Stop conditions live:* "Platform context cannot represent machine execution safely" and "machine
+authorization is undefined".
+
+### Correction 1 — G-7 needs no new Organization permission
+
+§3 recorded G-7 as hitting stop condition 1 (a new permission). **That was wrong.**
+`organization.calendar.read` already exists
+(`packages/modules/organization/src/application/organization-permissions.ts:46`) and is already
+grantable — it is declared as a navigation permission
+(`organization-module.ts:90-94`) and sits among "the read permissions no handler declares alone".
+
+What is missing is the **query**, not the permission: `CalendarDayView` still has zero producers, and
+none of Organization's eleven registered queries is a calendar query. A bounded business-day read
+would attach to the permission that already exists, exactly as the resolution's stop clause
+anticipated and did not trigger.
+
+G-7 therefore remains open **only** on dependency order — step 6, "if required" — and it is required
+only once a specific automatic action is defined at step 4.
+
+### Correction 2 — G-8 needs no new Identity permission
+
+§3 recorded G-8 as hitting stop conditions 1 and 3. The **permission half was wrong**:
+`identity.membership.read` already exists
+(`packages/modules/identity/src/application/identity-permissions.ts:21`) and is precisely what
+`identity.membership-standing` already declares — the D-16D-18 contract this one would follow.
+
+The rest of G-8 stands unchanged and is the real blocker: `NotificationRecipient` requires a
+`userId`, Workflow's production code contains **zero** occurrences of `userId`, and the mapping from
+membership to notification recipient is Identity's to publish. The resolution states that ownership
+explicitly. G-8 remains open on dependency order — step 7, "if required".
+
+### G-3 — the `JobPort` impact, as the resolution requires it documented
+
+The resolution approves extending the existing `JobPort` *only as necessary* and requires the
+cross-module impact be documented **before** implementation. Measured at HEAD:
+
+- **74 files** reference `JobPort` — 57 production, 17 test — across **10 areas**: `packages/kernel`,
+  `apps/api`, `apps/admin`, and the `career`, `documents`, `identity`, `learning`, `letters`,
+  `performance` and `workflow` modules.
+- **Exactly one** of them defines anything: `packages/kernel/src/ports/index.ts:61-74`. Every other
+  reference is prose or a negative-space assertion stating that `JobPort` has no adapter — several of
+  them load-bearing architectural claims (ADR-0070, ADR-0071) about why a stored flag is not written
+  and why a recurring requirement is computed rather than scheduled.
+- **Adding** delivery semantics does not falsify those claims — "no adapter" stays true until one is
+  written. What would falsify them is an adapter, and none is authorized here.
+
+**G-3 is nevertheless blocked by step 1.** The delivery half must hand a handler the machine
+execution context; that type does not exist and Workflow may not invent it, so the delivery signature
+cannot be typed. Extending the port now would mean inventing the context in all but name.
+
+### G-5 and G-6 — the amendments move the blocker rather than clearing it
+
+The amendments withdraw permission to build the general mechanism and require a **named business
+action** first: G-5 must identify the exact triggering condition, workflow state, action, history
+event, idempotency identity and notification intent before anything is implemented, and must not
+infer an action from `serviceLevel` nor create a generic action enum. G-6 keeps expiry derived and
+requires the exact expiry behaviour to be recorded as **a separate explicit decision**.
+
+**No specific automatic business action has been defined.** That is now a live stop condition in its
+own right — "a specific automatic action has not been defined" — and it is the next owner decision,
+independent of Platform.
+
+### G-4 — unchanged, and now explicitly withheld
+
+The requirement is approved; the vocabulary is not. The nine values stay closed, no human event may
+be borrowed, and execution/correlation provenance must move in the same change as the history event.
+Blocked behind step 4: until an action is named, there is nothing for an event to record.
+
+---
+
 ## 4. What is implementable now
 
 **Nothing.**
@@ -340,6 +447,12 @@ making a smaller undocumented change.
 
 Phase 16D is untouched. Human escalation, the ten permissions, the seven eligibility rules, the
 D-16D-08 denominator and the nine history events all stand exactly as `730502a` left them.
+
+**The gap resolutions do not change this.** They confirm the boundaries rather than opening them: the
+two contracts that would unblock everything are Platform's and belong to a repository this one may
+never modify, and the two amendments explicitly withhold implementation until the owner names a
+specific business action. Three stop conditions are live simultaneously — Platform context, machine
+authorization, and no defined automatic action — and any one of them alone is sufficient.
 
 ---
 
@@ -365,6 +478,13 @@ Organization and Identity; `apps/api/src` module listing — **no job or worker 
 
 Gates run: `pnpm standards` and `pnpm format:check`. The full implementation gate was **not** run,
 and `prisma validate` / `prisma migrate status` were **not** run, because no schema or code changed.
+
+Added for the gap resolutions: `docs/MASTER_INSTRUCTIONS.md` (Platform ownership) ·
+`packages/modules/organization/src/application/organization-permissions.ts` and
+`organization-module.ts` · `packages/modules/identity/src/application/identity-permissions.ts` ·
+`packages/modules/organization/src/application/calendar.use-case.ts` · the `packages/`, `apps/` and
+`packages/modules/` listings · the `docs/adr` series. `JobPort` impact counted by file across the
+repository, excluding `node_modules` and `dist`.
 
 ---
 
