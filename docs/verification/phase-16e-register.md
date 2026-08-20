@@ -1,7 +1,8 @@
 # Phase 16E — Decision Register
 
-**Eleven decisions are `APPROVED`; two, D-16E-12 and D-16E-13, are `OPEN`.** The owner's explicit
-decisions are recorded in
+**Twelve decisions are `APPROVED`; one, D-16E-12, is `OPEN`.** Implementation of the approved
+reminder is **authorized and blocked**: G-1, G-2 and G-3 are absent from Platform and D-16E-12 is
+open, so Step 1's preconditions fail. The owner's explicit decisions are recorded in
 [§ Owner approvals](#owner-approvals) below, appended rather than substituted: everything beneath
 that section is the **pre-approval record**, preserved word for word, because the reasoning that
 produced the questions is what makes the answers auditable a year from now.
@@ -40,7 +41,7 @@ unchanged in substance; this register is the canonical status table.
 | D-16E-10 | The first automatic business action | **APPROVED** | Owner — automatic service-level reminder |
 | D-16E-11 | The reminder's history event — its **existence** | **APPROVED** | Owner |
 | D-16E-12 | Authorization to modify Identity for the recipient contract | **OPEN** | None |
-| D-16E-13 | The **concrete** reminder history contract | **OPEN** | None |
+| D-16E-13 | The **concrete** reminder history contract | **APPROVED** | Owner |
 
 **The approval transition.** All nine stood `OPEN` from `2150f19` — the commit that recorded them —
 until the owner's instruction. They were `OPEN` for the whole of that interval, and the earlier state
@@ -542,7 +543,9 @@ runner-up so the choice stays the owner's.
 
 ---
 
-## D-16E-13 — The concrete reminder history contract · **OPEN**
+## D-16E-13 — The concrete reminder history contract · **APPROVED**
+
+*The open form of this decision is preserved below as it stood; the owner's resolution follows it.*
 
 D-16E-11 approved the event's **existence**; this decision is its **concrete shape**, and nothing in
 it may be inferred from that approval:
@@ -565,6 +568,66 @@ it may be inferred from that approval:
 
 **No migration, index, column or code exists.** Twelve change points are enumerated in the
 investigation; none is implemented.
+
+### The owner's resolution · **APPROVED**
+
+**D-16E-13 = APPROVED**, and implementation of the concrete history contract is authorized. The
+approved contract:
+
+| Item | Approved value |
+|---|---|
+| **Canonical event** | **`step-reminded`** — the runner-up `step-service-level-reminded` is explicitly **not** to be used, nor any of `step-escalated`, `sla-breached`, `sla-overdue`, `notification-sent`, `automation-executed`, `job-executed`, `scheduler-fired`, `system-action`. *The event name is the business fact; automatic execution is provenance* |
+| **Meaning** | an automatic service-level reminder intent was emitted for an awaiting step after its configured elapsed-time service level had passed. Implies nothing about delivery, receipt, reading, escalation, approval, rejection, skip, expiry, persisted overdue state, or any change to state, denominator, threshold, `outstanding` or `unresolved` |
+| **Actor** | `actor_membership_id = NULL`, `on_behalf_of_membership_id = NULL`. No human actor is created or impersonated — not the requester, approver, manager, administrator or a service membership. **The recipient is not the actor** |
+| **Provenance** | four dedicated **nullable** fields: execution identity · job identity · execution attempt · correlation identity. **Concrete names and types must follow the Platform execution-context contract**; until G-2/G-1/G-3 exist, **STOP rather than invent machine-identity types**. Never `metadata`, never secrets, tokens, credentials or authorization material. Tenant, instance and step are not copied in redundantly |
+| **Idempotency** | identity `tenant_id + step_id + event = 'step-reminded'`; **the `workflow_history` row itself is the idempotency record**. Index: `unique (tenant_id, step_id) where event = 'step-reminded' and deleted_at is null`. No separate table, no in-memory or process-local locking, no scheduler-level dedup, no application-only duplicate check, no sleeps, no exactly-once assumptions. **PostgreSQL is authoritative** |
+| **Vocabulary** | nine values → **ten**. Every layer that constrains the vocabulary updates consistently, and **no exact-set assertion may be weakened** |
+| **Migration** | **one additive** migration: widen the CHECK · add the four provenance columns · add the partial unique index. RLS, forced RLS, append-only triggers, history immutability, tenant policies and authority checks are **not** weakened — the idempotency mechanism works *with* immutability, never around it |
+| **Transaction ordering** | **`claim/idempotency → record history → commit → emit intent`.** The owner **rejected** `claim → notify → commit`, which opens a duplicate-notification window if the transaction later rolls back. The commit is the authoritative idempotency boundary, and the guarantee is explicitly **at-most-once reminder intent dispatch**. If dispatch fails after commit, history and the claim remain and the reminder is **not** re-emitted. No outbox in this checkpoint; ADR-0053/0064 unchanged; **exactly-once must not be claimed** |
+| **Stale execution** | re-evaluate authoritative state inside the transaction, strict `>`. If no longer eligible: no history, no intent, no state change — the repository's established no-op result |
+| **Localization** | `step-reminded` in **both** `en.json` and `ar.json`, human-readable. Provenance is **not** exposed through `WorkflowHistoryView` |
+
+*Note on the recommendation this overrides.* The D-16E-11 investigation recommended
+`claim → notify → commit`, reasoning that a duplicate message is cheaper than a silence. **The owner
+decided the other way**, and the decision stands: at-most-once dispatch, with a missed notification
+accepted rather than concealed. The earlier recommendation is left in place above so the trade-off
+remains legible, not because it survives.
+
+### Step 1 preconditions — **FAILED. Implementation did not begin.**
+
+Verified at HEAD `07ed810`, working tree clean:
+
+| Dependency | Required for | Status |
+|---|---|---|
+| **G-2** machine execution context | the four provenance columns (§5, §8.2), and any execution at all | **ABSENT** — `ExecutionContext` is still exactly `TenantContext \| SystemContext`; no machine-identity type exists anywhere in the kernel or the API |
+| **G-1** machine authorization | authorizing the automatic execution | **ABSENT** — zero machine permissions declared |
+| **G-3** `JobPort` execution | delivering the execution | **ABSENT** — `JobPort` is still enqueue-only, with **zero** implementations |
+| **D-16E-12** Identity recipient contract | resolving the notification recipient | **OPEN** — and the existing contracts are **insufficient**, verified below |
+
+**Why the migration cannot be written.** §8.2 states plainly: *"Their concrete names/types are
+dependent on the Platform execution-context contract. If that contract is unavailable: STOP before
+migration."* It is unavailable. And because §8 authorizes **one** migration containing 8.1, 8.2 and
+8.3 together, splitting it to land the CHECK and the index alone would be working around the
+dependency — which §25 forbids outright.
+
+**Why the vocabulary cannot move alone.** `workflow-parity.integration.test.ts:104` requires
+`workflow_history_event_check` and `WORKFLOW_HISTORY_EVENTS` to enumerate *exactly* the same set.
+Adding `step-reminded` to the domain without the migration turns that assertion red, and §7 forbids
+weakening it. The two must move together — the mechanism Phase 16D used deliberately for
+`step-escalated`.
+
+**Why Identity is insufficient, verified rather than assumed.** `TenantMembershipView` does carry
+`workforceUserId` — the exact field `NotificationRecipient` needs — but every query that returns it is
+closed to this use by §13: `identity.list-memberships` and
+`identity.active-memberships-for-employment` are **enumerations**, and `identity.describe-member` is
+**explicitly forbidden**. `identity.membership-standing` returns `{ active }` only, and widening it is
+forbidden. The data is one field away and there is no permitted route to it. → **STOP at the Identity
+boundary**, exactly as §13 provides.
+
+**Nothing was worked around.** No fake actor, no `system:auto-reminder` identity, no permission
+bypass, no wildcard authorization, no service credential, no impersonation, no tenant bypass, no
+Work-side substitute for a Platform contract, no direct query of Identity's database, no widened
+contract, and no split migration.
 
 ---
 
