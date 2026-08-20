@@ -1,6 +1,7 @@
 # Phase 16E — Decision Register
 
-**All nine decisions are `APPROVED`.** The owner's explicit decisions are recorded in
+**Nine decisions are `APPROVED`; a tenth, [D-16E-10](#d-16e-10--the-first-automatic-business-action--open),
+is `OPEN`.** The owner's explicit decisions are recorded in
 [§ Owner approvals](#owner-approvals) below, appended rather than substituted: everything beneath
 that section is the **pre-approval record**, preserved word for word, because the reasoning that
 produced the questions is what makes the answers auditable a year from now.
@@ -36,6 +37,7 @@ unchanged in substance; this register is the canonical status table.
 | D-16E-07 | Notification intent | **APPROVED** | Owner, record dated 2026-08-20 |
 | D-16E-08 | Business-day SLA | **APPROVED** | Owner, record dated 2026-08-20 |
 | D-16E-09 | Idempotency | **APPROVED** | Owner, record dated 2026-08-20 |
+| D-16E-10 | The first automatic business action | **OPEN** | None |
 
 **The approval transition.** All nine stood `OPEN` from `2150f19` — the commit that recorded them —
 until the owner's instruction. They were `OPEN` for the whole of that interval, and the earlier state
@@ -379,6 +381,60 @@ necessary · impersonation would be necessary · idempotency cannot be enforced 
 **Checkpoint 2 remains authorized and not started.** Three stop conditions are live: Platform context
 cannot represent machine execution (nothing here can supply it), machine authorization is undefined,
 and no specific automatic action has been defined.
+
+---
+
+## D-16E-10 — The first automatic business action · **OPEN**
+
+The tenth decision, added after D-16E-09. **Nothing above it is renumbered, and no approved decision
+changes status.** It exists because the G-5 and G-6 amendments withhold implementation until the
+owner names a specific business action, and step 4 of the dependency order is that naming.
+
+The full investigation is in [`phase-16e-first-action.md`](phase-16e-first-action.md). In summary:
+
+**The candidate — automatic SLA escalation — is put forward with a recommendation to DECLINE *as the
+first action*, and is not declined on merit.** The blocker is structural rather than a matter of
+effort: `escalateBranch` takes `approverMembershipId` as an **input** and the domain never chooses a
+person, so an automatic escalation must decide *who* is added. The three possible sources are all
+closed — candidate enumeration is refused by **D-16D-16 (A)** and excluded from D-16E-01's scope;
+configuring a target on the step template is new persistence and a new capability; and reusing
+manager resolution widens **P-1** and **D-16C-11**, which `domain/manager.ts` states may not be
+widened without a new approval. Secondary problems: `unanimous` branches refuse escalation by name,
+Admin's `escalated` marker cannot distinguish a machine from a person, the manual-versus-automatic
+race has no recorded rule, and `workflow_step_escalation_idx` keys on the *membership* so it cannot
+prevent two automatic attempts adding two different people to one stuck branch.
+
+**An alternative is put forward instead, for APPROVE / AMEND / DECLINE — not approved and not assumed
+approved:** an **automatic service-level reminder**. When an awaiting step with a configured service
+level passes its due instant, Workflow emits **one** notification intent addressed to that step's own
+approver, records it once, and **changes no workflow state**. It chooses nobody (the recipient is
+already named on the step, so D-16D-16 stays closed), leaves the D-16D-08 denominator structurally
+unreachable, decides nothing on anyone's behalf, needs no SLA model change, needs no business days,
+and has a one-key idempotency identity — `(tenant_id, step_id)`, because a step breaches once —
+enforceable by a single partial unique index on `workflow_history` itself.
+
+**Attached decisions, required only if the reminder is approved:** the **history event name** (the
+vocabulary is closed at nine and none may be invented) · **two history columns** for execution and
+correlation identity, moving in the same change · the **G-8 Identity contract**, bounded, on the
+`identity.membership-standing` model, with **no new permission** since `identity.membership.read`
+already exists.
+
+**If escalation is preferred anyway**, four questions must be answered first: how the automatic
+approver is selected (reopening D-16D-16, or widening P-1 and D-16C-11) · what happens on a
+`unanimous` branch · whether a human escalation consumes the branch's automatic entitlement · whether
+Admin must distinguish automatic from human escalation.
+
+**Business days are not required** by either option, so **G-7 stays unopened**: the SLA model supports
+elapsed time only, as `domain/service-level.ts` states outright. **Notification intent is required by
+the alternative only**, where the intent *is* the action.
+
+**Both options still require all three Platform contracts** — G-2, G-1 and G-3 — which live in
+`munaxa/munaxa-platform`.
+
+*Recorded, not asked:* whether the first automatic action must alter business state at all. If it
+must, the finding is that **no such action can be defined today** without reopening a closed 16D
+decision or introducing new configuration. That is the owner's choice and is not resolved by
+inference.
 
 ---
 
