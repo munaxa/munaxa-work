@@ -182,8 +182,8 @@ describe('when a reminder is refused', () => {
       refusalOf(reminderDue(instance('completed'), step(), after(1))),
       refusalOf(reminderDue(instance(), step({ instanceId: 'other' }), after(1))),
       refusalOf(reminderDue(instance(), step({ status: 'approved' }), after(1))),
-      refusalOf(reminderDue(instance(), noTarget as WorkflowStepState, after(1))),
-      refusalOf(reminderDue(instance(), noClock as WorkflowStepState, after(1))),
+      refusalOf(reminderDue(instance(), noTarget, after(1))),
+      refusalOf(reminderDue(instance(), noClock, after(1))),
       refusalOf(reminderDue(instance(), step(), DUE_AT)),
     ];
 

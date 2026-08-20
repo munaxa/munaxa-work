@@ -118,45 +118,30 @@ export interface HarnessOptions {
   readonly tenantId?: string;
 }
 
-export const harnessFor = (options: HarnessOptions = {}): Harness => {
-  const granted = options.permissions ?? ALL_WORKFLOW_PERMISSIONS;
-  const permissions: PermissionChecker = {
-    holds: (permission) => Promise.resolve(granted.includes(permission)),
-  };
-  const dispatcher = new Dispatcher(permissions);
-  const clock = new FixedClock(NOW);
-  const delegation = new FakeDelegation();
-  const membershipStanding = new FakeMembershipStanding();
-  const reportingLine = new FakeReportingLine();
-  const reminderRecipient = new FakeReminderRecipient();
-  const notifications = new FakeNotifications();
-  const business = new FakeBusinessDecisions();
-  const stores = inMemoryWorkflowStores();
-  const tenantId = options.tenantId ?? TENANT;
-  const module = workflowModule({
-    unitOfWork: new InMemoryUnitOfWork(tenantId),
-    stores,
-    delegation,
-    membershipStanding,
-    reminderRecipient,
-    notifications,
-    reportingLine,
-    businessDecision: business,
-    permissions,
-    clock,
-  });
+/** The doubles a harness composes, built together so the composition below stays one screen. */
+const fakesFor = () => ({
+  clock: new FixedClock(NOW),
+  delegation: new FakeDelegation(),
+  membershipStanding: new FakeMembershipStanding(),
+  reportingLine: new FakeReportingLine(),
+  reminderRecipient: new FakeReminderRecipient(),
+  notifications: new FakeNotifications(),
+  business: new FakeBusinessDecisions(),
+  stores: inMemoryWorkflowStores(),
+});
 
-  for (const handler of module.commands ?? []) dispatcher.registerCommand(handler);
-  for (const handler of module.queries ?? []) dispatcher.registerQuery(handler);
-
-  const run = <TResult>(
-    tenant: string,
-    membershipId: string | undefined,
-    work: () => Promise<TResult>,
-  ): Promise<TResult> =>
+/**
+ * Running work as somebody, or as nobody.
+ *
+ * Split out so the two kinds of caller sit side by side: a person's context carries an actor and a
+ * membership, a machine's carries neither and an execution identity instead. Reading them together is
+ * most of what makes the difference legible.
+ */
+const contextsFor = (tenantId: string) => ({
+  asPerson: <TResult>(membershipId: string | undefined, work: () => Promise<TResult>) =>
     runInContext(
       {
-        tenantId: tenant,
+        tenantId,
         correlationId: uuidV7(),
         // The actor is the workforce user, as the middleware sets it. The membership is a separate
         // field, as the middleware now sets it. The suites keep them distinguishable on purpose.
@@ -164,33 +149,56 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
         ...(membershipId === undefined ? {} : { membershipId }),
       },
       work,
-    );
+    ),
+  asMachine: <TResult>(
+    work: () => Promise<TResult>,
+    execution: { readonly jobId?: string; readonly attempt?: number },
+  ) =>
+    runInContext(
+      {
+        machine: true,
+        tenantId,
+        executionIdentity: 'service:workflow-reminders',
+        correlationId: uuidV7(),
+        ...(execution.jobId === undefined ? {} : { jobId: execution.jobId }),
+        ...(execution.attempt === undefined ? {} : { attempt: execution.attempt }),
+      },
+      work,
+    ),
+});
+
+export const harnessFor = (options: HarnessOptions = {}): Harness => {
+  const granted = options.permissions ?? ALL_WORKFLOW_PERMISSIONS;
+  const permissions: PermissionChecker = {
+    holds: (permission) => Promise.resolve(granted.includes(permission)),
+  };
+  const dispatcher = new Dispatcher(permissions);
+  const tenantId = options.tenantId ?? TENANT;
+  const fakes = fakesFor();
+  const contexts = contextsFor(tenantId);
+  const module = workflowModule({
+    unitOfWork: new InMemoryUnitOfWork(tenantId),
+    stores: fakes.stores,
+    delegation: fakes.delegation,
+    membershipStanding: fakes.membershipStanding,
+    reminderRecipient: fakes.reminderRecipient,
+    notifications: fakes.notifications,
+    reportingLine: fakes.reportingLine,
+    businessDecision: fakes.business,
+    permissions,
+    clock: fakes.clock,
+  });
+
+  for (const handler of module.commands ?? []) dispatcher.registerCommand(handler);
+  for (const handler of module.queries ?? []) dispatcher.registerQuery(handler);
 
   return {
+    ...fakes,
     dispatcher,
-    clock,
-    delegation,
-    membershipStanding,
-    reminderRecipient,
-    notifications,
-    reportingLine,
-    business,
-    stores,
-    as: (membershipId, work) => run(tenantId, membershipId, work),
-    asMachine: (work, execution = {}) =>
-      runInContext(
-        {
-          machine: true,
-          tenantId,
-          executionIdentity: 'service:workflow-reminders',
-          correlationId: uuidV7(),
-          ...(execution.jobId === undefined ? {} : { jobId: execution.jobId }),
-          ...(execution.attempt === undefined ? {} : { attempt: execution.attempt }),
-        },
-        work,
-      ),
-    withoutMembership: (work) => run(tenantId, undefined, work),
-    inTenant: (tenant, membershipId, work) => run(tenant, membershipId, work),
+    as: (membershipId, work) => contexts.asPerson(membershipId, work),
+    asMachine: (work, execution = {}) => contexts.asMachine(work, execution),
+    withoutMembership: (work) => contexts.asPerson(undefined, work),
+    inTenant: (tenant, membershipId, work) => contextsFor(tenant).asPerson(membershipId, work),
   };
 };
 
