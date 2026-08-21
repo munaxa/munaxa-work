@@ -57,12 +57,12 @@ const dependenciesFor = (granted: readonly string[]) => ({
 describe('every Workflow handler declares a permission', () => {
   const module = workflowModule(dependenciesFor(ALL_WORKFLOW_PERMISSIONS));
 
-  it('registers fourteen commands and ten queries, each with one', () => {
+  it('registers fourteen commands and eleven queries, each with one', () => {
     // Nine and eight in 16A; Phase 16B adds three group commands and two group reads; Phase 16D adds
     // one escalation command. Counted here so a handler that arrives without a permission — or
     // without a decision behind it — fails.
     expect(module.commands).toHaveLength(14);
-    expect(module.queries).toHaveLength(10);
+    expect(module.queries).toHaveLength(11);
 
     const declared = [
       ...(module.commands ?? []).map((handler) => handler.permission),

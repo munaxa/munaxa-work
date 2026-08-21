@@ -3,6 +3,7 @@ import type { Transaction } from '@work/kernel';
 
 import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instance.js';
 import type {
+  DueReminder,
   InstanceFilters,
   InstanceStore,
   Page,
@@ -20,6 +21,7 @@ import {
   type StepRow,
 } from './workflow-record-rows.js';
 import { insertRow, mutable, pageOf, predicateFor, type Filter } from './row-writer.js';
+import { dueForReminderRows } from './step-due-reminders.js';
 
 /**
  * Running approvals, and the steps they are made of.
@@ -194,6 +196,22 @@ export class PostgresStepRepository
       },
       stepState,
     );
+  }
+
+  /**
+   * The steps whose automatic service-level reminder is due, after a cursor, bounded.
+   *
+   * The SQL and the reasoning behind it are in `step-due-reminders.ts` — it is the only read here
+   * that answers a machine's question rather than a person's, and it is kept whole beside its own
+   * explanation.
+   */
+  public dueForReminder(
+    transaction: Transaction,
+    asAt: Date,
+    limit: number,
+    cursor?: string,
+  ): Promise<readonly DueReminder[]> {
+    return dueForReminderRows(transaction, asAt, limit, cursor);
   }
 
   public insert(transaction: Transaction, state: WorkflowStepState): Promise<void> {

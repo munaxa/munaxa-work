@@ -47,19 +47,24 @@ export type {
   ApprovalGroupDetailView,
   ApprovalGroupMemberView,
   ApprovalGroupView,
-  ApprovalStatusView,
-  ApprovalStepView,
   BranchConditionView,
-  BranchTallyView,
   LocalizedTextView,
-  PendingApprovalView,
-  WorkflowDecisionView,
   WorkflowDefinitionDetailView,
   WorkflowDefinitionView,
+  WorkflowStepTemplateView,
+  WorkflowVersionView,
+} from './views.js';
+
+/** The running half of the same contract — see `execution-views.ts` for why it is a second file. */
+export type {
+  ApprovalStatusView,
+  ApprovalStepView,
+  BranchTallyView,
+  DueReminderView,
+  PendingApprovalView,
+  WorkflowDecisionView,
   WorkflowHistoryView,
   WorkflowInstanceDetailView,
   WorkflowInstanceView,
-  WorkflowStepTemplateView,
   WorkflowStepView,
-  WorkflowVersionView,
-} from './views.js';
+} from './execution-views.js';

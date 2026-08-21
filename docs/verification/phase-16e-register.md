@@ -1,12 +1,13 @@
 # Phase 16E — Decision Register
 
-**Thirteen decisions are `APPROVED`, D-16E-12 is resolved, and one — D-16E-14 — is `OPEN`.** The approved automatic service-level
-reminder is **implemented, tested and verified** — see
-[`phase-16e-reminder-implementation.md`](phase-16e-reminder-implementation.md). One dependency
-remains genuinely outside this repository: no job runner exists in Platform, so nothing *invokes* the
-reminder on a schedule yet — and one remains **inside** it, opened by the handover investigation and
-recorded as **D-16E-14**: no published query answers *which* steps are due, so a runner could execute
-a reminder and could not find one. The contract Platform must satisfy, and that gap, are in
+**Fourteen decisions are `APPROVED`, D-16E-12 is resolved, and none is `OPEN`.** The approved automatic
+service-level reminder is **implemented, tested and verified** — see
+[`phase-16e-reminder-implementation.md`](phase-16e-reminder-implementation.md) — and so is the
+discovery read that feeds it: **D-16E-14** was opened by the handover investigation (a runner could
+execute a reminder and could not find one), approved by the owner, and closed by
+`workflow.due-reminders`. **One dependency remains genuinely outside this repository**: no job runner
+exists in Platform, so nothing *invokes* the reminder on a schedule yet. Every remaining criterion is
+Platform's, and the contract it must satisfy is in
 [`phase-16e-platform-runner-contract.md`](phase-16e-platform-runner-contract.md). The owner's explicit decisions are recorded in
 [§ Owner approvals](#owner-approvals) below, appended rather than substituted: everything beneath
 that section is the **pre-approval record**, preserved word for word, because the reasoning that
@@ -55,7 +56,7 @@ unchanged in substance; this register is the canonical status table.
 | D-16E-11 | The reminder's history event — its **existence** | **APPROVED** | Owner |
 | D-16E-12 | Authorization to modify Identity for the recipient contract | **RESOLVED** | Covered by the D-16E-13 directive; no new permission required |
 | D-16E-13 | The **concrete** reminder history contract | **APPROVED** | Owner |
-| D-16E-14 | How the runner discovers a due reminder | **OPEN** | None |
+| D-16E-14 | How the runner discovers a due reminder | **APPROVED** | Owner, record dated 2026-08-21 |
 
 **The approval transition.** All nine stood `OPEN` from `2150f19` — the commit that recorded them —
 until the owner's instruction. They were `OPEN` for the whole of that interval, and the earlier state
@@ -873,7 +874,12 @@ authorized it — appended, never by rewriting what stands above.
 
 ---
 
-## D-16E-14 — How the runner discovers a due reminder · **OPEN**
+## D-16E-14 — How the runner discovers a due reminder · **APPROVED**
+
+**Owner approval, record dated 2026-08-21.** The owner's instruction states, in its own words, that it
+*"explicitly authorizes the bounded implementation of D-16E-14"*. That is an explicit decision on this
+decision, and it is the only reason the status below moved. Everything from here to the resolution note
+is the record **as it stood while the decision was OPEN**, preserved word for word.
 
 Opened by the Platform handover investigation, not by the owner, and recorded here because it is a
 **new published contract** and therefore a decision rather than an implementation detail.
@@ -904,3 +910,38 @@ and none is reopened by this one.
 
 *Blocks:* the reminder being invoked at all, jointly with the absent Platform job runner. Neither is
 sufficient alone.
+
+### Resolution — `workflow.due-reminders`, implemented and verified
+
+The read named above is built, and is exactly what was named — nothing wider:
+
+| Requirement, as written while OPEN | As built |
+|---|---|
+| identifier-free | request carries `asAt`, `size?`, `cursor?` and **no `tenantId`**; the tenant comes from the execution context, and RLS filters again beneath it |
+| tenant-scoped | as above — a caller cannot name a tenant, so a caller cannot choose one |
+| returns `(instanceId, stepId)` pairs | `DueReminderView` has exactly those two fields and no others |
+| due at a **supplied** instant | `asAt` is a parameter; nothing reads a clock, as everywhere else in this module |
+| declares `workflow.reminder.execute` | it does, and no human permission opens it — the API composition suite now asserts that permission is declared **exactly twice**, by this query and the command it feeds, so a third holder cannot appear unnoticed |
+| bounded by a page size | clamped to 1…`MAXIMUM_DISCOVERY_PAGE` (200), default 100; a larger request is reduced, not refused |
+| never an unbounded sweep | cursor over `step.id`, not an offset — an offset over a set being written to repeats rows and skips others |
+
+**What it deliberately does not do**, matching "what it must not become" above: it returns work and
+never people. No approver, no requester, no workforce user, and no parameter that could ask for one —
+the recipient is resolved later, inside the command, from rows the command re-reads. D-16D-16 stays
+closed. It has **no HTTP route**, under any spelling, which the API route suite asserts in both
+directions and by name.
+
+**It narrows; it does not decide.** A returned row is a candidate, not a claim: nothing is reserved,
+leased or flagged. Every rule the query applies is re-applied by `workflow.remind-step` inside the
+authoritative transaction, and a candidate that went stale in between is refused by name rather than
+acted on. Two runners may discover the same step — correct rather than tolerated, because the
+guarantee lives in `workflow_history_reminder_idx` where the database can arbitrate it, and *a `select`
+followed by an `insert` is not idempotent under concurrency* (ADR-0071).
+
+*Files:* `application/due-reminders.query.ts`, `contracts/views.ts`,
+`application/workflow-ports.ts`, `infrastructure/instance.repository.ts`,
+`application/in-memory-stores.ts`. *Tests:* `application/workflow-due-reminders.test.ts` and
+`infrastructure/workflow-due-reminders.integration.test.ts` (real PostgreSQL, RLS enforced).
+
+*Still blocked, and not by this:* the Platform job runner. Criterion 5 of the handover contract is
+discharged; 1–4 and 6 remain Platform's.

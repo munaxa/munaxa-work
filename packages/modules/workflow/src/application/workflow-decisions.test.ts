@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { WorkflowInstanceDetailView } from '../contracts/views.js';
+import type { WorkflowInstanceDetailView } from '../contracts/execution-views.js';
 import type { HandlerFailure, Result } from '@work/kernel';
 
 import { runningApproval } from './workflow-scenarios.js';

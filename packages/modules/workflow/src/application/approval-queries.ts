@@ -6,7 +6,7 @@ import type {
   PendingApprovalView,
   WorkflowDecisionView,
   WorkflowHistoryView,
-} from '../contracts/views.js';
+} from '../contracts/execution-views.js';
 import { currentMembership, notFound } from './workflow-context.js';
 import { emptyPage, pageOf } from './workflow-paging.js';
 import { WorkflowPermissions } from './workflow-permissions.js';

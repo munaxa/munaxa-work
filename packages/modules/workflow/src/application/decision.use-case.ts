@@ -5,7 +5,7 @@ import { decisionHistory } from '../domain/history.js';
 import { awaitingSteps } from '../domain/instance.js';
 import type { BranchVote } from '../domain/branch.js';
 import type { ApprovalDecisionKind } from '../domain/workflow-vocabulary.js';
-import type { BranchTallyView } from '../contracts/views.js';
+import type { BranchTallyView } from '../contracts/execution-views.js';
 import { currentMembership, notFound, refuseWith, refusedBy } from './workflow-context.js';
 import { WorkflowPermissions } from './workflow-permissions.js';
 import { stepsFor } from './decision-authority.js';

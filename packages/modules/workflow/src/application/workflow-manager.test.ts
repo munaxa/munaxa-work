@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { ManagerResolution } from '../domain/manager.js';
-import type { PendingApprovalView, WorkflowInstanceDetailView } from '../contracts/views.js';
+import type {
+  PendingApprovalView,
+  WorkflowInstanceDetailView,
+} from '../contracts/execution-views.js';
 import type { Page } from './workflow-ports.js';
 import { publishedBranches, startedOn } from './workflow-scenarios.js';
 import {

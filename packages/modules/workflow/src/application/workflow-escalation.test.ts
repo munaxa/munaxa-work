@@ -15,7 +15,7 @@ import {
   type Harness,
 } from './workflow-test-harness.js';
 import { publishedBranches, startedOn } from './workflow-scenarios.js';
-import type { WorkflowInstanceDetailView } from '../contracts/views.js';
+import type { WorkflowInstanceDetailView } from '../contracts/execution-views.js';
 
 /**
  * What escalation does to a branch, through the real command.

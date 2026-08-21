@@ -118,8 +118,8 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
     );
 
     expect(offending).toStrictEqual([]);
-    // Twenty-four: seventeen from 16A, the three group commands and two group reads 16B added,
-    // Phase 16D's one escalation command, and Phase 16E's one reminder command. Counted so a handler
+    // Twenty-five: seventeen from 16A, the three group commands and two group reads 16B added,
+    // Phase 16D's one escalation command, and Phase 16E's reminder command plus its discovery query. Counted so a handler
     // nobody decided on fails here rather than shipping.
     //
     // **`workflow.remind-step` passes the forbidden-fragment scan above rather than being excused
@@ -127,9 +127,12 @@ describe('nothing deferred beyond Phase 16C is reachable', () => {
     // `expire` or `notify`, because it schedules nothing, breaches nothing and delivers nothing. A
     // handler that *did* fire on elapsed time would have had to be named for what it does and would
     // have failed the scan.
-    expect(registered).toHaveLength(24);
+    expect(registered).toHaveLength(25);
     expect(registered).toContain('workflow.escalate-branch');
     expect(registered).toContain('workflow.remind-step');
+    // The discovery query D-16E-14 added. Like the command, it passes the forbidden-fragment scan
+    // rather than being excused from it: it schedules nothing, sweeps nothing and notifies nobody.
+    expect(registered).toContain('workflow.due-reminders');
   });
 
   /**

@@ -260,6 +260,14 @@ through `WorkflowHistoryView`** — it is an operator's fact, not a field for an
 Platform should expect to correlate by `correlationId`, not to read it back out of a tenant-facing
 API.
 
+**The discovery stage leaves no business audit, on purpose.** `workflow.due-reminders` is a read; it
+writes nothing, and a row it returns is a candidate rather than a decision — two runners may be handed
+the same step and exactly one of them will record anything (§14). So a sweep that discovers a hundred
+steps and records three is not an anomaly, and any operator metric that treats discovered-vs-recorded
+as a loss rate will be wrong. Platform should count the discovery stage as it counts any other job
+step — pages fetched, rows returned, wall time, whether the loop terminated on an empty page or a
+budget — and read the business truth from the `step-reminded` entries alone.
+
 ## 18. What Platform must not delegate to Workflow
 
 - deciding *when* a reminder is due to be attempted (Workflow decides only *whether*, at execution);
@@ -269,6 +277,33 @@ API.
 - turning a lost notification into a second attempt.
 
 ## 19. The exact Workflow contract consumed by the runner
+
+Two calls, in this order. The read finds the work; the command does it.
+
+```
+query:       workflow.due-reminders
+request:     { asAt: Date, size?: number, cursor?: string }
+reply:       { items: { instanceId: string, stepId: string }[], nextCursor?: string }
+permission:  workflow.reminder.execute        ← the same one, not a second grant
+context:     tenant-scoped (MachineContext in production)
+```
+
+- **`asAt` is supplied, never read from a clock.** The runner names the instant; Workflow evaluates
+  against it. The same instant should be passed to every page of one sweep, so a sweep sees one
+  consistent horizon rather than a moving one.
+- **`size` is clamped, not trusted** — 1…200, default 100. A larger number is silently reduced; it is
+  not an error, because a runner asking for too much is a configuration mistake rather than an attack.
+- **`cursor` is the previous page's last `stepId`**, not an offset. Offsets over a set being written to
+  repeat rows and skip others. Absent `nextCursor` means the sweep is done.
+- **There is no `tenantId`, in the request or the reply.** The tenant comes from the execution context
+  and RLS filters again beneath it. A runner cannot name a tenant, so a runner cannot choose one.
+- **It returns work, never people.** Two identifiers per row and no way to ask for a third: no
+  approver, no requester, no workforce user. The recipient is resolved later, inside the command, from
+  rows the command re-reads. This is what keeps D-16D-16 closed.
+- **A row is a candidate, not a claim.** Nothing is reserved, leased or marked. Every rule the query
+  applied is re-applied by the command inside the authoritative transaction, and a candidate that went
+  stale in between is refused by name (the table below). Two runners discovering the same step is
+  correct rather than tolerated — the guarantee is the unique index, per §14.
 
 ```
 command:     workflow.remind-step
@@ -306,29 +341,28 @@ with `unit_span('hours') = 1h`, `unit_span('days') = 24h`, and `>` **strict**.
 
 ---
 
-## 20. The blocking gap: the runner cannot discover work
+## 20. The discovery gap — raised here, closed by D-16E-14
 
-**This is the one thing that must be resolved before any of the above is implementable, and it is
-Workflow's to resolve, not Platform's.**
+**Resolved.** This section originally recorded the one thing blocking the whole contract: the runner
+could *execute* a reminder and had no way to *find* one. It is kept rather than deleted, because the
+reasoning is why the query looks the way it does.
 
-`workflow.remind-step` requires an `instanceId` and a `stepId`. **No published Workflow query answers
-"which steps in this tenant are due a reminder now."** Verified against every registered query:
+`workflow.remind-step` requires an `instanceId` and a `stepId`, and no query published at the time
+could answer "which steps in this tenant are due a reminder now":
 
-| Query | Why it cannot answer |
+| Query | Why it could not answer |
 |---|---|
 | `workflow.pending-approvals` | declares `workflow.approval.read-own` and resolves from the **caller's membership** — a machine has none, by design |
 | `workflow.search-instances` | declares `workflow.instance.read` (a human administrator's permission the runner must not hold), returns **instances not steps**, and cannot filter on the service level |
 | `workflow.read-approval-status`, `workflow.read-history` | need an `instanceId` the caller already has |
 
-So the runner can *execute* a reminder and has no way to *find* one.
+The gap was opened as **D-16E-14**, approved by the owner, and closed by `workflow.due-reminders` —
+identifier-free, tenant-scoped, page-bounded, cursor-paged, declaring `workflow.reminder.execute` and
+no human permission. Its contract is §19; what it deliberately does not return is there too.
 
-Closing it needs a **new bounded Workflow read** — identifier-free, tenant-scoped, returning the
-`(instanceId, stepId)` pairs due at a supplied instant, declaring **`workflow.reminder.execute`**
-rather than any human permission, and bounded by a page size. That is a new published contract and
-therefore **a new owner decision**; it is deliberately not designed here beyond naming what it must
-be, and **not implemented**.
-
-Until it exists, Platform can build the runner but cannot feed it.
+**No Platform work was needed to close it, and none is implied by it.** The query is a read Platform
+calls; the scheduling, the loop and the runner remain Platform's, unchanged from the rest of this
+document.
 
 ---
 
@@ -343,6 +377,8 @@ machine execution principal           ← Platform owns (ServicePrincipal / ApiK
         ↓
 MachineContext                        ← Work's shape, Platform constructs it
         ↓
+workflow.due-reminders                ← Workflow answers *which* steps, bounded and cursor-paged
+        ↓        (per row, independently — a row is a candidate, not a claim)
 workflow.remind-step                  ← Workflow owns the business rule
         ↓
 evaluate the due condition            ← Workflow, inside the transaction
@@ -396,12 +432,13 @@ The reminder becomes executable when **all** of these hold:
    else of Workflow's.
 3. The runner constructs a `MachineContext` per §3 and runs the handler inside it.
 4. The runner connects as a role with no `BYPASSRLS`.
-5. **The Workflow discovery query of §20 is approved and built** — without it there is nothing to feed
-   the runner.
+5. ~~The Workflow discovery query is approved and built~~ — **done**: `workflow.due-reminders`
+   (D-16E-14), §19.
 6. The Platform-side tests above pass.
 
-Until 1–5, the approved reminder is complete and dormant: every part of it is built, verified and
-merged in `munaxa-work`, and nothing invokes it.
+Criterion 5 was Work's and is discharged. **1–4 and 6 are Platform's and remain open**, so the
+approved reminder is complete and dormant: every part of it — the discovery read included — is built,
+verified and merged in `munaxa-work`, and nothing invokes it.
 
 ---
 

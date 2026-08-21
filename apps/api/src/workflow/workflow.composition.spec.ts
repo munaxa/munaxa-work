@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 import { InProcessEventDispatcher } from '@work/kernel';
-import { ALL_WORKFLOW_PERMISSIONS } from '@work/workflow';
+import { ALL_WORKFLOW_PERMISSIONS, WorkflowPermissions } from '@work/workflow';
 import { PostgresUnitOfWork } from '@work/persistence';
 import { Pool } from 'pg';
 
@@ -76,8 +76,13 @@ describe('workflow composition', () => {
     // refuses outright — so a route could only ever answer 422. This counts what is *composed*;
     // `workflow.routes.spec.ts` counts what is reachable over HTTP and names that one by hand. The
     // two numbers differing is the design rather than a gap.
+    //
+    // The eleventh read is that command's other half: `workflow.due-reminders`, the discovery the
+    // runner makes before it can call anything (D-16E-14). It is unrouted for the same reason and
+    // named in the same place, so both halves of the machine surface are counted here and enumerated
+    // there.
     expect(workflow.commands ?? []).toHaveLength(14);
-    expect(workflow.queries ?? []).toHaveLength(10);
+    expect(workflow.queries ?? []).toHaveLength(11);
     expect(workflow.permissions).toEqual(ALL_WORKFLOW_PERMISSIONS);
     expect(ALL_WORKFLOW_PERMISSIONS).toHaveLength(11);
   });
@@ -89,7 +94,15 @@ describe('workflow composition', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(24);
+    expect(declared).toHaveLength(25);
+    // Twenty-five declarations over eleven permissions, so some are shared — and exactly one of them
+    // is shared by the machine surface. `workflow.reminder.execute` is declared twice and only twice:
+    // by the reminder command and by the discovery query that feeds it. Discovering the work and doing
+    // it are one capability held by one principal; a third holder would be a grant somebody could hold
+    // without the other, which is what this number is here to catch.
+    expect(
+      declared.filter((permission) => permission === WorkflowPermissions.reminderExecute),
+    ).toHaveLength(2);
     for (const permission of declared) {
       expect(ALL_WORKFLOW_PERMISSIONS).toContain(permission);
       expect(permission).not.toContain('*');

@@ -131,6 +131,12 @@ export interface InstanceStore {
   update(transaction: Transaction, state: WorkflowInstanceState, expected: number): Promise<void>;
 }
 
+/** A step whose reminder is due: the two identifiers the reminder command takes, and nothing else. */
+export interface DueReminder {
+  readonly instanceId: string;
+  readonly stepId: string;
+}
+
 export interface StepStore {
   byId(transaction: Transaction, id: string): Promise<WorkflowStepState | undefined>;
   forInstance(transaction: Transaction, instanceId: string): Promise<readonly WorkflowStepState[]>;
@@ -146,6 +152,26 @@ export interface StepStore {
     approverMembershipId: string,
     paged: Paged,
   ): Promise<Page<WorkflowStepState>>;
+  /**
+   * The steps whose automatic service-level reminder is due at `asAt`, after `cursor`.
+   *
+   * **The one read in this module that takes no identifier**, and the shape is what keeps that safe:
+   * it is bounded by `limit`, ordered by the step's own identifier, and returns two identifiers per
+   * row. There is no filter a caller could widen and no field through which a person could be named.
+   *
+   * **`asAt` is a parameter, never a clock the store reads**, exactly as every instant in this module
+   * is. A store that consulted the time would give two different answers to one question asked twice.
+   *
+   * **It excludes steps already reminded**, which is an optimisation and *not* the guarantee. Two
+   * runners may legitimately discover the same step; only one can claim the history row. Discovery
+   * narrows the work, and the database decides the effect.
+   */
+  dueForReminder(
+    transaction: Transaction,
+    asAt: Date,
+    limit: number,
+    cursor?: string,
+  ): Promise<readonly DueReminder[]>;
   insert(transaction: Transaction, state: WorkflowStepState): Promise<void>;
   update(transaction: Transaction, state: WorkflowStepState, expected: number): Promise<void>;
 }

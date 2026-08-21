@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { PendingApprovalView, WorkflowInstanceDetailView } from '../contracts/views.js';
+import type {
+  PendingApprovalView,
+  WorkflowInstanceDetailView,
+} from '../contracts/execution-views.js';
 import type { WorkflowDefinitionDetailView } from '../contracts/views.js';
 import type { Page } from './workflow-ports.js';
 import { approveAs, publishedBranches, startedOn } from './workflow-scenarios.js';

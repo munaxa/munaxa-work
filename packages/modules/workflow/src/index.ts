@@ -40,6 +40,7 @@ export * from './domain/decision.js';
 export * from './domain/history.js';
 
 export * from './contracts/views.js';
+export * from './contracts/execution-views.js';
 
 export * from './application/workflow-module.js';
 export * from './application/workflow-permissions.js';
