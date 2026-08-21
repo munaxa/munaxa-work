@@ -21,9 +21,9 @@ ADRs updated.
 | 2   | Workforce identity          | [`03_PHASE_2_WORKFORCE_IDENTITY.md`](../work%20prompts/03_PHASE_2_WORKFORCE_IDENTITY.md)              | Complete    |
 | 3   | Organization                | [`04_PHASE_3_ORGANIZATION.md`](../work%20prompts/04_PHASE_3_ORGANIZATION.md)                          | Complete    |
 | 4   | People master registry      | [`05_PHASE_4_PEOPLE_MASTER_REGISTRY.md`](../work%20prompts/05_PHASE_4_PEOPLE_MASTER_REGISTRY.md)      | Complete    |
-| 4.1 | Employee documents & expiry | [`05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md`](../work%20prompts/05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md)          | Not started |
+| 4.1 | Employee documents & expiry | [`05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md`](../work%20prompts/05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md)          | Complete    |
 | 5   | Employment                  | [`06_PHASE_5_EMPLOYMENT.md`](../work%20prompts/06_PHASE_5_EMPLOYMENT.md)                              | Awaiting approval |
-| 5.1 | Employee letters            | [`06A_PHASE_5.1_EMPLOYEE_LETTERS.md`](../work%20prompts/06A_PHASE_5.1_EMPLOYEE_LETTERS.md)            | Not started |
+| 5.1 | Employee letters            | [`06A_PHASE_5.1_EMPLOYEE_LETTERS.md`](../work%20prompts/06A_PHASE_5.1_EMPLOYEE_LETTERS.md)            | Complete    |
 | 5.2 | Employee relations          | [`06B_PHASE_5.2_EMPLOYEE_RELATIONS.md`](../work%20prompts/06B_PHASE_5.2_EMPLOYEE_RELATIONS.md)        | Not started |
 | 5.3 | Assets & custody            | [`06C_PHASE_5.3_ASSETS_CUSTODY.md`](../work%20prompts/06C_PHASE_5.3_ASSETS_CUSTODY.md)                | Not started |
 | 6   | Recruitment                 | [`07_PHASE_6_RECRUITMENT.md`](../work%20prompts/07_PHASE_6_RECRUITMENT.md)                            | Not started |
@@ -41,7 +41,7 @@ ADRs updated.
 | 13.1| Engagement & surveys        | [`14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md`](../work%20prompts/14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md)      | Not started |
 | 14  | Learning                    | [`15_PHASE_14_LEARNING.md`](../work%20prompts/15_PHASE_14_LEARNING.md)                                | Not started |
 | 15  | Career and succession       | [`16_PHASE_15_CAREER_SUCCESSION.md`](../work%20prompts/16_PHASE_15_CAREER_SUCCESSION.md)              | Complete    |
-| 16  | Workflow                    | [`17_PHASE_16_WORKFLOW.md`](../work%20prompts/17_PHASE_16_WORKFLOW.md)                                | Not started |
+| 16  | Workflow                    | [`17_PHASE_16_WORKFLOW.md`](../work%20prompts/17_PHASE_16_WORKFLOW.md)                                | Awaiting approval |
 | 17  | Communications              | [`18_PHASE_17_COMMUNICATIONS.md`](../work%20prompts/18_PHASE_17_COMMUNICATIONS.md)                    | Not started |
 | 18  | Employee self service       | [`19_PHASE_18_EMPLOYEE_SELF_SERVICE.md`](../work%20prompts/19_PHASE_18_EMPLOYEE_SELF_SERVICE.md)      | Not started |
 | 19  | Manager self service        | [`20_PHASE_19_MANAGER_SELF_SERVICE.md`](../work%20prompts/20_PHASE_19_MANAGER_SELF_SERVICE.md)        | Not started |
@@ -457,11 +457,51 @@ closing audit; its one finding was a stale sentence in a comment, carried as deb
 the eleven approved decisions and the four that remain open, the bounded Identity contract, the
 concurrency protection, the tenancy proofs under an unprivileged role, the recomputed scope and the
 twenty-three `NOT VERIFIED` capabilities are in
-[`verification/phase-16d-final-report.md`](verification/phase-16d-final-report.md). **Phase 16E is not
-started.** Notification delivery is Phase 17's and analytics is Phase 20's, by those phases' own
+[`verification/phase-16d-final-report.md`](verification/phase-16d-final-report.md).
+
+Phase 16E completed on 2026-08-21: **automatic execution** — one additive migration, one history
+event, one command, one query, one permission, one kernel context and **no scheduler**. It answers the
+question 16D left open: may Workflow act with no human at the other end of a request? The answer is
+one action, named by the owner and nothing wider — **an automatic service-level reminder**. Automatic
+escalation was evaluated first and **declined as structurally impossible**: `escalateBranch` takes the
+approver to add as an input, so a machine could only supply one by choosing a person, and there is no
+rule anywhere in the module for choosing one. The phase opened with **nine decisions `OPEN` and zero
+production changes**, and they stayed `OPEN` across three separate instructions that described them
+without approving them — recorded as `OPEN` rather than read as approval. Implementation then stopped
+on **eight contract gaps** before any code was written, of which two are still withheld: **no expiry
+action has been named** (G-6), and business days were never required so the Organization calendar
+contract **stays unopened** (G-7). **Nothing schedules anything.** There is no cron, worker, polling
+loop, queue consumer, broker, outbox or timer in this repository, and no `JobPort` adapter — the
+interface has existed since Phase 0 and still has none. Execution ownership is **Platform's**
+(D-16E-03), and the contract Platform must satisfy is written down rather than negotiable:
+[`verification/phase-16e-platform-runner-contract.md`](verification/phase-16e-platform-runner-contract.md).
+**No synthetic actor was invented to make any of it work.** A machine runs under a third
+`ExecutionContext` member — `MachineContext`, carrying the tenant the platform set, an execution
+identity, a correlation and no membership at all — and `currentMembershipId()` returns `undefined`
+under it *structurally*, so an automatic entry cannot name a human even by mistake: both actor columns
+are null and a check constraint refuses a row that names both an approver and an execution.
+**Idempotency is the database's**, not a preceding read's: `workflow_history_reminder_idx` is a partial
+unique index and the history row **is** the claim, because a `select` followed by an `insert` is not
+idempotent under concurrency (ADR-0071) — proved with two real connections overlapping in time, no
+sleeps, exactly one commit. **Identity gained one narrow query**, `identity.membership-recipient`, on
+the permission it already had and reached through the same bounded service grant 16D used; **no new
+Identity permission was created**. The reminder emits **notification intent and delivers nothing** —
+delivery is Phase 17's. The phase's last discovery was that the reminder was **executable and not
+discoverable**: nothing published could tell a runner *which* steps were due, so `workflow.remind-step`
+could be invoked and had nothing to invoke it with. That gap was opened as D-16E-14, approved, and
+closed by **`workflow.due-reminders`** — two identifiers per row, no tenant field, no person, no HTTP
+route, clamped and cursor-paged, declaring the same machine-only permission the command holds so that
+discovering the work and doing it are one capability held by one principal. A discovered row is a
+**candidate, not a claim**. **Nothing is operational**: every part of the capability is built, verified
+and merged, and nothing invokes it, because the durable job runner is Platform's and does not exist.
+The closure audit, the fourteen approved decisions, the two that remain withheld, the tenancy and
+concurrency proofs and the precise Platform handover are in
+[`verification/phase-16e-final-report.md`](verification/phase-16e-final-report.md).
+
+Notification delivery is Phase 17's and analytics is Phase 20's, by those phases' own
 specifications; a durable job runner for the kernel's `JobPort` — which has existed as an interface
-since Phase 0 and has never had an adapter — **is owned by no phase yet**, and neither 16C nor 16D
-assigned one.
+since Phase 0 and has never had an adapter — **is owned by no phase in this repository**, and
+Phase 16E assigned it to Platform rather than building one here.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

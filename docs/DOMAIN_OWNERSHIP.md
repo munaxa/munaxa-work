@@ -38,7 +38,10 @@ them afterwards.
 | Approval, workflow definition, version, instance, step, decision | `workflow` | Phase 16A ✅ |
 | Approval group, group membership, parallel branch, branch rule, quorum, branch condition, branch tally | `workflow` | Phase 16B ✅ |
 | Service-level target, manager-routing resolution and snapshot | `workflow` | Phase 16C ✅ |
-| Escalation, scheduled firing, approval expiry as a written state, role approvers | — | not owned; no module implements any of them |
+| Escalation (a person adds an approver to a stuck branch) | `workflow` | Phase 16D ✅ |
+| Automatic service-level reminder, machine execution context, reminder history and its idempotency, due-reminder discovery | `workflow` | Phase 16E ✅ |
+| Scheduled firing — the durable job runner that would invoke the above | — | **not owned by any module here.** `JobPort` has existed since Phase 0 and has never had an adapter; Phase 16E assigned execution to **Platform** (D-16E-03) and wrote the contract it must satisfy |
+| Approval expiry as a written state, role approvers, automatic expiry action | — | not owned; deliberately unbuilt. Expiry stays **derived** (G-6 withholds an action until one is named), and no role-approver model exists |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
 | Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |
