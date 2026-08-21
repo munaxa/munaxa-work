@@ -1,10 +1,13 @@
 # Phase 16E — Decision Register
 
-**Thirteen decisions are `APPROVED` and D-16E-12 is resolved.** The approved automatic service-level
+**Thirteen decisions are `APPROVED`, D-16E-12 is resolved, and one — D-16E-14 — is `OPEN`.** The approved automatic service-level
 reminder is **implemented, tested and verified** — see
 [`phase-16e-reminder-implementation.md`](phase-16e-reminder-implementation.md). One dependency
 remains genuinely outside this repository: no job runner exists in Platform, so nothing *invokes* the
-reminder on a schedule yet. The owner's explicit decisions are recorded in
+reminder on a schedule yet — and one remains **inside** it, opened by the handover investigation and
+recorded as **D-16E-14**: no published query answers *which* steps are due, so a runner could execute
+a reminder and could not find one. The contract Platform must satisfy, and that gap, are in
+[`phase-16e-platform-runner-contract.md`](phase-16e-platform-runner-contract.md). The owner's explicit decisions are recorded in
 [§ Owner approvals](#owner-approvals) below, appended rather than substituted: everything beneath
 that section is the **pre-approval record**, preserved word for word, because the reasoning that
 produced the questions is what makes the answers auditable a year from now.
@@ -52,6 +55,7 @@ unchanged in substance; this register is the canonical status table.
 | D-16E-11 | The reminder's history event — its **existence** | **APPROVED** | Owner |
 | D-16E-12 | Authorization to modify Identity for the recipient contract | **RESOLVED** | Covered by the D-16E-13 directive; no new permission required |
 | D-16E-13 | The **concrete** reminder history contract | **APPROVED** | Owner |
+| D-16E-14 | How the runner discovers a due reminder | **OPEN** | None |
 
 **The approval transition.** All nine stood `OPEN` from `2150f19` — the commit that recorded them —
 until the owner's instruction. They were `OPEN` for the whole of that interval, and the earlier state
@@ -866,3 +870,37 @@ implementation is authorized."* That was true of `2150f19` and is kept here rath
 
 When each gap is closed, this register gains the contract that closed it and the approval that
 authorized it — appended, never by rewriting what stands above.
+
+---
+
+## D-16E-14 — How the runner discovers a due reminder · **OPEN**
+
+Opened by the Platform handover investigation, not by the owner, and recorded here because it is a
+**new published contract** and therefore a decision rather than an implementation detail.
+
+**The problem.** `workflow.remind-step` requires an `instanceId` and a `stepId`. No published Workflow
+query answers *"which steps in this tenant are due a reminder now"*. Verified against every registered
+query:
+
+- `workflow.pending-approvals` declares `workflow.approval.read-own` and resolves from the **caller's
+  membership** — a machine holds none, by design;
+- `workflow.search-instances` declares `workflow.instance.read` — a human administrator's permission
+  the runner must not hold — returns **instances rather than steps**, and cannot filter on the service
+  level;
+- `workflow.read-approval-status` and `workflow.read-history` need an `instanceId` the caller already
+  has.
+
+So the approved reminder is **executable but not discoverable**: a Platform runner could invoke it and
+would have nothing to invoke it with. This is Workflow's gap to close, not Platform's.
+
+**What closing it would need**, named rather than designed, and deliberately **not implemented**: one
+bounded read — identifier-free, tenant-scoped, returning the `(instanceId, stepId)` pairs due at a
+supplied instant, declaring **`workflow.reminder.execute`** rather than any human permission, and
+bounded by a page size so it can never become an unbounded tenant-wide sweep.
+
+**What it must not become.** A general "search steps" query, a tenant-wide approvals dashboard, an
+analytics read, or anything a human principal could reach — each is refused elsewhere in this register
+and none is reopened by this one.
+
+*Blocks:* the reminder being invoked at all, jointly with the absent Platform job runner. Neither is
+sufficient alone.
