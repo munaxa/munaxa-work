@@ -57,7 +57,8 @@
     "overrides": {
       "sharp": "^0.35.3",
       "postcss": "^8.5.25",
-      "js-yaml": "^5.2.3"
+      "js-yaml": "^5.2.3",
+      "deepmerge-ts": "^8.0.2"
     }
   }
 }
