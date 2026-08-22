@@ -24,7 +24,7 @@ ADRs updated.
 | 4.1 | Employee documents & expiry | [`05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md`](../work%20prompts/05A_PHASE_4.1_EMPLOYEE_DOCUMENTS.md)          | Complete    |
 | 5   | Employment                  | [`06_PHASE_5_EMPLOYMENT.md`](../work%20prompts/06_PHASE_5_EMPLOYMENT.md)                              | Awaiting approval |
 | 5.1 | Employee letters            | [`06A_PHASE_5.1_EMPLOYEE_LETTERS.md`](../work%20prompts/06A_PHASE_5.1_EMPLOYEE_LETTERS.md)            | Complete    |
-| 5.2 | Employee relations          | [`06B_PHASE_5.2_EMPLOYEE_RELATIONS.md`](../work%20prompts/06B_PHASE_5.2_EMPLOYEE_RELATIONS.md)        | Not started |
+| 5.2 | Employee relations          | [`06B_PHASE_5.2_EMPLOYEE_RELATIONS.md`](../work%20prompts/06B_PHASE_5.2_EMPLOYEE_RELATIONS.md)        | In progress |
 | 5.3 | Assets & custody            | [`06C_PHASE_5.3_ASSETS_CUSTODY.md`](../work%20prompts/06C_PHASE_5.3_ASSETS_CUSTODY.md)                | Not started |
 | 6   | Recruitment                 | [`07_PHASE_6_RECRUITMENT.md`](../work%20prompts/07_PHASE_6_RECRUITMENT.md)                            | Not started |
 | 7   | Onboarding                  | [`08_PHASE_7_ONBOARDING.md`](../work%20prompts/08_PHASE_7_ONBOARDING.md)                              | Not started |
@@ -502,6 +502,21 @@ Notification delivery is Phase 17's and analytics is Phase 20's, by those phases
 specifications; a durable job runner for the kernel's `JobPort` — which has existed as an interface
 since Phase 0 and has never had an adapter — **is owned by no phase in this repository**, and
 Phase 16E assigned it to Platform rather than building one here.
+
+Phase 5.2 planning opened on 2026-08-22, the first phase after Workflow and a deliberate return from
+cross-cutting infrastructure to core product. Its Definition of Ready is in
+[`verification/phase-5.2-plan.md`](verification/phase-5.2-plan.md) and its decision register — fourteen
+entries, **all `OPEN`** — in [`verification/phase-5.2-register.md`](verification/phase-5.2-register.md).
+**No code, schema, migration, permission or route was written.** Its prerequisites (*"Phases 0 through
+5, plus Phases 4.1 and 5.1"*) were each verified against the modules rather than against this ledger.
+Two of the specification's acceptance criteria **cannot be fully met in this repository today** and are
+recorded as such rather than approximated: categories *"constrained by the country pack"* — the
+`country-packs` package is a bootstrapped shell that *"deliberately exports nothing yet"* until Phase
+11.1 — and the `WarningExpired` event, which would need the durable job runner Phase 16E assigned to
+Platform. Neither is worked around: the first follows the `source`-discriminator precedent Attendance
+and Leave already set, and the second keeps expiry **derived at read time**, with no `expired` column
+and nothing that fires. Six decisions block the first checkpoint, all six are Work-owned, and each is a
+choice between options this repository has already exercised.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
