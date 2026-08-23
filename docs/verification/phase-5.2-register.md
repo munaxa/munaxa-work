@@ -664,7 +664,7 @@ than promised in prose.
 Three, all **OPEN**, all Work-owned, and **all three block Checkpoint 2**. None existed before this
 investigation; the first is the reason the other two are needed.
 
-## D-5.2-15 — How the violation lifecycle advances, given an immutable violation row · **OPEN**
+## D-5.2-15 — How the violation lifecycle advances, given an immutable violation row · **APPROVED 2026-08-23**
 
 **The finding.** Checkpoint 1 delivered `relation_violation` with a trigger refusing every `UPDATE`
 and `DELETE`, and a `state` column locked by
@@ -709,7 +709,7 @@ happening, which is the cleaner outcome.
 one millisecond read deterministically (`(occurred_at, id)`, as `workflow_history` does).
 **Blocks Checkpoint 2: YES.**
 
-## D-5.2-16 — What an investigation is, and who may run one · **OPEN**
+## D-5.2-16 — What an investigation is, and who may run one · **APPROVED 2026-08-23**
 
 **Specification.** *"**Investigation** — investigator, statements, evidence, findings, recommendation,
 dates."*
@@ -738,7 +738,7 @@ investigation into somebody is a materially different act from filing a report, 
 **Risks:** the investigator is a membership identifier, and Relations must not resolve it to a person —
 the same rule Checkpoint 1 kept. **Blocks Checkpoint 2: YES.**
 
-## D-5.2-17 — Whether findings are immutable, and how a correction is made · **OPEN**
+## D-5.2-17 — Whether findings are immutable, and how a correction is made · **APPROVED 2026-08-23**
 
 **Specification.** AD-003: *"The record is immutable. A correction is a new, linked record with a
 stated reason. Nothing is edited or deleted, including after an appeal succeeds — a successful appeal
