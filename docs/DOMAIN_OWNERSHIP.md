@@ -48,7 +48,8 @@ them afterwards.
 | Letter template, template version, letter request, approval decision, issued letter, reference sequence | `letters` | Phase 12 ✅ |
 | Violation category, violation, investigation, case lifecycle, repeat-violation context, disciplinary ladder, issued disciplinary action, disciplinary access trail | `relations` | Phase 5.2 ✅ |
 | Grievance, appeal, acknowledgement, warning expiry, evidence attachment | — | not owned; **deliberately unbuilt** by Phase 5.2. Grievance is blocked on self-service routing (`read-own` is unimplementable under ADR-0032, D-5.2-13); evidence is deferred to a Documents contract (D-5.2-08); expiry stays **derived**, as it does for approvals above |
-| Asset, custody assignment                 | `assets`        | Phase 5.3     |
+| Asset category, asset (inventory item, in-service status) | `assets` | Phase 5.3 · Checkpoint 1 ✅ |
+| Custody assignment, custody transfer, acknowledgement, asset incident, liability, clearance projection | — | not owned yet; `assets` will own them in Phase 5.3 Checkpoints 2–4. **Deliberately unbuilt** by Checkpoint 1: custody needs D-5.3-01 and D-5.3-05, and the clearance projection needs D-5.3-03 if a deduction is in scope. `issued`, `in_custody` and `returned` are **not** asset statuses — they will be derived from custody history (ADR-0070, D-5.2-16) |
 | Loan, advance, repayment schedule         | `loans`         | Phase 10.1    |
 | Statutory rule, country pack, end of service | `statutory`  | Phase 11.1    |
 | Offboarding case, clearance, settlement request | `offboarding` | Phase 11.2 |

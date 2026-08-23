@@ -396,3 +396,61 @@ complexity ≤ 10, function ≤ 60 lines, ≤ 5 parameters.
 Checkpoint 1 depends on no open decision, which means it *could* begin — not that it *may*. Nothing in
 `packages/modules/assets`, `apps/api/src/assets`, `prisma/schema.prisma` or `prisma/migrations` should
 be created until the owner authorizes this checkpoint explicitly.
+
+---
+
+## 26. As built — what changed between the plan and the implementation
+
+*Added after Checkpoint 1 was implemented and verified. The plan above is left unedited: it is the
+record of what was intended, and this section is the record of where reality differed.*
+
+### 26.1 The plan was accurate, and three details tightened during implementation
+
+**§10's data model shipped unchanged** — two tables, the same columns, the same constraints, the same
+indexes. **§13's five commands, §14's three queries, §15's four permissions and §16's eight routes all
+shipped exactly as written.** §24 predicted one additive migration that modifies nothing existing, and
+that is what `20260823150000_assets_catalogue` is.
+
+Three things the plan did not spell out, decided during implementation on existing precedent:
+
+1. **`asset_serial_shape_check`.** The plan named the partial unique index on `serial_number` but not a
+   shape constraint. Without one, a blank string would be a value the index treats as real, and every
+   unserialled item would collide with every other. The domain already stored a blank as *absent*; the
+   CHECK makes the database agree, which is the same "stated twice, in the two places somebody might
+   try" argument Phase 5.2 used for its immutability rule.
+
+2. **Both `byId` reads override `Repository.findRow`.** §14 required every select to name its columns;
+   the base class issues `select *`, so honouring §14 meant overriding it. Neither table holds a date,
+   so nothing is currently wrong — the convention is adopted before there is a defect rather than after
+   one, which is the opposite of how Phase 5.2 met it.
+
+3. **A ninth copy of `row-writer.ts`**, and the smallest of the nine: the helpers this module does not
+   need — `asBigInt`, `civilDateColumn`, the filter `operator` — are absent rather than carried across,
+   so nothing in it is dead code waiting for a caller. The shared-helper debt is unchanged and restated.
+
+### 26.2 §6 grew one exclusion that the plan implied but did not state
+
+The plan excluded the condition scale, the requirements and the valuation basis from `asset_category`.
+It did not say explicitly that **`registered` must not be settable by a caller**. It is not: the domain
+assigns the initial status and the command has no field for it, because a caller who could choose would
+register an asset directly as `retired` — a disposal nobody recorded.
+
+### 26.3 Three of my own boundary assertions were too blunt, and were made exact rather than deleted
+
+Each failed on the module's own legitimate code, and each was replaced with a more precise statement of
+the same boundary — never removed.
+
+| Assertion | Why it failed | What replaced it |
+|---|---|---|
+| "no `valuation` anywhere" | matched a Swagger description *saying* no valuation basis exists | a second projection, `IDENTIFIERS`, that strips string literals as well as comments — so a concept scan reads code, and the scans that read command and query *names* keep using the raw source, where the string is the thing under test |
+| "no `dispatcher.ask`" | matched `AssetsDispatcher`, the module's own Nest wrapper | an assertion that a dispatcher may appear in **exactly one file** — `api/assets-dispatcher.ts` — so a handler or an adapter holding one still fails |
+| "no `tenant_id:` anywhere" | matched infrastructure writing `tenant_id` from `transaction.tenantId`, which is the design | the same scan restricted to `application` and `api`, where a caller's request actually arrives, and widened from `tenantId:` to `tenantId` |
+
+The third is stricter than the original in the layers that matter and correct in the one it was wrong
+about, which is the point of replacing rather than deleting.
+
+### 26.4 One file budget was met by splitting, not by exemption
+
+`assets-lifecycle.test.ts` reached 472 lines against a 400-line budget. It was split at the seam that
+was already in it — the catalogue in one file, the inventory in `assets-inventory.test.ts` — with no
+assertion lost and no rule exempted.

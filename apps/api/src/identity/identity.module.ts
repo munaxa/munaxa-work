@@ -71,6 +71,7 @@ import { performanceModuleFor } from '../performance/performance.composition.js'
 import { learningModuleFor } from '../learning/learning.composition.js';
 import { careerModuleFor } from '../career/career.composition.js';
 import { relationsModuleFor } from '../relations/relations.composition.js';
+import { assetsModuleFor } from '../assets/assets.composition.js';
 import { workflowModuleFor } from '../workflow/workflow.composition.js';
 
 import {
@@ -269,6 +270,11 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // addressed to a membership and the request has already resolved one (Checkpoint 4).
         registry.register(permissionAware.workflow);
         registry.register(permissionAware.relations);
+        // Assets last, and it is the only module in this registry that takes nothing but the unit of
+        // work. Checkpoint 1 is an asset catalogue and an inventory: it reads no other module, is
+        // read by none, holds no custody and references no employment. The first cross-module read
+        // arrives with custody, and it will be Employment's published one under a bounded grant.
+        registry.register(assetsModuleFor(unitOfWork));
         return registry;
       },
     },

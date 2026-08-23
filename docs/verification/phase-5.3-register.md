@@ -1,12 +1,16 @@
 # Phase 5.3 — Assets & Custody · Decision Register
 
-## Status: **CHECKPOINT 1 READY — AWAITING IMPLEMENTATION AUTHORIZATION**
+## Status: **CHECKPOINT 1 IMPLEMENTED** — Checkpoints 2–4 not started
 
-*Opened 2026-08-23 against `3ad9fd7` (`main`, immediately after Phase 5.2 merged as PR #14).*
+*Opened 2026-08-23 against `3ad9fd7` (`main`, immediately after Phase 5.2 merged as PR #14).
+Checkpoint 1 implemented 2026-08-23 — see
+[`phase-5.3-checkpoint-1.md`](./phase-5.3-checkpoint-1.md).*
 
-*Nothing in Phase 5.3 is implemented. There is no `@work/assets` package, no `asset*` table, no
-migration and no handler anywhere in this repository — verified, not assumed: the only occurrence of
-the word "asset" in `packages/` is a comment in `employment/src/application/lifecycle.use-case.ts`.*
+> **Historical note · the register when it opened.** The paragraph below was true when this register
+> was written and is preserved rather than rewritten: *"Nothing in Phase 5.3 is implemented. There is
+> no `@work/assets` package, no `asset*` table, no migration and no handler anywhere in this
+> repository."* Checkpoint 1 has since built the catalogue and the inventory. **Nothing else in the
+> phase has been built**, and no decision below was approved or reopened by that implementation.
 
 ---
 
@@ -37,8 +41,10 @@ Checkpoint 1.
 | D-5.3-05 | Whether the condition scale is tenant vocabulary or a closed set | **OPEN** | **no**, on one condition — §D-5.3-05 |
 | D-5.3-06 | Whether liability and waiver adopt Workflow | **SETTLED BY EXISTING EVIDENCE** | no |
 
-**Checkpoint 1 depends on no open decision.** That is a statement about readiness and **not** an
-authorization to implement.
+**Checkpoint 1 depended on no open decision, and the implementation kept it that way.** The condition
+scale was excluded from the catalogue precisely so D-5.3-05 would not be answered by accident, and no
+column was added to prepare for one. The three OPEN decisions above are open on exactly the terms they
+were open on before.
 
 ---
 
@@ -373,4 +379,5 @@ rather than to oversight.
 
 | Date | Change |
 |---|---|
+| 2026-08-23 | **Checkpoint 1 implemented.** Two tables, five commands, three reads, four permissions, one additive migration, zero cross-module dependencies. **No decision approved, none reopened.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged; the recommendations for D-5.3-01 and D-5.3-05 are documented and were **not** turned into behaviour or into columns. |
 | 2026-08-23 | Register opened against `3ad9fd7`. D-5.3-02, D-5.3-04 and D-5.3-06 moved from OPEN to **SETTLED BY EXISTING EVIDENCE** with the settling code named. D-5.3-01, D-5.3-03 and D-5.3-05 confirmed **OPEN** with evidence, options and one recommendation each. Checkpoint 1 confirmed to depend on no open decision. **No decision approved.** |

@@ -1,0 +1,67 @@
+{
+  "assets": {
+    "label": {
+      "inventory": "Assets",
+      "catalogue": "Asset catalogue",
+      "category": "Asset type",
+      "categories": "Asset types",
+      "code": "Code",
+      "name": "Name",
+      "sequence": "Order",
+      "active": "In use",
+      "asset": "Asset",
+      "assetTag": "Asset tag",
+      "serialNumber": "Serial number",
+      "description": "Description",
+      "locationNote": "Where it is",
+      "purchaseReference": "Purchase reference",
+      "status": "Status",
+      "version": "Version",
+      "define": "Add an asset type",
+      "amendCategory": "Amend asset type",
+      "register": "Register an asset",
+      "amendAsset": "Amend asset",
+      "changeStatus": "Change status"
+    },
+    "status": {
+      "registered": "Registered",
+      "available": "Available",
+      "under_repair": "Under repair",
+      "retired": "Retired"
+    },
+    "note": {
+      "catalogueIsTenant": "Asset types are your organization's own. Nothing is supplied with the product.",
+      "tagIsIdentity": "The asset tag identifies the item and cannot be changed once it is registered.",
+      "serialOptional": "A serial number is optional, and no two assets may share one.",
+      "statusIsService": "The status says whether the item is in service. It does not say who is holding it.",
+      "custodyNotBuilt": "Issuing an asset to somebody, recording receipt and tracking returns are not part of this release.",
+      "noCustodyStatus": "There is no issued or returned status, because custody is recorded separately and is not part of this release.",
+      "retiredIsFinal": "A retired asset stays retired. Nothing brings it back into service.",
+      "noDelete": "Assets are retired, never deleted, and asset types are deactivated rather than removed.",
+      "locationIsNote": "Where it is is a note you write, not a link to an organizational unit.",
+      "purchaseIsNote": "The purchase reference is a note you write. No value, cost or depreciation is held here.",
+      "noValuation": "This system holds no asset value, cost or depreciation. That is not what it is for.",
+      "noCondition": "Condition is not recorded in this release.",
+      "noDeduction": "No payroll deduction is produced or authorized here."
+    },
+    "rejection": {
+      "category_code_malformed": "A code may use lower-case letters, digits and hyphens only.",
+      "category_name_incomplete": "An asset type needs a name in both English and Arabic.",
+      "category_sequence_invalid": "The order must be a whole number, zero or more.",
+      "asset_tag_missing": "An asset needs a tag.",
+      "asset_tag_too_long": "That asset tag is too long.",
+      "serial_number_too_long": "That serial number is too long.",
+      "description_too_long": "That description is too long.",
+      "location_note_too_long": "That location note is too long.",
+      "purchase_reference_too_long": "That purchase reference is too long.",
+      "asset_status_unknown": "That status is not recognized.",
+      "asset_transition_refused": "An asset cannot move that way from where it is now."
+    },
+    "conflict": {
+      "category_code_taken": "An asset type already uses that code.",
+      "category_inactive": "This asset type is no longer in use.",
+      "asset_tag_taken": "An asset already uses that tag.",
+      "serial_number_taken": "An asset already has that serial number."
+    }
+  }
+}
