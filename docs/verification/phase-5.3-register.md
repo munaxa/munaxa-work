@@ -1,6 +1,6 @@
 # Phase 5.3 — Assets & Custody · Decision Register
 
-## Status: **CHECKPOINT 1 IMPLEMENTED** — Checkpoints 2–4 not started
+## Status: **CHECKPOINT 1 IMPLEMENTED** · Checkpoint 2 **READY, NOT AUTHORIZED** · Checkpoints 3–4 not started
 
 *Opened 2026-08-23 against `3ad9fd7` (`main`, immediately after Phase 5.2 merged as PR #14).
 Checkpoint 1 implemented 2026-08-23 — see
@@ -28,6 +28,10 @@ Three decisions moved from OPEN to SETTLED during this investigation. Each is ex
 the code that settles it named by file. **Three remain genuinely OPEN**, and none of the three blocks
 Checkpoint 1.
 
+> *That paragraph describes the register as it stood at Checkpoint 1 and is preserved. The Checkpoint 2
+> investigation later opened four more — D-5.3-07 to D-5.3-10 — so **seven are OPEN today**. They are
+> recorded in their own section below rather than woven into the text above.*
+
 ---
 
 ## Summary
@@ -40,6 +44,10 @@ Checkpoint 1.
 | D-5.3-04 | Whether an asset may reference a document | **SETTLED BY EXISTING EVIDENCE** | no |
 | D-5.3-05 | Whether the condition scale is tenant vocabulary or a closed set | **OPEN** | **no**, on one condition — §D-5.3-05 |
 | D-5.3-06 | Whether liability and waiver adopt Workflow | **SETTLED BY EXISTING EVIDENCE** | no |
+| D-5.3-07 | Whether issuing custody requires an *active* employment | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
+| D-5.3-08 | Whether a direct transfer is its own authority | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
+| D-5.3-09 | Whether an asset in open custody may be retired | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
+| D-5.3-10 | Whether custody may be cancelled or corrected | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
 
 **Checkpoint 1 depended on no open decision, and the implementation kept it that way.** The condition
 scale was excluded from the catalogue precisely so D-5.3-05 would not be answered by accident, and no
@@ -100,6 +108,24 @@ detail.
 
 **Does not block Checkpoint 1.** Checkpoint 1 builds the catalogue and the inventory; it creates no
 custody record, so there is nothing yet that can outlive an employment. It blocks **Checkpoint 2**.
+
+### Blocking, re-assessed at the Checkpoint 2 investigation · 2026-08-23
+
+**The sentence above is left standing as the record of what was believed, and it turned out to be
+wrong.** The Checkpoint 2 investigation found that custody can be built without answering this.
+
+Checkpoint 2 implements **no termination behaviour at all**: no employment-ended listener, no Platform
+job, no read of employment status, no `outstanding` closure. An employment that ends simply leaves its
+custody open, because nothing is watching for the end.
+
+That *resembles* option (a), and the difference matters: it is the **absence of behaviour**, not a
+choice of one. Option (c) stays reachable **additively** — the closure vocabulary would be a CHECK that
+widens by approved change, and the `closed_reason` column it needs does not exist in either direction.
+**Neither option is foreclosed by Checkpoint 2**, and the owner's decision costs one migration whichever
+way it is taken.
+
+**Revised: does not block Checkpoint 2. Blocks Checkpoint 4**, where clearance must decide what an
+outstanding item is. This decision remains **OPEN** and unapproved.
 
 ---
 
@@ -375,9 +401,205 @@ rather than to oversight.
 
 ---
 
+# Decisions opened by the Checkpoint 2 investigation
+
+*Opened 2026-08-23 against `7aedf7a`, while preparing
+[`phase-5.3-checkpoint-2-plan.md`](./phase-5.3-checkpoint-2-plan.md). None is approved. Nothing above
+this line was rewritten.*
+
+---
+
+## D-5.3-07 — Whether issuing custody requires an *active* employment, or merely an existing one · **OPEN**
+
+### The question
+
+Custody references Employment (AD-001). Assets must confirm the employment is real before opening a
+custody against it — but *how much* should it learn?
+
+### Evidence
+
+**Precedent gives one boolean and nothing more.** `RelationsEmploymentDirectory.exists()` asks
+`employment.read-employment` under a bounded grant and returns `found.ok`, with the file stating why:
+*"A boolean, and deliberately nothing more … returning any of those would make this a directory a
+disciplinary module has no business holding."* (`apps/api/src/relations/relations-sources.ts:43`).
+
+**A status is nevertheless reachable without any Employment change.** `EmploymentView` already carries
+`status`, `endDate` and `endReasonCode` (`packages/modules/employment/src/contracts/views.ts:34`), so
+option (b) below costs no new contract — only a wider disclosure into Assets.
+
+**There is no narrow standing query for an employment.** Identity publishes
+`identity.membership-standing` — one identifier in, one predicate out — precisely so a consumer does
+not receive a whole record. **Employment publishes no equivalent**, so "is this employment active" can
+only be answered today by reading the whole view.
+
+### Options
+
+| | Option | Consequence |
+|---|---|---|
+| (a) | `exists()` only — the Relations precedent | Assets holds no workforce information whatsoever. An administrator can issue a laptop to an employment that has ended, and nothing refuses it |
+| (b) | Read `status` and refuse a non-active employment | Catches a real data-entry error. Assets now learns an employment's lifecycle state — the beginning of the directory Relations refused to become |
+| (c) | Ask Employment for a narrow standing predicate, as Identity publishes for memberships | The cleanest boundary, but it is **a new contract in a module this checkpoint may not modify** |
+
+### Recommendation — **not an approval**
+
+**(a) for Checkpoint 2**, with the limitation stated in the report: an asset can be issued to an ended
+employment, and nothing refuses it. It is the precedent, it is the narrowest disclosure, and tightening
+later is additive. (c) is the right long-term answer and should be taken as an *Employment* decision
+in an Employment phase, not decided in passing here.
+
+### Blocking
+
+**Does not block Checkpoint 2.**
+
+---
+
+## D-5.3-08 — Whether a direct transfer is its own authority · **OPEN**
+
+### The question
+
+AD-003 names transfer explicitly: *"every handover, return and transfer is a new record."* A transfer
+closes one custody and opens another in one act. Which permission may perform it?
+
+### Evidence
+
+**A handler declares exactly one permission.** `CommandHandler.permission` is a single string
+throughout the kernel and every module, so a transfer command *cannot* require both
+`assets.custody.assign` and `assets.custody.return`.
+
+**The two grants are separated on risk** (Checkpoint 2 plan §12): a false *return* is what makes an
+outstanding asset disappear from the register offboarding clearance reads. Letting `assign` alone
+perform the closing half of a transfer would hand that capability to the weaker grant.
+
+**Nothing is lost by waiting.** A handover is recordable today as *return then issue* — two true
+records, no history lost. Only the fact that the handover was *direct* is not distinguished, and the
+`closed_reason` column that would distinguish it does not exist in either direction.
+
+### Options
+
+| | Option | Consequence |
+|---|---|---|
+| (a) | Transfer rides on `assets.custody.assign` | One command, but `assign` gains the ability to close a custody — the separation in §12 becomes partly decorative |
+| (b) | A fourth grant, `assets.custody.transfer` | The separation holds. A permission for one command, which D-5.2-04 warns against when the capability is thin |
+| (c) | No transfer command; a handover is return then issue | Nothing new at all. The history says the asset returned and was re-issued the same day, which is true but not the whole truth |
+
+### Recommendation — **not an approval**
+
+**(c) for Checkpoint 2**, then (b) if a tenant genuinely needs the distinction. (a) should be refused:
+it quietly widens the grant this module separated on purpose.
+
+### Blocking
+
+**Blocks transfer only.** Transfer is therefore excluded from Checkpoint 2, and Checkpoint 2 is not
+blocked.
+
+---
+
+## D-5.3-09 — Whether an asset in open custody may be retired · **OPEN**
+
+### The question
+
+`assets.change-asset-status` can move an asset to `retired`, which is terminal. Checkpoint 1 wrote that
+command before custody existed, so it cannot ask whether anybody is holding the item. Should it now?
+
+### Evidence
+
+Retiring an asset somebody holds removes it from service while the obligation is still outstanding —
+and the register offboarding clearance will read is exactly the set of open custodies. This is the
+same territory as D-5.3-01: what "outstanding" means when something ends.
+
+**No precedent settles it.** It is a business rule about company property, and no line of code in this
+repository expresses one.
+
+### Options
+
+| | Option | Consequence |
+|---|---|---|
+| (a) | Refuse retirement while a custody is open | The register cannot lose an outstanding item. A genuinely destroyed asset must have its custody closed first, which is arguably the correct order of events |
+| (b) | Permit it | A written-off laptop can be retired immediately. Clearance must then read closed-and-outstanding custodies as well as open ones — which is D-5.3-01's question, answered by accident |
+
+### Recommendation — **not an approval**
+
+**(a).** It is the reversible direction: a refusal can be relaxed later, whereas rows written under (b)
+cannot be un-written. It also keeps D-5.3-01 genuinely open rather than pre-empting it.
+
+Note that (a) makes `assets.change-asset-status` consult the custody store — a change in *behaviour* to
+a Checkpoint 1 command, not a change to any Checkpoint 1 *decision*: the status vocabulary, the
+transition table and the persisted/derived split are all untouched.
+
+### Blocking
+
+**Checkpoint 2 must choose a behaviour**, so the owner should confirm this at authorization. It blocks
+no schema and no other capability, and the recommendation is the reversible one.
+
+---
+
+## D-5.3-10 — Whether custody may be cancelled or corrected, and with what semantics · **OPEN**
+
+### The question
+
+A custody opened against the wrong employment, or closed by mistake. What may be done about it?
+
+### Evidence
+
+**Both repository precedents are substantial mechanisms, not details.**
+
+* Attendance built an entire `attendance_correction_request` table with its own kind and state CHECKs
+  and three foreign keys (`20260810140000_attendance`, line 570), and its migration states the rule:
+  a correction writes a *new* event rather than editing the original.
+* D-5.2-19 corrected a concluded investigation with a **backward reference on a new record**
+  (`corrects_investigation_id`), a self-FK, a "correction must itself be concluded" CHECK and a partial
+  unique index — and left the original untouched.
+
+Both confirm the direction — **a new corrective record, never a mutation** — and both show that the
+*semantics* are the work: what a corrected custody means to the register, whether it ever counted, and
+what clearance should see.
+
+### Options
+
+| | Option | Consequence |
+|---|---|---|
+| (a) | No correction; a closed custody is final | Honest and smallest. A mistake stands in the history, visible |
+| (b) | A corrective custody with a backward reference, in D-5.2-19's shape | The established pattern, and it needs its own decision about what the correction means downstream |
+| (c) | Cancellation as a third closure state | Invents a state whose meaning to clearance nobody has agreed |
+
+### Recommendation — **not an approval**
+
+**(a) for Checkpoint 2**, and (b) when a checkpoint genuinely needs it — with its downstream meaning
+decided at the same time, not afterwards. (c) should be refused: a cancelled custody that clearance
+might or might not count is the ambiguity this register exists to prevent.
+
+### Blocking
+
+**Does not block Checkpoint 2.** The limitation — a closed custody is final — is stated rather than
+worked around.
+
+---
+
+## A defect found during this investigation · **not a decision**
+
+Recorded here because it is the reason a Checkpoint 2 test exists, and because it is not Assets' to fix.
+
+**`RelationsEmploymentDirectory`'s bounded grant names a permission no handler declares.**
+`GrantAwarePermissionChecker` matches by exact string
+(`packages/kernel/src/tenancy/service-context.ts:114`); `employment.read-employment` declares
+`employment.employment.read`; Relations' adapter permits `'employment.read'`
+(`apps/api/src/relations/relations-sources.ts:9`). Seven other adapters name the correct string.
+Grepping the repository finds **no handler declaring `'employment.read'`**.
+
+The consequence is that `relations.record-violation` refuses every violation as `employment_unknown`
+unless the calling user personally holds `employment.employment.read`.
+
+**It is a Relations defect, outside Phase 5.3's authorized scope, and it is not fixed here.** Its
+bearing on this phase is that Assets must name `employment.employment.read` and must **reconcile that
+string against Employment's own export in a test**, so the same one-character-class mistake cannot be
+made twice.
+
+---
+
 ## Change log
 
 | Date | Change |
 |---|---|
+| 2026-08-23 | **Checkpoint 2 investigation.** Four decisions opened — D-5.3-07 (active versus existing employment), D-5.3-08 (transfer authority), D-5.3-09 (retirement while in custody), D-5.3-10 (correction and cancellation). **None approved.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged. A shipped Relations defect was found and recorded rather than fixed. Checkpoint 2 confirmed to be blocked by no decision; D-5.3-09 is a behaviour the owner should confirm at authorization. |
 | 2026-08-23 | **Checkpoint 1 implemented.** Two tables, five commands, three reads, four permissions, one additive migration, zero cross-module dependencies. **No decision approved, none reopened.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged; the recommendations for D-5.3-01 and D-5.3-05 are documented and were **not** turned into behaviour or into columns. |
 | 2026-08-23 | Register opened against `3ad9fd7`. D-5.3-02, D-5.3-04 and D-5.3-06 moved from OPEN to **SETTLED BY EXISTING EVIDENCE** with the settling code named. D-5.3-01, D-5.3-03 and D-5.3-05 confirmed **OPEN** with evidence, options and one recommendation each. Checkpoint 1 confirmed to depend on no open decision. **No decision approved.** |
