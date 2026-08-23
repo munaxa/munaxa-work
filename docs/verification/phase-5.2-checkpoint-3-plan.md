@@ -1,7 +1,12 @@
 # Phase 5.2 · Checkpoint 3 — Definition of Ready
 
-*Prepared 2026-08-23 against `2a2950c`. Planning only: no schema, no production code, no test for new
-behaviour changed by this document.*
+*Prepared 2026-08-23 against `2a2950c` as a Definition of Ready. **Implemented 2026-08-23** after the
+owner approved D-5.2-18, D-5.2-19 and this checkpoint.*
+
+> **How to read this document.** Sections 1–30 are the plan **as written before implementation** and
+> are left as they were. Where implementation diverged from the plan, the divergence is recorded in
+> *As built* notes and in §31 — **not** by editing the original text. A plan silently rewritten to
+> match what was built records nothing; the value is in seeing which predictions held.
 
 ---
 
@@ -360,3 +365,70 @@ Every remaining Phase 5.2 capability was assessed against repository evidence:
 Escalation counting is the only remaining capability that is implementable entirely inside Relations,
 depends on no unresolved decision, requires no cross-module contract, needs nothing from Platform,
 and is a prerequisite of the largest remaining capability rather than a dependant of it.
+
+
+---
+
+## 31. As built — what changed between the plan and the implementation
+
+Three things. Each is recorded here rather than by amending the sections above.
+
+### 31.1 §9 said "no new column". One was required, and it is D-5.2-19's, not Checkpoint 3's.
+
+The plan's data-model section was written about the *escalation* capability, and that prediction held
+exactly: **the count persists nothing**. No `occurrence`, `repeat_count`, `is_repeat`, `breached` or
+`escalation_level` column exists anywhere, and the negative-space suite fails if one appears.
+
+What the plan did not account for is that the same commit implements the approved D-5.2-19, which
+needs one column that genuinely cannot be derived: **`relation_investigation.corrects_investigation_id`**.
+
+| | |
+|---|---|
+| **Why it cannot be derived** | It is the *link itself*. Which conclusion a correction supersedes is a fact stated by the person correcting it; nothing in the data implies it. What **is** derived from it — which conclusion is operative — is stored nowhere. |
+| Owner | Relations |
+| Lifecycle | Written once at insert; never updated, because the row is immutable from creation. |
+| Mutability | None. The correcting row is concluded when written and the Checkpoint 2 trigger refuses every change to it. |
+| Tenant scope | Inherited — `relation_investigation` is already `app_protect_table`'d, enabled and forced. |
+| Foreign key | `relation_investigation_corrects_fk`, self-referencing. |
+| Uniqueness | `relation_investigation_corrects_idx`, **partial unique** on `(tenant_id, corrects_investigation_id)` — the correction concurrency arbiter. |
+| Indexes | The unique index above, plus `relation_investigation_corrected_idx` for reading a chain forward. |
+| Audit | The correcting row is itself the audit record, with its own actor, timestamps and required reason. |
+| Deletion | Refused by the existing trigger. |
+
+Two CHECKs came with it: a row may not correct itself, and a correcting row must be `concluded` — an
+open correction would be a draft of a correction, which is not a thing this domain has.
+
+### 31.2 §25 predicted "one migration, possibly none". One migration, and it did more than predicted.
+
+`20260823090000_relations_corrections` contains the column, its foreign key, its two CHECKs, its two
+indexes, and the additive widening of the access-action CHECK for `escalation_read` that §25 did
+predict. **No table was created, no trigger was created or altered, no CHECK was narrowed, no policy
+changed and no data was backfilled.**
+
+**No performance index was added for the count**, exactly as §9 asked: measurement first, and the
+existing indexes serve it at the row counts these tests produce. Recorded so a later checkpoint knows
+it was a decision rather than an oversight.
+
+### 31.3 A pre-existing defect surfaced, and had to be fixed here
+
+Not predicted by any section, because nothing before Checkpoint 3 could have revealed it.
+
+`ViolationRow.occurred_on` was typed `string`, but `node-postgres` returns a `date` column as a
+JavaScript `Date`. No test had read one back from the database in two checkpoints, so the type lie was
+invisible. The repeat window compares civil dates as strings, and a `Date` on the left of that
+comparison silently produces the wrong set — so every read of `relation_violation` and
+`relation_investigation` now names its columns and wraps the dates in `to_char` instead of using
+`select *`. Proved pre-existing against the live driver before being classified as such.
+
+### 31.4 What the plan got right
+
+Worth recording, because a plan is only useful if its predictions are checkable:
+
+* **No new permission for the escalation query** (§12) — it reuses `relations.violation.read`.
+* **No command** (§10) — the capability is a query, as predicted.
+* **No cross-module contract** (§19), **no Platform dependency** (§20), **no Payroll change** (§23),
+  **and Workflow required no modification** (§24). All four held exactly.
+* **No confidentiality architecture** was needed (D-5.2-13 untouched), and **no storage adapter**
+  (D-5.2-08 not reopened).
+* **`asAt` moves the window and never a record**, so nothing can be backdated by it (§11).
+* **D-5.2-20 remains OPEN**: no ladder, no action vocabulary, no prescription anywhere.

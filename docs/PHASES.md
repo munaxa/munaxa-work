@@ -568,6 +568,27 @@ not taken**. [`verification/phase-5.2-checkpoint-2.md`](verification/phase-5.2-c
 carries the schema, the proofs, the five Checkpoint 1 assertions that were updated and why none was
 weakened, and four stated limitations.
 
+Phase 5.2 Checkpoint 3 landed on 2026-08-23: **investigation permissions, correction of concluded
+inquiries, and repeat-violation counting** — the owner approved both decisions Checkpoint 2 had left
+open. **D-5.2-18** separated conducting an inquiry from filing a report and put an inquiry's findings
+behind a second grant applied *inside* the query, in Documents' `read-sensitive` shape; a caller
+without it meets `not_found` on a concluded inquiry rather than a distinguishable refusal, and the
+findings are withheld from the listing and the case history too — asserted by serializing each
+payload rather than by trusting the mapper. **D-5.2-19** made a correction a **new** immutable
+investigation linked backward to what it corrects: the concluded row is never written to, so **the
+Checkpoint 2 trigger is unchanged** and D-5.2-17 was not reopened — proved by a test that corrects a
+conclusion and then watches the trigger still refuse a direct update of it. Which conclusion is
+operative is derived from the chain, never stored, and two simultaneous corrections are settled by a
+partial unique index under two real connections. The checkpoint's own capability makes
+`repeat_window_days` **operational** after two checkpoints of being configuration nothing read
+(ADR-0070): a derived count over the tenant's configured window, persisting no occurrence, no repeat
+flag and no escalation level, and prescribing nothing — **D-5.2-20 remains open**, so what a repeat
+*produces* is still undecided. Implementing it surfaced a defect present since Checkpoint 1: civil
+date columns were typed `string` but returned as `Date` by the driver, invisible because no test had
+read one back; every read now projects them explicitly.
+[`verification/phase-5.2-checkpoint-3-plan.md`](verification/phase-5.2-checkpoint-3-plan.md) keeps
+the plan as written and records what was built beside it rather than in place of it.
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

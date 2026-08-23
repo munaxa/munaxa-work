@@ -14,6 +14,7 @@ import {
   caseEventValues,
   investigationState,
   investigationValues,
+  INVESTIGATION_COLUMNS,
   type CaseEventRow,
   type InvestigationRow,
 } from './relation-rows.js';
@@ -42,13 +43,24 @@ export class PostgresInvestigationRepository
     super('relation_investigation');
   }
 
+  /**
+   * By identifier, with an explicit projection rather than the base class's `findRow`.
+   *
+   * `Repository.findRow` issues `select *`, which returns `opened_on` and `concluded_on` as
+   * JavaScript `Date` objects where this module's row type promises civil strings. Every read of
+   * this table names its columns for that reason — see `relation-rows.ts`.
+   */
   public async byId(
     transaction: Transaction,
     id: string,
   ): Promise<InvestigationRecord | undefined> {
-    const row = await this.findRow(transaction, id);
+    const rows = await transaction.execute<InvestigationRow>(
+      `select ${INVESTIGATION_COLUMNS} from relation_investigation
+         where id = $1 and tenant_id = $2 and deleted_at is null`,
+      [id, transaction.tenantId],
+    );
 
-    return row === undefined ? undefined : investigationState(row);
+    return rows[0] === undefined ? undefined : investigationState(rows[0]);
   }
 
   /**
@@ -64,12 +76,32 @@ export class PostgresInvestigationRepository
     violationId: string,
   ): Promise<InvestigationRecord | undefined> {
     const rows = await transaction.execute<InvestigationRow>(
-      `select * from relation_investigation
+      `select ${INVESTIGATION_COLUMNS} from relation_investigation
          where tenant_id = $1 and violation_id = $2 and state = 'open' and deleted_at is null`,
       [transaction.tenantId, violationId],
     );
 
     return rows[0] === undefined ? undefined : investigationState(rows[0]);
+  }
+
+  /**
+   * Every inquiry on a violation, newest first — the chain an operative conclusion is derived from.
+   *
+   * Unpaged for the same reason the case history is: paginating a chain would make "which conclusion
+   * stands" a paginated question, and the answer would depend on which page you asked for.
+   */
+  public async chainFor(
+    transaction: Transaction,
+    violationId: string,
+  ): Promise<readonly InvestigationRecord[]> {
+    const rows = await transaction.execute<InvestigationRow>(
+      `select ${INVESTIGATION_COLUMNS} from relation_investigation
+         where tenant_id = $1 and violation_id = $2 and deleted_at is null
+         order by opened_on desc, id desc`,
+      [transaction.tenantId, violationId],
+    );
+
+    return rows.map(investigationState);
   }
 
   public forViolation(
@@ -80,7 +112,7 @@ export class PostgresInvestigationRepository
     return pageOf<InvestigationRow, InvestigationRecord>(
       transaction,
       {
-        select: `select * from relation_investigation
+        select: `select ${INVESTIGATION_COLUMNS} from relation_investigation
                    where tenant_id = $1 and violation_id = $2 and deleted_at is null
                    order by opened_on desc, id desc
                    limit $3 offset $4`,

@@ -101,6 +101,11 @@ export type InvestigationState = (typeof INVESTIGATION_STATES)[number];
  * Checkpoint 2 adds three more for the same reason it audited the first two: an investigation's
  * findings and a case's history are disciplinary content, and AD-007 audits reading it. `case_history_read`
  * has no `_listed` twin because the history of one case is only ever fetched whole.
+ *
+ * Checkpoint 3 adds `escalation_read`. Asking how many times an employment has done this before is
+ * asking about their disciplinary record, so it is audited — one event per violation the count
+ * actually disclosed, not one per question asked, because the trail answers *which records were
+ * seen* and a single event for an aggregate would leave that unanswerable.
  */
 export const ACCESS_ACTIONS = [
   'violation_read',
@@ -108,6 +113,7 @@ export const ACCESS_ACTIONS = [
   'investigation_read',
   'investigation_listed',
   'case_history_read',
+  'escalation_read',
 ] as const;
 export type AccessAction = (typeof ACCESS_ACTIONS)[number];
 

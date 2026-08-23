@@ -256,3 +256,37 @@ export class ConcludeInvestigationBody {
   @MaxLength(2000)
   public reason!: string;
 }
+
+/**
+ * A correction to a concluded inquiry.
+ *
+ * **No `correctsInvestigationId`.** What is being corrected is the investigation the route names, so
+ * a body field for it would let a caller correct one inquiry while addressing another. The linkage is
+ * server-controlled, like the actor and the timestamps.
+ *
+ * `reason` says why the earlier conclusion was wrong, and is required — a correction with no stated
+ * reason is indistinguishable from a rewrite.
+ */
+export class CorrectInvestigationBody {
+  @ApiProperty({ maxLength: 8000, description: 'What the inquiry should have found.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(8000)
+  public findings!: string;
+
+  @ApiProperty({ maxLength: 4000, description: 'Text. Nothing in this product acts on it.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  public recommendation!: string;
+
+  @ApiProperty({ pattern: ISO_DATE.source, example: '2026-08-23' })
+  @Matches(ISO_DATE)
+  public concludedOn!: string;
+
+  @ApiProperty({ maxLength: 2000, description: 'Why the earlier conclusion was wrong.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  public reason!: string;
+}

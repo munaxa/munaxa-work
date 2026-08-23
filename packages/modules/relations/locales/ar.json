@@ -41,7 +41,16 @@
       "actor": "بواسطة",
       "occurredAt": "التاريخ",
       "open": "فتح تحقيق",
-      "conclude": "إغلاق التحقيق"
+      "conclude": "إغلاق التحقيق",
+      "correction": "تصحيح",
+      "corrects": "يصحح",
+      "occurrence": "رقم التكرار",
+      "occurrences": "عدد التكرارات",
+      "windowFrom": "العد اعتبارًا من",
+      "asAt": "حتى تاريخ",
+      "firstOccurrence": "المرة الأولى",
+      "escalationContext": "سجل التكرار",
+      "correct": "تصحيح هذه النتيجة"
     },
     "source": {
       "tenant": "معرّف من قبل المنشأة",
@@ -57,7 +66,8 @@
       "violation_listed": "ظهرت في قائمة",
       "investigation_read": "تم الاطلاع على التحقيق",
       "investigation_listed": "ظهر التحقيق في قائمة",
-      "case_history_read": "تم الاطلاع على سجل الحالة"
+      "case_history_read": "تم الاطلاع على سجل الحالة",
+      "escalation_read": "تم الاطلاع على سجل التكرار"
     },
     "notice": {
       "empty": "لا يوجد ما يُعرض بعد.",
@@ -74,7 +84,13 @@
       "derivedState": "تُستنتج الحالة الراهنة من سجل الحالة ولا تُخزَّن، فلا يمكن أن يتعارض الاثنان.",
       "oneOpenInvestigation": "لا يمكن أن يكون للمخالفة أكثر من تحقيق واحد قيد التنفيذ في الوقت نفسه.",
       "noAutomaticTransitions": "لا شيء ينقل الحالة تلقائيًا. كل تغيير هنا قرار من شخص.",
-      "recommendationIsText": "التوصية اقتراح مكتوب. لا يتصرف النظام بناءً عليها تلقائيًا."
+      "recommendationIsText": "التوصية اقتراح مكتوب. لا يتصرف النظام بناءً عليها تلقائيًا.",
+      "correctionIsNewRecord": "التصحيح سجل جديد. تبقى النتيجة الأصلية كما هي، ويمكن الاطلاع على كليهما.",
+      "correctionOnce": "يمكن تصحيح النتيجة مرة واحدة. لتعديل التصحيح، صحّح التصحيح نفسه.",
+      "findingsRestricted": "تتطلب نتائج التحقيق صلاحية منفصلة. بدونها لا يُعرض التحقيق المغلق.",
+      "occurrenceDerived": "يُحتسب رقم التكرار من السجلات عند كل عرض، ولا يُخزَّن.",
+      "windowIsConfiguration": "فترة التكرار إعداد خاص بمنشأتك. ليس لها أي معنى قانوني ولا تترتب عليها عقوبة تلقائيًا.",
+      "noActionFromRepeat": "عدد التكرارات لا يقرر شيئًا. ما يترتب على التكرار ليس ضمن هذا الإصدار."
     },
     "rejection": {
       "category_code_malformed": "يجوز أن يحتوي الرمز على أحرف إنجليزية صغيرة وأرقام وشرطات فقط.",
@@ -111,7 +127,12 @@
       "findings_too_long": "النتائج طويلة جدًا.",
       "recommendation_missing": "سجّل توصية التحقيق.",
       "recommendation_too_long": "التوصية طويلة جدًا.",
-      "investigation_already_open": "هذه المخالفة لديها تحقيق قيد التنفيذ بالفعل."
+      "investigation_already_open": "هذه المخالفة لديها تحقيق قيد التنفيذ بالفعل.",
+      "correction_target_not_concluded": "لا يمكن تصحيح سوى تحقيق مغلق.",
+      "correction_reason_missing": "اذكر سبب عدم صحة النتيجة السابقة.",
+      "correction_reason_too_long": "سبب التصحيح طويل جدًا.",
+      "investigation_already_corrected": "سبق تصحيح هذه النتيجة.",
+      "as_at_malformed": "أدخل التاريخ بصيغة YYYY-MM-DD."
     },
     "conflict": {
       "category_code_taken": "يوجد نوع مخالفة يستخدم هذا الرمز."

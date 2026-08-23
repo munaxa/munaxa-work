@@ -51,6 +51,20 @@ export interface ViolationCategoryStore {
  */
 export interface ViolationStore {
   byId(transaction: Transaction, id: string): Promise<ViolationRecord | undefined>;
+  /**
+   * One employment's violations of one category, for the repeat-window derivation.
+   *
+   * **Bounded by the window at the database**, not read wholesale and filtered in memory: an
+   * employment with ten years of history should not be loaded to answer a question about six months
+   * of it. The domain filters again over what comes back, so a query that widened by accident would
+   * not silently widen the count.
+   */
+  inCategoryWindow(
+    transaction: Transaction,
+    employmentId: string,
+    violationCategoryId: string,
+    window: { readonly from: string; readonly to: string },
+  ): Promise<readonly ViolationRecord[]>;
   forEmployment(
     transaction: Transaction,
     employmentId: string,
@@ -79,6 +93,12 @@ export interface AccessEventStore {
 export interface InvestigationStore {
   byId(transaction: Transaction, id: string): Promise<InvestigationRecord | undefined>;
   openFor(transaction: Transaction, violationId: string): Promise<InvestigationRecord | undefined>;
+  /**
+   * Every investigation on a violation, newest first — the chain an operative conclusion is derived
+   * from. Unpaged like the case history and bounded by the same nature: a violation has as many
+   * inquiries as it has had, which is a handful.
+   */
+  chainFor(transaction: Transaction, violationId: string): Promise<readonly InvestigationRecord[]>;
   forViolation(
     transaction: Transaction,
     violationId: string,

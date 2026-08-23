@@ -36,7 +36,13 @@ export interface ViolationCategoryView {
   readonly name: LocalizedTextView;
   readonly severity: string;
   readonly sequence: number;
-  /** How far back a prior violation counts. Configuration; **nothing counts with it yet**. */
+  /**
+   * How far back a prior violation counts, in days.
+   *
+   * **Operational since Checkpoint 3.** It was configuration nothing read for two checkpoints;
+   * `relations.escalation-context` now measures its window with it. It still prescribes no outcome —
+   * what a repeat *produces* is D-5.2-20 and is open.
+   */
   readonly repeatWindowDays: number;
   readonly source: string;
   readonly countryPackId?: string;
@@ -68,6 +74,18 @@ export interface ViolationView {
   readonly state: string;
   /** When it was recorded, as an ISO instant. Distinct from when the conduct occurred. */
   readonly recordedOn: string;
+  /**
+   * Where this violation sits in its own repeat window — 1 for a first occurrence, 3 for a third.
+   *
+   * **Derived at read time and stored nowhere** (Checkpoint 3). Measured back from *this violation's*
+   * conduct date rather than from today, so the ordinal a record had when it happened is the ordinal
+   * it still has a year later; counting back from today would renumber history every night.
+   *
+   * Absent when the category that would define the window could not be read. It is a projection, not
+   * a fact about the row, and nothing may act on it automatically — what a repeat *produces* is
+   * D-5.2-20 and is still an open decision.
+   */
+  readonly occurrence?: number;
   readonly version: number;
 }
 
@@ -103,6 +121,14 @@ export interface InvestigationView {
   readonly findings?: string;
   readonly recommendation?: string;
   readonly concludedOn?: string;
+  /**
+   * The concluded inquiry this one corrects, where it corrects one (D-5.2-19).
+   *
+   * Present on the correction and never on the corrected — the link points backward, so the record
+   * being corrected is never written to. Follow the chain to see what was originally found; both
+   * accounts survive, which is the point of correcting by adding rather than by editing.
+   */
+  readonly correctsInvestigationId?: string;
   readonly version: number;
 }
 
@@ -142,4 +168,32 @@ export interface CaseHistoryView {
   readonly violationId: string;
   readonly currentState: string;
   readonly history: readonly CaseEventView[];
+}
+
+/**
+ * How many times before, and over what window.
+ *
+ * **Every field is derived at read time.** Nothing here is persisted — there is no occurrence
+ * counter, no repeat flag and no escalation level in any table, and a negative-space suite fails if
+ * one appears. The count is arithmetic over violations that already exist.
+ *
+ * **`windowDays` and `windowFrom` are published deliberately.** A bare number invites the reader to
+ * assume a window; showing which one was applied, and from which date, makes the answer checkable by
+ * the person whose record it describes.
+ *
+ * **It carries no conclusion.** There is no `isRepeat`, no `escalationLevel`, no `breached` and no
+ * recommended action: what a repeat should produce is D-5.2-20, still open, and a field asserting it
+ * would be this module deciding a disciplinary outcome.
+ */
+export interface EscalationContextView {
+  readonly employmentId: string;
+  readonly violationCategoryId: string;
+  /** The reference civil date the window was measured back from. */
+  readonly asAt: string;
+  readonly windowDays: number;
+  /** The first civil date inside the window. Inclusive. */
+  readonly windowFrom: string;
+  readonly occurrences: number;
+  /** The contributing violations, oldest first. Identifiers only — nothing about the person. */
+  readonly violationIds: readonly string[];
 }

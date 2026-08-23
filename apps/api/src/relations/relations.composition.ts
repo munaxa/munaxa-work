@@ -1,6 +1,6 @@
 import { systemClock } from '@work/payroll';
 import { postgresRelationsStores, relationsModule } from '@work/relations';
-import type { UnitOfWork, WorkModule } from '@work/kernel';
+import type { PermissionChecker, UnitOfWork, WorkModule } from '@work/kernel';
 
 import type { Asking } from '../payroll/asking.js';
 import { RelationsEmploymentDirectory, RelationsMembershipDirectory } from './relations-sources.js';
@@ -26,11 +26,18 @@ import { RelationsEmploymentDirectory, RelationsMembershipDirectory } from './re
  * than the deferred payroll dispatcher the caller happens to pass. Relations only ever *asks*: it
  * sends no cross-module command, and a wider type here would suggest it could.
  */
-export const relationsModuleFor = (unitOfWork: UnitOfWork, dispatcher: Asking): WorkModule =>
+export const relationsModuleFor = (
+  unitOfWork: UnitOfWork,
+  dispatcher: Asking,
+  permissions: PermissionChecker,
+): WorkModule =>
   relationsModule({
     unitOfWork,
     stores: postgresRelationsStores(),
     employments: new RelationsEmploymentDirectory(dispatcher),
     memberships: new RelationsMembershipDirectory(dispatcher),
+    // The pipeline's own checker, not a second one. Used for exactly one question: may this caller
+    // see an investigation's findings (D-5.2-18)?
+    permissions,
     clock: systemClock,
   });

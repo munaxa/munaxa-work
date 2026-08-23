@@ -45,9 +45,9 @@ given for them.
 | D-5.2-15 | How the violation lifecycle advances, given an immutable violation row | **APPROVED** 2026-08-23 | **resolved** |
 | D-5.2-16 | What an investigation is, and who may run one | **APPROVED** 2026-08-23 | **resolved** |
 | D-5.2-17 | Whether findings are immutable, and how a correction is made (AD-003) | **APPROVED** 2026-08-23 | **resolved** |
-| **D-5.2-18** | **Whether investigations need permissions of their own** | **OPEN** · investigated 2026-08-23, recommendation **Option C** | no — does not block Checkpoint 3 |
-| **D-5.2-19** | **How a concluded investigation is corrected** | **OPEN** · investigated 2026-08-23, recommendation **Option D via C** | no — does not block Checkpoint 3 |
-| **D-5.2-20** | **The penalty ladder — whether a repeat count maps to a prescribed action** | **OPEN** | **no — deliberately outside Checkpoint 3** |
+| **D-5.2-18** | **Whether investigations need permissions of their own** | **APPROVED** 2026-08-23 — Option C | **resolved · implemented in Checkpoint 3** |
+| **D-5.2-19** | **How a concluded investigation is corrected** | **APPROVED** 2026-08-23 — Option D via C | **resolved · implemented in Checkpoint 3** |
+| **D-5.2-20** | **The penalty ladder — whether a repeat count maps to a prescribed action** | **OPEN** | **no — deliberately outside Checkpoint 3, and still open after it** |
 
 All six of Checkpoint 1's blocking decisions are **APPROVED**, and none required a new architectural
 pattern: every one resolved onto a mechanism this repository already runs.
@@ -814,7 +814,7 @@ caused it commit together; and concurrency is settled by the database.
 
 Two. **Neither was taken**, and neither blocked the checkpoint.
 
-## D-5.2-18 — Whether investigations need permissions of their own · **OPEN**
+## D-5.2-18 — Whether investigations need permissions of their own · **APPROVED 2026-08-23**
 
 **What Checkpoint 2 did.** Reused the four permissions Checkpoint 1 defined. Opening and concluding
 an inquiry require `relations.violation.record`; the three new reads require
@@ -902,7 +902,7 @@ operations refused until an administrator grants them. Additive and reversible; 
 findings-bearing payload. Recommended before disciplinary actions, which is where a wrong grant first
 causes a penalty.
 
-## D-5.2-19 — How a concluded investigation is corrected · **OPEN**
+## D-5.2-19 — How a concluded investigation is corrected · **APPROVED 2026-08-23**
 
 **What Checkpoint 2 did.** Nothing. There is no `relations.correct-investigation` command, and the
 negative-space suite asserts its absence.
@@ -1016,3 +1016,103 @@ progression — which D-5.2-06 forbids and Phase 11.1 owns.
 ladder's output is an action, and a rule whose output does not exist yet cannot be specified honestly.
 
 **Blocks Checkpoint 3: NO** — Checkpoint 3 is scoped to exclude it deliberately.
+
+
+---
+
+# Owner approvals · 2026-08-23 · D-5.2-18 and D-5.2-19
+
+### D-5.2-18 — **APPROVED, Option C**
+
+Two dedicated permissions, no generic framework, no wildcard, no resource-wide inheritance and no
+fifth investigation permission without a further decision.
+
+**Implemented in Checkpoint 3.**
+
+* `relations.investigation.conduct` — opening, concluding and correcting an inquiry. The two
+  Checkpoint 2 commands moved off `relations.violation.record`, so **filing a report no longer
+  implies concluding the inquiry into it**. It does not grant findings.
+* `relations.investigation.read-findings` — required *in addition to* `relations.violation.read` for
+  any payload carrying `findings` or `recommendation`. Enforced inside the query via the pipeline's
+  own `PermissionChecker`, in Documents' `hiddenFromCaller` shape. A caller without it meets
+  **`not_found`** on a concluded inquiry, never a distinguishable refusal.
+
+**Asserted, not promised.** Findings are withheld from the single read *and* the listing *and* the
+case history — the alternate-path leak is tested explicitly by serializing each payload and asserting
+the findings text does not appear. Withheld findings are **absent, not blanked**, so a concluded
+inquiry is indistinguishable from an open one. No access event is written for a read that was
+refused.
+
+**One assumption was corrected rather than deleted.** Checkpoint 1 recorded that Relations needed no
+`PermissionChecker` because *"a caller either may read a violation or may not"*. That was true while
+every payload was equally sensitive; `relations-dependencies.ts` now states why it stopped being true.
+
+### D-5.2-19 — **APPROVED, Option D via the linked-investigation approach**
+
+**Implemented in Checkpoint 3.** `relations.correct-investigation` inserts a **new** immutable
+investigation carrying `corrects_investigation_id` and a required correction reason. The concluded
+row it corrects is **never written to** — not updated, not stamped, not re-pointed, not soft-deleted.
+
+**The Checkpoint 2 trigger is unchanged**, and an integration test proves it: after a correction, a
+direct `update` and a direct `delete` on the corrected row both still raise
+`relation_investigation_concluded`. That is the difference a backward pointer buys — `letter_issued`
+had to narrow its trigger for a forward pointer, and Relations did not, because it already derives
+"which one is operative" from persisted history the way it derives case state.
+
+* **Operative conclusion is derived**, never stored: the concluded investigation nobody has
+  corrected. No `is_current`, no `superseded_at`.
+* **Chains, does not branch.** `relation_investigation_corrects_idx` is unique on
+  `(tenant_id, corrects_investigation_id)`; two simultaneous corrections of one conclusion are
+  settled by the index under two real connections, not by the preceding read.
+* **A correction of a correction is permitted** — the newest link is what a second correction
+  attaches to.
+* **No case transition.** A correction restates findings; the case is already at `findings` and stays
+  there. `PERMITTED_CASE_TRANSITIONS` is unchanged.
+
+**A defect found while implementing this, and fixed.** An early draft refused to correct any row that
+*was itself* a correction, which was the wrong test entirely — it would have made a correction
+permanently uncorrectable. Caught by a test, and the guard was removed rather than worked around;
+"has this been corrected" is a question about the chain, which the use case reads and the index
+settles.
+
+# Checkpoint 3 implementation · authorized and delivered 2026-08-23
+
+**Escalation context — repeat-violation counting.** `relations.escalation-context` derives how many
+violations of one category fall inside the tenant's configured window, and the single violation read
+now carries its own `occurrence` ordinal.
+
+**`repeat_window_days` is operational.** It had been tenant-configurable since Checkpoint 1 and **no
+logic read it** — the ADR-0070 shape, a stored setting nothing maintains. A customer configuring 180
+days now gets an answer measured over 180 days, proved by a test in which two categories with
+different windows return different counts over identical data.
+
+**Nothing is persisted.** No `occurrence`, `repeat_count`, `is_repeat`, `breached` or
+`escalation_level` column exists; the migration adds none, and tests assert none appears.
+
+**Nothing is decided.** No penalty, no action, no warning, no case movement, no Payroll adjustment, no
+notification. **D-5.2-20 remains OPEN** and the result carries no field that resembles a conclusion.
+
+## Window semantics, as implemented
+
+| Question | Answer |
+|---|---|
+| Boundary | **Closed at both ends.** 180 days back from `2026-08-23` is `2026-02-24`, and that day counts. |
+| Day before the window | Excluded. Asserted in both directions, in the domain and against SQL `between`. |
+| Reference date | The server's civil date, or an explicit `asAt`. A malformed `asAt` is **refused**, never silently replaced with today. |
+| The violation being asked about | Counts. Conduct reported today is conduct. |
+| After the reference date | Excluded. |
+| `windowDays = 0` | The reference date alone — not "no window" and not "every violation ever". |
+| Ordering | `(occurred_on, violationId)` ascending, so same-day violations are deterministic. |
+| An ordinal's stability | Measured from **the violation's own conduct date**, so it does not renumber as time passes. |
+
+## A pre-existing defect this checkpoint surfaced and fixed
+
+`ViolationRow.occurred_on` was typed `string` from Checkpoint 1, but `node-postgres` returns a `date`
+column as a JavaScript `Date`. No test had ever read one back from the database, so the mismatch was
+invisible for two checkpoints. Checkpoint 3 is the first code whose correctness depends on it — a
+`Date` on the left of a civil-date string comparison silently produces the wrong set — so every read
+of `relation_violation` and `relation_investigation` now names its columns and wraps the dates in
+`to_char`, rather than using `select *`.
+
+**Proved pre-existing before being classified as such**: a probe against the live driver confirmed
+the `date` → `Date` behaviour independently of this branch's changes.

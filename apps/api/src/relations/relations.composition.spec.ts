@@ -44,27 +44,31 @@ describe('relations composition', () => {
 
     // Nothing connects: constructing the module registers handlers and touches no socket. The pool
     // exists because `PostgresUnitOfWork` takes one, and it is never used.
-    return relationsModuleFor(new PostgresUnitOfWork(pool, new InProcessEventDispatcher()), {
-      ask: () => Promise.reject(new Error('not called')),
-    });
+    return relationsModuleFor(
+      new PostgresUnitOfWork(pool, new InProcessEventDispatcher()),
+      { ask: () => Promise.reject(new Error('not called')) },
+      { holds: () => Promise.resolve(true) },
+    );
   };
 
   it('registers the whole application surface and nothing more', () => {
     const relations = composed();
 
     expect(relations.name).toBe('relations');
-    // Five and six, after Checkpoint 2. Checkpoint 1 built three and three: define and amend a
+    // Six and seven, after Checkpoint 3. Checkpoint 1 built three and three: define and amend a
     // catalogue entry, record a violation; list the catalogue, read one violation, list one
     // employment's. Checkpoint 2 added two commands (open and conclude an inquiry) and three reads
-    // (one inquiry, a violation's inquiries, a case history). Every remaining capability — actions,
-    // warnings, grievances, appeals — arrives with the checkpoint that builds it, so these numbers
-    // moving is a scope change rather than a detail.
-    expect(relations.commands ?? []).toHaveLength(5);
-    expect(relations.queries ?? []).toHaveLength(6);
+    // (one inquiry, a violation's inquiries, a case history). Checkpoint 3 added one command
+    // (correct a concluded inquiry) and one read (the repeat-violation context). Every remaining
+    // capability — actions, warnings, grievances, appeals — arrives with the checkpoint that builds
+    // it, so these numbers moving is a scope change rather than a detail.
+    expect(relations.commands ?? []).toHaveLength(6);
+    expect(relations.queries ?? []).toHaveLength(7);
     expect(relations.permissions).toEqual(ALL_RELATIONS_PERMISSIONS);
-    // **Still four.** Checkpoint 2 added five handlers and no permission: opening and concluding an
-    // inquiry are the disciplinary-handling capability `relations.violation.record` already names.
-    expect(ALL_RELATIONS_PERMISSIONS).toHaveLength(4);
+    // **Six, after D-5.2-18.** Checkpoint 2 added five handlers and no permission; Checkpoint 3 added
+    // two permissions by owner decision — conducting an inquiry is no longer implied by recording a
+    // violation, and reading what an inquiry found needs a grant of its own.
+    expect(ALL_RELATIONS_PERMISSIONS).toHaveLength(6);
   });
 
   /** Every handler declares one permission, and none of them is a wildcard or a prefix. */
@@ -74,7 +78,7 @@ describe('relations composition', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(11);
+    expect(declared).toHaveLength(13);
     for (const permission of declared) {
       expect(ALL_RELATIONS_PERMISSIONS).toContain(permission);
       expect(permission).not.toContain('*');

@@ -6,6 +6,7 @@ import type {
   ListViolationsForEmployment,
   ReadViolation,
 } from '../application/relations-queries.js';
+import type { ReadEscalationContext } from '../application/escalation.use-case.js';
 
 import { RecordViolationBody } from './relations.dto.js';
 import { RelationsDispatcher } from './relations-dispatcher.js';
@@ -56,6 +57,34 @@ export class ViolationController {
       await this.dispatcher.send<unknown, RecordViolationCommand>({
         commandName: 'relations.record-violation',
         ...body,
+      }),
+    );
+  }
+
+  /**
+   * How many times before — declared **before** `:violationId` deliberately.
+   *
+   * Nest resolves a route by declaration order, so `escalation` would otherwise be captured by the
+   * parameter route above and arrive as a violation identifier. A route test asserts the resolution
+   * rather than trusting this comment.
+   */
+  @Get('escalation')
+  @ApiOperation({ summary: 'How many violations of one category fall in the configured window' })
+  @ApiOkResponse({
+    description:
+      'Derived at read time and stored nowhere. Reports a count, never a penalty or an action.',
+  })
+  public async escalation(
+    @Query('employmentId') employmentId: string,
+    @Query('violationCategoryId') violationCategoryId: string,
+    @Query('asAt') asAt?: string,
+  ): Promise<unknown> {
+    return unwrapOrThrow(
+      await this.dispatcher.ask<unknown, ReadEscalationContext>({
+        queryName: 'relations.escalation-context',
+        employmentId,
+        violationCategoryId,
+        ...(asAt === undefined ? {} : { asAt }),
       }),
     );
   }

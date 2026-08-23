@@ -1,6 +1,8 @@
-import { success, type Query, type QueryHandler } from '@work/kernel';
+import { success, type Query, type QueryHandler, type Transaction } from '@work/kernel';
 
 import { recordAccessFor } from './access-recording.js';
+import { occurrenceOf, windowStart } from '../domain/escalation.js';
+import { mayReadFindings } from './findings-visibility.js';
 import { notFound } from './relations-context.js';
 import { RelationsPermissions } from './relations-permissions.js';
 import {
@@ -9,6 +11,7 @@ import {
   violationCategoryView,
   violationView,
 } from './relations-views.js';
+import type { ViolationRecord } from '../domain/violation.js';
 import type { RelationsDependencies } from './relations-dependencies.js';
 import type {
   CaseHistoryView,
@@ -106,9 +109,42 @@ export const readViolationHandler = (
         violationId: held.violationId,
         action: 'violation_read',
       });
-      return success(violationView(held));
+
+      return success(violationView(held, await occurrenceFor(dependencies, transaction, held)));
     }),
 });
+
+/**
+ * Where one violation sits in its own repeat window — derived here, stored nowhere.
+ *
+ * **The list read does not carry it**, deliberately: an ordinal per row would mean a category read
+ * and a window query per item, and a page of fifty would become fifty-one queries to decorate a list
+ * nobody counts from. The single read carries it, which is where the question is actually asked.
+ *
+ * Absent when the category cannot be read — never defaulted to 1. See `violationView`.
+ */
+const occurrenceFor = async (
+  dependencies: RelationsDependencies,
+  transaction: Transaction,
+  violation: ViolationRecord,
+): Promise<number | undefined> => {
+  const category = await dependencies.stores.categories.byId(
+    transaction,
+    violation.violationCategoryId,
+  );
+
+  if (category === undefined) return undefined;
+
+  const from = windowStart(violation.occurredOn, category.repeatWindowDays);
+  const violations = await dependencies.stores.violations.inCategoryWindow(
+    transaction,
+    violation.employmentId,
+    violation.violationCategoryId,
+    { from, to: violation.occurredOn },
+  );
+
+  return occurrenceOf(violation, category.repeatWindowDays, violations);
+};
 
 export interface ListViolationsForEmployment extends Query, PageRequest {
   readonly queryName: 'relations.violations';
@@ -149,6 +185,16 @@ export const listViolationsHandler = (
  * sensitive text this module holds, and AD-007 audits reading a disciplinary record rather than
  * reading a violation table specifically. The access event is keyed by the **violation**, so "who has
  * been looking at this case" is one question answered from one trail.
+ *
+ * **A concluded inquiry is `not_found` to a caller without `relations.investigation.read-findings`**
+ * (D-5.2-18, approved). Fetching one by identifier is asking for what it found, so a partial answer
+ * would be an odd contract and a `forbidden` would confirm that findings exist about somebody —
+ * which in this domain is itself the disclosure. An *open* inquiry is returned normally: it has
+ * concluded nothing, so there is nothing being withheld.
+ *
+ * **The access event is written only for what was actually disclosed.** A caller refused the
+ * findings did not read the record, so no event is written — an audit trail that recorded reads
+ * which did not happen would answer its own question wrongly.
  */
 export interface ReadInvestigation extends Query {
   readonly queryName: 'relations.read-investigation';
@@ -170,11 +216,17 @@ export const readInvestigationHandler = (
 
       if (held === undefined) return notFound<InvestigationView>('investigation');
 
+      const withFindings = await mayReadFindings(dependencies);
+
+      if (held.state === 'concluded' && !withFindings) {
+        return notFound<InvestigationView>('investigation');
+      }
+
       await recordAccessFor(dependencies, transaction, {
         violationId: held.violationId,
         action: 'investigation_read',
       });
-      return success(investigationView(held));
+      return success(investigationView(held, withFindings));
     }),
 });
 
@@ -205,7 +257,17 @@ export const listInvestigationsHandler = (
           action: 'investigation_listed',
         });
       }
-      return success({ items: found.items.map(investigationView), total: found.total });
+
+      // **The list is not filtered, only redacted.** That an inquiry exists is part of the case,
+      // which this permission already reaches; hiding concluded ones would also hide the count, and
+      // a reader would not be able to tell a case with no inquiry from one they may not read. What
+      // the inquiry *found* is withheld — which is exactly the line D-5.2-18 drew.
+      const withFindings = await mayReadFindings(dependencies);
+
+      return success({
+        items: found.items.map((investigation) => investigationView(investigation, withFindings)),
+        total: found.total,
+      });
     }),
 });
 

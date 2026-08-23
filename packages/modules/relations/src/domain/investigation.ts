@@ -40,6 +40,16 @@ export interface InvestigationRecord {
   readonly findings?: string;
   readonly recommendation?: string;
   readonly concludedOn?: string;
+  /**
+   * The concluded investigation this one corrects, where it corrects one (D-5.2-19).
+   *
+   * **Backward, never forward.** The corrected row carries no pointer to its correction, so it is
+   * never written to and its immutability trigger needs no exception — the difference from
+   * `letter_issued`, which stamps the original and had to narrow its trigger to permit exactly one
+   * write. Which conclusion is operative is derived from the chain, as case state is derived from
+   * history (D-5.2-16), so there is no stored answer that could disagree with the records.
+   */
+  readonly correctsInvestigationId?: string;
   readonly version: number;
 }
 
@@ -146,4 +156,103 @@ const validateConclusionDates = (request: ConcludeInvestigationRequest): Relatio
     return refuse('concluded_before_opened', { field: 'concludedOn' });
   }
   return accept(true);
+};
+
+export interface CorrectInvestigationRequest {
+  readonly investigationId: string;
+  /** The concluded investigation being corrected, as read from persisted data. */
+  readonly corrected: InvestigationRecord;
+  readonly findings: string;
+  readonly recommendation: string;
+  readonly concludedOn: string;
+  /** Why the earlier conclusion was wrong. Required, and never defaulted. */
+  readonly reason: string;
+  readonly today: string;
+}
+
+export const CORRECTION_REASON_LIMIT = 2000;
+
+/**
+ * A correction: a **new** investigation that says what the earlier one should have said.
+ *
+ * The record it corrects is passed in and comes back untouched — this function returns a second
+ * record and never a modified first. That is AD-003's *"a correction is a new, linked record with a
+ * stated reason"*, and it is the shape Payroll's reversal, Attendance's correction and Letters'
+ * supersession all take: nothing is deleted, and the chain reads as what actually happened.
+ *
+ * It is born `concluded`. There is no draft state for a correction, because the inquiry it corrects
+ * has already been conducted; what is being corrected is the account of it, not the work.
+ *
+ * **It inherits the violation, the investigator and the opening date of what it corrects.** A
+ * correction is the same inquiry restated, not a second inquiry — reassigning it to a different
+ * investigator or a different violation would make it a new investigation wearing a correction's
+ * name, and the caller has `open-investigation` for that.
+ */
+export const correctInvestigation = (
+  request: CorrectInvestigationRequest,
+): RelationsResult<InvestigationRecord> => {
+  const { corrected } = request;
+
+  if (corrected.state !== 'concluded') {
+    // Only a conclusion can be wrong in the way a correction fixes. An open inquiry is still being
+    // written and its own update path already handles it.
+    return refuse('correction_target_not_concluded', { field: 'investigationId' });
+  }
+  // **Whether this conclusion has already been corrected is not knowable here**, and this function
+  // deliberately does not guess. It sees one record; "has anything corrected it" is a question about
+  // the chain, which the use case reads and `relation_investigation_corrects_idx` settles under
+  // concurrency. An earlier draft refused any row that *was itself* a correction, which was the
+  // wrong test entirely — a correction is the newest link and is exactly what a second correction
+  // must attach to.
+  const reason = request.reason.trim();
+
+  if (reason === '') return refuse('correction_reason_missing', { field: 'reason' });
+  if (reason.length > CORRECTION_REASON_LIMIT) {
+    return refuse('correction_reason_too_long', { field: 'reason' });
+  }
+
+  const restated = concludeInvestigation({
+    // Concluded as a fresh open record, so every rule a first conclusion must satisfy — the date
+    // bounds, the all-or-nothing halves, the length limits — is applied to a correction identically
+    // rather than approximately.
+    investigation: {
+      ...corrected,
+      investigationId: request.investigationId,
+      state: 'open',
+      version: 1,
+    },
+    findings: request.findings,
+    recommendation: request.recommendation,
+    concludedOn: request.concludedOn,
+    today: request.today,
+  });
+
+  if (!restated.ok) return restated;
+
+  return accept({ ...restated.value, correctsInvestigationId: corrected.investigationId });
+};
+
+/**
+ * The conclusion that stands, from a violation's investigations alone.
+ *
+ * A conclusion is superseded when some other investigation names it as corrected; the operative one
+ * is the concluded investigation nobody has corrected. **Derived, never stored** — the same rule as
+ * current case state, for the same reason.
+ *
+ * Returns `undefined` while no inquiry has concluded, which is a real answer rather than an absence:
+ * a case under investigation has no findings yet.
+ */
+export const operativeConclusion = (
+  investigations: readonly InvestigationRecord[],
+): InvestigationRecord | undefined => {
+  const corrected = new Set(
+    investigations
+      .map((investigation) => investigation.correctsInvestigationId)
+      .filter((id): id is string => id !== undefined),
+  );
+
+  return investigations.find(
+    (investigation) =>
+      investigation.state === 'concluded' && !corrected.has(investigation.investigationId),
+  );
 };

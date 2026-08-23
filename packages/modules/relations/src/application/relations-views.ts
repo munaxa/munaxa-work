@@ -39,7 +39,14 @@ export const violationCategoryView = (state: ViolationCategoryState): ViolationC
     : { countryPackVersion: state.countryPackVersion }),
 });
 
-export const violationView = (state: ViolationRecord): ViolationView => ({
+/**
+ * A violation, optionally carrying where it sits in its own repeat window.
+ *
+ * `occurrence` is omitted rather than defaulted to 1 when it could not be derived — a category that
+ * could not be read is not evidence of a first offence, and publishing 1 would be a guess presented
+ * as a fact in the one place a guess must never appear.
+ */
+export const violationView = (state: ViolationRecord, occurrence?: number): ViolationView => ({
   violationId: state.violationId,
   employmentId: state.employmentId,
   violationCategoryId: state.violationCategoryId,
@@ -50,9 +57,25 @@ export const violationView = (state: ViolationRecord): ViolationView => ({
   state: state.state,
   recordedOn: state.recordedAt.toISOString(),
   version: state.version,
+  ...(occurrence === undefined ? {} : { occurrence }),
 });
 
-export const investigationView = (state: InvestigationRecord): InvestigationView => ({
+/**
+ * An inquiry, with its findings included only for a caller entitled to them (D-5.2-18).
+ *
+ * **`withFindings` is required rather than optional**, so a new call site cannot default into
+ * disclosure by forgetting an argument. A `false` here produces exactly the payload an *open*
+ * inquiry produces — the fields absent, not blanked and not marked redacted — because a field
+ * saying "withheld" tells the reader that findings exist, and for a manager reading about their own
+ * report that is most of the disclosure.
+ *
+ * `concludedOn` and `state` stay visible in both cases: that an inquiry finished is part of the
+ * case's shape, which `relations.violation.read` already reaches. What is withheld is what it said.
+ */
+export const investigationView = (
+  state: InvestigationRecord,
+  withFindings: boolean,
+): InvestigationView => ({
   investigationId: state.investigationId,
   violationId: state.violationId,
   investigatorMembershipId: state.investigatorMembershipId,
@@ -60,9 +83,14 @@ export const investigationView = (state: InvestigationRecord): InvestigationView
   subject: state.subject,
   state: state.state,
   version: state.version,
-  ...(state.findings === undefined ? {} : { findings: state.findings }),
-  ...(state.recommendation === undefined ? {} : { recommendation: state.recommendation }),
   ...(state.concludedOn === undefined ? {} : { concludedOn: state.concludedOn }),
+  ...(state.correctsInvestigationId === undefined
+    ? {}
+    : { correctsInvestigationId: state.correctsInvestigationId }),
+  ...(withFindings && state.findings !== undefined ? { findings: state.findings } : {}),
+  ...(withFindings && state.recommendation !== undefined
+    ? { recommendation: state.recommendation }
+    : {}),
 });
 
 export const caseEventView = (state: CaseEventState): CaseEventView => ({

@@ -12,6 +12,7 @@ import type {
   Paged,
   RelationsStores,
   ViolationCategoryStore,
+  ViolationStore,
 } from './relations-ports.js';
 
 /**
@@ -51,27 +52,7 @@ export const inMemoryRelationsStores = (): InMemoryRelationsStores => {
     investigationRows,
     caseEventRows,
     categories: categoryStore(categoryRows),
-    violations: {
-      byId: (_transaction: Transaction, id: string) => Promise.resolve(violationRows.get(id)),
-      forEmployment: (
-        _transaction: Transaction,
-        employmentId: string,
-        paged: Paged,
-      ): Promise<Page<ViolationRecord>> => {
-        const matching = [...violationRows.values()]
-          .filter((row) => row.employmentId === employmentId)
-          .sort(byNewestConductThenId);
-
-        return Promise.resolve({
-          items: matching.slice(paged.offset, paged.offset + paged.limit),
-          total: matching.length,
-        });
-      },
-      insert: (_transaction: Transaction, state: ViolationRecord) => {
-        violationRows.set(state.violationId, state);
-        return Promise.resolve();
-      },
-    },
+    violations: violationStore(violationRows),
     access: {
       insert: (_transaction: Transaction, state: AccessEventState) => {
         accessRows.push(state);
@@ -89,6 +70,13 @@ const investigationStore = (rows: Map<string, InvestigationRecord>): Investigati
   openFor: (_transaction: Transaction, violationId: string) =>
     Promise.resolve(
       [...rows.values()].find((row) => row.violationId === violationId && row.state === 'open'),
+    ),
+
+  chainFor: (_transaction: Transaction, violationId: string) =>
+    Promise.resolve(
+      [...rows.values()]
+        .filter((row) => row.violationId === violationId)
+        .sort(byNewestInquiryThenId),
     ),
 
   forViolation: (
@@ -146,6 +134,55 @@ const caseEventStore = (rows: CaseEventState[]): CaseEventStore => ({
 
   insert: (_transaction: Transaction, state: CaseEventState) => {
     rows.push(state);
+    return Promise.resolve();
+  },
+});
+
+/**
+ * Extracted from the factory when it passed the 60-line function budget — split, not exempted, and
+ * split the same way its three siblings already were.
+ */
+const violationStore = (violationRows: Map<string, ViolationRecord>): ViolationStore => ({
+  byId: (_transaction: Transaction, id: string) => Promise.resolve(violationRows.get(id)),
+  forEmployment: (
+    _transaction: Transaction,
+    employmentId: string,
+    paged: Paged,
+  ): Promise<Page<ViolationRecord>> => {
+    const matching = [...violationRows.values()]
+      .filter((row) => row.employmentId === employmentId)
+      .sort(byNewestConductThenId);
+
+    return Promise.resolve({
+      items: matching.slice(paged.offset, paged.offset + paged.limit),
+      total: matching.length,
+    });
+  },
+  inCategoryWindow: (
+    _transaction: Transaction,
+    employmentId: string,
+    violationCategoryId: string,
+    window: { readonly from: string; readonly to: string },
+  ): Promise<readonly ViolationRecord[]> =>
+    // `between` in SQL is inclusive at both ends; so is this. A fake that excluded a boundary
+    // would let a test pass on behaviour the database does not have.
+    Promise.resolve(
+      [...violationRows.values()]
+        .filter(
+          (row) =>
+            row.employmentId === employmentId &&
+            row.violationCategoryId === violationCategoryId &&
+            row.occurredOn >= window.from &&
+            row.occurredOn <= window.to,
+        )
+        .sort(
+          (left, right) =>
+            left.occurredOn.localeCompare(right.occurredOn) ||
+            left.violationId.localeCompare(right.violationId),
+        ),
+    ),
+  insert: (_transaction: Transaction, state: ViolationRecord) => {
+    violationRows.set(state.violationId, state);
     return Promise.resolve();
   },
 });

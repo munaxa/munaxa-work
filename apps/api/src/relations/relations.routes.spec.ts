@@ -43,19 +43,21 @@ const codeOf = (file: string): string =>
 const composed = (): ReturnType<typeof relationsModuleFor> => {
   const pool = new Pool({ connectionString: 'postgresql://unused:unused@127.0.0.1:1/unused' });
 
-  return relationsModuleFor(new PostgresUnitOfWork(pool, new InProcessEventDispatcher()), {
-    ask: () => Promise.reject(new Error('not called')),
-  });
+  return relationsModuleFor(
+    new PostgresUnitOfWork(pool, new InProcessEventDispatcher()),
+    { ask: () => Promise.reject(new Error('not called')) },
+    { holds: () => Promise.resolve(true) },
+  );
 };
 
 describe('the relations HTTP surface', () => {
-  it('dispatches exactly the eleven names the module registers, and no twelfth', () => {
+  it('dispatches exactly the thirteen names the module registers, and no fourteenth', () => {
     const dispatched = CONTROLLER_FILES.map(codeOf).flatMap((source) => [
       ...(source.match(/(?:queryName|commandName): 'relations\.[a-z-]+'/g) ?? []),
     ]);
 
-    expect(dispatched).toHaveLength(11);
-    expect(new Set(dispatched).size).toBe(11);
+    expect(dispatched).toHaveLength(13);
+    expect(new Set(dispatched).size).toBe(13);
   });
 
   /**

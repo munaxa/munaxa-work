@@ -52,34 +52,48 @@ const WILDCARDS = [
 ];
 
 describe('the permission set', () => {
-  it('is exactly four, and every one is explicit', () => {
+  it('is exactly six, and every one is explicit', () => {
     expect(ALL_RELATIONS_PERMISSIONS).toStrictEqual([
       'relations.category.read',
       'relations.category.manage',
       'relations.violation.read',
       'relations.violation.record',
+      'relations.investigation.conduct',
+      'relations.investigation.read-findings',
     ]);
   });
 
   /**
    * No permission names a capability that does not exist.
    *
-   * A grant for investigations, actions, warnings, grievances or appeals would be one somebody could
-   * hold over nothing — and the day the capability lands, they hold it already (D-5.2-04).
+   * A grant for actions, warnings, grievances or appeals would be one somebody could hold over
+   * nothing — and the day the capability lands, they hold it already (D-5.2-04).
+   *
+   * **`investigation` left this list because D-5.2-18 was approved and the capability now exists**,
+   * and for no other reason. The protection it gave is not lost: the exact-set assertion above pins
+   * which two investigation permissions exist, and the assertion below pins that there is no third.
    */
-  it.each([
-    'investigation',
-    'action',
-    'warning',
-    'grievance',
-    'appeal',
-    'penalty',
-    'admin',
-    'manage-all',
-  ])('declares nothing for the absent capability %s', (absent) => {
+  it.each(['action', 'warning', 'grievance', 'appeal', 'penalty', 'admin', 'manage-all'])(
+    'declares nothing for the absent capability %s',
+    (absent) => {
+      expect(
+        ALL_RELATIONS_PERMISSIONS.filter((permission) => permission.includes(absent)),
+      ).toStrictEqual([]);
+    },
+  );
+
+  /**
+   * Two investigation permissions and no more.
+   *
+   * D-5.2-18 approved exactly two and forbade a fifth investigation permission without a further
+   * decision. This is that sentence as an assertion — in particular there is no
+   * `relations.investigation.read`, because an inquiry's *existence* is part of the case and
+   * `relations.violation.read` already reaches it.
+   */
+  it('declares exactly two investigation permissions', () => {
     expect(
-      ALL_RELATIONS_PERMISSIONS.filter((permission) => permission.includes(absent)),
-    ).toStrictEqual([]);
+      ALL_RELATIONS_PERMISSIONS.filter((permission) => permission.includes('investigation')),
+    ).toStrictEqual(['relations.investigation.conduct', 'relations.investigation.read-findings']);
   });
 
   it('contains no wildcard and no prefix', () => {
@@ -104,15 +118,30 @@ describe('the permission set', () => {
       stores: inMemoryRelationsStores(),
       employments: { exists: () => Promise.resolve(true) },
       memberships: { canAct: () => Promise.resolve(true) },
+      permissions: { holds: () => Promise.resolve(true) },
       clock: { now: () => new Date() },
     });
     const declared = [...(module.commands ?? []), ...(module.queries ?? [])].map(
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(11);
+    expect(declared).toHaveLength(13);
     for (const permission of declared) expect(ALL_RELATIONS_PERMISSIONS).toContain(permission);
-    expect([...new Set(declared)].sort()).toStrictEqual([...ALL_RELATIONS_PERMISSIONS].sort());
+
+    // **Every published permission is declared by a handler except exactly one**, and naming which
+    // one is the point of this assertion. `relations.investigation.read-findings` guards a *payload*
+    // rather than an operation: the handler runs for a caller without it and returns less. It is
+    // therefore checked inside the handler, exactly as Documents checks `document.read-sensitive`,
+    // and a handler that declared it would refuse the whole read instead of redacting it.
+    //
+    // The earlier form of this assertion required the two sets to be equal. That was right while
+    // every permission gated an operation; it is replaced rather than relaxed, because an equality
+    // that quietly admitted a second undeclared permission would hide a grant nothing enforces.
+    const undeclared = ALL_RELATIONS_PERMISSIONS.filter(
+      (permission) => !declared.includes(permission),
+    );
+
+    expect(undeclared).toStrictEqual(['relations.investigation.read-findings']);
   });
 });
 

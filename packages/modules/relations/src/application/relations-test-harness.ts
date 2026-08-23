@@ -93,6 +93,8 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     holds: (permission) => Promise.resolve(granted.includes(permission)),
   };
   const dispatcher = new Dispatcher(permissions);
+  // The module receives the *same* checker the pipeline uses, so a suite cannot grant a permission
+  // to the route and withhold it from the findings rule, or the reverse.
   const clock = new FixedClock(NOW);
   const employments = new FakeEmployments();
   const memberships = new FakeMemberships();
@@ -102,6 +104,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     stores,
     employments,
     memberships,
+    permissions,
     clock,
   });
 
@@ -218,4 +221,25 @@ export const givenInvestigation = async (
   );
 
   return { violationId, investigationId: opened.investigationId };
+};
+
+/** An inquiry taken all the way to a conclusion, through the real commands. */
+export const givenConcludedInvestigation = async (
+  harness: Harness,
+  overrides: Record<string, unknown> = {},
+): Promise<{ readonly violationId: string; readonly investigationId: string }> => {
+  const opened = await givenInvestigation(harness, overrides);
+
+  await harness.as(OFFICER, () =>
+    send(harness, {
+      commandName: 'relations.conclude-investigation',
+      investigationId: opened.investigationId,
+      findings: 'The absences were unnotified and the shift log confirms them.',
+      recommendation: 'A written warning.',
+      concludedOn: '2026-08-22',
+      reason: 'The investigator has reported.',
+    }),
+  );
+
+  return opened;
 };

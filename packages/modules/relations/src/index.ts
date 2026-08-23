@@ -62,6 +62,11 @@ export type {
   ViolationRecorded,
 } from './application/violation.use-case.js';
 export type {
+  CorrectInvestigationCommand,
+  InvestigationCorrected,
+} from './application/investigation-correction.use-case.js';
+export type { ReadEscalationContext } from './application/escalation.use-case.js';
+export type {
   ConcludeInvestigationCommand,
   InvestigationConcluded,
   InvestigationOpened,

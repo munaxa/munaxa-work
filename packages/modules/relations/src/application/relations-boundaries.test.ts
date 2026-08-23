@@ -53,6 +53,7 @@ const moduleUnderTest = () =>
     stores: inMemoryRelationsStores(),
     employments: { exists: () => Promise.resolve(true) },
     memberships: { canAct: () => Promise.resolve(true) },
+    permissions: { holds: () => Promise.resolve(true) },
     clock: { now: () => new Date() },
   });
 
@@ -195,6 +196,7 @@ describe('the boundaries this module keeps', () => {
       'relations.read-investigation',
       'relations.investigations',
       'relations.case-history',
+      'relations.escalation-context',
     ]);
 
     const listing = codeOf(join(SOURCE_ROOT, 'application', 'relations-queries.ts'));
@@ -208,7 +210,7 @@ describe('the boundaries this module keeps', () => {
   });
 
   /**
-   * Five commands, and **still not one that changes or removes a recorded violation**.
+   * Six commands, and **still not one that changes or removes a recorded violation**.
    *
    * That is the assertion this test has always made, and Checkpoint 2 does not weaken it: the two
    * new commands write an investigation and a case event, and the violation row they concern is
@@ -227,12 +229,18 @@ describe('the boundaries this module keeps', () => {
       'relations.record-violation',
       'relations.open-investigation',
       'relations.conclude-investigation',
+      'relations.correct-investigation',
     ]);
+    // `correct-investigation` left this list when D-5.2-19 was approved. It is replaced by the
+    // assertions that the correction *adds a record* rather than editing one — in the application
+    // suite, and against the real trigger in the integration suite — so the protection is stronger
+    // here than the name-absence check it replaced.
     for (const forbidden of [
       'amend-violation',
       'delete-violation',
       'correct-violation',
-      'correct-investigation',
+      'amend-investigation',
+      'update-investigation',
       'delete-investigation',
       'transition-case',
       'set-case-state',
@@ -259,11 +267,11 @@ describe('the boundaries this module keeps', () => {
     expect(violationStore).not.toContain('remove(');
   });
 
-  it('registers exactly four permissions and one navigation entry', () => {
+  it('registers exactly six permissions and one navigation entry', () => {
     const module = moduleUnderTest();
 
     expect(module.permissions).toEqual(ALL_RELATIONS_PERMISSIONS);
-    expect(module.permissions).toHaveLength(4);
+    expect(module.permissions).toHaveLength(6);
     expect(module.navigation).toHaveLength(1);
     // Behind the record permission, not the catalogue one: somebody who may only maintain the
     // policy has no business finding a link to the case register.

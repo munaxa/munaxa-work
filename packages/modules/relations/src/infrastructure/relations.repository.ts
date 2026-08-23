@@ -16,6 +16,7 @@ import {
   violationCategoryValues,
   violationState,
   violationValues,
+  VIOLATION_COLUMNS,
   accessEventValues,
   type ViolationCategoryRow,
   type ViolationRow,
@@ -120,12 +121,41 @@ export class PostgresViolationCategoryRepository
 export class PostgresViolationRepository implements ViolationStore {
   public async byId(transaction: Transaction, id: string): Promise<ViolationRecord | undefined> {
     const rows = await transaction.execute<ViolationRow>(
-      `select * from relation_violation
+      `select ${VIOLATION_COLUMNS} from relation_violation
          where tenant_id = $1 and id = $2 and deleted_at is null`,
       [transaction.tenantId, id],
     );
 
     return rows[0] === undefined ? undefined : violationState(rows[0]);
+  }
+
+  /**
+   * One employment's violations of one category, inside a civil-date window.
+   *
+   * **Bounded at the database by both ends of the window**, so a ten-year history is not loaded to
+   * answer a question about six months of it. `between` is inclusive on both sides, which is the
+   * boundary rule the domain states and the tests assert in both directions.
+   *
+   * Unpaged, and bounded by the window rather than by a limit: a page boundary in the middle of a
+   * count would produce a smaller number rather than a truncated list, and a wrong count is worse
+   * than a slow one. Ordered so the caller receives a deterministic sequence.
+   */
+  public async inCategoryWindow(
+    transaction: Transaction,
+    employmentId: string,
+    violationCategoryId: string,
+    window: { readonly from: string; readonly to: string },
+  ): Promise<readonly ViolationRecord[]> {
+    const rows = await transaction.execute<ViolationRow>(
+      `select ${VIOLATION_COLUMNS} from relation_violation
+         where tenant_id = $1 and employment_id = $2 and violation_category_id = $3
+           and occurred_on between $4::date and $5::date
+           and deleted_at is null
+         order by occurred_on, id`,
+      [transaction.tenantId, employmentId, violationCategoryId, window.from, window.to],
+    );
+
+    return rows.map(violationState);
   }
 
   public forEmployment(
@@ -136,7 +166,7 @@ export class PostgresViolationRepository implements ViolationStore {
     return pageOf<ViolationRow, ViolationRecord>(
       transaction,
       {
-        select: `select * from relation_violation
+        select: `select ${VIOLATION_COLUMNS} from relation_violation
                    where tenant_id = $1 and employment_id = $2 and deleted_at is null
                    order by occurred_on desc, id desc
                    limit $3 offset $4`,

@@ -25,10 +25,28 @@ import { asNumber, orNull, orUndefined, type RowValues } from './row-writer.js';
  * column twice in one statement. The integration suite found exactly that, which is why this note
  * exists rather than a comment saying it was intended.
  *
- * `occurred_on` is a `date` and comes back as one. It is kept as the civil string the domain uses
- * rather than converted to a `Date`, because the day conduct happened is a day in the tenant's
- * world — turning it into an instant would attach a time zone to a fact that has none.
+ * **Civil dates are projected as text, and that is load-bearing.** `node-postgres` returns a `date`
+ * column as a JavaScript `Date` at midnight UTC, so `select *` would hand the mapper an object where
+ * the row type promises `'YYYY-MM-DD'`. Checkpoint 1 declared the string and no test read one back
+ * from the database, so the mismatch sat unnoticed until Checkpoint 3 compared civil dates to bound
+ * a repeat window — where a `Date` on the left of a string comparison silently produces the wrong
+ * set. Every select of these tables therefore names its columns and wraps the dates in `to_char`
+ * rather than using `select *`.
+ *
+ * Kept as strings rather than converted to `Date` for the original reason: the day conduct happened
+ * is a day in the tenant's world, and turning it into an instant attaches a time zone to a fact that
+ * has none.
  */
+
+/** The violation's columns, with `occurred_on` as a civil string. Used by every read of the table. */
+export const VIOLATION_COLUMNS = `id, tenant_id, employment_id, violation_category_id,
+  category_code, severity, to_char(occurred_on, 'YYYY-MM-DD') as occurred_on,
+  reported_by, description, state, recorded_at, version`;
+
+/** The investigation's columns, with both civil dates as strings, for the same reason. */
+export const INVESTIGATION_COLUMNS = `id, tenant_id, violation_id, investigator_membership_id,
+  to_char(opened_on, 'YYYY-MM-DD') as opened_on, subject, findings, recommendation,
+  to_char(concluded_on, 'YYYY-MM-DD') as concluded_on, state, corrects_investigation_id, version`;
 
 export interface ViolationCategoryRow {
   readonly id: string;
@@ -161,6 +179,7 @@ export interface InvestigationRow {
   readonly recommendation: string | null;
   readonly concluded_on: string | null;
   readonly state: string;
+  readonly corrects_investigation_id: string | null;
   readonly version: number | string;
 }
 
@@ -179,6 +198,9 @@ export const investigationState = (row: InvestigationRow): InvestigationRecord =
   ...(orUndefined(row.concluded_on) === undefined
     ? {}
     : { concludedOn: row.concluded_on as string }),
+  ...(orUndefined(row.corrects_investigation_id) === undefined
+    ? {}
+    : { correctsInvestigationId: row.corrects_investigation_id as string }),
 });
 
 export const investigationValues = (state: InvestigationRecord, tenantId: string): RowValues => ({
@@ -192,6 +214,7 @@ export const investigationValues = (state: InvestigationRecord, tenantId: string
   recommendation: orNull(state.recommendation),
   concluded_on: orNull(state.concludedOn),
   state: state.state,
+  corrects_investigation_id: orNull(state.correctsInvestigationId),
 });
 
 export interface CaseEventRow {

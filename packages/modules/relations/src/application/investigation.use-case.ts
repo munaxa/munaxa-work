@@ -42,10 +42,16 @@ import type { RelationsDependencies } from './relations-dependencies.js';
  * expiry moves a case along. Every transition in this module is a named human doing something
  * (ADR-0045), and there is no machine actor that could do it instead.
  *
- * **Both commands use the permissions Checkpoint 1 already defined.** Opening and concluding an
- * inquiry are the disciplinary-handling capability `relations.violation.record` already names, and no
- * new permission was unavoidable — so none was created. The case for separating them is recorded as
- * an open decision rather than implemented (D-5.2-18).
+ * **All three commands require `relations.investigation.conduct`** (D-5.2-18, approved 2026-08-23).
+ * Checkpoint 2 shipped them under `relations.violation.record` and recorded the case for separating
+ * them; the owner approved it, so conducting an inquiry is now its own capability and filing a report
+ * no longer implies concluding one. The grant does **not** carry findings: reading them back needs
+ * `relations.investigation.read-findings` as well.
+ *
+ * **Correcting is a third command and not a fourth state** (D-5.2-19, approved 2026-08-23). It
+ * inserts a *new* investigation naming the one it corrects and **never writes to the corrected row**
+ * — so the Checkpoint 2 trigger is untouched, D-5.2-17 is not reopened, and the chain reads as what
+ * actually happened: somebody concluded, somebody corrected it, and both accounts survive.
  */
 
 export interface OpenInvestigationCommand extends Command {
@@ -68,7 +74,7 @@ export const openInvestigationHandler = (
   dependencies: RelationsDependencies,
 ): CommandHandler<OpenInvestigationCommand, InvestigationOpened> => ({
   commandName: 'relations.open-investigation',
-  permission: RelationsPermissions.violationRecord,
+  permission: RelationsPermissions.investigationConduct,
 
   handle: async (command) =>
     dependencies.unitOfWork.execute(async (transaction) => {
@@ -139,7 +145,7 @@ export const concludeInvestigationHandler = (
   dependencies: RelationsDependencies,
 ): CommandHandler<ConcludeInvestigationCommand, InvestigationConcluded> => ({
   commandName: 'relations.conclude-investigation',
-  permission: RelationsPermissions.violationRecord,
+  permission: RelationsPermissions.investigationConduct,
 
   handle: async (command) =>
     dependencies.unitOfWork.execute(async (transaction) => {

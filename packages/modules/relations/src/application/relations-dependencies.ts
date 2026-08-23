@@ -1,4 +1,4 @@
-import type { UnitOfWork } from '@work/kernel';
+import type { PermissionChecker, UnitOfWork } from '@work/kernel';
 
 import type {
   Clock,
@@ -10,7 +10,7 @@ import type {
 /**
  * Everything this module needs from outside itself, in one place.
  *
- * **Four, and no more.** Checkpoint 2 added exactly one — `memberships`, so an investigator named on
+ * **Five, and no more.** Checkpoint 3 added `permissions`; Checkpoint 2 added exactly one — `memberships`, so an investigator named on
  * a command is a membership that really may act rather than a string somebody typed. It reaches an
  * existing published query under a bounded grant and learns one boolean.
  *
@@ -20,14 +20,20 @@ import type {
  * `ApprovalPort`, because Checkpoint 1 issues nothing that needs approving. There is **no `JobPort`**
  * — nothing in this module is scheduled, and declaring one would imply it could be.
  *
- * There is also no `PermissionChecker`. Documents needs one because its search assembles an answer
- * from what the caller holds; nothing here does that. A caller either may read a violation or may
- * not, and the pipeline settles it before a handler runs.
+ * **`permissions` arrived with D-5.2-18 and it changed a stated assumption**, so the old reasoning is
+ * corrected here rather than quietly deleted. Checkpoint 1 wrote that no `PermissionChecker` was
+ * needed because *"a caller either may read a violation or may not, and the pipeline settles it
+ * before a handler runs"*. That was true while every payload was equally sensitive. It stopped being
+ * true when an inquiry's findings became a second disclosure inside a payload the same permission
+ * already reached — so the answer is now assembled from what the caller holds, exactly as Documents'
+ * search is, and the checker is the same one Documents receives rather than a second engine.
  */
 export interface RelationsDependencies {
   readonly unitOfWork: UnitOfWork;
   readonly stores: RelationsStores;
   readonly employments: EmploymentDirectoryPort;
   readonly memberships: MembershipDirectoryPort;
+  /** The pipeline's own checker. Used for one question: may this caller see findings? */
+  readonly permissions: PermissionChecker;
   readonly clock: Clock;
 }

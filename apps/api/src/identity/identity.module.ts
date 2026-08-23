@@ -177,7 +177,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         learning: learningModuleFor(unitOfWork, senders.payroll, permissions),
         career: careerModuleFor(unitOfWork, senders.payroll, permissions),
         workflow: workflowModuleFor(unitOfWork, senders.payroll, senders.recruitment, permissions),
-        relations: relationsModuleFor(unitOfWork, senders.payroll),
+        relations: relationsModuleFor(unitOfWork, senders.payroll, permissions),
       }),
     },
     {

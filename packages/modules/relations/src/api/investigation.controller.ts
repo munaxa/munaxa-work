@@ -5,13 +5,18 @@ import type {
   ConcludeInvestigationCommand,
   OpenInvestigationCommand,
 } from '../application/investigation.use-case.js';
+import type { CorrectInvestigationCommand } from '../application/investigation-correction.use-case.js';
 import type {
   ListInvestigations,
   ReadCaseHistory,
   ReadInvestigation,
 } from '../application/relations-queries.js';
 
-import { ConcludeInvestigationBody, OpenInvestigationBody } from './relations.dto.js';
+import {
+  ConcludeInvestigationBody,
+  CorrectInvestigationBody,
+  OpenInvestigationBody,
+} from './relations.dto.js';
 import { RelationsDispatcher } from './relations-dispatcher.js';
 import { unwrapOrThrow } from './handler-result.js';
 
@@ -89,6 +94,28 @@ export class InvestigationController {
     return unwrapOrThrow(
       await this.dispatcher.send<unknown, ConcludeInvestigationCommand>({
         commandName: 'relations.conclude-investigation',
+        investigationId,
+        ...body,
+      }),
+    );
+  }
+  /**
+   * A correction: a `POST` that **creates a new inquiry**, not a `PUT` that replaces the old one.
+   *
+   * The verb is the contract. `PUT` would say the concluded inquiry is being overwritten, and it is
+   * not — it is untouched, and this returns a different identifier from the one in the path. The
+   * response carries both, so a caller can follow the chain without a second read.
+   */
+  @Post(':investigationId/correction')
+  @ApiOperation({ summary: 'Correct a concluded inquiry by recording a new, linked one' })
+  @ApiOkResponse({ description: 'The corrected inquiry is unchanged. Both accounts survive.' })
+  public async correct(
+    @Param('investigationId') investigationId: string,
+    @Body() body: CorrectInvestigationBody,
+  ): Promise<unknown> {
+    return unwrapOrThrow(
+      await this.dispatcher.send<unknown, CorrectInvestigationCommand>({
+        commandName: 'relations.correct-investigation',
         investigationId,
         ...body,
       }),

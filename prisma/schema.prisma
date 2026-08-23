@@ -5580,6 +5580,9 @@ model RelationInvestigation {
   recommendation             String?
   concluded_on               DateTime? @db.Date
   state                      String    @db.VarChar(24)
+  /// The concluded inquiry this one corrects (D-5.2-19). Backward-pointing, so the corrected row is
+  /// never written to and the Checkpoint 2 immutability trigger needs no exception.
+  corrects_investigation_id  String?   @db.Uuid
   metadata                   Json
   created_at                 DateTime  @db.Timestamptz(6)
   created_by                 String    @db.VarChar(255)
@@ -5591,10 +5594,15 @@ model RelationInvestigation {
 
   violation   RelationViolation   @relation(fields: [violation_id], references: [id], map: "relation_investigation_violation_fk")
   case_events RelationCaseEvent[]
+  corrects    RelationInvestigation?  @relation("InvestigationCorrection", fields: [corrects_investigation_id], references: [id], map: "relation_investigation_corrects_fk")
+  corrected_by RelationInvestigation[] @relation("InvestigationCorrection")
 
   /// One open inquiry per violation, settled by the database rather than by a preceding read
   /// (ADR-0071). Partial, so any number of concluded ones may accumulate.
+  /// At most one correction per conclusion, so the chain stays linear rather than branching into two
+  /// rival versions of what was found. Settled by the database, not by a preceding read (ADR-0071).
   @@index([tenant_id, violation_id, opened_on, id], map: "relation_investigation_violation_idx")
+  @@index([tenant_id, corrects_investigation_id], map: "relation_investigation_corrected_idx")
   @@map("relation_investigation")
 }
 

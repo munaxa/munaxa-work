@@ -264,6 +264,7 @@ describe('the vocabularies', () => {
       'investigation_read',
       'investigation_listed',
       'case_history_read',
+      'escalation_read',
     ]);
   });
 });
