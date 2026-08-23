@@ -35,17 +35,28 @@ given for them.
 | D-5.2-05 | Read auditing — AD-007 | **APPROVED** 2026-08-22 | **resolved** |
 | D-5.2-06 | Country-pack constraint on categories — AD-002 | **APPROVED** 2026-08-22 | **resolved** |
 | D-5.2-07 | Penalty ladder: shape, and whether it lands in checkpoint 1 | **APPROVED** 2026-08-22 | **resolved** |
-| D-5.2-08 | Evidence attachments — the Documents contract | **OPEN** | no (deferred out) |
-| D-5.2-09 | Warning expiry — derived or persisted (AD-006) | **OPEN** | no |
-| D-5.2-10 | Payroll penalty intake — AD-004 | **OPEN** | no |
-| D-5.2-11 | Employment termination recommendation — AD-005 | **OPEN** | no |
-| D-5.2-12 | Workflow approval adoption — AD-008 | **OPEN** | no |
-| D-5.2-13 | Grievance confidentiality | **OPEN** | no |
+| D-5.2-08 | Evidence attachments — the Documents contract | **OPEN** | no — deferred out of Checkpoint 2 |
+| D-5.2-09 | Warning expiry — derived or persisted (AD-006) | **OPEN** | no — no warning exists to expire until Checkpoint 3 |
+| D-5.2-10 | Payroll penalty intake — AD-004 | **OPEN** | no — nothing imposes a penalty until Checkpoint 3 |
+| D-5.2-11 | Employment termination recommendation — AD-005 | **OPEN** | no — a recommendation is an *outcome*, and Checkpoint 2 issues none |
+| D-5.2-12 | Workflow approval adoption — AD-008 | **OPEN** | no — nothing is *issued* in Checkpoint 2, so nothing needs approving |
+| D-5.2-13 | Grievance confidentiality | **OPEN** | no — grievances are a later checkpoint |
 | D-5.2-14 | Scope of the first implementation checkpoint | **APPROVED** 2026-08-22 | **resolved** |
+| **D-5.2-15** | **How the violation lifecycle advances, given an immutable violation row** | **OPEN** | **YES — blocks Checkpoint 2** |
+| **D-5.2-16** | **What an investigation is, and who may run one** | **OPEN** | **YES — blocks Checkpoint 2** |
+| **D-5.2-17** | **Whether findings are immutable, and how a correction is made (AD-003)** | **OPEN** | **YES — blocks Checkpoint 2** |
 
-All six blocking decisions are **APPROVED**, and none required a new architectural pattern: every one
-resolved onto a mechanism this repository already runs. The eight that remain `OPEN` are untouched by
-this approval and none of them was needed by Checkpoint 1.
+All six of Checkpoint 1's blocking decisions are **APPROVED**, and none required a new architectural
+pattern: every one resolved onto a mechanism this repository already runs.
+
+**The Checkpoint 2 investigation added three decisions and closed none.** D-5.2-15, D-5.2-16 and
+D-5.2-17 did not exist before it, and the first of them is the reason: **Checkpoint 1 made the
+violation row immutable and locked its `state` column to `'reported'`, so the specification's
+lifecycle cannot advance by updating it.** That is not a defect — it is AD-003 working — but it means
+the next checkpoint must decide *where* lifecycle state lives before it writes anything. Six earlier
+decisions remain `OPEN` and **none of them blocks Checkpoint 2**; each is investigated below with a
+recommendation, and every recommendation is analysis offered to the owner rather than a decision
+taken.
 
 ---
 
@@ -278,7 +289,7 @@ any inference of legal validity from the sequence.
 
 ---
 
-## D-5.2-08 — Evidence attachments · OPEN · *not required by checkpoint 1*
+## D-5.2-08 — Evidence attachments · **OPEN** · *investigated for Checkpoint 2*
 
 **The requirement.** `Violation` — *"evidence attachments"*. `Investigation` — *"statements,
 evidence"*.
@@ -306,7 +317,46 @@ Phase 4.1's open `NOT VERIFIED` item, not 5.2's to close.
 evidence is attached to it — which is also how the lifecycle reads: *Violation Reported → Under
 Investigation*, with evidence gathered during investigation.
 
-## D-5.2-09 — Warning expiry · OPEN · *not required by checkpoint 1*
+### Checkpoint 2 investigation · 2026-08-23
+
+**`StoragePort` still has no adapter.** The interface is declared in `packages/kernel/src/ports`
+and **nothing implements it** anywhere in the repository. The only `StorageAccessPort` in production
+is Documents' `storageUnavailable`, which answers `available: false` rather than returning a URL —
+*"not a fake and not a stub … the difference between the capability is not wired and the capability
+is broken."*
+
+**Documents already provides the whole boundary Relations needs, and it needs no change.**
+`Document.owner_type` accepts `employment`, so evidence about a disciplinary matter files against the
+same employment the violation names. Documents owns the file, its versions, its verification and its
+access trail. Relations would own **only the link**.
+
+**One precise obstacle, found by reading the migration.** `document_source_check` is a **closed
+vocabulary** — `('direct', 'recruitment', 'onboarding', 'letter', 'migration')`. There is no
+`relations` value, so filing evidence *as* a Documents row that names Relations as its origin would
+require a **Documents migration and a Documents vocabulary change**. That is a cross-module change to
+a completed module, and it is avoidable.
+
+**Options.**
+- **(a)** Relations owns a link table `relation_violation_evidence (violation_id, document_id, …)`.
+  Documents is unchanged; the document is created through `documents.create-document` with
+  `source='direct'` as it already permits, and Relations records that the document is evidence for a
+  violation. **No Documents migration, no vocabulary widening, no storage adapter.**
+- **(b)** Widen `document_source_check` to include `relations` and hang the link off
+  `source_reference`. Needs a Documents migration; puts a Relations concept inside Documents' schema.
+- **(c)** Relations stores its own attachment rows. Duplicates a concept Documents owns.
+- **(d)** Build a `StoragePort` adapter. Out of scope and not Relations' to build.
+
+**Recommendation: (a).** It is the only option that adds nothing to another module. It also separates
+cleanly, exactly as the instruction asks: **the metadata contract** (a violation has evidence, which
+is a document, added by someone at a time) is Relations'; **the physical storage** is Documents' and
+remains `NOT VERIFIED` until a `StoragePort` adapter exists somewhere. Evidence can therefore be
+added later **without redesigning violations or disciplinary records** — the link table is additive
+and touches neither.
+
+*Blocks Checkpoint 2?* **No.** Recommended for Checkpoint 3, alongside the investigation findings it
+supports.
+
+## D-5.2-09 — Warning expiry · **OPEN** · *investigated for Checkpoint 2*
 
 **The requirement.** AD-006: *"Warnings expire. Validity periods are configurable, and an expired
 warning no longer counts toward escalation."*
@@ -337,7 +387,33 @@ lists. An event is something that *fires*, and nothing in this repository fires 
 checkpoint's own constraints. **(b) is refused** — nothing exists to maintain the flag, which is
 precisely the state ADR-0070 calls worse than no flag.
 
-## D-5.2-10 — Payroll penalty intake · OPEN · *not required by checkpoint 1*
+### Checkpoint 2 investigation · 2026-08-23
+
+**No new evidence argues for persistence, and two precedents argue against it.** Workflow's
+`serviceLevelState` derives `within` / `overdue` and the overdue minutes from the target, the instant
+the step became awaiting and an explicit reading instant — **stored nowhere**. Career's `reviewDue` is
+derived on every read and *"notifies nobody. `JobPort` has no adapter."* Both are the same shape as a
+warning's validity window.
+
+**The question the instruction asks — does expiry change business state or merely eligibility — has a
+clear answer here.** AD-006's operative clause is *"an expired warning no longer counts toward
+escalation."* That is **eligibility**: when counting prior warnings, exclude those whose window has
+closed. Nothing about the warning itself changes; it remains issued, acknowledged and true. So there
+is no business state to persist.
+
+**The one part that is genuinely a state change** would be a `WarningExpired` **event** — something
+that *fires* on a date. `JobPort` has no adapter, and Phase 16E assigned the runner to Platform.
+
+**Recommendation stands: derived at read time.** Derivation: a warning is expired at instant *T* when
+`issuedOn + validityDays <= T`, computed from the warning's own window and a **supplied** reading
+instant, in the Relations domain beside the escalation count that consumes it — never in a
+repository, never in a controller. No `expired` column, no sweep, no timer. `WarningExpired` recorded
+**`NOT VERIFIED`**, with the Platform job runner named as its dependency.
+
+*Blocks Checkpoint 2?* **No — and it cannot.** Checkpoint 2 issues no warning, so there is nothing to
+expire. This decision becomes live in the checkpoint that introduces warnings.
+
+## D-5.2-10 — Payroll penalty intake · **OPEN** · *investigated for Checkpoint 2*
 
 **The requirement.** AD-004: *"A disciplinary action that carries a financial penalty produces an
 authorized deduction instruction for Payroll. This domain never computes payroll."*
@@ -362,7 +438,41 @@ failure mode Payroll's pull design exists to avoid. (c) inverts the direction ev
 dependency runs in. **(a) still requires an owner decision** because it adds a published contract and
 changes a completed module.
 
-## D-5.2-11 — Employment termination recommendation · OPEN · *not required by checkpoint 1*
+### Checkpoint 2 investigation · 2026-08-23
+
+**Payroll's inbound surface re-verified, and the finding holds.** Every cross-module port it declares
+is a `*SourcePort` it **reads**: `EmploymentSourcePort`, `CompensationSourcePort`,
+`AttendanceSourcePort`, `LeaveSourcePort`, `OrganizationSourcePort`. Each exposes a `factsFor`-shaped
+read. **There is no inbound instruction command and no subscription.**
+
+**`payroll.record-adjustment` exists and is not the seam.** It takes a `payrollRunId`, a treatment
+code, an amount and a reason — it is a **payroll clerk's manual adjustment inside a specific run**,
+declared under a Payroll permission, and its own phase describes it as *"manual adjustments with a
+written reason"*. Relations calling it would mean a disciplinary module writing directly into a
+payroll run, choosing the run, and holding a Payroll permission to do it. That is not AD-004's
+*"produces an authorized deduction instruction"* — it is Relations computing payroll, which AD-004
+forbids in the same sentence.
+
+**So the smallest contract consistent with Payroll's architecture is a read Payroll pulls.**
+Relations publishes `relations.authorized-penalties` — bounded, period-scoped, returning the
+`(employmentId, amount-or-basis, reasonCode, authorizedOn, disciplinaryActionId)` of penalties an
+approved disciplinary action authorized. Payroll gains a `RelationsSourcePort` and calls it exactly as
+it calls the other five. **Relations never writes Payroll; Payroll decides what a penalty is worth**,
+which keeps ADR-0054's rule that Payroll owns what a minute or a deduction is worth.
+
+**No event.** Phase 11's own record: *"Reconciliation is a pull, so correctness never depends on an
+event having been delivered."* A financial deduction is the last fact in this product that should
+depend on at-most-once dispatch.
+
+**This still requires an owner decision**, because it adds a published Relations contract *and* a new
+port and call site inside Payroll, a completed module. **Nothing about it should be built
+speculatively**: the read has no consumer until Payroll is changed, and a query nobody calls is the
+shape ADR-0070 warns about.
+
+*Blocks Checkpoint 2?* **No.** Checkpoint 2 issues no disciplinary action, so no penalty is
+authorized and there is nothing to publish.
+
+## D-5.2-11 — Employment termination recommendation · **OPEN** · *investigated for Checkpoint 2*
 
 **The requirement.** AD-005: a recommendation only — *"Employment executes, through its own lifecycle
 and approvals."*
@@ -375,7 +485,41 @@ AD-005 forbids.
 read; a human acts on it through Employment's existing lifecycle. **No Employment change, no
 automatic call.** Confirmation needed that a recommendation creates no obligation in Employment.
 
-## D-5.2-12 — Workflow approval adoption · OPEN · *not required by checkpoint 1*
+### Checkpoint 2 investigation · 2026-08-23
+
+**Employment owns termination, unambiguously.** It publishes `employment.end-employment` and
+`employment.change-status`, each behind an Employment permission, each driving Employment's own
+lifecycle and its `PERMITTED_TRANSITIONS` vocabulary. AD-005 is equally unambiguous: *"A disciplinary
+action that recommends termination produces a recommendation only. Employment executes, through its
+own lifecycle and approvals."*
+
+**So the safest default the instruction names is also the specification's:** Relations records a
+recommendation and **must not mutate employment status**. Concretely that means Relations holds **no
+`EmploymentPort` write of any kind** — its only Employment dependency stays the existence check
+Checkpoint 1 built, which returns a boolean.
+
+**A recommendation changes no employment state**, and that is the property to preserve: an employment
+whose disciplinary file contains a termination recommendation is in exactly the status it was in
+before. Whether Employment should *surface* pending recommendations is Employment's decision, not
+this phase's.
+
+**Automatic termination must remain impossible**, and in this repository it already is, structurally:
+Relations has no command that reaches Employment, `JobPort` has no adapter, and Employment's own
+commands require a human's permission. **No code should be written to "prevent" it** — the absence is
+the prevention, and a guard would imply a path exists.
+
+**Options.** (a) Relations records the recommendation and publishes a read; a human acts in Employment.
+(b) Relations calls `employment.end-employment` under a service grant — **refused**: that *is* the
+execution AD-005 forbids. (c) Workflow routes the recommendation to Employment through
+`BusinessDecisionPort` — plausible later, but it makes an approved recommendation *execute*, which is
+(b) with more steps.
+
+**Recommendation: (a).**
+
+*Blocks Checkpoint 2?* **No.** A recommendation is an *outcome of a disciplinary action*, and
+Checkpoint 2 issues none.
+
+## D-5.2-12 — Workflow approval adoption · **OPEN** · *investigated for Checkpoint 2*
 
 **The requirement.** AD-008 (due process — *"notice, hearing, response window and approvals"*) and the
 Non-Goal *"Workflow engine — approvals route through Workflow."*
@@ -392,7 +536,41 @@ That is a composition-root addition, **not a Workflow modification**.
 **Recommendation:** adopt `ApprovalPort` with `subjectType: 'relations.disciplinary-action'`, add
 `RelationsDecisions` in `apps/api`. **No generic workflow engine, no second approval mechanism.**
 
-## D-5.2-13 — Grievance confidentiality · OPEN · *not required by checkpoint 1*
+### Checkpoint 2 investigation · 2026-08-23
+
+**Workflow needs no change, and the precedent is complete.** `ApprovalPort.request` takes an opaque
+`subjectType`; Workflow's controller *"neither holds nor interprets"* it. The return path is
+`BusinessDecisionPort { apply(approval): Promise<ApprovalDelivery> }`, and
+`apps/api/src/workflow/recruitment-decisions.ts` is a working implementation whose own comment states
+the rule: *"a terminal approval arrives, and this carries it to Recruitment's own published `decide`
+command. Every other subject type … is not recognized, and is answered `not-adopted`. That is how
+Workflow stays free of module names while exactly one module is adopted."*
+
+**The one real change** is that the adapter currently adopts exactly one subject. Adopting a second
+means either extending `RecruitmentDecisions` into a two-subject adapter or composing a
+`RelationsDecisions` beside it — **a composition-root change in `apps/api`, not a Workflow change.**
+Which of the two is cleaner is worth deciding when it is built; neither touches Workflow.
+
+**What Relations needs Workflow for, and what it does not.**
+
+| Capability | Workflow? | Why |
+|---|---|---|
+| Approving a **disciplinary action** before issue (AD-008) | **yes** | routed, multi-approver, delegation and escalation already exist |
+| **Escalation** of a stuck approval | **yes, free** | Workflow 16D, no Relations work |
+| **Investigation** | **no** | an investigation is an inquiry, not an approval — nobody approves *opening* one |
+| **Findings** | **no** | a finding is a conclusion the investigator records |
+| **Termination recommendation** | **no** | it is an outcome, and Employment executes (D-5.2-11) |
+| Grievance handling | **undecided** | depends on D-5.2-13 |
+
+**Subject identifier and lifecycle, as recommended:** `subjectType = 'relations.disciplinary-action'`,
+`subjectId = disciplinaryActionId`; the action is created `pending-approval`, `ApprovalPort.request`
+is called, and a terminal approval arrives at `RelationsDecisions.apply`, which calls Relations' own
+`decide` command — **Relations decides whether it may be issued, in Relations' transaction, against
+Relations' own lifecycle.** The adapter translates and reconciles; it evaluates nothing.
+
+*Blocks Checkpoint 2?* **No.** Nothing is *issued* in Checkpoint 2, so nothing needs approving.
+
+## D-5.2-13 — Grievance confidentiality · **OPEN** · *investigated for Checkpoint 2*
 
 `Grievance` carries *"confidentiality"*. **Evidence:** Documents established that confidentiality is
 applied **in** the query rather than after it, *"so a caller without `document.read-sensitive` neither
@@ -401,6 +579,44 @@ disclosure."*
 
 **Recommendation:** the same rule, in the query. A grievance often names the manager it is about, so
 a filtered count would leak its existence to exactly the wrong reader.
+
+### Checkpoint 2 investigation · 2026-08-23
+
+**Confidentiality in this repository is a classification on the record plus a second permission — not
+a per-row access list.** Documents' `hiddenFromCaller` is the whole mechanism: a `confidential`
+document needs `document.read-sensitive` *in addition to* `document.read`, and a hit becomes **not
+found** rather than forbidden, because *"a manager learning that a medical certificate exists has
+learned the thing the confidentiality level was protecting."* There is **no row-level ACL anywhere in
+this product**, and no role engine.
+
+**The decisive finding — and it is a repository-wide one.** *"The raiser can see their own
+grievance"* is **not implementable today**. Documents' permission file states it plainly: *"`read-own`
+is declared and **enforced nowhere** … There is no authenticated-principal-to-employment resolution in
+this repository (ADR-0032)."* **Ten modules** — attendance, career, compensation, documents, learning,
+leave, letters, payroll, performance and workflow — each declare a `read-own` permission that nothing
+enforces, for that reason. ADR-0032 resolves a principal to a **tenant membership**, which is what
+makes tenancy work; it does not resolve a principal to an **employment**, which is what
+self-service would need.
+
+**So the honest model is HR-scoped, not participant-scoped:**
+- `relations.grievance.read` — the grievance register, for the people who handle grievances.
+- `relations.grievance.read-sensitive` — required *in addition* for a grievance a tenant classified
+  confidential; a caller without it gets **not found**, and **learns no count**.
+- `relations.grievance.read-own` — **declared and enforced nowhere**, matching the ten modules that
+  already do this, so the contract exists for the day the Platform capability does.
+
+**Managers see nothing by default**, and nothing derives visibility from the reporting line — the same
+rule Documents' D-9 set (*"None by default and never derived from the reporting line"*). A grievance is
+frequently *about* the manager.
+
+**What is NOT recommended:** a per-row participant ACL (no precedent, and it is an authorization
+model), a role engine (forbidden), a wildcard, or duplicating Platform authorization.
+
+**The Platform dependency, documented rather than invented:** participant-scoped visibility —
+raiser, handler, named respondent — requires principal→employment resolution that **does not exist**.
+Until it does, self-service grievance access is **`NOT VERIFIED`**.
+
+*Blocks Checkpoint 2?* **No.** Grievances are a later checkpoint.
 
 ---
 
@@ -433,3 +649,111 @@ enforcement · Admin · generic relations workflow · generic automation.
 
 **Every one of those is absent from the implementation**, asserted by a negative-space suite rather
 than promised in prose.
+
+---
+
+# Decisions opened by the Checkpoint 2 investigation
+
+Three, all **OPEN**, all Work-owned, and **all three block Checkpoint 2**. None existed before this
+investigation; the first is the reason the other two are needed.
+
+## D-5.2-15 — How the violation lifecycle advances, given an immutable violation row · **OPEN**
+
+**The finding.** Checkpoint 1 delivered `relation_violation` with a trigger refusing every `UPDATE`
+and `DELETE`, and a `state` column locked by
+`relation_violation_state_check check (state in ('reported'))`. The specification's lifecycle runs
+*Violation Reported → Under Investigation → Findings → Pending Approval → Action Issued → …*.
+
+**Those two facts cannot both be satisfied by the column.** Advancing the lifecycle by updating
+`relation_violation.state` is impossible — the trigger raises — and making it possible would mean
+reopening D-5.2-03, which this checkpoint may not do. **This is not a defect.** It is AD-003 working
+exactly as approved: the record of what was alleged, by whom, on what date, is evidence and does not
+move. What has to move is *where the case has got to*, which is a different fact.
+
+**Options.**
+- **(a) Derived from the records that exist.** A violation is *under investigation* when an open
+  investigation references it, *concluded* when that investigation has findings, and so on. No column,
+  no transition log; the state is a projection computed at read time, exactly as
+  `serviceLevelState` and `reviewDue` are. `relation_violation.state` stays `'reported'` for ever and
+  means *"what this record was when it was written"*, which is what an immutable row should say.
+- **(b) An append-only transition log**, `relation_violation_history`, whose latest row is the state.
+  Mirrors `workflow_history`; gives an explicit audited transition with actor, timestamp and **reason**
+  (the specification requires all three: *"Every transition is audited with actor, timestamp and
+  reason"*). Costs a table and an ordering rule.
+- **(c) Both**: the log is authoritative for *how it got here* and the current state is derived as the
+  latest entry.
+- **(d) Widen the CHECK and make the row mutable.** **Refused** — reopens D-5.2-03.
+
+**Recommendation: (b), with the state read as the latest entry.** The specification's *"every
+transition is audited with actor, timestamp and reason"* is a requirement (a) cannot meet: a derived
+state has no actor and no reason, and in a labour dispute *who moved this case, when, and why* is
+precisely what is asked. (b) is also the repository's own answer to the same problem —
+`workflow_history` is an append-only, trigger-immutable log carrying actor and event, and Workflow
+reads state from the aggregate while the log carries the narrative. (c) is (b) with the derivation
+named, and is what the recommendation amounts to in practice.
+
+**Consequence to accept openly:** `relation_violation.state` becomes a historical field meaning *the
+state at recording*, and every reader of the *current* state uses the log. That is a small
+awkwardness, and the alternative — a mutable evidence row — is a much larger one. The column's own
+comment already says the CHECK widens *"by an approved change"*; this decision is that change not
+happening, which is the cleaner outcome.
+
+**Dependencies:** none outside Relations. **Risks:** an ordering rule is needed so two transitions in
+one millisecond read deterministically (`(occurred_at, id)`, as `workflow_history` does).
+**Blocks Checkpoint 2: YES.**
+
+## D-5.2-16 — What an investigation is, and who may run one · **OPEN**
+
+**Specification.** *"**Investigation** — investigator, statements, evidence, findings, recommendation,
+dates."*
+
+**What is undecided.** Whether an investigation is **one aggregate with a lifecycle** (opened →
+concluded) or a bundle of separate records; whether **statements** are rows of their own or text on
+the investigation; whether more than one investigation may be open against one violation; and which
+permission opens it — `relations.investigation.manage`, or a reuse of `relations.violation.record`.
+
+**Evidence.** The specification lists `InvestigationOpened` and `InvestigationConcluded` as separate
+domain events, which reads as one aggregate with two transitions rather than a bundle. *"Statements"*
+is plural and belongs to people, which argues for rows; but nothing in Checkpoint 2's value depends on
+statements being separately queryable.
+
+**Options.** **(a)** One `relation_investigation` aggregate; statements and findings are text on it;
+**one open investigation per violation**, enforced by a partial unique index (ADR-0071 — never a
+select-then-insert). **(b)** As (a), plus a `relation_investigation_statement` table. **(c)** Reuse
+the violation permissions rather than adding any.
+
+**Recommendation: (a), with two new permissions** — `relations.investigation.manage` and
+`relations.investigation.read`. Statements as rows are deferred until something needs to read one
+independently; adding a table for them later is additive. **(c) is not recommended**: opening an
+investigation into somebody is a materially different act from filing a report, and AD-007's
+*"restricted independently"* argues for separating them.
+
+**Risks:** the investigator is a membership identifier, and Relations must not resolve it to a person —
+the same rule Checkpoint 1 kept. **Blocks Checkpoint 2: YES.**
+
+## D-5.2-17 — Whether findings are immutable, and how a correction is made · **OPEN**
+
+**Specification.** AD-003: *"The record is immutable. A correction is a new, linked record with a
+stated reason. Nothing is edited or deleted, including after an appeal succeeds — a successful appeal
+annuls, it does not erase."*
+
+**What is undecided.** Checkpoint 1 built the *first half* — the trigger — and deliberately left the
+second: *"There is no correction path, because there is nothing to correct into."* An investigation
+with findings is the first record that can plausibly need correcting, so the second half has to be
+decided now.
+
+**Options.** **(a)** The investigation is trigger-immutable once concluded, and a correction is a new
+investigation row linked by `corrects_investigation_id` with a stated `correction_reason`. **(b)** The
+investigation is mutable while open and trigger-immutable on conclusion. **(c)** Insert-only versions
+with a `current_version_id` pointer, as `document_version` does.
+
+**Recommendation: (b) plus (a)** — mutable while the investigation is open, because a draft an
+investigator is still writing is not yet evidence; **immutable from the moment it concludes**; and a
+concluded investigation corrected only by a new linked row carrying a reason. That is the shape
+AD-003 describes, and (b)'s open-draft window is the same distinction Letters draws between a template
+version and one that has issued a letter (`app_letter_template_version_refuse_issued` refuses a change
+only *after* first issue — a conditional trigger, and the precedent for exactly this).
+
+**Risks:** a conditional trigger is harder to reason about than an unconditional one; the assertion
+must prove both directions — an open investigation *can* be amended, a concluded one *cannot*.
+**Blocks Checkpoint 2: YES.**
