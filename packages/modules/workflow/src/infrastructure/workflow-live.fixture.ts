@@ -16,7 +16,7 @@ import {
   FakeReportingLine,
   FixedClock,
 } from '../application/workflow-test-harness.js';
-import type { WorkflowInstanceDetailView } from '../contracts/views.js';
+import type { WorkflowInstanceDetailView } from '../contracts/execution-views.js';
 import {
   APPROVER,
   REQUESTER,

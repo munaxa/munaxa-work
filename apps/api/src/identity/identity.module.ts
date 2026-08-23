@@ -70,6 +70,7 @@ import { lettersModuleFor } from '../letters/letters.composition.js';
 import { performanceModuleFor } from '../performance/performance.composition.js';
 import { learningModuleFor } from '../learning/learning.composition.js';
 import { careerModuleFor } from '../career/career.composition.js';
+import { relationsModuleFor } from '../relations/relations.composition.js';
 import { workflowModuleFor } from '../workflow/workflow.composition.js';
 
 import {
@@ -176,6 +177,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         learning: learningModuleFor(unitOfWork, senders.payroll, permissions),
         career: careerModuleFor(unitOfWork, senders.payroll, permissions),
         workflow: workflowModuleFor(unitOfWork, senders.payroll, senders.recruitment, permissions),
+        relations: relationsModuleFor(unitOfWork, senders.payroll, permissions),
       }),
     },
     {
@@ -266,6 +268,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // first `read-own` in this repository that actually routes, because an approval is
         // addressed to a membership and the request has already resolved one (Checkpoint 4).
         registry.register(permissionAware.workflow);
+        registry.register(permissionAware.relations);
         return registry;
       },
     },
@@ -326,6 +329,7 @@ interface PermissionAwareModules {
   readonly learning: WorkModule;
   readonly career: WorkModule;
   readonly workflow: WorkModule;
+  readonly relations: WorkModule;
 }
 
 interface DeferredSenders {

@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { BranchCondition } from '../domain/condition.js';
-import type { WorkflowInstanceDetailView, WorkflowHistoryView } from '../contracts/views.js';
+import type {
+  WorkflowInstanceDetailView,
+  WorkflowHistoryView,
+} from '../contracts/execution-views.js';
 import { decideAs, publishedBranches, startedOn } from './workflow-scenarios.js';
 import {
   APPROVER,

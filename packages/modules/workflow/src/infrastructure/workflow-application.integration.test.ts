@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { ApprovalGroupDetailView, WorkflowHistoryView } from '../contracts/views.js';
+import type { ApprovalGroupDetailView } from '../contracts/views.js';
+import type { WorkflowHistoryView } from '../contracts/execution-views.js';
 import type { Page } from '../application/workflow-ports.js';
 import {
   APPROVER,

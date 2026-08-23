@@ -8,6 +8,7 @@ import type {
 } from '../domain/definition.js';
 import type { WorkflowHistoryState } from '../domain/history.js';
 import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instance.js';
+import { dueForReminder } from './in-memory-due-reminders.js';
 import {
   byIdentifier,
   bumped,
@@ -72,14 +73,19 @@ const sorted = <TState>(
 export const inMemoryWorkflowStores = (): WorkflowStores => {
   const instances = new Map<string, WorkflowInstanceState>();
   const steps = new Map<string, WorkflowStepState>();
+  // Hoisted so the step store can answer `dueForReminder`, which is a question about all three: an
+  // awaiting step, of a running instance, with no reminder recorded. A fake that could see only steps
+  // would have to guess at two thirds of it — and a fake looser than the database is the failure mode
+  // this module has already been bitten by once.
+  const history = new Map<string, WorkflowHistoryState>();
 
   return {
     definitions: definitionStore(),
     versions: versionStore(),
     instances: instanceStore(instances),
-    steps: stepStore(steps),
+    steps: stepStore(steps, instances, history),
     decisions: decisionStore(),
-    history: historyStore(),
+    history: historyStore(history),
     groups: approvalGroupStore(),
   };
 };
@@ -263,11 +269,17 @@ const instanceStore = (
  * remains a fact about a *set* — one decision per step — is enforced by the decision store, where
  * the index actually is.
  */
-const stepStore = (steps: Map<string, WorkflowStepState>): WorkflowStores['steps'] => {
+const stepStore = (
+  steps: Map<string, WorkflowStepState>,
+  instances: Map<string, WorkflowInstanceState>,
+  history: Map<string, WorkflowHistoryState>,
+): WorkflowStores['steps'] => {
   const stepsOf = (instanceId: string): readonly WorkflowStepState[] =>
     [...steps.values()].filter((step) => step.instanceId === instanceId);
 
   return {
+    dueForReminder: (_transaction, asAt, limit, cursor) =>
+      Promise.resolve(dueForReminder({ steps, instances, history }, asAt, limit, cursor)),
     byId: (_transaction: Transaction, id: string) => Promise.resolve(steps.get(id)),
     forInstance: (_transaction: Transaction, instanceId: string) =>
       Promise.resolve([...stepsOf(instanceId)].sort((left, right) => left.ordinal - right.ordinal)),
@@ -337,9 +349,7 @@ const decisionStore = (): WorkflowStores['decisions'] => {
   };
 };
 
-const historyStore = (): WorkflowStores['history'] => {
-  const history = new Map<string, WorkflowHistoryState>();
-
+const historyStore = (history: Map<string, WorkflowHistoryState>): WorkflowStores['history'] => {
   return {
     forInstance: (_transaction: Transaction, instanceId: string, page: Paged) =>
       Promise.resolve(

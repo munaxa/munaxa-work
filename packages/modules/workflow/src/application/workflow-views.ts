@@ -11,17 +11,19 @@ import type { WorkflowInstanceState, WorkflowStepState } from '../domain/instanc
 import type {
   ApprovalGroupMemberView,
   ApprovalGroupView,
-  BranchTallyView,
-  PendingApprovalView,
   StepServiceLevelView,
-  WorkflowDecisionView,
   WorkflowDefinitionView,
-  WorkflowHistoryView,
-  WorkflowInstanceView,
   WorkflowStepTemplateView,
-  WorkflowStepView,
   WorkflowVersionView,
 } from '../contracts/views.js';
+import type {
+  BranchTallyView,
+  PendingApprovalView,
+  WorkflowDecisionView,
+  WorkflowHistoryView,
+  WorkflowInstanceView,
+  WorkflowStepView,
+} from '../contracts/execution-views.js';
 import { dueAt, overdueByMinutes, serviceLevelState } from '../domain/service-level.js';
 import { definedOf } from '../domain/defined.js';
 

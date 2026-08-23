@@ -184,8 +184,16 @@ suite('the Workflow API surface', () => {
     // could therefore only ever answer 422 — and offering one would invite somebody to wire
     // authentication to it later and make it mean something. The refusal is asserted below, so this
     // exemption is a property of the handler rather than a note in a list.
+    //
+    // **`workflow.due-reminders` has no route for the same reason, one step earlier.** It is the read
+    // that tells a runner *which* steps are due (D-16E-14), and it declares the same machine-only
+    // permission the command does — no human grant opens it, so a route could only ever answer 403.
+    // Exposing it would also be the one thing D-16D-16 forbids in a different costume: an endpoint
+    // that enumerates a tenant's overdue approvals on demand. The exemption is the pair, and both
+    // names are written out rather than counted, so adding a third cannot pass unnoticed.
     expect([...registered].filter((name) => !dispatched.has(name))).toStrictEqual([
       'workflow.remind-step',
+      'workflow.due-reminders',
     ]);
   });
 

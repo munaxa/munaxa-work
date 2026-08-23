@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { PendingApprovalView, WorkflowDefinitionView } from '../contracts/views.js';
+import type { WorkflowDefinitionView } from '../contracts/views.js';
+import type { PendingApprovalView } from '../contracts/execution-views.js';
 import { publishedProcess, runningApproval } from './workflow-scenarios.js';
 import { DEFAULT_PAGE_SIZE, MAXIMUM_PAGE_SIZE, pageOf } from './workflow-paging.js';
 import { APPROVER, ask, harnessFor, type Harness } from './workflow-test-harness.js';

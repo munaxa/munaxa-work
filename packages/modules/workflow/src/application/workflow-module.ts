@@ -10,6 +10,7 @@ import {
 import { addStepHandler } from './step.use-case.js';
 import { cancelInstanceHandler, startInstanceHandler } from './instance.use-case.js';
 import { escalateBranchHandler } from './escalation.use-case.js';
+import { dueRemindersHandler } from './due-reminders.query.js';
 import { remindStepHandler } from './remind-step.use-case.js';
 import {
   addGroupMemberHandler,
@@ -120,5 +121,6 @@ const queriesOf = (dependencies: WorkflowDependencies): readonly QueryHandler<Qu
     pendingApprovalsHandler(dependencies),
     decidedApprovalsHandler(dependencies),
     readHistoryHandler(dependencies),
+    dueRemindersHandler(dependencies),
     readApprovalStatusHandler(dependencies),
   ] as readonly QueryHandler<Query, unknown>[];

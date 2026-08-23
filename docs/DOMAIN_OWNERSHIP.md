@@ -38,12 +38,16 @@ them afterwards.
 | Approval, workflow definition, version, instance, step, decision | `workflow` | Phase 16A ✅ |
 | Approval group, group membership, parallel branch, branch rule, quorum, branch condition, branch tally | `workflow` | Phase 16B ✅ |
 | Service-level target, manager-routing resolution and snapshot | `workflow` | Phase 16C ✅ |
-| Escalation, scheduled firing, approval expiry as a written state, role approvers | — | not owned; no module implements any of them |
+| Escalation (a person adds an approver to a stuck branch) | `workflow` | Phase 16D ✅ |
+| Automatic service-level reminder, machine execution context, reminder history and its idempotency, due-reminder discovery | `workflow` | Phase 16E ✅ |
+| Scheduled firing — the durable job runner that would invoke the above | — | **not owned by any module here.** `JobPort` has existed since Phase 0 and has never had an adapter; Phase 16E assigned execution to **Platform** (D-16E-03) and wrote the contract it must satisfy |
+| Approval expiry as a written state, role approvers, automatic expiry action | — | not owned; deliberately unbuilt. Expiry stays **derived** (G-6 withholds an action until one is named), and no role-approver model exists |
 | Message delivery, template, notification  | `communications`| Phase 17      |
 | External system integration               | `integration`   | Phase 22      |
 | Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |
 | Letter template, template version, letter request, approval decision, issued letter, reference sequence | `letters` | Phase 12 ✅ |
-| Violation, disciplinary action, grievance | `relations`     | Phase 5.2     |
+| Violation category, violation, investigation, case lifecycle, repeat-violation context, disciplinary ladder, issued disciplinary action, disciplinary access trail | `relations` | Phase 5.2 ✅ |
+| Grievance, appeal, acknowledgement, warning expiry, evidence attachment | — | not owned; **deliberately unbuilt** by Phase 5.2. Grievance is blocked on self-service routing (`read-own` is unimplementable under ADR-0032, D-5.2-13); evidence is deferred to a Documents contract (D-5.2-08); expiry stays **derived**, as it does for approvals above |
 | Asset, custody assignment                 | `assets`        | Phase 5.3     |
 | Loan, advance, repayment schedule         | `loans`         | Phase 10.1    |
 | Statutory rule, country pack, end of service | `statutory`  | Phase 11.1    |

@@ -156,9 +156,13 @@ mutation or authentication · analytics · portals.
 
 ## 9. The one remaining gap — **no job runner**
 
+*This section originally named two gaps. The second — that nothing could tell a runner **which** steps
+were due — was opened as D-16E-14, approved, and closed by `workflow.due-reminders`; see
+[`phase-16e-discovery-read.md`](phase-16e-discovery-read.md). What follows is the one that remains.*
+
 Nothing invokes the reminder on a schedule, because **no job runner exists in Platform**. The
-capability is complete and reachable — a command, through the pipeline, under a machine context — and
-what is missing is the thing that decides *when*.
+capability is complete and reachable — a discovery read and a command, through the pipeline, under a
+machine context — and what is missing is the thing that decides *when*.
 
 This is not a gap that can be closed here: D-16E-03 assigns the scheduler, job triggering, retry
 mechanics and worker lifecycle to Platform, and building one in Workflow is forbidden by that same

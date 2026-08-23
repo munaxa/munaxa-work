@@ -3,13 +3,12 @@ import { success, type Query, type QueryHandler, type Transaction } from '@work/
 import { awaitingSteps, type WorkflowStepState } from '../domain/instance.js';
 import { branchAt, branchOf, branchOrdinals, tallyOf, type BranchVote } from '../domain/branch.js';
 import type { WorkflowDecisionState } from '../domain/decision.js';
+import type { WorkflowDefinitionDetailView, WorkflowDefinitionView } from '../contracts/views.js';
 import type {
   BranchTallyView,
-  WorkflowDefinitionDetailView,
-  WorkflowDefinitionView,
   WorkflowInstanceDetailView,
   WorkflowInstanceView,
-} from '../contracts/views.js';
+} from '../contracts/execution-views.js';
 import { notFound } from './workflow-context.js';
 import { pageOf } from './workflow-paging.js';
 import { WorkflowPermissions } from './workflow-permissions.js';
