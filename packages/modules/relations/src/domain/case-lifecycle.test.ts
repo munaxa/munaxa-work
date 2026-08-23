@@ -102,25 +102,32 @@ describe('where a case is', () => {
 });
 
 describe('which transitions exist', () => {
-  it('names three states and no more', () => {
-    expect(CASE_STATES).toStrictEqual(['reported', 'under_investigation', 'findings']);
+  it('names four states and no more', () => {
+    expect(CASE_STATES).toStrictEqual([
+      'reported',
+      'under_investigation',
+      'findings',
+      'action_issued',
+    ]);
     expect(INVESTIGATION_STATES).toStrictEqual(['open', 'concluded']);
   });
 
-  it('permits exactly two moves', () => {
+  it('permits exactly three moves', () => {
     expect(PERMITTED_CASE_TRANSITIONS).toStrictEqual({
       reported: ['under_investigation'],
       under_investigation: ['findings'],
-      findings: [],
+      findings: ['action_issued'],
+      action_issued: [],
     });
   });
 
   /**
    * Every pair, stated exhaustively rather than sampled.
    *
-   * Nine combinations, two permitted, seven refused — including every self-transition, because a
-   * move that changes nothing is not a move, and including everything that leaves `findings`,
-   * because acting on findings is a capability this checkpoint does not build.
+   * Sixteen combinations, three permitted, thirteen refused — including every self-transition,
+   * because a move that changes nothing is not a move, and including everything that leaves
+   * `action_issued`, because acknowledging, appealing, upholding and annulling are all capabilities
+   * nothing here builds.
    */
   it.each(
     CASE_STATES.flatMap((from) =>
@@ -172,10 +179,11 @@ describe('recording a transition', () => {
     expect(refused.error.detail).toStrictEqual({ from: 'reported', to: 'findings' });
   });
 
-  it('refuses moving a case that has already reached findings', () => {
+  it('refuses moving a case that has already had an action issued', () => {
     const history = [
       event(),
       event({ sequence: 2, fromState: 'under_investigation', toState: 'findings' }),
+      event({ sequence: 3, fromState: 'findings', toState: 'action_issued' }),
     ];
 
     for (const toState of CASE_STATES) {

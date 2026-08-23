@@ -55,20 +55,22 @@ describe('relations composition', () => {
     const relations = composed();
 
     expect(relations.name).toBe('relations');
-    // Six and seven, after Checkpoint 3. Checkpoint 1 built three and three: define and amend a
+    // Nine and ten, after Checkpoint 4. Checkpoint 1 built three and three: define and amend a
     // catalogue entry, record a violation; list the catalogue, read one violation, list one
     // employment's. Checkpoint 2 added two commands (open and conclude an inquiry) and three reads
     // (one inquiry, a violation's inquiries, a case history). Checkpoint 3 added one command
-    // (correct a concluded inquiry) and one read (the repeat-violation context). Every remaining
-    // capability — actions, warnings, grievances, appeals — arrives with the checkpoint that builds
-    // it, so these numbers moving is a scope change rather than a detail.
-    expect(relations.commands ?? []).toHaveLength(6);
-    expect(relations.queries ?? []).toHaveLength(7);
+    // (correct a concluded inquiry) and one read (the repeat-violation context). Checkpoint 4 added
+    // three commands (define and amend a ladder rung, issue an action) and three reads (the ladder,
+    // what it prescribes, and what was issued). Every remaining capability — warnings with expiry,
+    // grievances, appeals — arrives with the checkpoint that builds it, so these numbers moving is a
+    // scope change rather than a detail.
+    expect(relations.commands ?? []).toHaveLength(9);
+    expect(relations.queries ?? []).toHaveLength(10);
     expect(relations.permissions).toEqual(ALL_RELATIONS_PERMISSIONS);
-    // **Six, after D-5.2-18.** Checkpoint 2 added five handlers and no permission; Checkpoint 3 added
+    // **Nine, after D-5.2-18 and D-5.2-20.** Checkpoint 2 added five handlers and no permission; Checkpoint 3 added
     // two permissions by owner decision — conducting an inquiry is no longer implied by recording a
     // violation, and reading what an inquiry found needs a grant of its own.
-    expect(ALL_RELATIONS_PERMISSIONS).toHaveLength(6);
+    expect(ALL_RELATIONS_PERMISSIONS).toHaveLength(9);
   });
 
   /** Every handler declares one permission, and none of them is a wildcard or a prefix. */
@@ -78,7 +80,7 @@ describe('relations composition', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(13);
+    expect(declared).toHaveLength(19);
     for (const permission of declared) {
       expect(ALL_RELATIONS_PERMISSIONS).toContain(permission);
       expect(permission).not.toContain('*');

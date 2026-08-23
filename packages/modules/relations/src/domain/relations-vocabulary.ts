@@ -39,13 +39,19 @@ export type ViolationState = (typeof VIOLATION_STATES)[number];
  * record does not move. The case built on top of it does move, and D-5.2-15 puts that movement in a
  * separate Relations-owned lifecycle record rather than in a column somebody has to update.
  *
- * **Three values, not the specification's twelve.** The lifecycle continues through pending-approval,
- * action-issued, acknowledged, appealed, upheld, annulled, expired and archived; every one of those
- * is reached by a capability Checkpoint 2 does not build. Listing a state nothing can produce is the
- * promise the code cannot keep that Checkpoint 1 declined to make, and declining it twice is
- * consistency rather than timidity. The database CHECK widens by an approved change.
+ * **Four values, not the specification's twelve.** Checkpoint 2 built three; Checkpoint 4 adds
+ * `action_issued`, because it builds the capability that reaches it. The lifecycle continues through
+ * acknowledged, appealed, upheld, annulled, expired and archived, and every one of those is still
+ * reached by a capability nothing here builds. Listing a state nothing can produce is the promise
+ * the code cannot keep that Checkpoint 1 declined to make; declining it three times is consistency
+ * rather than timidity. The database CHECK widens by an approved change, never by convenience.
  */
-export const CASE_STATES = ['reported', 'under_investigation', 'findings'] as const;
+export const CASE_STATES = [
+  'reported',
+  'under_investigation',
+  'findings',
+  'action_issued',
+] as const;
 export type CaseState = (typeof CASE_STATES)[number];
 
 export const isCaseState = (value: string): value is CaseState =>
@@ -68,14 +74,16 @@ export const INITIAL_CASE_STATE: CaseState = 'reported';
  * edges does not need one. A transition absent from this map is refused by name, so adding a state
  * later means adding its edges here and nowhere else.
  *
- * Note what is *not* here: nothing returns to `reported`, and nothing leaves `findings`. Reopening a
- * concluded case and acting on findings are both later capabilities; leaving their edges out means a
- * request for them is refused rather than silently accepted into a state nothing can act on.
+ * Note what is *not* here: nothing returns to `reported`, and **nothing leaves `action_issued`**.
+ * Acknowledging an action, appealing it, upholding or annulling it are all later capabilities;
+ * leaving their edges out means a request for them is refused rather than silently accepted into a
+ * state nothing can act on. `findings → action_issued` is Checkpoint 4's one new edge.
  */
 export const PERMITTED_CASE_TRANSITIONS: Readonly<Record<CaseState, readonly CaseState[]>> = {
   reported: ['under_investigation'],
   under_investigation: ['findings'],
-  findings: [],
+  findings: ['action_issued'],
+  action_issued: [],
 };
 
 export const permitsTransition = (from: CaseState, to: CaseState): boolean =>
@@ -106,6 +114,10 @@ export type InvestigationState = (typeof INVESTIGATION_STATES)[number];
  * asking about their disciplinary record, so it is audited — one event per violation the count
  * actually disclosed, not one per question asked, because the trail answers *which records were
  * seen* and a single event for an aggregate would leave that unanswerable.
+ *
+ * Checkpoint 4 adds `disciplinary_action_read`. An issued action is the most consequential record
+ * this module holds — somebody may be dismissed on the strength of it — so reading one is audited
+ * like reading the inquiry behind it.
  */
 export const ACCESS_ACTIONS = [
   'violation_read',
@@ -114,6 +126,7 @@ export const ACCESS_ACTIONS = [
   'investigation_listed',
   'case_history_read',
   'escalation_read',
+  'disciplinary_action_read',
 ] as const;
 export type AccessAction = (typeof ACCESS_ACTIONS)[number];
 
@@ -126,3 +139,33 @@ export type AccessAction = (typeof ACCESS_ACTIONS)[number];
 const ENTITY_CODE = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
 
 export const isEntityCode = (value: string): boolean => ENTITY_CODE.test(value);
+
+/**
+ * What a tenant's ladder may prescribe — five rungs, and no sixth.
+ *
+ * **Small and explicit, rather than every action the specification names.** Each of these has a
+ * business meaning this module can actually represent, and nothing is here speculatively.
+ *
+ * **The two most serious are recommendations, and the naming is the boundary.** Employment owns
+ * `suspended` and `ended` (AD-005: *"a recommendation only. Employment executes, through its own
+ * lifecycle and approvals"*). A value called `termination` would promise something Relations must
+ * never do, and the day somebody wired it to Employment nobody would notice the promise had been
+ * made. `*_recommendation` cannot be misread.
+ *
+ * **Nothing here is ordered by severity.** The rungs are values a tenant assigns to thresholds; this
+ * module does not know that a final warning is "worse" than a verbal one, because ranking them would
+ * be this product deciding disciplinary policy for every customer (AD-002, D-5.2-06).
+ */
+export const DISCIPLINARY_ACTIONS = [
+  'verbal_warning',
+  'written_warning',
+  'final_warning',
+  /** A recommendation to Employment. **This module suspends nobody.** */
+  'suspension_recommendation',
+  /** A recommendation to Employment (AD-005). **This module ends no employment.** */
+  'termination_recommendation',
+] as const;
+export type DisciplinaryAction = (typeof DISCIPLINARY_ACTIONS)[number];
+
+export const isDisciplinaryAction = (value: string): value is DisciplinaryAction =>
+  (DISCIPLINARY_ACTIONS as readonly string[]).includes(value);

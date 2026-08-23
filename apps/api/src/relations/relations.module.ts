@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import {
   CaseHistoryController,
+  DisciplinaryActionController,
+  DisciplinaryRuleController,
   InvestigationController,
   RelationsDispatcher,
   ViolationCategoryController,
@@ -28,11 +30,16 @@ import { IdentityModule } from '../identity/identity.module.js';
   // resolution rather than trusting this comment. `InvestigationController` and
   // `CaseHistoryController` own distinct literal prefixes (`relations/investigations` and
   // `relations/cases`), so neither can be shadowed by the `:violationId` route above them.
+  // `DisciplinaryActionController` shares the `relations/cases` prefix with `CaseHistoryController`
+  // and declares distinct suffixes (`:violationId/action`, `:violationId/applicable-action`), so
+  // neither shadows the other. A route test asserts the resolution rather than trusting this.
   controllers: [
     ViolationCategoryController,
     ViolationController,
     InvestigationController,
+    DisciplinaryRuleController,
     CaseHistoryController,
+    DisciplinaryActionController,
   ],
   providers: [
     {

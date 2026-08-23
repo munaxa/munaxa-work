@@ -1,9 +1,12 @@
 import type { AccessEventState } from '../domain/access-event.js';
 import type { CaseEventState } from '../domain/case-event.js';
+import type { DisciplinaryActionState } from '../domain/disciplinary-action.js';
+import type { DisciplinaryRuleState } from '../domain/disciplinary-ladder.js';
 import type { InvestigationRecord } from '../domain/investigation.js';
 import type {
   AccessAction,
   CaseState,
+  DisciplinaryAction,
   CountryPackSource,
   InvestigationState,
   ViolationState,
@@ -257,4 +260,95 @@ export const caseEventValues = (state: CaseEventState, tenantId: string): RowVal
   occurred_at: state.occurredAt,
   correlation_id: state.correlationId,
   investigation_id: orNull(state.investigationId),
+});
+
+export interface DisciplinaryRuleRow {
+  readonly id: string;
+  readonly violation_category_id: string;
+  readonly min_occurrence: number | string;
+  readonly action_code: string;
+  readonly sequence: number | string;
+  readonly active: boolean;
+  readonly version: number | string;
+}
+
+export const disciplinaryRuleState = (row: DisciplinaryRuleRow): DisciplinaryRuleState => ({
+  disciplinaryRuleId: row.id,
+  violationCategoryId: row.violation_category_id,
+  minOccurrence: asNumber(row.min_occurrence),
+  action: row.action_code as DisciplinaryAction,
+  sequence: asNumber(row.sequence),
+  active: row.active,
+  version: asNumber(row.version),
+});
+
+export const disciplinaryRuleValues = (
+  state: DisciplinaryRuleState,
+  tenantId: string,
+): RowValues => ({
+  id: state.disciplinaryRuleId,
+  tenant_id: tenantId,
+  violation_category_id: state.violationCategoryId,
+  min_occurrence: state.minOccurrence,
+  action_code: state.action,
+  sequence: state.sequence,
+  active: state.active,
+});
+
+/** `issued_on` is a `date`; projected as text for the reason at the top of this file. */
+export const DISCIPLINARY_ACTION_COLUMNS = `id, tenant_id, violation_id, investigation_id,
+  disciplinary_rule_id, action_code, prescribed_by_rule, occurrence_at_issue, reason,
+  issued_by, to_char(issued_on, 'YYYY-MM-DD') as issued_on, issued_at, correlation_id, version`;
+
+export interface DisciplinaryActionRow {
+  readonly id: string;
+  readonly violation_id: string;
+  readonly investigation_id: string;
+  readonly disciplinary_rule_id: string | null;
+  readonly action_code: string;
+  readonly prescribed_by_rule: boolean;
+  readonly occurrence_at_issue: number | string;
+  readonly reason: string;
+  readonly issued_by: string;
+  readonly issued_on: string;
+  readonly issued_at: Date;
+  readonly correlation_id: string;
+  readonly version: number | string;
+}
+
+export const disciplinaryActionState = (row: DisciplinaryActionRow): DisciplinaryActionState => ({
+  disciplinaryActionId: row.id,
+  violationId: row.violation_id,
+  investigationId: row.investigation_id,
+  action: row.action_code as DisciplinaryAction,
+  prescribedByRule: row.prescribed_by_rule,
+  occurrenceAtIssue: asNumber(row.occurrence_at_issue),
+  reason: row.reason,
+  issuedBy: row.issued_by,
+  issuedOn: row.issued_on,
+  issuedAt: row.issued_at,
+  correlationId: row.correlation_id,
+  version: asNumber(row.version),
+  ...(orUndefined(row.disciplinary_rule_id) === undefined
+    ? {}
+    : { disciplinaryRuleId: row.disciplinary_rule_id as string }),
+});
+
+export const disciplinaryActionValues = (
+  state: DisciplinaryActionState,
+  tenantId: string,
+): RowValues => ({
+  id: state.disciplinaryActionId,
+  tenant_id: tenantId,
+  violation_id: state.violationId,
+  investigation_id: state.investigationId,
+  disciplinary_rule_id: orNull(state.disciplinaryRuleId),
+  action_code: state.action,
+  prescribed_by_rule: state.prescribedByRule,
+  occurrence_at_issue: state.occurrenceAtIssue,
+  reason: state.reason,
+  issued_by: state.issuedBy,
+  issued_on: state.issuedOn,
+  issued_at: state.issuedAt,
+  correlation_id: state.correlationId,
 });

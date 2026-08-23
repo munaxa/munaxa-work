@@ -64,14 +64,13 @@ describe('what Checkpoints 1 and 2 did not build', () => {
    * Matched against stripped code, so a comment explaining that grievances are a later checkpoint
    * does not fail the test that grievances are not implemented.
    *
-   * **`Investigation` left this list because Checkpoint 2 was approved to build it**, and for no
-   * other reason. Everything else on it stayed. The protection an entry gives is not lost when the
+   * **`Investigation` and `DisciplinaryAction` left this list because the checkpoints that build them
+   * were approved**, and for no other reason. Everything else on it stayed. The protection an entry gives is not lost when the
    * capability is approved — it is replaced by the tests that assert how the capability actually
    * behaves: the transition rules, the immutability of a concluded inquiry, and the audit of every
    * read of one. An entry may only leave here with an approval behind it.
    */
   it.each([
-    'DisciplinaryAction',
     'Warning',
     'Grievance',
     'Appeal',
@@ -197,6 +196,9 @@ describe('the boundaries this module keeps', () => {
       'relations.investigations',
       'relations.case-history',
       'relations.escalation-context',
+      'relations.disciplinary-rules',
+      'relations.applicable-action',
+      'relations.disciplinary-action',
     ]);
 
     const listing = codeOf(join(SOURCE_ROOT, 'application', 'relations-queries.ts'));
@@ -210,7 +212,7 @@ describe('the boundaries this module keeps', () => {
   });
 
   /**
-   * Six commands, and **still not one that changes or removes a recorded violation**.
+   * Nine commands, and **still not one that changes or removes a recorded violation**.
    *
    * That is the assertion this test has always made, and Checkpoint 2 does not weaken it: the two
    * new commands write an investigation and a case event, and the violation row they concern is
@@ -230,6 +232,9 @@ describe('the boundaries this module keeps', () => {
       'relations.open-investigation',
       'relations.conclude-investigation',
       'relations.correct-investigation',
+      'relations.define-disciplinary-rule',
+      'relations.amend-disciplinary-rule',
+      'relations.issue-disciplinary-action',
     ]);
     // `correct-investigation` left this list when D-5.2-19 was approved. It is replaced by the
     // assertions that the correction *adds a record* rather than editing one — in the application
@@ -267,11 +272,11 @@ describe('the boundaries this module keeps', () => {
     expect(violationStore).not.toContain('remove(');
   });
 
-  it('registers exactly six permissions and one navigation entry', () => {
+  it('registers exactly nine permissions and one navigation entry', () => {
     const module = moduleUnderTest();
 
     expect(module.permissions).toEqual(ALL_RELATIONS_PERMISSIONS);
-    expect(module.permissions).toHaveLength(6);
+    expect(module.permissions).toHaveLength(9);
     expect(module.navigation).toHaveLength(1);
     // Behind the record permission, not the catalogue one: somebody who may only maintain the
     // policy has no business finding a link to the case register.

@@ -5495,6 +5495,8 @@ model RelationViolationCategory {
 
   violations RelationViolation[]
 
+  disciplinary_rules RelationDisciplinaryRule[]
+
   @@index([tenant_id, sequence, code], map: "relation_violation_category_order_idx")
   @@map("relation_violation_category")
 }
@@ -5532,6 +5534,7 @@ model RelationViolation {
   access_events  RelationViolationAccessEvent[]
   investigations RelationInvestigation[]
   case_events    RelationCaseEvent[]
+  actions        RelationDisciplinaryAction[]
 
   @@index([tenant_id, employment_id, occurred_on, id], map: "relation_violation_employment_idx")
   @@index([tenant_id, violation_category_id], map: "relation_violation_category_ref_idx")
@@ -5596,6 +5599,7 @@ model RelationInvestigation {
   case_events RelationCaseEvent[]
   corrects    RelationInvestigation?  @relation("InvestigationCorrection", fields: [corrects_investigation_id], references: [id], map: "relation_investigation_corrects_fk")
   corrected_by RelationInvestigation[] @relation("InvestigationCorrection")
+  actions      RelationDisciplinaryAction[]
 
   /// One open inquiry per violation, settled by the database rather than by a preceding read
   /// (ADR-0071). Partial, so any number of concluded ones may accumulate.
@@ -5642,4 +5646,78 @@ model RelationCaseEvent {
   @@index([tenant_id, violation_id, sequence], map: "relation_case_event_case_idx")
   @@index([tenant_id, actor, occurred_at], map: "relation_case_event_actor_idx")
   @@map("relation_case_event")
+}
+
+/// A rung of a tenant's disciplinary ladder: what an occurrence of a category attracts. Tenant
+/// configuration, never hard-coded policy (D-5.2-20). Where no rule matches, nothing is prescribed.
+model RelationDisciplinaryRule {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  violation_category_id String    @db.Uuid
+  /// The occurrence at or above which this rule applies. A threshold, never a counter — no repeat
+  /// state is persisted anywhere in this module.
+  min_occurrence        Int
+  action_code           String    @db.VarChar(48)
+  /// Precedence when two rules could apply, in the (sequence, code) shape D-5.2-07 established.
+  sequence              Int
+  active                Boolean   @default(true)
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  category RelationViolationCategory    @relation(fields: [violation_category_id], references: [id], map: "relation_disciplinary_rule_category_fk")
+  actions  RelationDisciplinaryAction[]
+
+  @@index([tenant_id, violation_category_id, min_occurrence, sequence, id], map: "relation_disciplinary_rule_evaluation_idx")
+  @@map("relation_disciplinary_rule")
+}
+
+/// A disciplinary action a named human issued. Immutable: update and delete both raise. Issued, not
+/// executed — it suspends nobody, ends no employment and deducts no pay (AD-005).
+model RelationDisciplinaryAction {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  violation_id         String    @db.Uuid
+  /// The concluded inquiry this rests on. Required: an action with no findings behind it is the
+  /// decision a tribunal sets aside first.
+  investigation_id     String    @db.Uuid
+  /// The rule that prescribed it, where one did. Nullable, because a human may issue an action the
+  /// ladder did not prescribe — refusing that would be an automatic punishment engine in reverse.
+  disciplinary_rule_id String?   @db.Uuid
+  action_code          String    @db.VarChar(48)
+  prescribed_by_rule   Boolean
+  /// The derived occurrence frozen at issue (AD-003). Not a counter: nothing increments it, and the
+  /// count itself is derived and stored nowhere.
+  occurrence_at_issue  Int
+  reason               String
+  /// The authenticated caller. Never supplied by a request.
+  issued_by            String    @db.VarChar(255)
+  issued_on            DateTime  @db.Date
+  issued_at            DateTime  @db.Timestamptz(6)
+  correlation_id       String    @db.Uuid
+  metadata             Json
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  /// Present because every table carries them. Unusable by construction: a soft delete is an update,
+  /// and the trigger refuses every update on this table.
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  violation     RelationViolation         @relation(fields: [violation_id], references: [id], map: "relation_disciplinary_action_violation_fk")
+  investigation RelationInvestigation     @relation(fields: [investigation_id], references: [id], map: "relation_disciplinary_action_investigation_fk")
+  rule          RelationDisciplinaryRule? @relation(fields: [disciplinary_rule_id], references: [id], map: "relation_disciplinary_action_rule_fk")
+
+  /// One action per case. Two would be two punishments for one matter, and whether that is ever
+  /// legitimate is a decision nobody has taken.
+  @@unique([tenant_id, violation_id], map: "relation_disciplinary_action_violation_idx")
+  @@index([tenant_id, issued_on, id], map: "relation_disciplinary_action_issued_idx")
+  @@map("relation_disciplinary_action")
 }

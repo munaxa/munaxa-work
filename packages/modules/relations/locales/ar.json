@@ -50,7 +50,21 @@
       "asAt": "حتى تاريخ",
       "firstOccurrence": "المرة الأولى",
       "escalationContext": "سجل التكرار",
-      "correct": "تصحيح هذه النتيجة"
+      "correct": "تصحيح هذه النتيجة",
+      "ladder": "سلم الجزاءات",
+      "rule": "قاعدة السلم",
+      "rules": "قواعد السلم",
+      "minOccurrence": "يسري من التكرار رقم",
+      "action": "الإجراء",
+      "disciplinaryAction": "إجراء تأديبي",
+      "issuedBy": "صادر عن",
+      "issuedOn": "تاريخ الإصدار",
+      "occurrenceAtIssue": "رقم التكرار عند الإصدار",
+      "prescribedByRule": "مطابق للسلم",
+      "applicableAction": "الإجراء المقترح",
+      "defineRule": "إضافة قاعدة",
+      "amendRule": "تعديل القاعدة",
+      "issueAction": "إصدار إجراء تأديبي"
     },
     "source": {
       "tenant": "معرّف من قبل المنشأة",
@@ -59,7 +73,8 @@
     "state": {
       "reported": "مبلّغ عنها",
       "under_investigation": "قيد التحقيق",
-      "findings": "صدرت النتائج"
+      "findings": "صدرت النتائج",
+      "action_issued": "صدر الإجراء"
     },
     "access": {
       "violation_read": "تم الاطلاع",
@@ -67,7 +82,8 @@
       "investigation_read": "تم الاطلاع على التحقيق",
       "investigation_listed": "ظهر التحقيق في قائمة",
       "case_history_read": "تم الاطلاع على سجل الحالة",
-      "escalation_read": "تم الاطلاع على سجل التكرار"
+      "escalation_read": "تم الاطلاع على سجل التكرار",
+      "disciplinary_action_read": "تم الاطلاع على الإجراء التأديبي"
     },
     "notice": {
       "empty": "لا يوجد ما يُعرض بعد.",
@@ -90,7 +106,16 @@
       "findingsRestricted": "تتطلب نتائج التحقيق صلاحية منفصلة. بدونها لا يُعرض التحقيق المغلق.",
       "occurrenceDerived": "يُحتسب رقم التكرار من السجلات عند كل عرض، ولا يُخزَّن.",
       "windowIsConfiguration": "فترة التكرار إعداد خاص بمنشأتك. ليس لها أي معنى قانوني ولا تترتب عليها عقوبة تلقائيًا.",
-      "noActionFromRepeat": "عدد التكرارات لا يقرر شيئًا. ما يترتب على التكرار ليس ضمن هذا الإصدار."
+      "noActionFromRepeat": "عدد التكرارات لا يقرر شيئًا. ما يترتب على التكرار ليس ضمن هذا الإصدار.",
+      "ladderIsConfiguration": "سلم الجزاءات سياسة منشأتك. لا شيء فيه مفروض أو مستمد من القانون.",
+      "ladderPrescribesOnly": "السلم يقترح إجراءً ولا يصدره. القرار يتخذه شخص ويُسجَّل باسمه.",
+      "noRuleNoAction": "إذا لم تُعرّف قاعدة، لا يُقترح شيء. لن يبتكر النظام إجراءً.",
+      "actionNotExecuted": "تسجيل الإجراء لا ينفّذه. الإيقاف وإنهاء الخدمة توصيتان يعالجهما سجل التوظيف بشكل منفصل.",
+      "actionImmutable": "لا يمكن تعديل إجراء تأديبي صادر أو حذفه.",
+      "actionNeedsFindings": "لا يمكن إصدار إجراء إلا بعد إغلاق التحقيق.",
+      "actionOncePerCase": "يمكن إصدار إجراء تأديبي واحد لكل مخالفة.",
+      "frozenAtIssue": "يُحتفظ بالإجراء ورقم التكرار كما كانا عند الإصدار، فلا تغيّر تعديلات السلم القرارات السابقة.",
+      "noLegalCheckLadder": "لا يُطبَّق أي تحقق قانوني على السلم: حزم الدول تأتي في مرحلة لاحقة."
     },
     "rejection": {
       "category_code_malformed": "يجوز أن يحتوي الرمز على أحرف إنجليزية صغيرة وأرقام وشرطات فقط.",
@@ -132,7 +157,21 @@
       "correction_reason_missing": "اذكر سبب عدم صحة النتيجة السابقة.",
       "correction_reason_too_long": "سبب التصحيح طويل جدًا.",
       "investigation_already_corrected": "سبق تصحيح هذه النتيجة.",
-      "as_at_malformed": "أدخل التاريخ بصيغة YYYY-MM-DD."
+      "as_at_malformed": "أدخل التاريخ بصيغة YYYY-MM-DD.",
+      "rule_occurrence_invalid": "يجب أن يكون حد التكرار عددًا صحيحًا لا يقل عن 1.",
+      "rule_sequence_invalid": "يجب أن يكون الترتيب عددًا صحيحًا لا يقل عن 0.",
+      "rule_action_unknown": "اختر أحد الإجراءات التأديبية المتاحة.",
+      "rule_threshold_taken": "توجد قاعدة تغطي هذا التكرار لنوع المخالفة هذا.",
+      "action_unknown": "اختر أحد الإجراءات التأديبية المتاحة.",
+      "action_reason_missing": "اذكر سبب إصدار هذا الإجراء.",
+      "action_reason_too_long": "السبب طويل جدًا.",
+      "action_issuer_unknown": "يجب أن يكون الإجراء التأديبي منسوبًا إلى شخص.",
+      "action_occurrence_invalid": "تعذر تحديد رقم التكرار لهذه المخالفة.",
+      "action_rule_mismatch": "الإجراء لا يطابق القاعدة التي تسري.",
+      "issued_on_malformed": "أدخل تاريخ الإصدار بصيغة YYYY-MM-DD.",
+      "issued_on_in_future": "لا يمكن إصدار إجراء تأديبي بتاريخ مستقبلي.",
+      "no_concluded_investigation": "لا يوجد تحقيق مغلق لهذه الحالة بعد.",
+      "action_already_issued": "سبق إصدار إجراء تأديبي على هذه المخالفة."
     },
     "conflict": {
       "category_code_taken": "يوجد نوع مخالفة يستخدم هذا الرمز."
@@ -140,6 +179,13 @@
     "investigationState": {
       "open": "مفتوح",
       "concluded": "مغلق"
+    },
+    "actionType": {
+      "verbal_warning": "إنذار شفهي",
+      "written_warning": "إنذار كتابي",
+      "final_warning": "إنذار نهائي",
+      "suspension_recommendation": "توصية بالإيقاف",
+      "termination_recommendation": "توصية بإنهاء الخدمة"
     }
   }
 }

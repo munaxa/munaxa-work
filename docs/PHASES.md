@@ -589,6 +589,29 @@ read one back; every read now projects them explicitly.
 [`verification/phase-5.2-checkpoint-3-plan.md`](verification/phase-5.2-checkpoint-3-plan.md) keeps
 the plan as written and records what was built beside it rather than in place of it.
 
+Phase 5.2 Checkpoint 4 landed on 2026-08-23: **disciplinary actions** — the owner approved D-5.2-20
+on the principle that **counting repeats and prescribing an outcome are separate responsibilities**.
+The ladder is tenant configuration in `relation_disciplinary_rule`, never hard-coded policy: nothing
+infers an outcome from severity, occurrence, country, employment type or manager, and **where a
+tenant has configured no rule nothing is prescribed** — the single most-asserted property in the
+checkpoint, because it is what separates decision support from an engine that invents disciplinary
+outcomes. Five rungs, and the two most serious are `*_recommendation` because Employment owns
+`suspended` and `ended` (AD-005); `termination`, `dismissal`, `payroll_deduction` and `fine` are
+asserted un-nameable. **Nothing is punished automatically**: issuing is a command a named human sends
+under a permission of its own, with no event handler, no subscription and no path from the evaluation
+to the issue. A recommendation is derived from current configuration, while an **issued** action
+freezes its action and occurrence (AD-003) and keeps the rule link, so re-grading the ladder
+afterwards cannot rewrite a decision somebody was disciplined by. An action requires a concluded
+inquiry and rests on the *operative* conclusion, so a correction (D-5.2-19) is respected without
+mutating either investigation. Concurrency is settled by two unique indexes under two real
+connections; the issued action is trigger-immutable; RLS is enabled and forced on both new tables and
+proved in both directions. **Payroll, Employment, Workflow and Platform are untouched**, evidence
+storage stays deferred (D-5.2-08) and country-law enforcement stays `NOT VERIFIED` (D-5.2-06) — each a
+test rather than a promise, in 79 boundary assertions.
+[`verification/phase-5.2-checkpoint-4.md`](verification/phase-5.2-checkpoint-4.md) carries the schema,
+the proofs, the twelve assertions that were updated and why none was weakened, two defects found
+during implementation, and six stated limitations.
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

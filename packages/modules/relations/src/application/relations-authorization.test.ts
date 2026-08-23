@@ -52,7 +52,7 @@ const WILDCARDS = [
 ];
 
 describe('the permission set', () => {
-  it('is exactly six, and every one is explicit', () => {
+  it('is exactly nine, and every one is explicit', () => {
     expect(ALL_RELATIONS_PERMISSIONS).toStrictEqual([
       'relations.category.read',
       'relations.category.manage',
@@ -60,6 +60,9 @@ describe('the permission set', () => {
       'relations.violation.record',
       'relations.investigation.conduct',
       'relations.investigation.read-findings',
+      'relations.ladder.read',
+      'relations.ladder.manage',
+      'relations.action.issue',
     ]);
   });
 
@@ -73,7 +76,7 @@ describe('the permission set', () => {
    * and for no other reason. The protection it gave is not lost: the exact-set assertion above pins
    * which two investigation permissions exist, and the assertion below pins that there is no third.
    */
-  it.each(['action', 'warning', 'grievance', 'appeal', 'penalty', 'admin', 'manage-all'])(
+  it.each(['warning', 'grievance', 'appeal', 'penalty', 'admin', 'manage-all'])(
     'declares nothing for the absent capability %s',
     (absent) => {
       expect(
@@ -94,6 +97,24 @@ describe('the permission set', () => {
     expect(
       ALL_RELATIONS_PERMISSIONS.filter((permission) => permission.includes('investigation')),
     ).toStrictEqual(['relations.investigation.conduct', 'relations.investigation.read-findings']);
+  });
+
+  /**
+   * Three disciplinary grants and no more (D-5.2-20).
+   *
+   * In particular there is **no `relations.action.read`** — an issued action is part of the case, so
+   * a caller who may read the case may see what it produced — and no `relations.admin`,
+   * `relations.manage` or `relations.write-all`, each of which the approval forbade by name.
+   */
+  it('declares exactly three disciplinary permissions', () => {
+    expect(
+      ALL_RELATIONS_PERMISSIONS.filter(
+        (permission) => permission.includes('ladder') || permission.includes('action'),
+      ),
+    ).toStrictEqual(['relations.ladder.read', 'relations.ladder.manage', 'relations.action.issue']);
+    for (const forbidden of ['relations.admin', 'relations.manage', 'relations.write-all']) {
+      expect(ALL_RELATIONS_PERMISSIONS).not.toContain(forbidden);
+    }
   });
 
   it('contains no wildcard and no prefix', () => {
@@ -125,7 +146,7 @@ describe('the permission set', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(13);
+    expect(declared).toHaveLength(19);
     for (const permission of declared) expect(ALL_RELATIONS_PERMISSIONS).toContain(permission);
 
     // **Every published permission is declared by a handler except exactly one**, and naming which

@@ -47,7 +47,7 @@ given for them.
 | D-5.2-17 | Whether findings are immutable, and how a correction is made (AD-003) | **APPROVED** 2026-08-23 | **resolved** |
 | **D-5.2-18** | **Whether investigations need permissions of their own** | **APPROVED** 2026-08-23 — Option C | **resolved · implemented in Checkpoint 3** |
 | **D-5.2-19** | **How a concluded investigation is corrected** | **APPROVED** 2026-08-23 — Option D via C | **resolved · implemented in Checkpoint 3** |
-| **D-5.2-20** | **The penalty ladder — whether a repeat count maps to a prescribed action** | **OPEN** | **no — deliberately outside Checkpoint 3, and still open after it** |
+| **D-5.2-20** | **The penalty ladder — whether a repeat count maps to a prescribed action** | **APPROVED** 2026-08-23 | **resolved · implemented in Checkpoint 4** |
 
 All six of Checkpoint 1's blocking decisions are **APPROVED**, and none required a new architectural
 pattern: every one resolved onto a mechanism this repository already runs.
@@ -987,7 +987,7 @@ for an inconvenient finding — hence the required reason and the audited, immut
 It should be approved before the disciplinary actions that rely on a conclusion being right.
 
 
-## D-5.2-20 — The penalty ladder: whether a repeat count maps to a prescribed action · **OPEN**
+## D-5.2-20 — The penalty ladder: whether a repeat count maps to a prescribed action · **APPROVED 2026-08-23**
 
 *Opened by the Checkpoint 3 investigation, 2026-08-23. Not taken.*
 
@@ -1116,3 +1116,101 @@ of `relation_violation` and `relation_investigation` now names its columns and w
 
 **Proved pre-existing before being classified as such**: a probe against the live driver confirmed
 the `date` → `Date` behaviour independently of this branch's changes.
+
+
+---
+
+# Owner approval · 2026-08-23 · D-5.2-20
+
+**APPROVED**, on the principle that **counting repeats and prescribing an outcome are separate
+responsibilities**. `relations.escalation-context` stays a derived factual input and prescribes
+nothing; a disciplinary-action layer *consumes* that context to determine what is applicable. No
+occurrence, repeat window or escalation context becomes persisted state.
+
+## The approved semantic, as implemented in Checkpoint 4
+
+**The ladder is tenant configuration, never hard-coded policy.** `relation_disciplinary_rule` holds
+rows a tenant writes: a category, a threshold, an action, a sequence, and `active`. Nothing infers a
+policy from severity alone, from an occurrence alone, from a country, an employment type, a manager,
+historical behaviour, or an undocumented default.
+
+**Where a tenant has configured nothing, nothing is prescribed.** `applicableRule` returns
+`undefined` and the view omits `action` entirely. This is the single most-asserted property in the
+checkpoint — it appears in the domain suite, the application suite and the published contract — because
+it is the difference between decision support and an engine that invents disciplinary outcomes.
+
+**Nothing is punished automatically.** Issuing is a command a named human sends, holding a permission
+of its own. No violation being recorded, no threshold being crossed and no rule being written causes
+an action to exist. A negative-space suite asserts there is no event handler, no subscription, no
+`autoIssue` and no path from the evaluation to the issue.
+
+### The vocabulary, and why it stops at five
+
+`verbal_warning` · `written_warning` · `final_warning` · `suspension_recommendation` ·
+`termination_recommendation`.
+
+**The two most serious are recommendations, and the naming is the module boundary.** Employment owns
+`suspended` and `ended`, and AD-005 says this domain *"produces a recommendation only. Employment
+executes, through its own lifecycle and approvals."* A value called `termination` would promise
+something Relations must never do — and the day somebody wired it to Employment, nobody would notice
+the promise had been made. Tests assert that `suspension`, `termination`, `dismissal`,
+`payroll_deduction` and `fine` are **not** nameable.
+
+### Historical stability — what is frozen and what is derived
+
+The distinction the approval asked for, drawn exactly:
+
+| | |
+|---|---|
+| **A recommendation** | Derived from *current* configuration. Nothing is frozen, because nothing was decided. Amending the ladder changes what is recommended — asserted. |
+| **An issued action** | `action`, `occurrence_at_issue` and `prescribed_by_rule` are **frozen at issue** (AD-003), with `disciplinary_rule_id` keeping the link. Re-grading or deactivating the rule afterwards changes nothing about the record — asserted. |
+
+**No snapshot beyond that.** The rule's text is not copied, because the link plus the frozen action
+answers both questions a tribunal asks: which rule, and what was actually issued.
+
+### Lifecycle: the minimum, not a framework
+
+Of the seven concepts the authorization listed — configured, applicable, recommended, selected,
+issued, completed, cancelled — Checkpoint 4 implements **configured**, **applicable/recommended**
+(one derived read) and **issued**. Completion, cancellation and supersession of an action are not
+built: no capability reaches them, and a status field listing them would be the promise the code
+cannot keep this module has now declined four times.
+
+One lifecycle edge was added — `findings → action_issued` — using the existing validated-transition
+mechanism. **No generic workflow engine**, and `action_issued` is terminal.
+
+### Boundaries, asserted rather than promised
+
+| Boundary | State | Evidence |
+|---|---|---|
+| Payroll | **untouched** | No file in the diff; assertions against `PayrollPort`, `payroll.record-adjustment`, `calculateDeduction` |
+| Employment | **untouched** | No file in the diff; assertions against `EmploymentPort`, `employment.suspend`, `terminateEmployment` |
+| Workflow | **untouched** | No file in the diff; assertions against `WorkflowPort`, `subjectType`, `ApprovalPort`, `autoApprove` |
+| Platform | **untouched** | Nothing scheduled; assertions against `JobPort`, `Scheduler`, `setInterval` |
+| Evidence / storage | **deferred** (D-5.2-08 not reopened) | Assertions against `StoragePort`, `signedUrl`, `bucket`, `attachment` |
+| Country pack | **preserved** (D-5.2-06) | Enforcement `NOT VERIFIED`; assertions against jurisdictions, `maxWarnings`, `statutoryLimit`, `mandatorySuspension` |
+| Expiry | **not built** | Assertions against `expiredAt`, `markExpired`, `sweep` |
+| Repeat state | **not persisted** | Assertions against `repeat_count`, `is_repeat`, `escalation_level` and their camel-case forms |
+
+### Permissions — three, least-privilege
+
+`relations.ladder.read` · `relations.ladder.manage` · `relations.action.issue`. Nine in the module
+overall.
+
+**`relations.violation.record` was deliberately not reused**, as the approval required: filing an
+allegation, conducting an inquiry, configuring policy and issuing a punishment are four different
+authorities. There is **no `relations.action.read`** — an issued action is part of the case — and no
+`relations.admin`, `relations.manage`, `relations.write-all` or wildcard, each asserted absent by
+name.
+
+### Two defects found while implementing, and fixed
+
+1. **The handler attached a matched rule even when the human issued a different action**, so a
+   legitimate departure from the ladder was refused as `action_rule_mismatch`. A rule that prescribes
+   something else did not prescribe *this*; the rule is now attached only when its action matches, and
+   the record says `prescribedByRule: false`. Caught by a test written for the approval's requirement
+   that the ladder must not override human judgement.
+2. **An early draft clamped the occurrence with `Math.max(…, 1)`** when a violation had fallen out of
+   its own window. That would have written a plausible number nobody could justify onto a disciplinary
+   record. Replaced with the Checkpoint 3 ordinal measured from the violation's own conduct date, and
+   an unanswerable case is refused rather than guessed.

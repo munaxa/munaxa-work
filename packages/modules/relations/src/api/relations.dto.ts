@@ -290,3 +290,97 @@ export class CorrectInvestigationBody {
   @MaxLength(2000)
   public reason!: string;
 }
+
+const DISCIPLINARY_ACTIONS = [
+  'verbal_warning',
+  'written_warning',
+  'final_warning',
+  'suspension_recommendation',
+  'termination_recommendation',
+];
+
+/**
+ * A rung of the tenant's ladder.
+ *
+ * `minOccurrence` is a **threshold**, not a count — nothing increments it and no counter is stored
+ * beside it. `action` is one of five values; an unknown one is refused rather than stored, because a
+ * ladder that could name any string would let a tenant configure an outcome nothing can represent.
+ */
+export class DefineDisciplinaryRuleBody {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  public violationCategoryId!: string;
+
+  @ApiProperty({ minimum: 1, description: 'The occurrence at or above which this rule applies.' })
+  @IsInt()
+  @Min(1)
+  public minOccurrence!: number;
+
+  @ApiProperty({ enum: DISCIPLINARY_ACTIONS })
+  @IsIn(DISCIPLINARY_ACTIONS)
+  public action!: string;
+
+  @ApiProperty({
+    minimum: 0,
+    description: 'Precedence when two rules could apply. Ties break on id.',
+  })
+  @IsInt()
+  @Min(0)
+  public sequence!: number;
+}
+
+/**
+ * An amendment. **`violationCategoryId` and `minOccurrence` are absent, and that is the contract** —
+ * they are the rule's identity, and changing either would silently turn a rule about third offences
+ * into a rule about first ones under actions already issued from it.
+ */
+export class AmendDisciplinaryRuleBody {
+  @ApiProperty({ minimum: 1 })
+  @IsInt()
+  @Min(1)
+  public expectedVersion!: number;
+
+  @ApiPropertyOptional({ enum: DISCIPLINARY_ACTIONS })
+  @IsOptional()
+  @IsIn(DISCIPLINARY_ACTIONS)
+  public action?: string;
+
+  @ApiPropertyOptional({ minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  public sequence?: number;
+
+  @ApiPropertyOptional({
+    description: 'Deactivation is how a rung leaves service. There is no delete.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  public active?: boolean;
+}
+
+/**
+ * Issuing a disciplinary action.
+ *
+ * **No occurrence, no rule identifier and no issuer.** The server derives the repeat context, reads
+ * the tenant's ladder and takes the actor from the authenticated context — a caller who could supply
+ * any of them could justify a decision with a number they chose.
+ *
+ * **No `investigationId`.** The operative conclusion is derived from the case's own chain, so a
+ * caller cannot attach an action to a conclusion that has since been corrected.
+ */
+export class IssueDisciplinaryActionBody {
+  @ApiProperty({ enum: DISCIPLINARY_ACTIONS })
+  @IsIn(DISCIPLINARY_ACTIONS)
+  public action!: string;
+
+  @ApiProperty({ pattern: ISO_DATE.source, example: '2026-08-23' })
+  @Matches(ISO_DATE)
+  public issuedOn!: string;
+
+  @ApiProperty({ maxLength: 2000, description: 'Why this action, on this case.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  public reason!: string;
+}

@@ -1,5 +1,5 @@
 /**
- * Employee Relations & Disciplinary — Phase 5.2, Checkpoints 1 and 2.
+ * Employee Relations & Disciplinary — Phase 5.2, Checkpoints 1 to 4.
  *
  * **What this module holds:** the tenant's violation catalogue, the violations recorded against an
  * employment, the inquiries into them, and the case lifecycle those inquiries move. Violations and
@@ -32,6 +32,8 @@ export type { RelationsDependencies } from './application/relations-dependencies
 export type {
   AccessEventStore,
   CaseEventStore,
+  DisciplinaryActionStore,
+  DisciplinaryRuleStore,
   Clock,
   EmploymentDirectoryPort,
   InvestigationStore,
@@ -50,6 +52,8 @@ export { postgresRelationsStores } from './infrastructure/relations-stores.js';
 export { RelationsDispatcher } from './api/relations-dispatcher.js';
 export { ViolationCategoryController } from './api/violation-category.controller.js';
 export { ViolationController } from './api/violation.controller.js';
+export { DisciplinaryRuleController } from './api/disciplinary-rule.controller.js';
+export { DisciplinaryActionController } from './api/disciplinary-action.controller.js';
 export { CaseHistoryController, InvestigationController } from './api/investigation.controller.js';
 
 export type {
@@ -66,6 +70,20 @@ export type {
   InvestigationCorrected,
 } from './application/investigation-correction.use-case.js';
 export type { ReadEscalationContext } from './application/escalation.use-case.js';
+export type {
+  AmendDisciplinaryRuleCommand,
+  DefineDisciplinaryRuleCommand,
+  DisciplinaryRuleDefined,
+} from './application/disciplinary-ladder.use-case.js';
+export type {
+  DisciplinaryActionIssued,
+  IssueDisciplinaryActionCommand,
+} from './application/disciplinary-action.use-case.js';
+export type {
+  ListDisciplinaryRules,
+  ReadApplicableAction,
+  ReadDisciplinaryAction,
+} from './application/disciplinary-queries.js';
 export type {
   ConcludeInvestigationCommand,
   InvestigationConcluded,
@@ -84,6 +102,7 @@ export type {
 export {
   ACCESS_ACTIONS,
   CASE_STATES,
+  DISCIPLINARY_ACTIONS,
   COUNTRY_PACK_SOURCES,
   INITIAL_CASE_STATE,
   INVESTIGATION_STATES,
@@ -94,6 +113,7 @@ export {
 export type {
   AccessAction,
   CaseState,
+  DisciplinaryAction,
   CountryPackSource,
   InvestigationState,
   ViolationState,

@@ -50,7 +50,21 @@
       "asAt": "As at",
       "firstOccurrence": "First occurrence",
       "escalationContext": "Repeat history",
-      "correct": "Correct this conclusion"
+      "correct": "Correct this conclusion",
+      "ladder": "Disciplinary ladder",
+      "rule": "Ladder rule",
+      "rules": "Ladder rules",
+      "minOccurrence": "Applies from occurrence",
+      "action": "Action",
+      "disciplinaryAction": "Disciplinary action",
+      "issuedBy": "Issued by",
+      "issuedOn": "Issued",
+      "occurrenceAtIssue": "Occurrence when issued",
+      "prescribedByRule": "Followed the ladder",
+      "applicableAction": "Suggested action",
+      "defineRule": "Add a ladder rule",
+      "amendRule": "Amend ladder rule",
+      "issueAction": "Issue disciplinary action"
     },
     "source": {
       "tenant": "Defined by this organization",
@@ -59,7 +73,8 @@
     "state": {
       "reported": "Reported",
       "under_investigation": "Under investigation",
-      "findings": "Findings"
+      "findings": "Findings",
+      "action_issued": "Action issued"
     },
     "access": {
       "violation_read": "Opened",
@@ -67,7 +82,8 @@
       "investigation_read": "Investigation opened",
       "investigation_listed": "Investigation listed",
       "case_history_read": "Case history opened",
-      "escalation_read": "Repeat history checked"
+      "escalation_read": "Repeat history checked",
+      "disciplinary_action_read": "Disciplinary action opened"
     },
     "notice": {
       "empty": "Nothing to show yet.",
@@ -90,7 +106,16 @@
       "findingsRestricted": "Investigation findings need a separate permission. Without it, a concluded investigation is not shown.",
       "occurrenceDerived": "The occurrence number is worked out from the records each time it is shown. It is not stored.",
       "windowIsConfiguration": "The repeat window is your organization's own setting. It carries no legal meaning and no penalty follows from it automatically.",
-      "noActionFromRepeat": "A repeat count does not decide anything. What a repeat should lead to is not part of this release."
+      "noActionFromRepeat": "A repeat count does not decide anything. What a repeat should lead to is not part of this release.",
+      "ladderIsConfiguration": "The ladder is your organization's own policy. Nothing here is required or supplied by law.",
+      "ladderPrescribesOnly": "The ladder suggests an action. It never issues one — a person decides, and their decision is recorded against their name.",
+      "noRuleNoAction": "Where you have configured no rule, nothing is suggested. The system will not invent an action.",
+      "actionNotExecuted": "Recording an action does not carry it out. Suspension and termination are recommendations that the employment record handles separately.",
+      "actionImmutable": "An issued disciplinary action cannot be edited or deleted.",
+      "actionNeedsFindings": "An action can only be issued once an investigation has concluded.",
+      "actionOncePerCase": "One disciplinary action can be issued per violation.",
+      "frozenAtIssue": "The action and the occurrence are kept as they were when the action was issued, so later changes to the ladder do not rewrite past decisions.",
+      "noLegalCheckLadder": "No labour-law validation is applied to the ladder: country packs arrive in a later phase."
     },
     "rejection": {
       "category_code_malformed": "A code may use lower-case letters, digits and hyphens only.",
@@ -132,7 +157,21 @@
       "correction_reason_missing": "Say why the earlier conclusion was wrong.",
       "correction_reason_too_long": "The correction reason is too long.",
       "investigation_already_corrected": "This conclusion has already been corrected.",
-      "as_at_malformed": "Give the date as YYYY-MM-DD."
+      "as_at_malformed": "Give the date as YYYY-MM-DD.",
+      "rule_occurrence_invalid": "An occurrence threshold must be a whole number of 1 or more.",
+      "rule_sequence_invalid": "The order must be a whole number of 0 or more.",
+      "rule_action_unknown": "Choose one of the available disciplinary actions.",
+      "rule_threshold_taken": "A rule already covers that occurrence for this violation type.",
+      "action_unknown": "Choose one of the available disciplinary actions.",
+      "action_reason_missing": "Say why this action is being issued.",
+      "action_reason_too_long": "The reason is too long.",
+      "action_issuer_unknown": "A disciplinary action must be attributable to somebody.",
+      "action_occurrence_invalid": "The occurrence could not be worked out for this violation.",
+      "action_rule_mismatch": "The action does not match the rule that would apply.",
+      "issued_on_malformed": "Give the issue date as YYYY-MM-DD.",
+      "issued_on_in_future": "A disciplinary action cannot be issued with a future date.",
+      "no_concluded_investigation": "This case has no concluded investigation yet.",
+      "action_already_issued": "A disciplinary action has already been issued on this violation."
     },
     "conflict": {
       "category_code_taken": "A violation type already uses that code."
@@ -140,6 +179,13 @@
     "investigationState": {
       "open": "Open",
       "concluded": "Concluded"
+    },
+    "actionType": {
+      "verbal_warning": "Verbal warning",
+      "written_warning": "Written warning",
+      "final_warning": "Final warning",
+      "suspension_recommendation": "Recommendation to suspend",
+      "termination_recommendation": "Recommendation to terminate"
     }
   }
 }

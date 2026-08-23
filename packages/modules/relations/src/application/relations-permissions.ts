@@ -1,5 +1,5 @@
 /**
- * What a caller must hold — six grants, and no seventh.
+ * What a caller must hold — nine grants, and no tenth.
  *
  * **AD-007: access is restricted independently of ordinary employee access.** Holding
  * `employee.read`, `employment.read` or any other HR grant opens nothing here. Seeing that somebody
@@ -35,6 +35,12 @@
  * they hold it already. **There is deliberately no `relations.investigation.read`**: an inquiry's
  * existence is part of the case, and a third investigation grant would be the fifth permission
  * D-5.2-18 refused in advance.
+ *
+ * **The ladder is configuration and is separated from the case, exactly as the catalogue is.**
+ * Reading which rules a tenant configured names nobody; reading what somebody was actually issued is
+ * a disciplinary disclosure and rides on `relations.violation.read`. **There is no
+ * `relations.action.read`**: an issued action is part of the case, and a caller who may read the
+ * case may see what it produced.
  */
 export const RelationsPermissions = {
   /** The tenant's violation catalogue. Configuration; names nobody. */
@@ -54,6 +60,19 @@ export const RelationsPermissions = {
    * in this domain is itself the disclosure.
    */
   investigationReadFindings: 'relations.investigation.read-findings',
+
+  /** The tenant's disciplinary ladder. Configuration; names nobody. */
+  ladderRead: 'relations.ladder.read',
+  ladderManage: 'relations.ladder.manage',
+  /**
+   * Issuing a disciplinary action — **the most consequential act in this module**.
+   *
+   * Its own grant, and deliberately not `relations.violation.record`: filing an allegation and
+   * deciding what somebody is disciplined for are not the same authority, and the module has already
+   * separated conducting an inquiry from filing one (D-5.2-18). It does **not** imply reading
+   * findings, and reading findings does not imply it.
+   */
+  actionIssue: 'relations.action.issue',
 } as const;
 
 export type RelationsPermission = (typeof RelationsPermissions)[keyof typeof RelationsPermissions];

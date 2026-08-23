@@ -243,3 +243,21 @@ export const givenConcludedInvestigation = async (
 
   return opened;
 };
+
+/** A configured ladder rung, through the real command. */
+export const givenDisciplinaryRule = async (
+  harness: Harness,
+  overrides: Record<string, unknown> = {},
+): Promise<string> => {
+  const defined = await harness.as(ADMINISTRATOR, () =>
+    send<{ disciplinaryRuleId: string }>(harness, {
+      commandName: 'relations.define-disciplinary-rule',
+      minOccurrence: 1,
+      action: 'verbal_warning',
+      sequence: 10,
+      ...overrides,
+    }),
+  );
+
+  return defined.disciplinaryRuleId;
+};

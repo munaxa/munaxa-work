@@ -197,3 +197,68 @@ export interface EscalationContextView {
   /** The contributing violations, oldest first. Identifiers only — nothing about the person. */
   readonly violationIds: readonly string[];
 }
+
+/**
+ * One configured rung of a tenant's ladder.
+ *
+ * Configuration, and it names nobody. `action` is one of the five values this product can represent;
+ * `minOccurrence` is the threshold the tenant chose. **Nothing here claims legal validity** —
+ * statutory limits on warnings, suspensions and dismissals are jurisdiction-specific, enforcement is
+ * `NOT VERIFIED`, and Phase 11.1 owns country packs (D-5.2-06).
+ */
+export interface DisciplinaryRuleView {
+  readonly disciplinaryRuleId: string;
+  readonly violationCategoryId: string;
+  readonly minOccurrence: number;
+  readonly action: string;
+  readonly sequence: number;
+  readonly active: boolean;
+  readonly version: number;
+}
+
+/**
+ * What the tenant's ladder prescribes for one case, right now.
+ *
+ * **Derived at read time, and it decides nothing.** It reports which configured rule applies given
+ * the case's derived repeat context. It issues nothing, moves no case, suspends nobody and writes
+ * nothing — issuing is a separate act by a named human with its own permission and its own record.
+ *
+ * **`action` is absent when the tenant has configured no matching rule.** That is a real answer:
+ * this tenant has not decided what this occurrence attracts. Nothing is invented to fill the gap.
+ */
+export interface ApplicableActionView {
+  readonly violationId: string;
+  readonly violationCategoryId: string;
+  /** The derived occurrence the evaluation used. Not stored anywhere. */
+  readonly occurrence: number;
+  readonly windowDays: number;
+  /** The prescribed action, or absent when no configured rule applies. */
+  readonly action?: string;
+  readonly disciplinaryRuleId?: string;
+  readonly minOccurrence?: number;
+}
+
+/**
+ * A disciplinary action somebody issued.
+ *
+ * `action`, `occurrenceAtIssue` and `prescribedByRule` are **frozen at issue** — what the decision
+ * meant when it was taken, not what the tenant's ladder says today. `disciplinaryRuleId` keeps the
+ * link, so both questions can be asked.
+ *
+ * **Issued, not executed.** No employment was suspended or ended by this record, no pay was
+ * deducted, and no approval was started. The two most serious values are recommendations, and
+ * carrying one out is another module's operation with its own authorization.
+ */
+export interface DisciplinaryActionView {
+  readonly disciplinaryActionId: string;
+  readonly violationId: string;
+  readonly investigationId: string;
+  readonly action: string;
+  readonly disciplinaryRuleId?: string;
+  readonly prescribedByRule: boolean;
+  readonly occurrenceAtIssue: number;
+  readonly reason: string;
+  readonly issuedBy: string;
+  readonly issuedOn: string;
+  readonly version: number;
+}

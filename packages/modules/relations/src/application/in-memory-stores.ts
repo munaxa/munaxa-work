@@ -2,11 +2,15 @@ import type { Transaction } from '@work/kernel';
 
 import type { AccessEventState } from '../domain/access-event.js';
 import type { CaseEventState } from '../domain/case-event.js';
+import type { DisciplinaryActionState } from '../domain/disciplinary-action.js';
+import type { DisciplinaryRuleState } from '../domain/disciplinary-ladder.js';
 import type { InvestigationRecord } from '../domain/investigation.js';
 import type { ViolationCategoryState } from '../domain/violation-category.js';
 import type { ViolationRecord } from '../domain/violation.js';
 import type {
   CaseEventStore,
+  DisciplinaryActionStore,
+  DisciplinaryRuleStore,
   InvestigationStore,
   Page,
   Paged,
@@ -36,6 +40,8 @@ export interface InMemoryRelationsStores extends RelationsStores {
   readonly accessRows: AccessEventState[];
   readonly investigationRows: Map<string, InvestigationRecord>;
   readonly caseEventRows: CaseEventState[];
+  readonly disciplinaryRuleRows: Map<string, DisciplinaryRuleState>;
+  readonly disciplinaryActionRows: Map<string, DisciplinaryActionState>;
 }
 
 export const inMemoryRelationsStores = (): InMemoryRelationsStores => {
@@ -44,6 +50,8 @@ export const inMemoryRelationsStores = (): InMemoryRelationsStores => {
   const accessRows: AccessEventState[] = [];
   const investigationRows = new Map<string, InvestigationRecord>();
   const caseEventRows: CaseEventState[] = [];
+  const disciplinaryRuleRows = new Map<string, DisciplinaryRuleState>();
+  const disciplinaryActionRows = new Map<string, DisciplinaryActionState>();
 
   return {
     categoryRows,
@@ -51,6 +59,8 @@ export const inMemoryRelationsStores = (): InMemoryRelationsStores => {
     accessRows,
     investigationRows,
     caseEventRows,
+    disciplinaryRuleRows,
+    disciplinaryActionRows,
     categories: categoryStore(categoryRows),
     violations: violationStore(violationRows),
     access: {
@@ -61,8 +71,66 @@ export const inMemoryRelationsStores = (): InMemoryRelationsStores => {
     },
     investigations: investigationStore(investigationRows),
     caseEvents: caseEventStore(caseEventRows),
+    disciplinaryRules: disciplinaryRuleStore(disciplinaryRuleRows),
+    disciplinaryActions: disciplinaryActionStore(disciplinaryActionRows),
   };
 };
+
+/** Ordered exactly as the SQL orders: most specific rung first, ties by sequence then identifier. */
+const disciplinaryRuleStore = (
+  rows: Map<string, DisciplinaryRuleState>,
+): DisciplinaryRuleStore => ({
+  byId: (_transaction: Transaction, id: string) => Promise.resolve(rows.get(id)),
+
+  forCategory: (_transaction: Transaction, violationCategoryId: string, includeInactive: boolean) =>
+    Promise.resolve(
+      [...rows.values()]
+        .filter(
+          (row) =>
+            row.violationCategoryId === violationCategoryId && (includeInactive || row.active),
+        )
+        .sort(
+          (left, right) =>
+            right.minOccurrence - left.minOccurrence ||
+            left.sequence - right.sequence ||
+            left.disciplinaryRuleId.localeCompare(right.disciplinaryRuleId),
+        ),
+    ),
+
+  insert: (_transaction: Transaction, state: DisciplinaryRuleState) => {
+    rows.set(state.disciplinaryRuleId, state);
+    return Promise.resolve();
+  },
+
+  update: (_transaction: Transaction, state: DisciplinaryRuleState, expected: number) => {
+    const held = rows.get(state.disciplinaryRuleId);
+
+    if (held === undefined) throw new Error('relation_disciplinary_rule not found');
+    if (held.version !== expected) {
+      throw new Error(`relation_disciplinary_rule version ${String(held.version)}`);
+    }
+    rows.set(state.disciplinaryRuleId, { ...state, version: held.version + 1 });
+    return Promise.resolve();
+  },
+});
+
+/**
+ * Insert and read. **No update method exists**, so no test can rewrite an issued action even by
+ * accident — the guarantee the trigger enforces, stated where a developer meets it first.
+ */
+const disciplinaryActionStore = (
+  rows: Map<string, DisciplinaryActionState>,
+): DisciplinaryActionStore => ({
+  byId: (_transaction: Transaction, id: string) => Promise.resolve(rows.get(id)),
+
+  forViolation: (_transaction: Transaction, violationId: string) =>
+    Promise.resolve([...rows.values()].find((row) => row.violationId === violationId)),
+
+  insert: (_transaction: Transaction, state: DisciplinaryActionState) => {
+    rows.set(state.disciplinaryActionId, state);
+    return Promise.resolve();
+  },
+});
 
 const investigationStore = (rows: Map<string, InvestigationRecord>): InvestigationStore => ({
   byId: (_transaction: Transaction, id: string) => Promise.resolve(rows.get(id)),

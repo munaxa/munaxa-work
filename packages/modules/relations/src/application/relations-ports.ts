@@ -2,6 +2,8 @@ import type { Transaction } from '@work/kernel';
 
 import type { AccessEventState } from '../domain/access-event.js';
 import type { CaseEventState } from '../domain/case-event.js';
+import type { DisciplinaryActionState } from '../domain/disciplinary-action.js';
+import type { DisciplinaryRuleState } from '../domain/disciplinary-ladder.js';
 import type { InvestigationRecord } from '../domain/investigation.js';
 import type { ViolationCategoryState } from '../domain/violation-category.js';
 import type { ViolationRecord } from '../domain/violation.js';
@@ -120,12 +122,43 @@ export interface CaseEventStore {
   insert(transaction: Transaction, state: CaseEventState): Promise<void>;
 }
 
+/**
+ * The ladder. Ordinary configuration: read, insert, update — no immutability, because a tenant may
+ * change its policy, and an action already issued keeps its own frozen copy of what the rule said.
+ */
+export interface DisciplinaryRuleStore {
+  byId(transaction: Transaction, id: string): Promise<DisciplinaryRuleState | undefined>;
+  /** Every rule for one category, active first — what the evaluation reads. */
+  forCategory(
+    transaction: Transaction,
+    violationCategoryId: string,
+    includeInactive: boolean,
+  ): Promise<readonly DisciplinaryRuleState[]>;
+  insert(transaction: Transaction, state: DisciplinaryRuleState): Promise<void>;
+  update(transaction: Transaction, state: DisciplinaryRuleState, expected: number): Promise<void>;
+}
+
+/**
+ * Issued actions. **Reads and one insert — no update and no remove**, like the violation and the
+ * case history, and for the same reason: somebody may be dismissed on the strength of one.
+ */
+export interface DisciplinaryActionStore {
+  byId(transaction: Transaction, id: string): Promise<DisciplinaryActionState | undefined>;
+  forViolation(
+    transaction: Transaction,
+    violationId: string,
+  ): Promise<DisciplinaryActionState | undefined>;
+  insert(transaction: Transaction, state: DisciplinaryActionState): Promise<void>;
+}
+
 export interface RelationsStores {
   readonly categories: ViolationCategoryStore;
   readonly violations: ViolationStore;
   readonly access: AccessEventStore;
   readonly investigations: InvestigationStore;
   readonly caseEvents: CaseEventStore;
+  readonly disciplinaryRules: DisciplinaryRuleStore;
+  readonly disciplinaryActions: DisciplinaryActionStore;
 }
 
 /**

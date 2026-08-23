@@ -118,7 +118,12 @@ describe.skipIf(CONNECTION === undefined)('investigation and case-history immuta
       ).rejects.toThrow(/relation_case_event_sequence_idx/);
     });
 
-    it('refuses a transition between states this checkpoint cannot reach', async () => {
+    /**
+     * `acknowledged` rather than `action_issued`: the latter became reachable when Checkpoint 4 was
+     * approved and built, so this asserts a state that is *still* unreachable rather than a state
+     * that merely used to be. The protection is the same; the example moved with the boundary.
+     */
+    it('refuses a transition to a state no checkpoint has built', async () => {
       const violationId = await givenViolation(fixture);
 
       await expect(
@@ -127,7 +132,7 @@ describe.skipIf(CONNECTION === undefined)('investigation and case-history immuta
             `insert into relation_case_event
                (tenant_id, violation_id, sequence, from_state, to_state, reason, actor,
                 occurred_at, correlation_id, created_at, created_by, updated_at, updated_by, version)
-             values ($1, $2, 1, 'findings', 'action_issued', 'r', 'a', now(), $3, now(), 'a', now(), 'a', 1)`,
+             values ($1, $2, 1, 'findings', 'acknowledged', 'r', 'a', now(), $3, now(), 'a', now(), 'a', 1)`,
             [TENANT_A, violationId, uuidV7()],
           ),
         ),

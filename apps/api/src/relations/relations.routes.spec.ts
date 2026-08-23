@@ -31,6 +31,8 @@ const CONTROLLER_FILES = [
   'violation-category.controller.ts',
   'violation.controller.ts',
   'investigation.controller.ts',
+  'disciplinary-rule.controller.ts',
+  'disciplinary-action.controller.ts',
 ];
 
 const sourceOf = (file: string): string => readFileSync(join(RELATIONS_PACKAGE, file), 'utf8');
@@ -51,13 +53,13 @@ const composed = (): ReturnType<typeof relationsModuleFor> => {
 };
 
 describe('the relations HTTP surface', () => {
-  it('dispatches exactly the thirteen names the module registers, and no fourteenth', () => {
+  it('dispatches exactly the nineteen names the module registers, and no twentieth', () => {
     const dispatched = CONTROLLER_FILES.map(codeOf).flatMap((source) => [
       ...(source.match(/(?:queryName|commandName): 'relations\.[a-z-]+'/g) ?? []),
     ]);
 
-    expect(dispatched).toHaveLength(13);
-    expect(new Set(dispatched).size).toBe(13);
+    expect(dispatched).toHaveLength(19);
+    expect(new Set(dispatched).size).toBe(19);
   });
 
   /**

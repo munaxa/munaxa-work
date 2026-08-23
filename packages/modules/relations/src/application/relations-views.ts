@@ -1,9 +1,13 @@
 import { currentCaseState, type CaseEventState } from '../domain/case-event.js';
+import type { DisciplinaryActionState } from '../domain/disciplinary-action.js';
+import type { DisciplinaryRuleState } from '../domain/disciplinary-ladder.js';
 import type { InvestigationRecord } from '../domain/investigation.js';
 import type { ViolationCategoryState } from '../domain/violation-category.js';
 import type { ViolationRecord } from '../domain/violation.js';
 import type {
   CaseEventView,
+  DisciplinaryActionView,
+  DisciplinaryRuleView,
   CaseHistoryView,
   InvestigationView,
   ViolationCategoryView,
@@ -117,4 +121,38 @@ export const caseHistoryView = (
   violationId,
   currentState: currentCaseState(history),
   history: [...history].sort((a, b) => a.sequence - b.sequence).map(caseEventView),
+});
+
+export const disciplinaryRuleView = (state: DisciplinaryRuleState): DisciplinaryRuleView => ({
+  disciplinaryRuleId: state.disciplinaryRuleId,
+  violationCategoryId: state.violationCategoryId,
+  minOccurrence: state.minOccurrence,
+  action: state.action,
+  sequence: state.sequence,
+  active: state.active,
+  version: state.version,
+});
+
+/**
+ * An issued action, as published.
+ *
+ * `issuedBy` **is** published, unlike a violation's `reportedBy`. The distinction is deliberate: a
+ * reporter is somebody whose identity the accused has no automatic right to, whereas the person who
+ * disciplined you is a fact you are entitled to know — it is on the letter, and a decision nobody
+ * will put their name to is not a decision.
+ */
+export const disciplinaryActionView = (state: DisciplinaryActionState): DisciplinaryActionView => ({
+  disciplinaryActionId: state.disciplinaryActionId,
+  violationId: state.violationId,
+  investigationId: state.investigationId,
+  action: state.action,
+  prescribedByRule: state.prescribedByRule,
+  occurrenceAtIssue: state.occurrenceAtIssue,
+  reason: state.reason,
+  issuedBy: state.issuedBy,
+  issuedOn: state.issuedOn,
+  version: state.version,
+  ...(state.disciplinaryRuleId === undefined
+    ? {}
+    : { disciplinaryRuleId: state.disciplinaryRuleId }),
 });

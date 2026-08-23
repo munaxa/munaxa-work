@@ -8,6 +8,10 @@ import {
   PostgresCaseEventRepository,
   PostgresInvestigationRepository,
 } from './investigation.repository.js';
+import {
+  PostgresDisciplinaryActionRepository,
+  PostgresDisciplinaryRuleRepository,
+} from './disciplinary.repository.js';
 
 /**
  * The real stores, assembled.
@@ -22,4 +26,6 @@ export const postgresRelationsStores = (): RelationsStores => ({
   access: new PostgresAccessEventRepository(),
   investigations: new PostgresInvestigationRepository(),
   caseEvents: new PostgresCaseEventRepository(),
+  disciplinaryRules: new PostgresDisciplinaryRuleRepository(),
+  disciplinaryActions: new PostgresDisciplinaryActionRepository(),
 });

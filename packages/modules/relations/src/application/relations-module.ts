@@ -12,6 +12,16 @@ import {
 import { correctInvestigationHandler } from './investigation-correction.use-case.js';
 import { escalationContextHandler } from './escalation.use-case.js';
 import {
+  amendDisciplinaryRuleHandler,
+  defineDisciplinaryRuleHandler,
+} from './disciplinary-ladder.use-case.js';
+import { issueDisciplinaryActionHandler } from './disciplinary-action.use-case.js';
+import {
+  applicableActionHandler,
+  disciplinaryActionHandler,
+  listDisciplinaryRulesHandler,
+} from './disciplinary-queries.js';
+import {
   listInvestigationsHandler,
   listViolationCategoriesHandler,
   listViolationsHandler,
@@ -23,7 +33,7 @@ import { ALL_RELATIONS_PERMISSIONS, RelationsPermissions } from './relations-per
 import type { RelationsDependencies } from './relations-dependencies.js';
 
 /**
- * Employee Relations' module declaration: six commands, seven queries, one navigation entry.
+ * Employee Relations' module declaration: nine commands, ten queries, one navigation entry.
  *
  * Registered on the same dispatcher as every other module. **Nothing here subscribes to an event and
  * nothing raises one.** The dispatch is at-most-once with no outbox (ADR-0053/0064), so a module
@@ -69,6 +79,10 @@ const commandsOf = (
     openInvestigationHandler(dependencies),
     concludeInvestigationHandler(dependencies),
     correctInvestigationHandler(dependencies),
+
+    defineDisciplinaryRuleHandler(dependencies),
+    amendDisciplinaryRuleHandler(dependencies),
+    issueDisciplinaryActionHandler(dependencies),
   ] as readonly CommandHandler<Command, unknown>[];
 
 const queriesOf = (dependencies: RelationsDependencies): readonly QueryHandler<Query, unknown>[] =>
@@ -83,4 +97,8 @@ const queriesOf = (dependencies: RelationsDependencies): readonly QueryHandler<Q
     readCaseHistoryHandler(dependencies),
 
     escalationContextHandler(dependencies),
+
+    listDisciplinaryRulesHandler(dependencies),
+    applicableActionHandler(dependencies),
+    disciplinaryActionHandler(dependencies),
   ] as readonly QueryHandler<Query, unknown>[];
