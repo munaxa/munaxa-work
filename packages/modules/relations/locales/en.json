@@ -25,18 +25,39 @@
       "version": "Version",
       "record": "Record a violation",
       "define": "Add a violation type",
-      "amend": "Amend violation type"
+      "amend": "Amend violation type",
+      "investigation": "Investigation",
+      "investigations": "Investigations",
+      "investigator": "Investigator",
+      "openedOn": "Opened",
+      "subject": "What is being investigated",
+      "findings": "Findings",
+      "recommendation": "Recommendation",
+      "concludedOn": "Concluded",
+      "reason": "Reason",
+      "caseHistory": "Case history",
+      "currentState": "Current state",
+      "transition": "Change",
+      "actor": "By",
+      "occurredAt": "When",
+      "open": "Open an investigation",
+      "conclude": "Conclude investigation"
     },
     "source": {
       "tenant": "Defined by this organization",
       "country_pack": "From a country pack"
     },
     "state": {
-      "reported": "Reported"
+      "reported": "Reported",
+      "under_investigation": "Under investigation",
+      "findings": "Findings"
     },
     "access": {
       "violation_read": "Opened",
-      "violation_listed": "Listed"
+      "violation_listed": "Listed",
+      "investigation_read": "Investigation opened",
+      "investigation_listed": "Investigation listed",
+      "case_history_read": "Case history opened"
     },
     "notice": {
       "empty": "Nothing to show yet.",
@@ -46,7 +67,14 @@
       "immutable": "A recorded violation cannot be edited or deleted. A correction is a new, linked record.",
       "inactiveCategory": "This violation type is no longer in use. Existing records keep it; new ones cannot use it.",
       "noLegalCheck": "Violation types are configuration. No labour-law validation is applied: country packs arrive in a later phase.",
-      "noLadder": "Penalties and escalation are not part of this release."
+      "noLadder": "Penalties and escalation are not part of this release.",
+      "investigationAudited": "Every time an investigation or a case history is opened, that is recorded against your name.",
+      "concludedImmutable": "A concluded investigation cannot be edited or deleted.",
+      "historyImmutable": "A case history is append-only. Nothing rewrites a step that already happened.",
+      "derivedState": "The current state is worked out from the case history rather than stored, so the two cannot disagree.",
+      "oneOpenInvestigation": "A violation can have one investigation in progress at a time.",
+      "noAutomaticTransitions": "Nothing moves a case on its own. Every change here is somebody's decision.",
+      "recommendationIsText": "A recommendation is a written suggestion. Nothing in this system acts on it automatically."
     },
     "rejection": {
       "category_code_malformed": "A code may use lower-case letters, digits and hyphens only.",
@@ -65,10 +93,32 @@
       "description_too_long": "That description is too long.",
       "reporter_unknown": "The person recording this could not be identified.",
       "access_actor_unknown": "The person reading this could not be identified.",
-      "access_correlation_unknown": "This read could not be traced to a request."
+      "access_correlation_unknown": "This read could not be traced to a request.",
+      "transition_not_permitted": "This case cannot move that way from where it is now.",
+      "transition_reason_missing": "Say why the case is moving.",
+      "transition_reason_too_long": "The reason is too long.",
+      "transition_actor_unknown": "A change must be attributable to somebody.",
+      "opened_on_malformed": "Give the date the investigation opened as YYYY-MM-DD.",
+      "opened_on_in_future": "An investigation cannot open in the future.",
+      "investigator_unknown": "Choose who is conducting the investigation.",
+      "subject_missing": "Say what is being investigated.",
+      "subject_too_long": "The subject is too long.",
+      "investigation_already_concluded": "This investigation has already concluded.",
+      "concluded_on_malformed": "Give the conclusion date as YYYY-MM-DD.",
+      "concluded_on_in_future": "An investigation cannot conclude in the future.",
+      "concluded_before_opened": "An investigation cannot conclude before it opened.",
+      "findings_missing": "Record what the investigation found.",
+      "findings_too_long": "The findings are too long.",
+      "recommendation_missing": "Record what the investigation recommends.",
+      "recommendation_too_long": "The recommendation is too long.",
+      "investigation_already_open": "This violation already has an investigation in progress."
     },
     "conflict": {
       "category_code_taken": "A violation type already uses that code."
+    },
+    "investigationState": {
+      "open": "Open",
+      "concluded": "Concluded"
     }
   }
 }

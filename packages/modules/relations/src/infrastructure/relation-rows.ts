@@ -1,7 +1,11 @@
 import type { AccessEventState } from '../domain/access-event.js';
+import type { CaseEventState } from '../domain/case-event.js';
+import type { InvestigationRecord } from '../domain/investigation.js';
 import type {
   AccessAction,
+  CaseState,
   CountryPackSource,
+  InvestigationState,
   ViolationState,
 } from '../domain/relations-vocabulary.js';
 import type { LocalizedName, ViolationCategoryState } from '../domain/violation-category.js';
@@ -145,4 +149,89 @@ export const accessEventValues = (state: AccessEventState, tenantId: string): Ro
   actor: state.actor,
   occurred_at: state.occurredAt,
   correlation_id: state.correlationId,
+});
+
+export interface InvestigationRow {
+  readonly id: string;
+  readonly violation_id: string;
+  readonly investigator_membership_id: string;
+  readonly opened_on: string;
+  readonly subject: string;
+  readonly findings: string | null;
+  readonly recommendation: string | null;
+  readonly concluded_on: string | null;
+  readonly state: string;
+  readonly version: number | string;
+}
+
+export const investigationState = (row: InvestigationRow): InvestigationRecord => ({
+  investigationId: row.id,
+  violationId: row.violation_id,
+  investigatorMembershipId: row.investigator_membership_id,
+  openedOn: row.opened_on,
+  subject: row.subject,
+  state: row.state as InvestigationState,
+  version: asNumber(row.version),
+  ...(orUndefined(row.findings) === undefined ? {} : { findings: row.findings as string }),
+  ...(orUndefined(row.recommendation) === undefined
+    ? {}
+    : { recommendation: row.recommendation as string }),
+  ...(orUndefined(row.concluded_on) === undefined
+    ? {}
+    : { concludedOn: row.concluded_on as string }),
+});
+
+export const investigationValues = (state: InvestigationRecord, tenantId: string): RowValues => ({
+  id: state.investigationId,
+  tenant_id: tenantId,
+  violation_id: state.violationId,
+  investigator_membership_id: state.investigatorMembershipId,
+  opened_on: state.openedOn,
+  subject: state.subject,
+  findings: orNull(state.findings),
+  recommendation: orNull(state.recommendation),
+  concluded_on: orNull(state.concludedOn),
+  state: state.state,
+});
+
+export interface CaseEventRow {
+  readonly id: string;
+  readonly violation_id: string;
+  readonly sequence: number | string;
+  readonly from_state: string;
+  readonly to_state: string;
+  readonly reason: string;
+  readonly actor: string;
+  readonly occurred_at: Date;
+  readonly correlation_id: string;
+  readonly investigation_id: string | null;
+}
+
+export const caseEventState = (row: CaseEventRow): CaseEventState => ({
+  caseEventId: row.id,
+  violationId: row.violation_id,
+  sequence: asNumber(row.sequence),
+  fromState: row.from_state as CaseState,
+  toState: row.to_state as CaseState,
+  reason: row.reason,
+  actor: row.actor,
+  occurredAt: row.occurred_at,
+  correlationId: row.correlation_id,
+  ...(orUndefined(row.investigation_id) === undefined
+    ? {}
+    : { investigationId: row.investigation_id as string }),
+});
+
+export const caseEventValues = (state: CaseEventState, tenantId: string): RowValues => ({
+  id: state.caseEventId,
+  tenant_id: tenantId,
+  violation_id: state.violationId,
+  sequence: state.sequence,
+  from_state: state.fromState,
+  to_state: state.toState,
+  reason: state.reason,
+  actor: state.actor,
+  occurred_at: state.occurredAt,
+  correlation_id: state.correlationId,
+  investigation_id: orNull(state.investigationId),
 });

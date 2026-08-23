@@ -42,12 +42,19 @@ given for them.
 | D-5.2-12 | Workflow approval adoption — AD-008 | **OPEN** | no — nothing is *issued* in Checkpoint 2, so nothing needs approving |
 | D-5.2-13 | Grievance confidentiality | **OPEN** | no — grievances are a later checkpoint |
 | D-5.2-14 | Scope of the first implementation checkpoint | **APPROVED** 2026-08-22 | **resolved** |
-| **D-5.2-15** | **How the violation lifecycle advances, given an immutable violation row** | **OPEN** | **YES — blocks Checkpoint 2** |
-| **D-5.2-16** | **What an investigation is, and who may run one** | **OPEN** | **YES — blocks Checkpoint 2** |
-| **D-5.2-17** | **Whether findings are immutable, and how a correction is made (AD-003)** | **OPEN** | **YES — blocks Checkpoint 2** |
+| D-5.2-15 | How the violation lifecycle advances, given an immutable violation row | **APPROVED** 2026-08-23 | **resolved** |
+| D-5.2-16 | What an investigation is, and who may run one | **APPROVED** 2026-08-23 | **resolved** |
+| D-5.2-17 | Whether findings are immutable, and how a correction is made (AD-003) | **APPROVED** 2026-08-23 | **resolved** |
+| **D-5.2-18** | **Whether investigations need permissions of their own** | **OPEN** | no — Checkpoint 2 shipped without them |
+| **D-5.2-19** | **How a concluded investigation is corrected** | **OPEN** | no — deferred out of Checkpoint 2 |
 
 All six of Checkpoint 1's blocking decisions are **APPROVED**, and none required a new architectural
 pattern: every one resolved onto a mechanism this repository already runs.
+
+**Status after Checkpoint 2 (2026-08-23).** D-5.2-15, D-5.2-16 and D-5.2-17 were approved and are
+implemented; see `phase-5.2-checkpoint-2.md`. Implementing them surfaced two further decisions,
+D-5.2-18 and D-5.2-19, **both recorded rather than taken** — neither blocked the checkpoint, and
+taking either without approval is precisely what the authorization forbade.
 
 **The Checkpoint 2 investigation added three decisions and closed none.** D-5.2-15, D-5.2-16 and
 D-5.2-17 did not exist before it, and the first of them is the reason: **Checkpoint 1 made the
@@ -757,3 +764,87 @@ only *after* first issue — a conditional trigger, and the precedent for exactl
 **Risks:** a conditional trigger is harder to reason about than an unconditional one; the assertion
 must prove both directions — an open investigation *can* be amended, a concluded one *cannot*.
 **Blocks Checkpoint 2: YES.**
+
+
+### Owner approval · 2026-08-23 — D-5.2-15
+
+**APPROVED.** Lifecycle state does **not** live on the violation. `relation_violation` remains
+immutable, its `state` CHECK still reads `('reported')`, and its trigger is untouched — D-5.2-03 was
+not reopened. Where a case has got to is a separate Relations-owned lifecycle record,
+`relation_case_event`.
+
+**Implemented** in migration `20260823060000_relations_investigations`.
+
+### Owner approval · 2026-08-23 — D-5.2-16
+
+**APPROVED.** The current state is **derived** from the lifecycle records — the `to_state` of the
+highest `sequence`, and `reported` for a case with none. **No redundant state column** exists
+anywhere: not on the violation, not on the investigation, not on a projection. **No generic
+framework**: no state-machine engine, no event-sourcing library, no workflow engine. The whole state
+machine is `PERMITTED_CASE_TRANSITIONS`, nine lines of data in `relations-vocabulary.ts`.
+
+**Asserted, not promised:** `relations-lifecycle-boundaries.test.ts` fails if a `current_state`
+column, a persisted `currentState` field, or any of that machinery appears.
+
+### Owner approval · 2026-08-23 — D-5.2-17
+
+**APPROVED.** States are explicit; transitions are validated against the state the **server** derives
+from persisted history, never against one a caller supplies; every transition is persisted with
+actor, timestamp and a required reason; history is immutable; a transition and the investigation that
+caused it commit together; and concurrency is settled by the database.
+
+**How each clause is met, and where it is proved:**
+
+| Clause | Mechanism | Proof |
+| --- | --- | --- |
+| Explicit states | `CASE_STATES` — three, not the specification's twelve | `case-lifecycle.test.ts` |
+| Validated transitions | `PERMITTED_CASE_TRANSITIONS`, all nine pairs asserted | `case-lifecycle.test.ts` |
+| No caller-supplied `from` | `recordTransition` derives it; a supplied one is ignored | `case-lifecycle.test.ts`, `relations.routes.spec.ts` |
+| Persisted with actor, time, reason | `relation_case_event`, `reason` NOT NULL | `investigation.test.ts` |
+| Immutable history | `app_relation_case_event_immutable`, unconditional | `relations-investigation.integration.test.ts` |
+| Immutable findings | `app_relation_investigation_refuse_concluded`, conditional | both directions, same suite |
+| Atomic | one `unitOfWork.execute` per command | `investigation.test.ts` |
+| Concurrency-safe | `relation_case_event_sequence_idx` unique per case | **two real PostgreSQL connections**, `relations-case-lifecycle.integration.test.ts` |
+| No automatic transitions | no scheduler, timer, worker or machine actor | negative-space suites |
+
+---
+
+# Decisions opened by the Checkpoint 2 implementation
+
+Two. **Neither was taken**, and neither blocked the checkpoint.
+
+## D-5.2-18 — Whether investigations need permissions of their own · **OPEN**
+
+**What Checkpoint 2 did.** Reused the four permissions Checkpoint 1 defined. Opening and concluding
+an inquiry require `relations.violation.record`; the three new reads require
+`relations.violation.read`. **No permission was created**, because the authorization required
+stopping before creating one unless the repository proved it unavoidable — and it is not: the
+capability is implementable without one, as the working implementation shows.
+
+**The case for separating them, recorded for the owner.** AD-007 says disciplinary access is
+*"restricted independently of ordinary employee access"*, and there is a real argument that filing a
+report and conducting an inquiry into a colleague are different acts deserving different grants — the
+same argument the Checkpoint 2 plan made for `relations.investigation.manage` / `.read`. Against it:
+anyone holding `relations.violation.record` can already record an allegation against any employment
+in the tenant, which is the more consequential act of the two, so the separation buys less than it
+first appears.
+
+**Consequence of today's choice, stated plainly:** a user who may record a violation may also open and
+conclude an inquiry. If that is wrong for a customer, the fix is a new permission, which is additive
+and needs no data migration.
+
+## D-5.2-19 — How a concluded investigation is corrected · **OPEN**
+
+**What Checkpoint 2 did.** Nothing. There is no `relations.correct-investigation` command, and the
+negative-space suite asserts its absence.
+
+**Why.** The approved D-5.2-17 text resolved transitions and immutability; corrections were the part
+of the original D-5.2-17 recommendation — *"a correction is a new investigation row linked by
+`corrects_investigation_id`"* — that the approval did not restate. Building it anyway would have been
+scope expansion, which the authorization forbade in the same paragraph.
+
+**Consequence, stated plainly:** a concluded investigation cannot be amended by any path. The
+database refuses it, which is correct under AD-003 — but AD-003's other half, *"a correction is a new,
+linked record with a stated reason"*, has no implementation yet. Until it does, a mistake in a
+concluded investigation's findings is uncorrectable, not merely unedited. That is the honest state of
+the module and the reason this decision is recorded rather than left implicit.

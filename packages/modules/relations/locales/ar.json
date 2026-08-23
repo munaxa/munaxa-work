@@ -25,18 +25,39 @@
       "version": "الإصدار",
       "record": "تسجيل مخالفة",
       "define": "إضافة نوع مخالفة",
-      "amend": "تعديل نوع المخالفة"
+      "amend": "تعديل نوع المخالفة",
+      "investigation": "تحقيق",
+      "investigations": "التحقيقات",
+      "investigator": "المحقق",
+      "openedOn": "تاريخ الفتح",
+      "subject": "موضوع التحقيق",
+      "findings": "النتائج",
+      "recommendation": "التوصية",
+      "concludedOn": "تاريخ الإغلاق",
+      "reason": "السبب",
+      "caseHistory": "سجل الحالة",
+      "currentState": "الحالة الراهنة",
+      "transition": "التغيير",
+      "actor": "بواسطة",
+      "occurredAt": "التاريخ",
+      "open": "فتح تحقيق",
+      "conclude": "إغلاق التحقيق"
     },
     "source": {
       "tenant": "معرّف من قبل المنشأة",
       "country_pack": "من حزمة دولة"
     },
     "state": {
-      "reported": "مبلّغ عنها"
+      "reported": "مبلّغ عنها",
+      "under_investigation": "قيد التحقيق",
+      "findings": "صدرت النتائج"
     },
     "access": {
       "violation_read": "تم الاطلاع",
-      "violation_listed": "ظهرت في قائمة"
+      "violation_listed": "ظهرت في قائمة",
+      "investigation_read": "تم الاطلاع على التحقيق",
+      "investigation_listed": "ظهر التحقيق في قائمة",
+      "case_history_read": "تم الاطلاع على سجل الحالة"
     },
     "notice": {
       "empty": "لا يوجد ما يُعرض بعد.",
@@ -46,7 +67,14 @@
       "immutable": "لا يمكن تعديل مخالفة مسجلة أو حذفها. التصحيح سجل جديد مرتبط بها.",
       "inactiveCategory": "هذا النوع لم يعد قيد الاستخدام. السجلات القائمة تحتفظ به، ولا يمكن استخدامه في سجل جديد.",
       "noLegalCheck": "أنواع المخالفات إعدادات. لا يُطبّق أي تحقق قانوني: حزم الدول تأتي في مرحلة لاحقة.",
-      "noLadder": "العقوبات والتدرج ليست ضمن هذا الإصدار."
+      "noLadder": "العقوبات والتدرج ليست ضمن هذا الإصدار.",
+      "investigationAudited": "كل اطلاع على تحقيق أو على سجل حالة يُسجّل باسمك.",
+      "concludedImmutable": "لا يمكن تعديل تحقيق مغلق أو حذفه.",
+      "historyImmutable": "سجل الحالة يُضاف إليه فقط. لا يُعاد كتابة خطوة وقعت بالفعل.",
+      "derivedState": "تُستنتج الحالة الراهنة من سجل الحالة ولا تُخزَّن، فلا يمكن أن يتعارض الاثنان.",
+      "oneOpenInvestigation": "لا يمكن أن يكون للمخالفة أكثر من تحقيق واحد قيد التنفيذ في الوقت نفسه.",
+      "noAutomaticTransitions": "لا شيء ينقل الحالة تلقائيًا. كل تغيير هنا قرار من شخص.",
+      "recommendationIsText": "التوصية اقتراح مكتوب. لا يتصرف النظام بناءً عليها تلقائيًا."
     },
     "rejection": {
       "category_code_malformed": "يجوز أن يحتوي الرمز على أحرف إنجليزية صغيرة وأرقام وشرطات فقط.",
@@ -65,10 +93,32 @@
       "description_too_long": "هذا الوصف طويل جدًا.",
       "reporter_unknown": "تعذر تحديد من يسجل هذه المخالفة.",
       "access_actor_unknown": "تعذر تحديد من اطلع على هذا السجل.",
-      "access_correlation_unknown": "تعذر ربط هذا الاطلاع بطلب."
+      "access_correlation_unknown": "تعذر ربط هذا الاطلاع بطلب.",
+      "transition_not_permitted": "لا يمكن نقل الحالة بهذه الطريقة من وضعها الحالي.",
+      "transition_reason_missing": "اذكر سبب تغيير الحالة.",
+      "transition_reason_too_long": "السبب طويل جدًا.",
+      "transition_actor_unknown": "يجب أن يكون التغيير منسوبًا إلى شخص.",
+      "opened_on_malformed": "أدخل تاريخ فتح التحقيق بصيغة YYYY-MM-DD.",
+      "opened_on_in_future": "لا يمكن فتح تحقيق بتاريخ مستقبلي.",
+      "investigator_unknown": "اختر من يتولى التحقيق.",
+      "subject_missing": "اذكر موضوع التحقيق.",
+      "subject_too_long": "الموضوع طويل جدًا.",
+      "investigation_already_concluded": "هذا التحقيق مغلق بالفعل.",
+      "concluded_on_malformed": "أدخل تاريخ الإغلاق بصيغة YYYY-MM-DD.",
+      "concluded_on_in_future": "لا يمكن إغلاق تحقيق بتاريخ مستقبلي.",
+      "concluded_before_opened": "لا يمكن إغلاق التحقيق قبل تاريخ فتحه.",
+      "findings_missing": "سجّل ما توصل إليه التحقيق.",
+      "findings_too_long": "النتائج طويلة جدًا.",
+      "recommendation_missing": "سجّل توصية التحقيق.",
+      "recommendation_too_long": "التوصية طويلة جدًا.",
+      "investigation_already_open": "هذه المخالفة لديها تحقيق قيد التنفيذ بالفعل."
     },
     "conflict": {
       "category_code_taken": "يوجد نوع مخالفة يستخدم هذا الرمز."
+    },
+    "investigationState": {
+      "open": "مفتوح",
+      "concluded": "مغلق"
     }
   }
 }

@@ -258,6 +258,12 @@ describe('the vocabularies', () => {
   });
 
   it('distinguishes a record opened from one that appeared in a list', () => {
-    expect(ACCESS_ACTIONS).toStrictEqual(['violation_read', 'violation_listed']);
+    expect(ACCESS_ACTIONS).toStrictEqual([
+      'violation_read',
+      'violation_listed',
+      'investigation_read',
+      'investigation_listed',
+      'case_history_read',
+    ]);
   });
 });

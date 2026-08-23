@@ -1,6 +1,8 @@
 import type { Transaction } from '@work/kernel';
 
 import type { AccessEventState } from '../domain/access-event.js';
+import type { CaseEventState } from '../domain/case-event.js';
+import type { InvestigationRecord } from '../domain/investigation.js';
 import type { ViolationCategoryState } from '../domain/violation-category.js';
 import type { ViolationRecord } from '../domain/violation.js';
 
@@ -62,10 +64,48 @@ export interface AccessEventStore {
   insert(transaction: Transaction, state: AccessEventState): Promise<void>;
 }
 
+/**
+ * Investigations. Reads, an insert, and an update that only an *open* row can survive.
+ *
+ * `update` exists — unlike on the two stores above — because an open investigation is a draft its
+ * investigator is still writing. It cannot touch a concluded one: the trigger refuses that from any
+ * path, and the `expected` version guards the ordinary lost-update race in between.
+ *
+ * `openFor` is how a caller learns there is already an inquiry in progress. It is **not** what makes
+ * "one open investigation per violation" true — the partial unique index is, because a read that
+ * precedes an insert decides nothing under concurrency (ADR-0071). This read exists so the common
+ * case is a business refusal rather than a database exception.
+ */
+export interface InvestigationStore {
+  byId(transaction: Transaction, id: string): Promise<InvestigationRecord | undefined>;
+  openFor(transaction: Transaction, violationId: string): Promise<InvestigationRecord | undefined>;
+  forViolation(
+    transaction: Transaction,
+    violationId: string,
+    paged: Paged,
+  ): Promise<Page<InvestigationRecord>>;
+  insert(transaction: Transaction, state: InvestigationRecord): Promise<void>;
+  update(transaction: Transaction, state: InvestigationRecord, expected: number): Promise<void>;
+}
+
+/**
+ * The case history. Reads and one insert — **no update and no remove**, like the access trail.
+ *
+ * `forViolation` is unbounded by page on purpose, and bounded by nature: it returns the transitions
+ * of a single case, which is a handful of rows, and paginating a history would make deriving the
+ * current state from it a paginated question.
+ */
+export interface CaseEventStore {
+  forViolation(transaction: Transaction, violationId: string): Promise<readonly CaseEventState[]>;
+  insert(transaction: Transaction, state: CaseEventState): Promise<void>;
+}
+
 export interface RelationsStores {
   readonly categories: ViolationCategoryStore;
   readonly violations: ViolationStore;
   readonly access: AccessEventStore;
+  readonly investigations: InvestigationStore;
+  readonly caseEvents: CaseEventStore;
 }
 
 /**
@@ -79,6 +119,27 @@ export interface RelationsStores {
  */
 export interface EmploymentDirectoryPort {
   exists(employmentId: string): Promise<boolean>;
+}
+
+/**
+ * Whether the membership named as an investigator may act in this tenant.
+ *
+ * **A second boolean, for the same reason as the first.** An investigator is assigned by the person
+ * opening the inquiry, so the identifier arrives on the command — and an identifier a command
+ * supplies is an identifier a command can invent. Without this, a tenant could accumulate
+ * investigations attributed to memberships that never existed or left last year, and nothing would
+ * notice until a tribunal asked who conducted the inquiry.
+ *
+ * **No new query and no new permission.** Identity already publishes `identity.membership-standing`
+ * — one identifier in, one predicate out — precisely so a consumer needing this fact does not receive
+ * a member's whole page. It is reached under a bounded service grant (ADR-0043), exactly as Workflow
+ * reaches it for escalation. Relations learns whether the membership may act and nothing else: not a
+ * name, not a role, not an employment.
+ *
+ * A membership in another tenant answers `false`, indistinguishable from one that never existed.
+ */
+export interface MembershipDirectoryPort {
+  canAct(membershipId: string): Promise<boolean>;
 }
 
 /** The clock, as a port, so a test can hold time still without stubbing the platform. */

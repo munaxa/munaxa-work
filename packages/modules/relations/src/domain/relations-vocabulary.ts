@@ -32,14 +32,83 @@ export const VIOLATION_STATES = ['reported'] as const;
 export type ViolationState = (typeof VIOLATION_STATES)[number];
 
 /**
+ * Where a **case** has got to — which is not the same fact as what the violation row says.
+ *
+ * `relation_violation.state` is still `'reported'` for every row and always will be: that row is the
+ * factual record of what was reported, it is immutable at the database (D-5.2-03), and a factual
+ * record does not move. The case built on top of it does move, and D-5.2-15 puts that movement in a
+ * separate Relations-owned lifecycle record rather than in a column somebody has to update.
+ *
+ * **Three values, not the specification's twelve.** The lifecycle continues through pending-approval,
+ * action-issued, acknowledged, appealed, upheld, annulled, expired and archived; every one of those
+ * is reached by a capability Checkpoint 2 does not build. Listing a state nothing can produce is the
+ * promise the code cannot keep that Checkpoint 1 declined to make, and declining it twice is
+ * consistency rather than timidity. The database CHECK widens by an approved change.
+ */
+export const CASE_STATES = ['reported', 'under_investigation', 'findings'] as const;
+export type CaseState = (typeof CASE_STATES)[number];
+
+export const isCaseState = (value: string): value is CaseState =>
+  (CASE_STATES as readonly string[]).includes(value);
+
+/**
+ * The state a case is in before anything has happened to it.
+ *
+ * Not stored anywhere (D-5.2-16). A case with no lifecycle events **is** `reported`, because the
+ * violation being recorded is what reported it; writing an event to say so would be recording that a
+ * thing is itself.
+ */
+export const INITIAL_CASE_STATE: CaseState = 'reported';
+
+/**
+ * Which transitions exist, stated as data and exhaustively.
+ *
+ * **This is the whole state machine, and it is nine lines long.** No engine, no registry, no
+ * pluggable rule set — D-5.2-16 forbids the generic framework, and a domain with three states and two
+ * edges does not need one. A transition absent from this map is refused by name, so adding a state
+ * later means adding its edges here and nowhere else.
+ *
+ * Note what is *not* here: nothing returns to `reported`, and nothing leaves `findings`. Reopening a
+ * concluded case and acting on findings are both later capabilities; leaving their edges out means a
+ * request for them is refused rather than silently accepted into a state nothing can act on.
+ */
+export const PERMITTED_CASE_TRANSITIONS: Readonly<Record<CaseState, readonly CaseState[]>> = {
+  reported: ['under_investigation'],
+  under_investigation: ['findings'],
+  findings: [],
+};
+
+export const permitsTransition = (from: CaseState, to: CaseState): boolean =>
+  PERMITTED_CASE_TRANSITIONS[from].includes(to);
+
+/**
+ * Whether an investigation is still being written or has become evidence.
+ *
+ * The database enforces the consequence rather than trusting this type: a row at `concluded` refuses
+ * every update and every delete, from any path including a direct `psql` session.
+ */
+export const INVESTIGATION_STATES = ['open', 'concluded'] as const;
+export type InvestigationState = (typeof INVESTIGATION_STATES)[number];
+
+/**
  * What a read of a disciplinary record was.
  *
  * `violation_read` is one record fetched by identifier; `violation_listed` is one record disclosed
  * as part of a bounded list. They are separate values because "who opened this violation" and "whose
  * violation appeared on somebody's screen" are different questions an investigator asks, and
  * collapsing them would make the first unanswerable.
+ *
+ * Checkpoint 2 adds three more for the same reason it audited the first two: an investigation's
+ * findings and a case's history are disciplinary content, and AD-007 audits reading it. `case_history_read`
+ * has no `_listed` twin because the history of one case is only ever fetched whole.
  */
-export const ACCESS_ACTIONS = ['violation_read', 'violation_listed'] as const;
+export const ACCESS_ACTIONS = [
+  'violation_read',
+  'violation_listed',
+  'investigation_read',
+  'investigation_listed',
+  'case_history_read',
+] as const;
 export type AccessAction = (typeof ACCESS_ACTIONS)[number];
 
 /**

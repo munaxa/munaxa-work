@@ -547,6 +547,27 @@ substrings to concepts, are recorded in
 schema, the RLS proofs under an unprivileged role, the concurrency proof and the eight decisions that
 remain `OPEN`.
 
+Phase 5.2 Checkpoint 2 landed on 2026-08-23: **investigations and the Relations case lifecycle** —
+two tables, two commands, three reads, and no new permission. The Checkpoint 2 investigation had
+found that the lifecycle *cannot* advance by updating `relation_violation`, because Checkpoint 1 made
+that row trigger-immutable with its `state` CHECK locked to `'reported'`; the owner resolved it
+(D-5.2-15) by keeping the violation exactly as it was and putting the case's movement in its own
+append-only table. **Where a case is, is derived and stored nowhere** (D-5.2-16) — the latest
+transition's destination, with no `current_state` column, no projection and no state-machine engine;
+the whole state machine is nine lines of data. Transitions are validated against the state the
+**server** derives from persisted history rather than one a caller supplies, every transition carries
+actor, server timestamp and a required reason, the history is unconditionally immutable and an
+investigation becomes immutable the moment it concludes — the conditional trigger `letter_template_version`
+established, asserted in **both** directions. Concurrency is settled by a unique sequence per case and
+a partial unique index for the one open inquiry, both proved with **two real PostgreSQL connections
+contending**, no sleeps and no timing assumptions. The one new cross-module dependency reuses
+Identity's existing `membership-standing` predicate under a bounded grant, so an investigator is
+verified without this module learning a name. Two decisions the implementation surfaced — separate
+investigation permissions, and how a concluded investigation is corrected — were **recorded as open,
+not taken**. [`verification/phase-5.2-checkpoint-2.md`](verification/phase-5.2-checkpoint-2.md)
+carries the schema, the proofs, the five Checkpoint 1 assertions that were updated and why none was
+weakened, and four stated limitations.
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

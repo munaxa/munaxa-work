@@ -89,19 +89,28 @@ describe('the permission set', () => {
     }
   });
 
-  /** Every handler declares one, and the four declared are exactly the four published. */
+  /**
+   * Every handler declares one, and the declared set is exactly the published set.
+   *
+   * The count moved from six to eleven when Checkpoint 2 added two commands and three queries. **The
+   * permission set did not move**: opening and concluding an inquiry are the disciplinary-handling
+   * capability `relations.violation.record` already names, and the three reads are
+   * `relations.violation.read`. That is what the last two assertions prove — a new handler that
+   * invented a permission would fail them, and one that declared none would fail the pipeline.
+   */
   it('is declared one per handler, and covers every handler', () => {
     const module = relationsModule({
       unitOfWork: { execute: () => Promise.reject(new Error('not called')) } as never,
       stores: inMemoryRelationsStores(),
       employments: { exists: () => Promise.resolve(true) },
+      memberships: { canAct: () => Promise.resolve(true) },
       clock: { now: () => new Date() },
     });
     const declared = [...(module.commands ?? []), ...(module.queries ?? [])].map(
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(6);
+    expect(declared).toHaveLength(11);
     for (const permission of declared) expect(ALL_RELATIONS_PERMISSIONS).toContain(permission);
     expect([...new Set(declared)].sort()).toStrictEqual([...ALL_RELATIONS_PERMISSIONS].sort());
   });

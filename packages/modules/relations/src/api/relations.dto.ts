@@ -179,3 +179,80 @@ export class RecordViolationBody {
   @MaxLength(4000)
   public description!: string;
 }
+
+/**
+ * Opening an inquiry.
+ *
+ * **No `fromState`, and that is the whole point of D-5.2-17.** A caller does not say where the case
+ * is; the server reads its history and derives it. A body carrying a `from` state would let a caller
+ * name the state that makes their transition legal, and the server would be validating the caller's
+ * claim rather than the case.
+ *
+ * **No actor and no timestamp**, for the reasons at the top of this file. The person opening the
+ * inquiry is the authenticated caller; the investigator is a *membership they assign*, which is a
+ * different fact and is verified against Identity before anything is written.
+ *
+ * `reason` is required. A transition with no stated reason is the thing a tribunal asks about.
+ */
+export class OpenInvestigationBody {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  public violationId!: string;
+
+  @ApiProperty({ format: 'uuid', description: 'A membership. Never a person (AD-001).' })
+  @IsUUID()
+  public investigatorMembershipId!: string;
+
+  @ApiProperty({ pattern: ISO_DATE.source, example: '2026-08-21' })
+  @Matches(ISO_DATE)
+  public openedOn!: string;
+
+  @ApiProperty({ maxLength: 4000 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  public subject!: string;
+
+  @ApiProperty({
+    maxLength: 2000,
+    description: 'Why the case is moving. Recorded on the transition.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  public reason!: string;
+}
+
+/**
+ * Concluding one.
+ *
+ * `recommendation` is text and nothing acts on it — not Payroll, not an approval, not a letter. A
+ * disciplinary outcome is a decision a named human takes (ADR-0045), and a field that took it
+ * automatically would be this module taking it instead.
+ *
+ * There is no `expectedVersion`: the handler uses the version it read, so a caller cannot claim to
+ * have seen one they did not. Concluding twice is refused by the domain and by a trigger.
+ */
+export class ConcludeInvestigationBody {
+  @ApiProperty({ maxLength: 8000 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(8000)
+  public findings!: string;
+
+  @ApiProperty({ maxLength: 4000, description: 'Text. Nothing in this product acts on it.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  public recommendation!: string;
+
+  @ApiProperty({ pattern: ISO_DATE.source, example: '2026-08-23' })
+  @Matches(ISO_DATE)
+  public concludedOn!: string;
+
+  @ApiProperty({ maxLength: 2000 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  public reason!: string;
+}

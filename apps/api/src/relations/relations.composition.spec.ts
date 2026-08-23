@@ -53,13 +53,17 @@ describe('relations composition', () => {
     const relations = composed();
 
     expect(relations.name).toBe('relations');
-    // Three and three, in Checkpoint 1: define and amend a catalogue entry, record a violation; list
-    // the catalogue, read one violation, list one employment's. Every later capability —
-    // investigations, actions, warnings, grievances, appeals — arrives with the checkpoint that
-    // builds it, so these numbers moving is a scope change rather than a detail.
-    expect(relations.commands ?? []).toHaveLength(3);
-    expect(relations.queries ?? []).toHaveLength(3);
+    // Five and six, after Checkpoint 2. Checkpoint 1 built three and three: define and amend a
+    // catalogue entry, record a violation; list the catalogue, read one violation, list one
+    // employment's. Checkpoint 2 added two commands (open and conclude an inquiry) and three reads
+    // (one inquiry, a violation's inquiries, a case history). Every remaining capability — actions,
+    // warnings, grievances, appeals — arrives with the checkpoint that builds it, so these numbers
+    // moving is a scope change rather than a detail.
+    expect(relations.commands ?? []).toHaveLength(5);
+    expect(relations.queries ?? []).toHaveLength(6);
     expect(relations.permissions).toEqual(ALL_RELATIONS_PERMISSIONS);
+    // **Still four.** Checkpoint 2 added five handlers and no permission: opening and concluding an
+    // inquiry are the disciplinary-handling capability `relations.violation.record` already names.
     expect(ALL_RELATIONS_PERMISSIONS).toHaveLength(4);
   });
 
@@ -70,7 +74,7 @@ describe('relations composition', () => {
       (handler) => handler.permission,
     );
 
-    expect(declared).toHaveLength(6);
+    expect(declared).toHaveLength(11);
     for (const permission of declared) {
       expect(ALL_RELATIONS_PERMISSIONS).toContain(permission);
       expect(permission).not.toContain('*');
@@ -122,8 +126,28 @@ describe('relations composition', () => {
 
     expect(source).toContain('postgresRelationsStores()');
     expect(source).toContain('new RelationsEmploymentDirectory(dispatcher)');
+    expect(source).toContain('new RelationsMembershipDirectory(dispatcher)');
     expect(source).not.toContain('inMemory');
     expect(source).not.toContain('AlwaysExists');
+  });
+
+  /**
+   * The investigator check goes through a grant too, and through a query Identity already publishes.
+   *
+   * A disciplinary module that could read the member register would be able to enumerate a tenant's
+   * people; `identity.membership-standing` exists so that holding the register's read permission
+   * inside a grant returns **one boolean** rather than a member's whole page. Workflow reaches the
+   * same query the same way, which is why no Identity change was needed and none was made.
+   */
+  it('verifies an investigator under a bounded grant, through one published predicate', () => {
+    const source = codeOf('relations-sources.ts');
+
+    expect(source).toContain('permits: [MEMBERSHIP_READ]');
+    expect(source).toContain("queryName: 'identity.membership-standing'");
+    // Not the wide read it exists to avoid, and no second question smuggled alongside it.
+    expect(source).not.toContain('identity.describe-member');
+    expect(source).not.toContain('identity.search-members');
+    expect(source).not.toContain('identity.list-memberships');
   });
 
   /**
@@ -180,6 +204,8 @@ describe('relations composition', () => {
 
     expect(source).toContain('Promise<boolean>');
     expect(source).toContain('return found.ok');
+    // The membership adapter answers the same way: a predicate, and nothing about the person.
+    expect(source).toContain('return answered.value.active');
     for (const leaked of ['name', 'status', 'personId', 'grade', 'manager']) {
       expect([leaked, source.includes(`${leaked}:`)]).toStrictEqual([leaked, false]);
     }

@@ -3,12 +3,16 @@ import { postgresRelationsStores, relationsModule } from '@work/relations';
 import type { UnitOfWork, WorkModule } from '@work/kernel';
 
 import type { Asking } from '../payroll/asking.js';
-import { RelationsEmploymentDirectory } from './relations-sources.js';
+import { RelationsEmploymentDirectory, RelationsMembershipDirectory } from './relations-sources.js';
 
 /**
- * Employee Relations' composition: the PostgreSQL stores, one cross-module adapter, and a clock.
+ * Employee Relations' composition: the PostgreSQL stores, two cross-module adapters, and a clock.
  *
- * **Three dependencies, and the absences are the design.** There is no storage adapter — evidence
+ * **Four dependencies, and the absences are the design.** Checkpoint 2 added one — Identity's
+ * membership standing, so an investigator named on a command is verified rather than accepted. It
+ * reaches a query Identity already published, under a bounded grant, and learns one boolean.
+ *
+ * There is no storage adapter — evidence
  * attachment is a later decision and no `StoragePort` adapter exists anywhere in this repository.
  * There is no notification port: nothing here tells anybody anything, and delivery is Phase 17's.
  * There is no approval port, because Checkpoint 1 issues nothing that needs approving. There is no
@@ -27,5 +31,6 @@ export const relationsModuleFor = (unitOfWork: UnitOfWork, dispatcher: Asking): 
     unitOfWork,
     stores: postgresRelationsStores(),
     employments: new RelationsEmploymentDirectory(dispatcher),
+    memberships: new RelationsMembershipDirectory(dispatcher),
     clock: systemClock,
   });

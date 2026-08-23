@@ -1,6 +1,7 @@
 import { runWithServiceGrant, type HandlerFailure, type Query, type Result } from '@work/kernel';
-import type { EmploymentDirectoryPort } from '@work/relations';
+import type { EmploymentDirectoryPort, MembershipDirectoryPort } from '@work/relations';
 import type { EmploymentView } from '@work/employment';
+import type { MembershipStandingView } from '@work/identity';
 
 import type { Asking } from '../payroll/asking.js';
 
@@ -58,5 +59,57 @@ export class RelationsEmploymentDirectory implements EmploymentDirectoryPort {
     );
 
     return found.ok;
+  }
+}
+
+/** The one permission this adapter ever holds inside another module. */
+const MEMBERSHIP_READ = 'identity.membership.read';
+
+interface MembershipStandingQuery extends Query {
+  readonly queryName: 'identity.membership-standing';
+  readonly membershipId: string;
+}
+
+/**
+ * Whether the membership named as an investigator may act in this tenant.
+ *
+ * **An existing query, not a new one.** Identity publishes `identity.membership-standing` precisely
+ * so a consumer needing this predicate does not receive a member's whole page; Workflow already
+ * reaches it the same way for escalation, and this adapter is that one with a different reason
+ * attached. No Identity change, no new permission, no widened contract.
+ *
+ * **`not_found` becomes `false`, and every other failure raises.** A membership that names nobody and
+ * one that may not act are the same answer to the question this asks — *may this person conduct an
+ * inquiry* — and row-level security makes another tenant's membership arrive as the first. A database
+ * that cannot answer has not said no: reporting an outage as "this investigator is invalid" would
+ * refuse every inquiry in the tenant while sending administrators to inspect memberships that are
+ * perfectly fine.
+ */
+export class RelationsMembershipDirectory implements MembershipDirectoryPort {
+  public constructor(private readonly dispatcher: Asking) {}
+
+  public async canAct(membershipId: string): Promise<boolean> {
+    const answered: Result<MembershipStandingView, HandlerFailure> = await runWithServiceGrant(
+      {
+        module: 'relations',
+        operation: 'relations.open-investigation',
+        permits: [MEMBERSHIP_READ],
+        reason:
+          'An investigation is conducted by somebody, and a membership that may no longer act in ' +
+          'this tenant cannot be assigned to conduct one.',
+      },
+      () =>
+        asking<MembershipStandingView, MembershipStandingQuery>(this.dispatcher, {
+          queryName: 'identity.membership-standing',
+          membershipId,
+        }),
+    );
+
+    if (answered.ok) return answered.value.active;
+    if (answered.error.kind === 'not_found') return false;
+
+    throw new Error(
+      `Identity could not answer a membership-standing question: ${answered.error.kind}`,
+    );
   }
 }

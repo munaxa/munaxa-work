@@ -42,9 +42,11 @@ export const requireDatabaseInCi = (suite: string): void => {
 export const TENANT_A = '01940000-0000-7000-8000-0000000ae111';
 export const TENANT_B = '01940000-0000-7000-8000-0000000ae222';
 
-/** The three tables this module owns, most dependent first, for truncation between tests. */
+/** The five tables this module owns, most dependent first, for truncation between tests. */
 export const RELATIONS_TABLES = [
+  'relation_case_event',
   'relation_violation_access_event',
+  'relation_investigation',
   'relation_violation',
   'relation_violation_category',
 ];

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import {
+  CaseHistoryController,
+  InvestigationController,
   RelationsDispatcher,
   ViolationCategoryController,
   ViolationController,
@@ -23,8 +25,15 @@ import { IdentityModule } from '../identity/identity.module.js';
   // its controllers were declared. `ViolationCategoryController` owns the literal
   // `relations/categories` prefix and is declared first; `ViolationController` declares its
   // collection and create routes before its `:violationId` route. An API test asserts the
-  // resolution rather than trusting this comment.
-  controllers: [ViolationCategoryController, ViolationController],
+  // resolution rather than trusting this comment. `InvestigationController` and
+  // `CaseHistoryController` own distinct literal prefixes (`relations/investigations` and
+  // `relations/cases`), so neither can be shadowed by the `:violationId` route above them.
+  controllers: [
+    ViolationCategoryController,
+    ViolationController,
+    InvestigationController,
+    CaseHistoryController,
+  ],
   providers: [
     {
       provide: RelationsDispatcher,

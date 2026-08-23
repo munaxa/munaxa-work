@@ -27,7 +27,11 @@ const RELATIONS_PACKAGE = join(
   'api',
 );
 
-const CONTROLLER_FILES = ['violation-category.controller.ts', 'violation.controller.ts'];
+const CONTROLLER_FILES = [
+  'violation-category.controller.ts',
+  'violation.controller.ts',
+  'investigation.controller.ts',
+];
 
 const sourceOf = (file: string): string => readFileSync(join(RELATIONS_PACKAGE, file), 'utf8');
 
@@ -45,13 +49,13 @@ const composed = (): ReturnType<typeof relationsModuleFor> => {
 };
 
 describe('the relations HTTP surface', () => {
-  it('dispatches exactly the six names the module registers, and no seventh', () => {
+  it('dispatches exactly the eleven names the module registers, and no twelfth', () => {
     const dispatched = CONTROLLER_FILES.map(codeOf).flatMap((source) => [
       ...(source.match(/(?:queryName|commandName): 'relations\.[a-z-]+'/g) ?? []),
     ]);
 
-    expect(dispatched).toHaveLength(6);
-    expect(new Set(dispatched).size).toBe(6);
+    expect(dispatched).toHaveLength(11);
+    expect(new Set(dispatched).size).toBe(11);
   });
 
   /**
@@ -129,6 +133,51 @@ describe('the relations HTTP surface', () => {
     }
   });
 
+  /**
+   * The same restraint on the lifecycle routes: inquiries are listed for one violation, and there is
+   * no route that lists a tenant's open cases, its investigators' workloads, or its case history at
+   * large. Each would be the watchlist the violation routes already refuse to be.
+   */
+  it('lists inquiries only for a named violation', () => {
+    const source = codeOf('investigation.controller.ts');
+
+    expect(source).toContain("@Query('violationId')");
+    for (const forbidden of ['state', 'investigatorMembershipId', 'openedFrom', 'employmentId']) {
+      expect([forbidden, source.includes(`@Query('${forbidden}')`)]).toStrictEqual([
+        forbidden,
+        false,
+      ]);
+    }
+  });
+
+  /**
+   * **No route sets a state.**
+   *
+   * A case moves because somebody opened or concluded an inquiry, and the transition is that act's
+   * consequence. A `PATCH /state` — or any route carrying a `fromState` — would let a caller name
+   * where the case is and have the server validate their claim rather than the case (D-5.2-17).
+   */
+  it('exposes no route that sets a case state directly', () => {
+    const source = CONTROLLER_FILES.map(codeOf).join('\n');
+
+    // No route *carries* a state. `transition` and `state` are not forbidden words — the case-history
+    // route's own summary describes the transitions it returns — so this asks the exact question:
+    // does any route path or payload name a state the caller could set?
+    for (const forbidden of ['fromState', 'toState', 'currentState', 'setState']) {
+      expect([forbidden, source.includes(forbidden)]).toStrictEqual([forbidden, false]);
+    }
+
+    const routePaths = [...source.matchAll(/@(?:Get|Post)\('([^']*)'\)/g)].map(
+      (match) => match[1] ?? '',
+    );
+
+    for (const path of routePaths) {
+      expect([path, /state|transition/.test(path)]).toStrictEqual([path, false]);
+    }
+    // …and the one route that concludes an inquiry names the act, not a state to set.
+    expect(routePaths).toContain(':investigationId/conclusion');
+  });
+
   /** The literal prefix resolves before the parameter route, or `categories` becomes a violation id. */
   it('declares the category controller before the violation controller', () => {
     const registration = readFileSync(
@@ -137,8 +186,18 @@ describe('the relations HTTP surface', () => {
     ).replace(/\/\*[\s\S]*?\*\//g, '');
 
     expect(registration.indexOf('ViolationCategoryController')).toBeLessThan(
-      registration.indexOf('ViolationController]'),
+      registration.indexOf('ViolationController,'),
     );
+
+    // The two lifecycle controllers own distinct literal prefixes, so neither is shadowed by the
+    // `:violationId` route above them whatever order Nest resolves them in.
+    const controllers = readFileSync(
+      join(RELATIONS_PACKAGE, 'investigation.controller.ts'),
+      'utf8',
+    );
+
+    expect(controllers).toContain("path: 'relations/investigations'");
+    expect(controllers).toContain("path: 'relations/cases'");
   });
 
   /**

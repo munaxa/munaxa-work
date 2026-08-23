@@ -11,7 +11,7 @@ import { InMemoryUnitOfWork } from '@work/testing';
 import { inMemoryRelationsStores, type InMemoryRelationsStores } from './in-memory-stores.js';
 import { relationsModule } from './relations-module.js';
 import { ALL_RELATIONS_PERMISSIONS } from './relations-permissions.js';
-import type { Clock, EmploymentDirectoryPort } from './relations-ports.js';
+import type { Clock, EmploymentDirectoryPort, MembershipDirectoryPort } from './relations-ports.js';
 
 /**
  * The harness the application suites run against: the real module, the real dispatcher, the real
@@ -20,6 +20,11 @@ import type { Clock, EmploymentDirectoryPort } from './relations-ports.js';
  * **Employment is faked, not assumed.** An employment absent from `FakeEmployments` is refused, not
  * invented, so a suite can prove that a violation cannot be filed against an identifier Employment
  * does not recognise — which is the same answer another tenant's employment gets.
+ *
+ * **Identity is faked the same way**, for the same reason: a membership absent from
+ * `FakeMemberships` may not act, so a suite can prove an investigator is verified rather than
+ * accepted. Both fakes start empty, so a test that forgets to arrange one meets a refusal rather
+ * than a pass.
  */
 
 export const TENANT = uuidV7();
@@ -53,10 +58,27 @@ export class FakeEmployments implements EmploymentDirectoryPort {
   }
 }
 
+/** Which memberships may act, as Identity would answer. Absent means no — never a silent yes. */
+export class FakeMemberships implements MembershipDirectoryPort {
+  private readonly acting = new Set<string>();
+
+  public add(membershipId: string): void {
+    this.acting.add(membershipId);
+  }
+
+  public canAct(membershipId: string): Promise<boolean> {
+    return Promise.resolve(this.acting.has(membershipId));
+  }
+}
+
+/** The membership every investigation suite assigns as investigator, unless it is proving otherwise. */
+export const INVESTIGATOR = '01940000-0000-7000-8000-00000000c001';
+
 export interface Harness {
   readonly dispatcher: Dispatcher;
   readonly clock: FixedClock;
   readonly employments: FakeEmployments;
+  readonly memberships: FakeMemberships;
   readonly stores: InMemoryRelationsStores;
   as<TResult>(actor: string, work: () => Promise<TResult>): Promise<TResult>;
 }
@@ -73,11 +95,13 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
   const dispatcher = new Dispatcher(permissions);
   const clock = new FixedClock(NOW);
   const employments = new FakeEmployments();
+  const memberships = new FakeMemberships();
   const stores = inMemoryRelationsStores();
   const module = relationsModule({
     unitOfWork: new InMemoryUnitOfWork(TENANT),
     stores,
     employments,
+    memberships,
     clock,
   });
 
@@ -88,6 +112,7 @@ export const harnessFor = (options: HarnessOptions = {}): Harness => {
     dispatcher,
     clock,
     employments,
+    memberships,
     stores,
     as: (actor, work) => runInContext({ tenantId: TENANT, correlationId: uuidV7(), actor }, work),
   };
@@ -143,4 +168,54 @@ export const givenCategory = async (
   );
 
   return created.violationCategoryId;
+};
+
+/** A violation, recorded through the real command, against an employment this harness knows. */
+export const givenViolation = async (
+  harness: Harness,
+  overrides: Record<string, unknown> = {},
+): Promise<string> => {
+  const employmentId = (overrides.employmentId as string | undefined) ?? uuidV7();
+
+  harness.employments.add(employmentId);
+
+  const categoryId =
+    (overrides.violationCategoryId as string | undefined) ?? (await givenCategory(harness));
+  const recorded = await harness.as(OFFICER, () =>
+    send<{ violationId: string }>(harness, {
+      commandName: 'relations.record-violation',
+      employmentId,
+      violationCategoryId: categoryId,
+      occurredOn: '2026-08-20',
+      description: 'Absent for three consecutive shifts without notifying the supervisor.',
+      ...overrides,
+    }),
+  );
+
+  return recorded.violationId;
+};
+
+/** An open investigation into a fresh violation, through the real commands. */
+export const givenInvestigation = async (
+  harness: Harness,
+  overrides: Record<string, unknown> = {},
+): Promise<{ readonly violationId: string; readonly investigationId: string }> => {
+  const violationId =
+    (overrides.violationId as string | undefined) ?? (await givenViolation(harness));
+
+  harness.memberships.add(INVESTIGATOR);
+
+  const opened = await harness.as(OFFICER, () =>
+    send<{ investigationId: string }>(harness, {
+      commandName: 'relations.open-investigation',
+      violationId,
+      investigatorMembershipId: INVESTIGATOR,
+      openedOn: '2026-08-21',
+      subject: 'Three consecutive unnotified absences',
+      reason: 'The supervisor asked for the absences to be looked into.',
+      ...overrides,
+    }),
+  );
+
+  return { violationId, investigationId: opened.investigationId };
 };

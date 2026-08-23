@@ -3,9 +3,17 @@ import { success, type Query, type QueryHandler } from '@work/kernel';
 import { recordAccessFor } from './access-recording.js';
 import { notFound } from './relations-context.js';
 import { RelationsPermissions } from './relations-permissions.js';
-import { violationCategoryView, violationView } from './relations-views.js';
+import {
+  caseHistoryView,
+  investigationView,
+  violationCategoryView,
+  violationView,
+} from './relations-views.js';
 import type { RelationsDependencies } from './relations-dependencies.js';
 import type {
+  CaseHistoryView,
+  InvestigationPageView,
+  InvestigationView,
   ViolationCategoryView,
   ViolationPageView,
   ViolationView,
@@ -131,5 +139,113 @@ export const listViolationsHandler = (
         });
       }
       return success({ items: found.items.map(violationView), total: found.total });
+    }),
+});
+
+/**
+ * One investigation, by identifier.
+ *
+ * Audited like a violation read and for the same reason: findings and a recommendation are the most
+ * sensitive text this module holds, and AD-007 audits reading a disciplinary record rather than
+ * reading a violation table specifically. The access event is keyed by the **violation**, so "who has
+ * been looking at this case" is one question answered from one trail.
+ */
+export interface ReadInvestigation extends Query {
+  readonly queryName: 'relations.read-investigation';
+  readonly investigationId: string;
+}
+
+export const readInvestigationHandler = (
+  dependencies: RelationsDependencies,
+): QueryHandler<ReadInvestigation, InvestigationView> => ({
+  queryName: 'relations.read-investigation',
+  permission: RelationsPermissions.violationRead,
+
+  handle: async (query) =>
+    dependencies.unitOfWork.execute(async (transaction) => {
+      const held = await dependencies.stores.investigations.byId(
+        transaction,
+        query.investigationId,
+      );
+
+      if (held === undefined) return notFound<InvestigationView>('investigation');
+
+      await recordAccessFor(dependencies, transaction, {
+        violationId: held.violationId,
+        action: 'investigation_read',
+      });
+      return success(investigationView(held));
+    }),
+});
+
+/** The inquiries into one violation. Bounded, and never tenant-wide — like every list here. */
+export interface ListInvestigations extends Query, PageRequest {
+  readonly queryName: 'relations.investigations';
+  readonly violationId: string;
+}
+
+export const listInvestigationsHandler = (
+  dependencies: RelationsDependencies,
+): QueryHandler<ListInvestigations, InvestigationPageView> => ({
+  queryName: 'relations.investigations',
+  permission: RelationsPermissions.violationRead,
+
+  handle: async (query) =>
+    dependencies.unitOfWork.execute(async (transaction) => {
+      const found = await dependencies.stores.investigations.forViolation(
+        transaction,
+        query.violationId,
+        pagedFrom(query),
+      );
+
+      // One event per record disclosed, as for violations — and only when something was disclosed.
+      for (const investigation of found.items) {
+        await recordAccessFor(dependencies, transaction, {
+          violationId: investigation.violationId,
+          action: 'investigation_listed',
+        });
+      }
+      return success({ items: found.items.map(investigationView), total: found.total });
+    }),
+});
+
+/**
+ * Where a case is, and every step that got it there.
+ *
+ * **The violation is read first, and not for its content.** A history for an identifier that names
+ * nothing would otherwise answer with an empty history and a `reported` state — which is a real
+ * answer about a case that does not exist, and it would tell a caller that guessing identifiers is
+ * harmless. Reading the violation makes an unknown case answer `not_found`, exactly as every other
+ * read here does.
+ *
+ * `currentState` is derived from the returned history and read from no column (D-5.2-16).
+ */
+export interface ReadCaseHistory extends Query {
+  readonly queryName: 'relations.case-history';
+  readonly violationId: string;
+}
+
+export const readCaseHistoryHandler = (
+  dependencies: RelationsDependencies,
+): QueryHandler<ReadCaseHistory, CaseHistoryView> => ({
+  queryName: 'relations.case-history',
+  permission: RelationsPermissions.violationRead,
+
+  handle: async (query) =>
+    dependencies.unitOfWork.execute(async (transaction) => {
+      const violation = await dependencies.stores.violations.byId(transaction, query.violationId);
+
+      if (violation === undefined) return notFound<CaseHistoryView>('violation');
+
+      const history = await dependencies.stores.caseEvents.forViolation(
+        transaction,
+        query.violationId,
+      );
+
+      await recordAccessFor(dependencies, transaction, {
+        violationId: query.violationId,
+        action: 'case_history_read',
+      });
+      return success(caseHistoryView(query.violationId, history));
     }),
 });

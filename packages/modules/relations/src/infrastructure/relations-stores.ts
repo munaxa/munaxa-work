@@ -4,6 +4,10 @@ import {
   PostgresViolationCategoryRepository,
   PostgresViolationRepository,
 } from './relations.repository.js';
+import {
+  PostgresCaseEventRepository,
+  PostgresInvestigationRepository,
+} from './investigation.repository.js';
 
 /**
  * The real stores, assembled.
@@ -16,4 +20,6 @@ export const postgresRelationsStores = (): RelationsStores => ({
   categories: new PostgresViolationCategoryRepository(),
   violations: new PostgresViolationRepository(),
   access: new PostgresAccessEventRepository(),
+  investigations: new PostgresInvestigationRepository(),
+  caseEvents: new PostgresCaseEventRepository(),
 });

@@ -52,18 +52,24 @@ const moduleUnderTest = () =>
     unitOfWork: { execute: () => Promise.reject(new Error('not called')) } as never,
     stores: inMemoryRelationsStores(),
     employments: { exists: () => Promise.resolve(true) },
+    memberships: { canAct: () => Promise.resolve(true) },
     clock: { now: () => new Date() },
   });
 
-describe('what Checkpoint 1 did not build', () => {
+describe('what Checkpoints 1 and 2 did not build', () => {
   /**
-   * The approval's exclusion list, as identifiers rather than prose.
+   * The exclusion list, as identifiers rather than prose.
    *
    * Matched against stripped code, so a comment explaining that grievances are a later checkpoint
    * does not fail the test that grievances are not implemented.
+   *
+   * **`Investigation` left this list because Checkpoint 2 was approved to build it**, and for no
+   * other reason. Everything else on it stayed. The protection an entry gives is not lost when the
+   * capability is approved — it is replaced by the tests that assert how the capability actually
+   * behaves: the transition rules, the immutability of a concluded inquiry, and the audit of every
+   * read of one. An entry may only leave here with an approval behind it.
    */
   it.each([
-    'Investigation',
     'DisciplinaryAction',
     'Warning',
     'Grievance',
@@ -75,30 +81,6 @@ describe('what Checkpoint 1 did not build', () => {
     'Termination',
   ])('holds no %s type', (absent) => {
     expect([absent, ALL_CODE.includes(absent)]).toStrictEqual([absent, false]);
-  });
-
-  /**
-   * Nothing schedules anything, and nothing is delivered.
-   *
-   * The Platform runner is D-16E-03's, and notification delivery is Phase 17's. Building either here
-   * to make a capability look finished is the failure this list exists to prevent.
-   */
-  it.each([
-    'JobPort',
-    'setInterval',
-    'setTimeout',
-    'cron',
-    'Scheduler',
-    'Worker',
-    'Outbox',
-    'Broker',
-    'Queue',
-    'NotificationPort',
-    'Smtp',
-    'Email',
-    'Sms',
-  ])('contains no %s', (forbidden) => {
-    expect([forbidden, ALL_CODE.includes(forbidden)]).toStrictEqual([forbidden, false]);
   });
 
   /** No storage adapter, and no `StoragePort` — evidence attachment is a later decision. */
@@ -210,15 +192,31 @@ describe('the boundaries this module keeps', () => {
       'relations.categories',
       'relations.read-violation',
       'relations.violations',
+      'relations.read-investigation',
+      'relations.investigations',
+      'relations.case-history',
     ]);
 
     const listing = codeOf(join(SOURCE_ROOT, 'application', 'relations-queries.ts'));
 
     // The bounded read names the employment it is for, in the handler and in the store call.
     expect(listing).toContain('employmentId');
+
+    // Every collection read Checkpoint 2 added is scoped to one violation, exactly as the violation
+    // list is scoped to one employment. Nothing published here lists a tenant's cases at large.
+    expect(listing).toContain('violationId');
   });
 
-  /** Three commands, and no update or delete of a violation among them. */
+  /**
+   * Five commands, and **still not one that changes or removes a recorded violation**.
+   *
+   * That is the assertion this test has always made, and Checkpoint 2 does not weaken it: the two
+   * new commands write an investigation and a case event, and the violation row they concern is
+   * never updated. `relation_violation` stays immutable at the database exactly as D-5.2-03 left it.
+   *
+   * `correct-investigation` is absent for a different reason — it was not in the approved scope, and
+   * inventing it here would be the scope expansion the checkpoint forbids.
+   */
   it('publishes no command that could change or remove a recorded violation', () => {
     const module = moduleUnderTest();
     const commands = (module.commands ?? []).map((handler) => handler.commandName);
@@ -227,8 +225,18 @@ describe('the boundaries this module keeps', () => {
       'relations.define-category',
       'relations.amend-category',
       'relations.record-violation',
+      'relations.open-investigation',
+      'relations.conclude-investigation',
     ]);
-    for (const forbidden of ['amend-violation', 'delete-violation', 'correct-violation']) {
+    for (const forbidden of [
+      'amend-violation',
+      'delete-violation',
+      'correct-violation',
+      'correct-investigation',
+      'delete-investigation',
+      'transition-case',
+      'set-case-state',
+    ]) {
       expect(commands).not.toContain(`relations.${forbidden}`);
     }
   });

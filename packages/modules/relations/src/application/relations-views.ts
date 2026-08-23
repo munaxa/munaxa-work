@@ -1,6 +1,14 @@
+import { currentCaseState, type CaseEventState } from '../domain/case-event.js';
+import type { InvestigationRecord } from '../domain/investigation.js';
 import type { ViolationCategoryState } from '../domain/violation-category.js';
 import type { ViolationRecord } from '../domain/violation.js';
-import type { ViolationCategoryView, ViolationView } from '../contracts/views.js';
+import type {
+  CaseEventView,
+  CaseHistoryView,
+  InvestigationView,
+  ViolationCategoryView,
+  ViolationView,
+} from '../contracts/views.js';
 
 /**
  * Domain state into published view, in one direction only.
@@ -42,4 +50,43 @@ export const violationView = (state: ViolationRecord): ViolationView => ({
   state: state.state,
   recordedOn: state.recordedAt.toISOString(),
   version: state.version,
+});
+
+export const investigationView = (state: InvestigationRecord): InvestigationView => ({
+  investigationId: state.investigationId,
+  violationId: state.violationId,
+  investigatorMembershipId: state.investigatorMembershipId,
+  openedOn: state.openedOn,
+  subject: state.subject,
+  state: state.state,
+  version: state.version,
+  ...(state.findings === undefined ? {} : { findings: state.findings }),
+  ...(state.recommendation === undefined ? {} : { recommendation: state.recommendation }),
+  ...(state.concludedOn === undefined ? {} : { concludedOn: state.concludedOn }),
+});
+
+export const caseEventView = (state: CaseEventState): CaseEventView => ({
+  caseEventId: state.caseEventId,
+  sequence: state.sequence,
+  fromState: state.fromState,
+  toState: state.toState,
+  reason: state.reason,
+  actor: state.actor,
+  occurredAt: state.occurredAt.toISOString(),
+  ...(state.investigationId === undefined ? {} : { investigationId: state.investigationId }),
+});
+
+/**
+ * The case, with its current state derived here rather than read from a column.
+ *
+ * The derivation is `currentCaseState` and nothing else — the same function the command handlers
+ * validate transitions against, so what a screen shows and what the server enforces cannot drift.
+ */
+export const caseHistoryView = (
+  violationId: string,
+  history: readonly CaseEventState[],
+): CaseHistoryView => ({
+  violationId,
+  currentState: currentCaseState(history),
+  history: [...history].sort((a, b) => a.sequence - b.sequence).map(caseEventView),
 });

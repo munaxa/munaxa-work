@@ -76,3 +76,70 @@ export interface ViolationPageView {
   readonly items: readonly ViolationView[];
   readonly total: number;
 }
+
+/**
+ * One inquiry into a violation.
+ *
+ * `investigatorMembershipId` is a **tenant membership identifier and not a person**. A screen that
+ * wants the investigator's name asks People for it, with People's own permissions applied — which is
+ * the point: whether the reader may know who investigated is People's question, not this module's.
+ *
+ * `findings` and `recommendation` are absent while the inquiry is open. That is not a redaction — an
+ * open investigation has concluded nothing, so there is nothing to publish.
+ *
+ * **The recommendation is text.** Nothing in this product acts on it. It does not instruct Payroll,
+ * does not start a workflow and does not issue anything; a disciplinary outcome is a decision a named
+ * human takes (ADR-0045), and a recommendation that took it automatically would be this module
+ * deciding it instead.
+ */
+export interface InvestigationView {
+  readonly investigationId: string;
+  readonly violationId: string;
+  readonly investigatorMembershipId: string;
+  /** The civil date the inquiry opened, `YYYY-MM-DD`. */
+  readonly openedOn: string;
+  readonly subject: string;
+  readonly state: string;
+  readonly findings?: string;
+  readonly recommendation?: string;
+  readonly concludedOn?: string;
+  readonly version: number;
+}
+
+export interface InvestigationPageView {
+  readonly items: readonly InvestigationView[];
+  readonly total: number;
+}
+
+/**
+ * One movement of a case, as it will be read back in a dispute.
+ *
+ * `actor` is the authenticated caller who caused it and `occurredAt` came from the server's clock;
+ * neither was ever a field a request could set. `reason` is required, so no transition in this
+ * history is unexplained.
+ */
+export interface CaseEventView {
+  readonly caseEventId: string;
+  readonly sequence: number;
+  readonly fromState: string;
+  readonly toState: string;
+  readonly reason: string;
+  readonly actor: string;
+  /** When the transition happened, as an ISO instant. */
+  readonly occurredAt: string;
+  readonly investigationId?: string;
+}
+
+/**
+ * A case: where it is now, and every step that got it there.
+ *
+ * **`currentState` is derived from `history` and stored nowhere** (D-5.2-16). It is the `toState` of
+ * the highest-numbered event, and a case with no events is `reported`. It appears in this view
+ * because a screen should not have to re-derive it; it appears in no table, because a second copy is
+ * a second thing that can disagree.
+ */
+export interface CaseHistoryView {
+  readonly violationId: string;
+  readonly currentState: string;
+  readonly history: readonly CaseEventView[];
+}
