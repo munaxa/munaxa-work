@@ -5455,3 +5455,108 @@ model WorkflowHistory {
   @@index([tenant_id, instance_id, occurred_at, id], map: "workflow_history_instance_idx")
   @@map("workflow_history")
 }
+
+// =================================================================================================
+// Phase 5.2 — Employee Relations & Disciplinary · Checkpoint 1
+//
+// The tenant's violation catalogue, the violations recorded against an employment, and the trail of
+// who read one. Records are immutable at the database; every read of one is audited.
+//
+// **No person anywhere.** These tables reference an employment and nothing else (AD-001).
+// **Nothing statutory.** Every catalogue entry is a row a tenant writes; `source` records which
+// authority wrote it, and legal enforcement is NOT VERIFIED until Phase 11.1 (D-5.2-06).
+// =================================================================================================
+
+/// What a tenant calls a kind of violation — the words its disciplinary policy is written in.
+model RelationViolationCategory {
+  id                   String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  code                 String    @db.VarChar(64)
+  name                 Json
+  /// A tenant's own word, deliberately not a closed set (AD-002). Nothing orders by it.
+  severity             String    @db.VarChar(64)
+  /// What ordering uses (D-5.2-07). Not unique: reads order by `(sequence, code)`.
+  sequence             Int
+  /// How far back a prior violation counts. Configuration; nothing reads it in Checkpoint 1.
+  repeat_window_days   Int
+  /// `tenant` today; `country_pack` when Phase 11.1 supplies the statutory version.
+  source               String    @db.VarChar(24)
+  country_pack_id      String?   @db.VarChar(64)
+  country_pack_version Int?
+  active               Boolean
+  metadata             Json
+  created_at           DateTime  @db.Timestamptz(6)
+  created_by           String    @db.VarChar(255)
+  updated_at           DateTime  @db.Timestamptz(6)
+  updated_by           String    @db.VarChar(255)
+  deleted_at           DateTime? @db.Timestamptz(6)
+  deleted_by           String?   @db.VarChar(255)
+  version              Int
+
+  violations RelationViolation[]
+
+  @@index([tenant_id, sequence, code], map: "relation_violation_category_order_idx")
+  @@map("relation_violation_category")
+}
+
+/// A violation recorded against an employment. Immutable: update and delete both raise (D-5.2-03).
+model RelationViolation {
+  id                    String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  /// Employment, never person (AD-001). No cross-module foreign key: existence is confirmed through
+  /// Employment's published read before the insert, under a bounded service grant (ADR-0043).
+  employment_id         String    @db.Uuid
+  violation_category_id String    @db.Uuid
+  /// Frozen at recording. What the catalogue said then, not what it says now (AD-003).
+  category_code         String    @db.VarChar(64)
+  severity              String    @db.VarChar(64)
+  /// The day the conduct occurred. A date, not a timestamp.
+  occurred_on           DateTime  @db.Date
+  /// The authenticated caller. Never supplied by a command.
+  reported_by           String    @db.VarChar(255)
+  description           String
+  state                 String    @db.VarChar(32)
+  recorded_at           DateTime  @db.Timestamptz(6)
+  metadata              Json
+  created_at            DateTime  @db.Timestamptz(6)
+  created_by            String    @db.VarChar(255)
+  updated_at            DateTime  @db.Timestamptz(6)
+  updated_by            String    @db.VarChar(255)
+  /// Present because every table carries them. Unusable by construction: a soft delete is an
+  /// update, and the trigger refuses every update on this table.
+  deleted_at            DateTime? @db.Timestamptz(6)
+  deleted_by            String?   @db.VarChar(255)
+  version               Int
+
+  category      RelationViolationCategory     @relation(fields: [violation_category_id], references: [id], map: "relation_violation_category_fk")
+  access_events RelationViolationAccessEvent[]
+
+  @@index([tenant_id, employment_id, occurred_on, id], map: "relation_violation_employment_idx")
+  @@index([tenant_id, violation_category_id], map: "relation_violation_category_ref_idx")
+  @@map("relation_violation")
+}
+
+/// Who read which disciplinary record (AD-007). Carries who looked at what and nothing about the
+/// matter — no employment, no category, no severity, no description.
+model RelationViolationAccessEvent {
+  id             String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  violation_id   String    @db.Uuid
+  action         String    @db.VarChar(32)
+  actor          String    @db.VarChar(255)
+  occurred_at    DateTime  @db.Timestamptz(6)
+  correlation_id String    @db.Uuid
+  created_at     DateTime  @db.Timestamptz(6)
+  created_by     String    @db.VarChar(255)
+  updated_at     DateTime  @db.Timestamptz(6)
+  updated_by     String    @db.VarChar(255)
+  deleted_at     DateTime? @db.Timestamptz(6)
+  deleted_by     String?   @db.VarChar(255)
+  version        Int
+
+  violation RelationViolation @relation(fields: [violation_id], references: [id], map: "relation_violation_access_event_violation_fk")
+
+  @@index([tenant_id, violation_id, occurred_at], map: "relation_violation_access_event_violation_idx")
+  @@index([tenant_id, actor, occurred_at], map: "relation_violation_access_event_actor_idx")
+  @@map("relation_violation_access_event")
+}

@@ -212,13 +212,23 @@ suite('what the Workflow schema deliberately does not contain', () => {
    * fourth appearing without one is a failure rather than a detail. What has not moved is that every
    * Workflow migration is Workflow's: the assertion above proves none of them touches another
    * module's table.
+   *
+   * **The "latest" assertion is about Workflow's own migrations, not the repository's.** It used to
+   * read `directories.at(-1)`, which happened to be Workflow's reminder only while Workflow was the
+   * newest phase in the product — so Phase 5.2's `relations` migration broke it without anything
+   * about Workflow changing. The property actually worth protecting is that **no sixth Workflow
+   * migration has appeared and the reminder is still the last of them**, which is what the narrowed
+   * assertion says. It is more exact than the original, not weaker: another module adding a
+   * migration is none of this suite's business, and a new *Workflow* one still fails here.
    */
   it('adds exactly one migration directory per Workflow phase that needed one', () => {
     const directories = readdirSync(join(process.cwd(), '..', '..', '..', 'prisma', 'migrations'))
       .filter((entry) => /^\d{14}_/.test(entry))
       .sort();
 
-    expect(directories.at(-1)).toBe('20260820100000_workflow_reminder');
+    expect(directories.filter((entry) => entry.includes('workflow')).at(-1)).toBe(
+      '20260820100000_workflow_reminder',
+    );
     // One per phase that needed one, and no phase needed two. 16A built the module, 16B the routing
     // core, 16C the routing resolution, and 16D one column, one widened vocabulary and one index.
     expect(directories.filter((entry) => entry.includes('workflow'))).toStrictEqual([

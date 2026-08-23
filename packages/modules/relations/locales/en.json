@@ -1,0 +1,74 @@
+{
+  "relations": {
+    "label": {
+      "register": "Employee relations",
+      "catalogue": "Violation catalogue",
+      "category": "Violation type",
+      "categories": "Violation types",
+      "code": "Code",
+      "name": "Name",
+      "severity": "Severity",
+      "sequence": "Order",
+      "repeatWindow": "Repeat window",
+      "repeatWindowDays": "Repeat window (days)",
+      "source": "Source",
+      "countryPack": "Country pack",
+      "countryPackVersion": "Country pack version",
+      "active": "In use",
+      "violation": "Violation",
+      "violations": "Violations",
+      "employment": "Employment",
+      "occurredOn": "Date of conduct",
+      "description": "What happened",
+      "state": "State",
+      "recordedOn": "Recorded",
+      "version": "Version",
+      "record": "Record a violation",
+      "define": "Add a violation type",
+      "amend": "Amend violation type"
+    },
+    "source": {
+      "tenant": "Defined by this organization",
+      "country_pack": "From a country pack"
+    },
+    "state": {
+      "reported": "Reported"
+    },
+    "access": {
+      "violation_read": "Opened",
+      "violation_listed": "Listed"
+    },
+    "notice": {
+      "empty": "Nothing to show yet.",
+      "error": "This could not be loaded.",
+      "loading": "Loading…",
+      "audited": "Every time a violation is opened, that is recorded against your name.",
+      "immutable": "A recorded violation cannot be edited or deleted. A correction is a new, linked record.",
+      "inactiveCategory": "This violation type is no longer in use. Existing records keep it; new ones cannot use it.",
+      "noLegalCheck": "Violation types are configuration. No labour-law validation is applied: country packs arrive in a later phase.",
+      "noLadder": "Penalties and escalation are not part of this release."
+    },
+    "rejection": {
+      "category_code_malformed": "A code may use lower-case letters, digits and hyphens only.",
+      "category_name_incomplete": "A violation type needs a name in both English and Arabic.",
+      "category_severity_missing": "A violation type needs a severity.",
+      "category_sequence_invalid": "The order must be a whole number, zero or more.",
+      "category_repeat_window_invalid": "The repeat window must be a whole number of days, zero or more.",
+      "category_source_unknown": "That source is not recognized.",
+      "category_pack_source_needs_pack": "A country-pack entry must name the pack it came from.",
+      "category_tenant_source_has_pack": "An entry defined by this organization cannot name a country pack.",
+      "category_pack_version_invalid": "The country pack version must be a whole number, one or more.",
+      "category_inactive": "This violation type is no longer in use.",
+      "occurred_on_malformed": "The date of conduct must be a calendar date.",
+      "occurred_on_in_future": "The date of conduct cannot be in the future.",
+      "description_missing": "Describe what happened.",
+      "description_too_long": "That description is too long.",
+      "reporter_unknown": "The person recording this could not be identified.",
+      "access_actor_unknown": "The person reading this could not be identified.",
+      "access_correlation_unknown": "This read could not be traced to a request."
+    },
+    "conflict": {
+      "category_code_taken": "A violation type already uses that code."
+    }
+  }
+}

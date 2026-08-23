@@ -518,6 +518,35 @@ and Leave already set, and the second keeps expiry **derived at read time**, wit
 and nothing that fires. Six decisions block the first checkpoint, all six are Work-owned, and each is a
 choice between options this repository has already exercised.
 
+Phase 5.2 Checkpoint 1 landed on 2026-08-22: **Employee Relations** — one new module, three tables,
+one additive migration, three commands, three queries and **four** permissions. It is the first
+capability of the domain and deliberately the smallest real one: a tenant defines the violation types
+its disciplinary policy recognises, and an authorized user records that one occurred, against an
+**employment** and never a person (AD-001). **The record is immutable at the database** — update and
+delete both raise, from any path including a direct `psql` session, because AD-003 says these records
+are evidence in a labour dispute and a guard that lives only in TypeScript holds until somebody opens
+a shell. **Every read of a violation is audited** and every read of the *catalogue* is not: a
+disciplinary record names somebody, a catalogue names nobody, and auditing both would be the
+audit-every-query mechanism the approval forbade. The trail carries who looked at which record and
+**nothing about the matter** — no employment, no category, no description — because copying those in
+would make the audit table a second, less-guarded copy of what it audits. **The category is referenced
+*and* frozen**: a violation keeps the code and severity the catalogue carried at the moment of
+recording, so renaming or re-grading an entry two years later cannot rewrite what an old record meant.
+**`severity` is a word the tenant chooses**, deliberately not a closed set, and nothing orders by it —
+ordering is a persisted integer. **Nothing statutory ships**, for any jurisdiction: the country-pack
+boundary is recorded with the same `source` discriminator and nullable pack columns Attendance and
+Leave already carry, and **legal enforcement is `NOT VERIFIED` until Phase 11.1**, which means a tenant
+can today configure a ladder its country's law would not permit and nothing will stop it. Expiry stays
+**derived** — no `expired` column, no sweep, no timer — and the specification's `WarningExpired` event
+is not emitted, because the durable job runner is Platform's. **Nothing else in the phase was built**:
+no investigations, actions, warnings, grievances, appeals, evidence, penalties or Admin screens, and a
+sixty-three-assertion negative-space suite proves each absence against the module's own source rather
+than promising it. Three defects the tests caught before the gate, and two assertions narrowed from
+substrings to concepts, are recorded in
+[`verification/phase-5.2-checkpoint-1.md`](verification/phase-5.2-checkpoint-1.md) alongside the
+schema, the RLS proofs under an unprivileged role, the concurrency proof and the eight decisions that
+remain `OPEN`.
+
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,
 compensation, loans, payroll with statutory country packs, and offboarding with final

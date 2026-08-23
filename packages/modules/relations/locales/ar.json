@@ -1,0 +1,74 @@
+{
+  "relations": {
+    "label": {
+      "register": "علاقات الموظفين",
+      "catalogue": "دليل المخالفات",
+      "category": "نوع المخالفة",
+      "categories": "أنواع المخالفات",
+      "code": "الرمز",
+      "name": "الاسم",
+      "severity": "الدرجة",
+      "sequence": "الترتيب",
+      "repeatWindow": "فترة التكرار",
+      "repeatWindowDays": "فترة التكرار (أيام)",
+      "source": "المصدر",
+      "countryPack": "حزمة الدولة",
+      "countryPackVersion": "إصدار حزمة الدولة",
+      "active": "قيد الاستخدام",
+      "violation": "مخالفة",
+      "violations": "المخالفات",
+      "employment": "التوظيف",
+      "occurredOn": "تاريخ الواقعة",
+      "description": "ما الذي حدث",
+      "state": "الحالة",
+      "recordedOn": "تاريخ التسجيل",
+      "version": "الإصدار",
+      "record": "تسجيل مخالفة",
+      "define": "إضافة نوع مخالفة",
+      "amend": "تعديل نوع المخالفة"
+    },
+    "source": {
+      "tenant": "معرّف من قبل المنشأة",
+      "country_pack": "من حزمة دولة"
+    },
+    "state": {
+      "reported": "مبلّغ عنها"
+    },
+    "access": {
+      "violation_read": "تم الاطلاع",
+      "violation_listed": "ظهرت في قائمة"
+    },
+    "notice": {
+      "empty": "لا يوجد ما يُعرض بعد.",
+      "error": "تعذر تحميل هذا.",
+      "loading": "جارٍ التحميل…",
+      "audited": "كل اطلاع على مخالفة يُسجّل باسمك.",
+      "immutable": "لا يمكن تعديل مخالفة مسجلة أو حذفها. التصحيح سجل جديد مرتبط بها.",
+      "inactiveCategory": "هذا النوع لم يعد قيد الاستخدام. السجلات القائمة تحتفظ به، ولا يمكن استخدامه في سجل جديد.",
+      "noLegalCheck": "أنواع المخالفات إعدادات. لا يُطبّق أي تحقق قانوني: حزم الدول تأتي في مرحلة لاحقة.",
+      "noLadder": "العقوبات والتدرج ليست ضمن هذا الإصدار."
+    },
+    "rejection": {
+      "category_code_malformed": "يجوز أن يحتوي الرمز على أحرف إنجليزية صغيرة وأرقام وشرطات فقط.",
+      "category_name_incomplete": "يحتاج نوع المخالفة إلى اسم بالعربية والإنجليزية.",
+      "category_severity_missing": "يحتاج نوع المخالفة إلى درجة.",
+      "category_sequence_invalid": "يجب أن يكون الترتيب عددًا صحيحًا من صفر فأكثر.",
+      "category_repeat_window_invalid": "يجب أن تكون فترة التكرار عدد أيام صحيحًا من صفر فأكثر.",
+      "category_source_unknown": "هذا المصدر غير معروف.",
+      "category_pack_source_needs_pack": "يجب أن يذكر الإدخال المأخوذ من حزمة دولة اسم الحزمة.",
+      "category_tenant_source_has_pack": "لا يمكن لإدخال عرّفته المنشأة أن يذكر حزمة دولة.",
+      "category_pack_version_invalid": "يجب أن يكون إصدار حزمة الدولة عددًا صحيحًا من واحد فأكثر.",
+      "category_inactive": "هذا النوع لم يعد قيد الاستخدام.",
+      "occurred_on_malformed": "يجب أن يكون تاريخ الواقعة تاريخًا صحيحًا.",
+      "occurred_on_in_future": "لا يمكن أن يكون تاريخ الواقعة في المستقبل.",
+      "description_missing": "اذكر ما الذي حدث.",
+      "description_too_long": "هذا الوصف طويل جدًا.",
+      "reporter_unknown": "تعذر تحديد من يسجل هذه المخالفة.",
+      "access_actor_unknown": "تعذر تحديد من اطلع على هذا السجل.",
+      "access_correlation_unknown": "تعذر ربط هذا الاطلاع بطلب."
+    },
+    "conflict": {
+      "category_code_taken": "يوجد نوع مخالفة يستخدم هذا الرمز."
+    }
+  }
+}

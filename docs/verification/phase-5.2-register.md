@@ -1,13 +1,26 @@
 # Phase 5.2 — Employee Relations & Disciplinary · Decision Register
 
-**Status** Planning · **Date** 2026-08-22 · **Baseline** `7d20c02` · **Code changes** NONE
+**Status** Six approved · **Checkpoint 1 implemented** · **Date** 2026-08-22 · **Baseline** `d5c24b7`
 
-Every decision below is **OPEN** unless its Status says otherwise. A decision marked
+**Implementation status:** Checkpoint 1 is built, tested and verified — module `@work/relations`,
+three tables, one additive migration, three commands, three queries, four permissions, 188 module
+tests plus 26 in `apps/api`. The report is
+[`phase-5.2-checkpoint-1.md`](phase-5.2-checkpoint-1.md). **The eight remaining decisions are
+untouched and none was needed.**
+
+**Six decisions were approved by the owner on 2026-08-22** — D-5.2-03, D-5.2-04, D-5.2-05, D-5.2-06,
+D-5.2-07 and D-5.2-14. Each carries an **Owner approval** block recording the approval in the owner's
+own terms, appended beneath the analysis rather than replacing it, so what was recommended and what
+was approved stay separately readable. **Checkpoint 1 is authorized and implemented** — see
+[`phase-5.2-checkpoint-1.md`](phase-5.2-checkpoint-1.md).
+
+The remaining eight decisions are unchanged. Every decision below is **OPEN** unless its Status says otherwise. A decision marked
 *SETTLED BY EXISTING EVIDENCE* is one the repository has already decided in a document that predates
 this register; the evidence is cited so the claim can be checked rather than trusted.
 
 **A recommendation is not an approval.** Where this register recommends an option, that is analysis
-offered to the owner. Nothing below has an approval date, because none has been given.
+offered to the owner. The eight decisions still `OPEN` carry no approval date, because none has been
+given for them.
 
 ---
 
@@ -17,22 +30,22 @@ offered to the owner. Nothing below has an approval date, because none has been 
 |---|---|---|---|
 | D-5.2-01 | Module name and boundary | **SETTLED BY EXISTING EVIDENCE** | no |
 | D-5.2-02 | What Relations references — Employment, never Person | **SETTLED BY EXISTING EVIDENCE** | no |
-| D-5.2-03 | Immutability mechanism | **OPEN** | **yes** |
-| D-5.2-04 | The `relations.*` permission set | **OPEN** | **yes** |
-| D-5.2-05 | Read auditing — AD-007 | **OPEN** | **yes** |
-| D-5.2-06 | Country-pack constraint on categories — AD-002 | **OPEN** | **yes** |
-| D-5.2-07 | Penalty ladder: shape, and whether it lands in checkpoint 1 | **OPEN** | **yes** |
+| D-5.2-03 | Immutability mechanism | **APPROVED** 2026-08-22 | **resolved** |
+| D-5.2-04 | The `relations.*` permission set | **APPROVED** 2026-08-22 | **resolved** |
+| D-5.2-05 | Read auditing — AD-007 | **APPROVED** 2026-08-22 | **resolved** |
+| D-5.2-06 | Country-pack constraint on categories — AD-002 | **APPROVED** 2026-08-22 | **resolved** |
+| D-5.2-07 | Penalty ladder: shape, and whether it lands in checkpoint 1 | **APPROVED** 2026-08-22 | **resolved** |
 | D-5.2-08 | Evidence attachments — the Documents contract | **OPEN** | no (deferred out) |
 | D-5.2-09 | Warning expiry — derived or persisted (AD-006) | **OPEN** | no |
 | D-5.2-10 | Payroll penalty intake — AD-004 | **OPEN** | no |
 | D-5.2-11 | Employment termination recommendation — AD-005 | **OPEN** | no |
 | D-5.2-12 | Workflow approval adoption — AD-008 | **OPEN** | no |
 | D-5.2-13 | Grievance confidentiality | **OPEN** | no |
-| D-5.2-14 | Scope of the first implementation checkpoint | **OPEN** | **yes** |
+| D-5.2-14 | Scope of the first implementation checkpoint | **APPROVED** 2026-08-22 | **resolved** |
 
-Six decisions block the first checkpoint. **None of them is Platform-owned, and none requires a new
-architectural pattern** — each is a choice between options this repository has already exercised
-elsewhere.
+All six blocking decisions are **APPROVED**, and none required a new architectural pattern: every one
+resolved onto a mechanism this repository already runs. The eight that remain `OPEN` are untouched by
+this approval and none of them was needed by Checkpoint 1.
 
 ---
 
@@ -61,7 +74,7 @@ this.**
 
 ---
 
-## D-5.2-03 — Immutability mechanism · OPEN
+## D-5.2-03 — Immutability mechanism · **APPROVED**
 
 **The requirement.** AD-003: *"The record is immutable. A correction is a new, linked record with a
 stated reason. Nothing is edited or deleted, including after an appeal succeeds — a successful appeal
@@ -87,7 +100,19 @@ already.
 
 *This blocks checkpoint 1* because it decides the shape of the first table.
 
-## D-5.2-04 — The `relations.*` permission set · OPEN
+### Owner approval · 2026-08-22
+
+**APPROVED — the existing database-enforced immutability trigger pattern.** *"The violation record
+must be immutable after creation. The database must reject: UPDATE; DELETE. Do not rely solely on
+application-level guards. Do not invent a new immutability mechanism. Reuse the established
+PostgreSQL trigger/function pattern already present in the repository."*
+
+**As built:** `app_relation_violation_immutable()`, modelled on `app_document_access_immutable()`,
+refusing `update or delete` with `errcode = 'restrict_violation'`. The recommendation's second half —
+a correction as a linked row — is **not** built in Checkpoint 1: no correction path exists yet
+because nothing can change a violation. It returns with the lifecycle in a later checkpoint.
+
+## D-5.2-04 — The `relations.*` permission set · **APPROVED**
 
 **Why this is a decision and not an implementation detail.** The repository rule is that a new
 permission requires an explicit decision. Every handler declares exactly one, no wildcards, no
@@ -112,7 +137,17 @@ separation AD-007 asks for. (a) leaves reads unpermissioned, which cannot be rig
 every read must be audited. **The exact list is the owner's to approve**, and no permission should be
 created before that.
 
-## D-5.2-05 — Read auditing · OPEN
+### Owner approval · 2026-08-22
+
+**APPROVED — option (b), the narrowest set Checkpoint 1 requires.** *"no future disciplinary
+permissions; no wildcard permission; no broad `relations.admin`; no permission covering functionality
+that does not yet exist."*
+
+**As built — four, and only four:** `relations.category.read` · `relations.category.manage` ·
+`relations.violation.read` · `relations.violation.record`. Asserted exact by the composition suite,
+which also asserts that no existing permission from any other module opens a `relations` handler.
+
+## D-5.2-05 — Read auditing · **APPROVED**
 
 **The requirement.** AD-007: *"every read of a disciplinary record is audited."*
 
@@ -134,7 +169,23 @@ specification already decided. **(c) is not recommended** even though it would m
 smaller: retro-fitting an access trail onto a record type that already exists means a period with
 unaudited reads of exactly the records that most need auditing.
 
-## D-5.2-06 — Country-pack constraint on categories · OPEN
+### Owner approval · 2026-08-22
+
+**APPROVED — the existing audited-read pattern**, explicitly `documents.document_access_event`.
+*"Do not invent a new audit architecture … The audit must identify the read without exposing
+unnecessary employee information. Do not introduce a generic 'audit every query' mechanism."*
+
+**As built:** `relation_violation_access_event`, immutable by trigger, written inside the read's own
+transaction. It carries the violation identifier, the action, the actor, the instant, the correlation
+identifier and the outcome — **and no employment identifier, no category, no description**, because
+the trail answers *who looked at which record* and copying the employee's details into it would make
+the audit table a second disclosure of the thing it audits.
+
+**The line the approval draws is honoured:** violation reads are audited; **catalogue reads are
+not**. A catalogue is tenant configuration, not an employee record, and auditing it would be the
+generic every-query mechanism the approval forbids.
+
+## D-5.2-06 — Country-pack constraint on categories · **APPROVED**
 
 **The requirement.** AD-002: violation categories and penalty ladders are *"tenant configurable and
 constrained by the country pack. Nothing is hardcoded."* And the objective: *"Feed statutory
@@ -172,7 +223,23 @@ declare.
 **What this costs, stated plainly:** until Phase 11.1, a tenant can configure a ladder its country's
 labor law would not permit, and nothing will stop it.
 
-## D-5.2-07 — Penalty ladder: shape, and whether it lands in checkpoint 1 · OPEN
+### Owner approval · 2026-08-22
+
+**APPROVED — option (a), the existing country-pack discriminator/version pattern.** *"Do not implement
+labor-law enforcement in Checkpoint 1 … Mark actual legal enforcement as NOT VERIFIED / deferred to
+Phase 11.1. Do not invent Jordanian or any other jurisdiction's disciplinary rules. Do not hard-code
+statutory limits. Do not create a new country-pack implementation."*
+
+**As built:** `source` (`tenant` | `country_pack`) plus nullable `country_pack_id` and
+`country_pack_version`, exactly the columns `document_type` already carries and the discriminator
+`attendance_policy` already carries. A `country_pack` source with no pack identifier is refused by a
+CHECK constraint, so the boundary is explicit in the schema rather than implied.
+
+**No statutory content ships**, for any jurisdiction. Legal enforcement is **NOT VERIFIED**, deferred
+to Phase 11.1. A negative-space test asserts that no country code, no jurisdiction name and no
+statutory limit appears in the module's source.
+
+## D-5.2-07 — Penalty ladder: shape, and whether it lands in checkpoint 1 · **APPROVED**
 
 **The requirement.** `ViolationCategory` — *"code, severity, penalty ladder, statutory constraints,
 repeat window."*
@@ -194,6 +261,20 @@ that will need a breaking change.
 **Recommendation: (a).** It delivers the configurable catalogue — real, usable tenant configuration —
 without publishing a contract whose consumer is unbuilt. **This is a checkpoint-sequencing
 recommendation, not a scope reduction:** the ladder remains fully in Phase 5.2.
+
+### Owner approval · 2026-08-22
+
+**APPROVED — an explicit ordered sequence, persisted as data.** *"The sequence must be deterministic
+and persisted as configuration/data rather than inferred from severity names … The first checkpoint
+does not implement the disciplinary ladder execution."*
+
+**As built:** `sequence`, a non-negative integer on the catalogue entry. Ordering is
+`(sequence, code)` — deterministic **without** requiring the sequence to be unique, so two entries
+sharing a rank still order identically on every read. `severity` is a tenant-defined label and
+**nothing orders by it**, which is the approval's operative clause.
+
+**Not built, per the approval:** ladder execution · automatic advancement through disciplinary levels ·
+any inference of legal validity from the sequence.
 
 ---
 
@@ -323,7 +404,7 @@ a filtered count would leak its existence to exactly the wrong reader.
 
 ---
 
-## D-5.2-14 — Scope of the first implementation checkpoint · OPEN
+## D-5.2-14 — Scope of the first implementation checkpoint · **APPROVED**
 
 **Recommendation: the tenant's violation catalogue, and recording a violation against an employment.**
 
@@ -341,3 +422,14 @@ later decision would have to unpick.
 
 **Blocked on:** D-5.2-03, D-5.2-04, D-5.2-05, D-5.2-06, D-5.2-07 and this decision. All six are
 Work-owned and each is a choice between options already exercised in this repository.
+
+### Owner approval · 2026-08-22
+
+**APPROVED — Checkpoint 1: Violation Catalogue & Violation Recording**, with the exclusion list
+restated by the owner: disciplinary cases · grievances · investigations · hearings · appeals ·
+evidence/document uploads · disciplinary decisions · automatic penalties · penalty-ladder execution ·
+expiry execution · scheduled jobs · notifications · Platform runner · country-specific legal
+enforcement · Admin · generic relations workflow · generic automation.
+
+**Every one of those is absent from the implementation**, asserted by a negative-space suite rather
+than promised in prose.
