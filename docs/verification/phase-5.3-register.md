@@ -1,0 +1,376 @@
+# Phase 5.3 — Assets & Custody · Decision Register
+
+## Status: **CHECKPOINT 1 READY — AWAITING IMPLEMENTATION AUTHORIZATION**
+
+*Opened 2026-08-23 against `3ad9fd7` (`main`, immediately after Phase 5.2 merged as PR #14).*
+
+*Nothing in Phase 5.3 is implemented. There is no `@work/assets` package, no `asset*` table, no
+migration and no handler anywhere in this repository — verified, not assumed: the only occurrence of
+the word "asset" in `packages/` is a comment in `employment/src/application/lifecycle.use-case.ts`.*
+
+---
+
+## How to read this register
+
+Each decision carries one of three states.
+
+| State | Meaning |
+|---|---|
+| **SETTLED BY EXISTING EVIDENCE** | The repository already answers this. Recorded so the answer is traceable, **not** sent to the owner: an owner decision over a question precedent has closed is a decision nobody needs to take, and taking it invites a second answer to a settled question. |
+| **OPEN** | A genuine owner choice remains. Options are stated with evidence and one recommendation. **No recommendation here is an approval.** |
+| **APPROVED** | The owner has decided, with the date and the wording of the approval recorded. |
+
+Three decisions moved from OPEN to SETTLED during this investigation. Each is explained in place, with
+the code that settles it named by file. **Three remain genuinely OPEN**, and none of the three blocks
+Checkpoint 1.
+
+---
+
+## Summary
+
+| # | Decision | State | Blocks Checkpoint 1? |
+|---|---|---|---|
+| D-5.3-01 | What custody attaches to, when an employment ends | **OPEN** | **no** — Checkpoint 1 creates no custody |
+| D-5.3-02 | Whether acknowledgement can be by the employee | **SETTLED BY EXISTING EVIDENCE** | no |
+| D-5.3-03 | How a non-return deduction reaches Payroll | **OPEN** | **no** — Checkpoint 1 authorizes no deduction |
+| D-5.3-04 | Whether an asset may reference a document | **SETTLED BY EXISTING EVIDENCE** | no |
+| D-5.3-05 | Whether the condition scale is tenant vocabulary or a closed set | **OPEN** | **no**, on one condition — §D-5.3-05 |
+| D-5.3-06 | Whether liability and waiver adopt Workflow | **SETTLED BY EXISTING EVIDENCE** | no |
+
+**Checkpoint 1 depends on no open decision.** That is a statement about readiness and **not** an
+authorization to implement.
+
+---
+
+## D-5.3-01 — What custody attaches to, when an employment ends · **OPEN**
+
+### The question
+
+AD-001: *"Assets reference Employment for custody. Never Person directly."* Employment's `ended` is
+terminal — `EMPLOYMENT_STATUSES` is `draft · pending_approval · active · suspended · ended`
+(`packages/modules/employment/src/domain/employment-vocabulary.ts:35`), and Phase 5's AD-004 says
+somebody returning is a *new* employment. So an employment that ends holding a laptop leaves a custody
+record pointing at a relationship that is over.
+
+### What the repository determines, and what it does not
+
+**Determined.** Assets can learn that an employment has ended without any Employment change.
+`employment.read-employment` is published, and `EmploymentView`
+(`packages/modules/employment/src/contracts/views.ts:34`) already carries `status`, `endDate` and
+`endReasonCode`. The bounded service grant that would ask it exists and has a working template in
+`apps/api/src/relations/relations-sources.ts:43`. So no option below is blocked by reachability.
+
+**Determined.** Option (b) — custody transferring to a person-level holding record — is **refused by
+AD-001**, and this register does not present a forbidden option as a live one. Documents' owner
+vocabulary is `person · employment · legal_entity`
+(`packages/modules/documents/src/domain/documents-vocabulary.ts:16`), so the shape exists elsewhere;
+AD-001 is what rules it out here, not the absence of a pattern.
+
+**Not determined.** What "outstanding" means once the employment is over. That is a business rule
+about company property and about what Offboarding is entitled to see, and no line of code in this
+repository expresses it.
+
+### Options
+
+| | Option | Consequence |
+|---|---|---|
+| (a) | Custody stays attached to the ended employment; outstanding items are read through it | Custody history stays literally true. The clearance projection must read across ended employments, which means a read that deliberately does not filter by employment status |
+| (c) | Non-return closes the custody with an outstanding marker and the asset returns to the pool | The asset becomes issuable again while the loss is still unresolved. "Outstanding" becomes a closed record rather than an open one, which changes what AD-006 blocks clearance on |
+
+### Recommendation — **not an approval**
+
+**(a).** It is the only option under which AD-003 stays true without qualification: custody history is
+immutable and complete, and a record that is closed *because the person left* is a record that has been
+edited by an event outside itself. Under (a) the asset simply has an open custody whose holder is an
+ended employment, which is exactly what is true, and the AD-004 one-custodian invariant continues to
+mean what it says — under (c) an asset could be re-issued while genuinely unreturned.
+
+The cost of (a) is real and should be stated rather than hidden: an asset in the custody of an ended
+employment cannot be issued to anybody until the matter is resolved, so a lost laptop blocks its own
+inventory slot. That is arguably correct — it *is* still lost — but it is a live consequence, not a
+detail.
+
+### Blocking
+
+**Does not block Checkpoint 1.** Checkpoint 1 builds the catalogue and the inventory; it creates no
+custody record, so there is nothing yet that can outlive an employment. It blocks **Checkpoint 2**.
+
+---
+
+## D-5.3-02 — Whether acknowledgement can be by the employee · **SETTLED BY EXISTING EVIDENCE**
+
+### The question
+
+The acceptance criteria say *"Employees see their own custody in self-service and acknowledge receipt
+there."*
+
+### Why this is settled rather than open
+
+The wall is real and unchanged: ADR-0032 resolves a principal to a **tenant membership**, not an
+employment. `read-own` is declared in Attendance, Career (twice), Compensation, Documents, Learning
+(twice), Leave, Letters, Payroll and Performance — **ten declarations, and it is enforced nowhere**.
+Career's own permission file states it in as many words
+(`packages/modules/career/src/application/career-permissions.ts:24`).
+
+What makes this settled rather than an owner choice is that **the repository has already answered the
+identical question, in code, and has a name for the answer**. Career's D-9:
+
+> *"`party` records which side acknowledged; it is not a claim about who is calling. This repository
+> cannot resolve a principal to an employment, so an API that inferred 'you are the employee' would be
+> inventing the resolution rather than performing it."*
+> — `packages/modules/career/src/api/development.controller.ts:37`
+
+The mechanism is concrete and already shipped:
+`career.acknowledge-development-plan` takes a `party` naming *whose* acknowledgement is recorded, takes
+`recordedBy` from the authenticated context and never from the command, and persists both — the columns
+are `employee_acknowledged_on` / `employee_acknowledgement_recorded_by` and their manager equivalents
+(`packages/modules/career/src/infrastructure/career-development-rows.ts:37`). The domain comment is
+blunt about what it is: *"The employee did not press this button, because the employee cannot sign in"*
+(`development.use-case.ts:155`).
+
+The alternatives are not owner choices about Assets. Option (b) — waiting — is a decision to leave a
+capability unbuilt that precedent shows can be built honestly. Option (c) — building repository-wide
+self-service principal routing inside Phase 5.3 — is a change to Identity and to ten other modules, and
+Assets is not the place to take it.
+
+### Settled position
+
+Acknowledgement is **recorded on behalf of** the employee by an authorized administrator, with the
+acknowledging party named and the recording actor taken from the request context, following Career D-9
+exactly. The column names say `recorded_by` so that no screen can later present it as a signature, and
+the limitation is stated in the checkpoint report rather than implied.
+
+**Self-service acknowledgement remains `NOT VERIFIED` and unbuilt**, for the same repository-wide
+reason it is unbuilt in ten other modules. Nothing is stubbed for it.
+
+### Blocking
+
+Does not block Checkpoint 1 — nothing is acknowledged until custody exists. Checkpoint 2 implements it
+on this settled pattern with no further decision.
+
+---
+
+## D-5.3-03 — How a non-return deduction reaches Payroll · **OPEN**
+
+### The question
+
+AD-005: non-return *"produces an authorized deduction instruction for Payroll on approval. This domain
+never computes payroll."*
+
+### What the repository determines
+
+**The blocker is confirmed at this HEAD, not carried over on trust.** Payroll's twelve commands are
+`amend-group`, `approve`, `calculate`, `define-deduction`, `define-group`, `finalize`, `move-period`,
+`open-period`, `reconcile`, `record-adjustment`, `reverse-approval`, `reverse-run`. The only one that
+could carry an instruction from outside is `payroll.record-adjustment`, and it is **run-scoped, not an
+intake**: it requires an existing `payrollRunId`, refuses a finalized or reversed run, requires
+Payroll's own `kind` / `code` / `payrollTreatmentCode` vocabulary, and is gated on `payroll.adjust`
+(`packages/modules/payroll/src/application/adjustment.use-case.ts:29-60`). A module holding
+`payroll.adjust` and naming a run identifier is not an authorized instruction reaching Payroll; it is
+Assets writing a payroll line, which AD-005 forbids in its second sentence.
+
+So D-5.2-10 was right and remains right: **Payroll has no inbound instruction seam.** This is the same
+blocker in a second domain.
+
+### Options
+
+| | Option | Consequence |
+|---|---|---|
+| (a) | Assets publishes a bounded read of authorized deductions; Payroll consumes it when Payroll decides to | No Payroll change, no obligation created, and no claim that anybody was paid or docked. Assets holds a record that says "authorized", and whether it was ever applied is `NOT VERIFIED` |
+| (b) | Payroll grows an inbound command | Inverts an established boundary in a module that is pull-oriented by design, and does it for the second domain to ask rather than as a considered Payroll change |
+| (c) | Deduction is out of scope for the first checkpoints | Nothing is claimed and nothing is half-built |
+
+### Recommendation — **not an approval**
+
+**(c) for Checkpoints 1–3, then (a).** (b) should be taken as a Payroll decision in a Payroll phase if
+it is taken at all — two domains have now needed it, which is an argument for deciding it deliberately
+rather than for letting Assets decide it in passing.
+
+**This decision and D-5.2-10 are the same decision.** They should be answered once, and the answer
+applied in both places.
+
+### Blocking
+
+Does not block Checkpoint 1 or Checkpoint 2. Blocks Checkpoint 4 only if deduction is in its scope.
+
+---
+
+## D-5.3-04 — Whether an asset may reference a document · **SETTLED BY EXISTING EVIDENCE**
+
+### The question
+
+The domain model gives `Asset` a `documents` field; the non-goals say *"Documents owns files; this
+domain references them."*
+
+### Why the premise of the original question was wrong
+
+`docs/verification/phase-5.3-plan.md` §7 recorded that `document_source` is a closed CHECK vocabulary
+with no `assets` value, and treated that as the obstacle. **Investigation shows it is not an obstacle
+at all, because `document_source` answers a different question.**
+
+`document_source` records where the *document* came from — `direct · recruitment · onboarding · letter
+· migration` (`prisma/migrations/20260811120000_documents_letters/migration.sql:151`, and
+`documents-vocabulary.ts:79`). It is the document's own provenance, not a list of modules permitted to
+point at one. The proof is direct: **Learning and Performance both reference documents today, and
+neither appears in that vocabulary.**
+
+The pattern they use is identical in both modules, down to the comment:
+
+> *"Evidence, as a reference and never as a byte. … This port answers one question: does the document
+> a certification points at exist, and may this caller know that it does. Learning stores the
+> identifier and nothing else: no filename, no size, no content hash, no URL, and above all no second
+> expiry date."*
+> — `packages/modules/learning/src/application/learning-cross-module-ports.ts:97`
+
+`DocumentReferencePort { exists(documentId): Promise<boolean> }`, implemented at the composition edge
+over a bounded service grant holding `documents.read` and nothing else
+(`apps/api/src/performance/performance-sources.ts:236`, `apps/api/src/learning/learning-sources.ts:275`).
+
+Option (c) — Assets storing its own file references — remains rejected on sight: a second file boundary
+in the product. Option (a) is unnecessary. Option (b) — defer entirely — was only attractive while the
+vocabulary looked like a blocker.
+
+### Settled position
+
+An asset may reference a document **by identifier**, through a `DocumentReferencePort.exists` bounded
+service grant, storing the identifier and nothing else. **No `document_source` change, no Documents
+change, no new permission, no widened contract.**
+
+Two limits carry over from the precedent and are not negotiable at checkpoint level: there is **no
+`StoragePort` adapter anywhere in this repository**, so upload, download and signed links stay
+`NOT VERIFIED`; and an asset may not be a document *owner* — `document.owner_type` is
+`person · employment · legal_entity` and an asset is none of them. A photograph of a damaged laptop is
+owned by the employment it concerns, and referenced by the incident.
+
+### Blocking
+
+Does not block Checkpoint 1. **Recommended out of Checkpoint 1 anyway**: an identifier column nothing
+reads is the stored-flag-nothing-maintains problem ADR-0070 names, and Phase 5.2 lived with exactly
+that for two checkpoints in `repeat_window_days`. Document references arrive with the incident that
+needs them.
+
+---
+
+## D-5.3-05 — Whether the condition scale is tenant vocabulary or a closed set · **OPEN**
+
+### The question
+
+AD-002 makes categories and rules tenant configurable; the domain model gives `AssetCategory` a
+*"condition scale"*, and `CustodyAssignment` a condition at issue and a condition at return.
+
+### Why precedent genuinely does not settle it
+
+It points both ways, and this register says so rather than picking the convenient half.
+
+**For an open tenant vocabulary.** `relation_violation_category.severity` is a free tenant string with
+only a non-empty CHECK, and the migration states the reasoning in place: *"A tenant's own word.
+Deliberately not a closed set: a fixed list of severities would be this product deciding what 'gross
+misconduct' means for every customer (AD-002). **Nothing orders by it.**"*
+(`prisma/migrations/20260822100000_relations_violations/migration.sql:36`).
+
+**For a closed ordered set.** `EMPLOYMENT_STATUSES` and Phase 5.2's `DISCIPLINARY_ACTIONS` are closed
+at the database, precisely because something *does* reason over them.
+
+The distinguishing sentence is the one in the migration: **nothing orders by it.** A condition scale
+that is only displayed is `severity`. A condition scale that answers *"did this come back worse than
+it went out"* — which is the question an incident and a deduction both rest on — must be **ordered**,
+and an ordered free string is the worst of both.
+
+### Options
+
+| | Option | Consequence |
+|---|---|---|
+| (a) | Free tenant string, nothing orders by it | AD-002 in its purest form. Damage is then a human's separate assertion, not a comparison the system can make |
+| (b) | Closed ordered set owned by the product | The system can say "returned worse than issued". Decides for every customer what "fair condition" means |
+| (c) | Tenant-defined scale with a tenant-assigned **rank** — the `(sequence, code)` shape D-5.2-07 already established for ordering a tenant catalogue | Tenant owns the words; the product owns only the fact that they are ordered. Comparison becomes possible without the product naming a single condition |
+
+### Recommendation — **not an approval**
+
+**(c).** It is the only option that keeps AD-002 whole and still lets the system answer the question the
+later checkpoints actually ask. It also reuses a shape this repository already has and has argued for
+once — a tenant-ordered catalogue ordered by an integer the tenant assigns, deterministic without
+forcing a renumber, exactly as `relation_violation_category.sequence` works.
+
+### Blocking
+
+**Does not block Checkpoint 1 — on one condition**: that Checkpoint 1 does **not** create the condition
+scale. Nothing in Checkpoint 1 records a condition, because nothing in Checkpoint 1 issues an asset. If
+Checkpoint 1 were to create the scale anyway, this decision would block it, and the checkpoint would
+ship a configuration surface no code reads — the `repeat_window_days` mistake, knowingly repeated. The
+Checkpoint 1 plan therefore excludes it. **Blocks Checkpoint 2.**
+
+---
+
+## D-5.3-06 — Whether liability and waiver adopt Workflow · **SETTLED BY EXISTING EVIDENCE**
+
+### The question
+
+AD-006 requires a clearance waiver to carry *"a reason and an approval"*; `AssetIncident` carries a
+*"liability decision"*. Workflow exists. Phase 5.2 left the identical question open at D-5.2-12.
+
+### What the repository determines
+
+The seam is real, and better-formed than the original plan assumed. The kernel has published
+`ApprovalPort { request, status, cancel }` since Phase 2 (`packages/kernel/src/ports/approval.ts:42`,
+ADR-0024), and `WorkflowApprovals` implements it over `workflow.start-instance` with an opaque
+`subjectType` (`apps/api/src/workflow/workflow-approvals.ts:101`). So "adopt Workflow" would need no
+Workflow change and no new contract.
+
+**And no module in this repository consumes it.** That is not an omission; it is a stated, repeated,
+seven-module position, and the adapter itself says so:
+
+> *"Nothing here is wired to a consumer yet. … this is the capability sitting ready rather than a path
+> in use. Said plainly because an implementation nobody calls is easy to mistake for one that is
+> load-bearing."* — `workflow-approvals.ts:60`
+
+Attendance: *"There is deliberately no `ApprovalPort`."* Onboarding: the same sentence. Payroll:
+*"**No `ApprovalPort`.** The only adapter is `AutoApprovingPort`."* Compensation and Leave both record
+their own decision **and publish the chain in `ApprovalPort`'s shape** so the *source* can change later
+without the contract changing (`compensation-dependencies.ts:22`, `leave-dependencies.ts:18`). Letters
+mirrors the same view shape (`letter-approval.ts:12`). Relations, at D-5.2-12, made the same choice
+again three weeks later.
+
+Seven modules, one answer, and a migration path deliberately left open. The original plan said
+*"consistency matters more than the individual answer"* — the repository already **has** the consistent
+answer, so sending it to the owner as an open question invites an eighth module to answer it
+differently.
+
+### Settled position
+
+A liability decision and a clearance waiver are recorded as **Assets' own decisions by a named human**
+(ADR-0045), and the chain is published **in `ApprovalPort`'s shape** so the source can move to Workflow
+later without a contract change. Assets does **not** consume `ApprovalPort`, does not start a workflow
+instance, and does not define a `subjectType`.
+
+The one thing that would reopen this is a deliberate repository-wide decision to route approvals through
+Workflow — which would move seven modules at once and is not an Assets decision.
+
+### Blocking
+
+Does not block Checkpoint 1: nothing is approved or waived in a catalogue.
+
+---
+
+## Decisions this investigation deliberately did **not** open
+
+Recorded so no chain of planning documents forms, and so the absence of each is traceable to evidence
+rather than to oversight.
+
+| Question | Why it is not an owner decision |
+|---|---|
+| **Whether `issued` / `in_custody` / `returned` are persisted asset statuses** | Two settled precedents point the same way. ADR-0070: *"a stored flag that nothing maintains is worse than no flag."* D-5.2-16: derived reads rather than persisted projections. Custody is the authority on who holds an asset; a second copy on `asset` would be a flag that goes stale the moment a custody row is written. Persisted status is confined to what custody cannot answer — `registered`, `available`, `under_repair`, `retired` — and the rest is derived |
+| The AD-004 one-custodian invariant | A partial unique index, per ADR-0071 (*"a `select` followed by an `insert` is not idempotent under concurrency"*); `relation_investigation_open_idx` is the shape |
+| Custody history immutability (AD-003) | Append-only table, unconditional trigger, as `relation_case_event` and `relation_disciplinary_action` have |
+| RLS | `app_protect_table`, enabled **and forced** (ADR-0030) |
+| Reaching Employment | Bounded service grant returning the least it can (ADR-0043); `RelationsEmploymentDirectory` is the template |
+| Catalogue ordering | `(sequence, code)` — D-5.2-07 |
+| Civil dates | Named in every select and projected with `to_char`, never reached by `select *` — the Checkpoint 3 defect |
+| Whether custody reads are audited | A per-resource judgement at checkpoint level, not an architecture decision. An asset register is not an allegation; blanket auditing is the mechanism D-5.2-05 rejected |
+
+---
+
+## Change log
+
+| Date | Change |
+|---|---|
+| 2026-08-23 | Register opened against `3ad9fd7`. D-5.3-02, D-5.3-04 and D-5.3-06 moved from OPEN to **SETTLED BY EXISTING EVIDENCE** with the settling code named. D-5.3-01, D-5.3-03 and D-5.3-05 confirmed **OPEN** with evidence, options and one recommendation each. Checkpoint 1 confirmed to depend on no open decision. **No decision approved.** |

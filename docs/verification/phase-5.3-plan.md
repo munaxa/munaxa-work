@@ -3,6 +3,14 @@
 *Prepared 2026-08-23 against `b0020a1`, immediately after Phase 5.2 closed. **Planning only** — no
 module, no schema, no migration and no code exists for this phase.*
 
+> **Superseded in part by [`phase-5.3-register.md`](./phase-5.3-register.md) (2026-08-23).** The
+> register is the authority on the six decisions. Investigation against the repository moved three of
+> them — D-5.3-02, D-5.3-04 and D-5.3-06 — from OPEN to **settled by existing evidence**, and found
+> that **§7's premise for D-5.3-04 was wrong**: `document_source` records a document's own provenance,
+> not a list of modules permitted to reference one, and Learning and Performance already reference
+> documents without appearing in it. This section is left unedited as the record of what was believed
+> before the evidence was gathered.
+
 ---
 
 ## 1. Objective
