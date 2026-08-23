@@ -14,10 +14,11 @@ import { postgresAssetsStores } from './assets-stores.js';
  * The database fixture this module's integration suites share.
  *
  * They run against a real PostgreSQL because everything they check belongs to the database: the
- * row-level security isolating two tables, the partial unique indexes that settle two storekeepers
- * registering the same laptop at the same moment, the CHECK constraints that close the status
- * vocabulary against SQL nobody wrote in TypeScript, and the foreign key that stops an asset
- * pointing at a category that is not there. A mock would only prove the mock behaves as instructed.
+ * row-level security isolating three tables, the partial unique indexes that settle two storekeepers
+ * registering — or issuing — the same laptop at the same moment, the CHECK constraints that close the
+ * status vocabularies against SQL nobody wrote in TypeScript, the trigger that refuses every edit of a
+ * returned custody, and the row lock that makes "an asset may not be retired while it is held" hold
+ * under concurrency. A mock would only prove the mock behaves as instructed.
  *
  * Two connections, deliberately. `admin` seeds and inspects, as a migration would. `application`
  * connects as a role that owns nothing and cannot bypass row-level security — the only configuration
@@ -40,8 +41,8 @@ export const requireDatabaseInCi = (suite: string): void => {
 export const TENANT_A = '01940000-0000-7000-8000-0000000a5511';
 export const TENANT_B = '01940000-0000-7000-8000-0000000a5522';
 
-/** The two tables this module owns, most dependent first, for truncation between tests. */
-export const ASSETS_TABLES = ['asset', 'asset_category'];
+/** The three tables this module owns, most dependent first, for truncation between tests. */
+export const ASSETS_TABLES = ['asset_custody', 'asset', 'asset_category'];
 
 export interface AssetsFixture {
   readonly admin: Pool;
@@ -159,9 +160,12 @@ export const openAssetsFixture = async (role: string): Promise<AssetsFixture> =>
     asTenant: (tenantId, work) => inContext(tenantId, 'user:test', work),
     asActor: (tenantId, actor, work) => inContext(tenantId, actor, work),
     truncate: async () => {
-      // `cascade` is unnecessary: `asset` references `asset_category` and both are truncated
-      // together, in dependency order. Nothing outside this module references either table — which
-      // is the same thing the composition suite asserts from the other direction.
+      // `truncate` rather than `delete`: the immutability trigger refuses a delete of a returned
+      // custody, and a table-level truncate is not something a row trigger sees.
+      //
+      // `cascade` is unnecessary: the three tables reference only each other and are truncated
+      // together, in dependency order. Nothing outside this module references any of them — which is
+      // the same thing the composition suite asserts from the other direction.
       await admin.query(`truncate ${ASSETS_TABLES.join(', ')}`);
     },
     close: async () => {

@@ -5,9 +5,10 @@
  * module: a consumer that could reach a handler could bypass this module's permission checks, and one
  * that could reach a store could bypass its tenancy.
  *
- * **Nothing here carries a person, and in Checkpoint 1 nothing carries an employment either.** An
- * asset is a thing, not a relationship. The first employment identifier this module publishes will
- * arrive on a custody view in Checkpoint 2, and it will be an employment and never a person (AD-001).
+ * **Nothing here carries a person.** Checkpoint 2 publishes the module's first employment identifier,
+ * on the custody views below — and it is an employment and never a person (AD-001). No name, no email,
+ * no national identifier and no user account leaves this module; a screen that wants one asks People
+ * or Employment, which own them.
  *
  * Contracts are versioned. A breaking change to anything here requires an ADR.
  */
@@ -63,4 +64,45 @@ export interface AssetView {
 export interface AssetPageView {
   readonly items: readonly AssetView[];
   readonly total: number;
+}
+
+/**
+ * One custody — a period during which one employment held one asset.
+ *
+ * `state` is `open` or `returned`, and nothing else: the specification's accepted, acknowledged,
+ * cancelled and transferred are reached by capabilities Checkpoint 2 does not build.
+ *
+ * `returnedOn` is absent while the custody is open, and its absence is the fact rather than a gap.
+ *
+ * **This view carries an employment identifier and no other personal reference.** It is the only place
+ * this module names a person at all, and it names them the way Employment does.
+ */
+export interface CustodyView {
+  readonly assetCustodyId: string;
+  readonly assetId: string;
+  readonly employmentId: string;
+  readonly issuedOn: string;
+  readonly returnedOn?: string;
+  readonly state: string;
+  readonly issueNote?: string;
+  readonly returnNote?: string;
+  readonly version: number;
+}
+
+export interface CustodyPageView {
+  readonly items: readonly CustodyView[];
+  readonly total: number;
+}
+
+/**
+ * An asset's custody: who holds it now, and who held it before.
+ *
+ * **`current` is derived, never stored.** It is the open custody among this asset's records, and there
+ * is at most one — the partial unique index is what makes that true. Its absence is a real answer: the
+ * asset is in nobody's custody. Nothing anywhere holds a second copy of it (ADR-0070).
+ */
+export interface AssetCustodyView {
+  readonly assetId: string;
+  readonly current?: CustodyView;
+  readonly history: CustodyPageView;
 }

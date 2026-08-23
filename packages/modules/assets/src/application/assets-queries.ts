@@ -3,18 +3,24 @@ import { success, type Query, type QueryHandler } from '@work/kernel';
 import { notFound } from './assets-context.js';
 import { AssetsPermissions } from './assets-permissions.js';
 import { assetCategoryView, assetView } from './assets-views.js';
+import { pagedFrom, type PageRequest } from './paging.js';
 import type { AssetsDependencies } from './assets-dependencies.js';
 import type { AssetCategoryView, AssetPageView, AssetView } from '../contracts/views.js';
 
 /**
  * The three reads, and the rules every one of them keeps.
  *
+ * **The paging rules moved to `paging.ts`** when custody's reads needed the same bounds — one place
+ * decides what a page is, so an unbounded read cannot appear by somebody writing their own arithmetic.
+ *
  * **No read here is audited, and that is a decision rather than an omission.** Relations audits reads
  * because a violation is an allegation about a named person and AD-007 requires the trail; an asset
  * register is a list of laptops and names nobody. Auditing it would bury the reads that matter under
  * reads that never mattered — the "audit every query" mechanism D-5.2-05 rejected — and there is no
- * access-trail table in this module to write into. **When custody arrives it names a person, and
- * whether *that* read is audited is Checkpoint 2's judgement made on Checkpoint 2's evidence.**
+ * access-trail table in this module to write into. **Checkpoint 2 made the same judgement for custody
+ * on its own evidence** — see `custody-queries.ts`: the only two audited-read domains in this
+ * repository hold medical documents and disciplinary allegations, and Attendance records when people
+ * arrive and leave without auditing a read.
  *
  * **Bounded.** The inventory read is paged, with a default and a maximum, so no caller can ask for
  * every asset a tenant owns in one response. The catalogue read is unpaged and bounded by nature: it
@@ -23,29 +29,6 @@ import type { AssetCategoryView, AssetPageView, AssetView } from '../contracts/v
  * **Nothing found rather than forbidden.** An asset in another tenant answers exactly as one that
  * never existed, so an identifier cannot be used as a probe.
  */
-
-const DEFAULT_PAGE_SIZE = 50;
-const MAXIMUM_PAGE_SIZE = 200;
-
-export interface PageRequest {
-  readonly page?: number;
-  readonly pageSize?: number;
-}
-
-const pagedFrom = (request: PageRequest): { readonly limit: number; readonly offset: number } => {
-  const size = boundedSize(request.pageSize);
-  const page =
-    request.page !== undefined && Number.isInteger(request.page) && request.page > 0
-      ? request.page
-      : 1;
-
-  return { limit: size, offset: (page - 1) * size };
-};
-
-const boundedSize = (size: number | undefined): number => {
-  if (size === undefined || !Number.isInteger(size) || size < 1) return DEFAULT_PAGE_SIZE;
-  return Math.min(size, MAXIMUM_PAGE_SIZE);
-};
 
 /** The tenant's catalogue, ordered `(sequence, code)`. Inactive entries on request, never by default. */
 export interface ListAssetCategories extends Query {

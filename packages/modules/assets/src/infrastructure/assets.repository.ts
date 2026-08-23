@@ -23,7 +23,9 @@ import {
 import { insertRow, mutable, pageOf, predicateFor } from './row-writer.js';
 
 /**
- * The catalogue and the inventory, in PostgreSQL.
+ * The catalogue and the inventory, in PostgreSQL. Custody is next door in `custody.repository.ts`,
+ * split when the three together passed the 250-line file budget — split at the seam that was already
+ * there rather than exempted.
  *
  * **Every statement names its columns**, including the two `byId` reads, which is why both override
  * the base class's `findRow` rather than calling it: `Repository.findRow` issues `select *`, and
@@ -136,6 +138,30 @@ export class PostgresAssetRepository
     const rows = await transaction.execute<AssetRow>(
       `select ${ASSET_COLUMNS} from asset
          where id = $1 and tenant_id = $2 and deleted_at is null`,
+      [id, transaction.tenantId],
+    );
+
+    return rows[0] === undefined ? undefined : assetState(rows[0]);
+  }
+
+  /**
+   * The same read, holding the row until the transaction ends.
+   *
+   * This is the serialization point for "an asset may not be retired while a custody is open"
+   * (D-5.3-09). The invariant spans two tables, so no constraint expresses it; instead both
+   * `issue-custody` and `change-asset-status` take this lock **before** they check, so the second
+   * transaction blocks rather than reading a truth the first is about to change. On unblocking,
+   * PostgreSQL re-evaluates the row at the new version, which is exactly what makes the re-check
+   * meaningful rather than decorative.
+   */
+  public async byIdForUpdate(
+    transaction: Transaction,
+    id: string,
+  ): Promise<AssetState | undefined> {
+    const rows = await transaction.execute<AssetRow>(
+      `select ${ASSET_COLUMNS} from asset
+         where id = $1 and tenant_id = $2 and deleted_at is null
+         for update`,
       [id, transaction.tenantId],
     );
 

@@ -1,5 +1,11 @@
 import { Module } from '@nestjs/common';
-import { AssetCategoryController, AssetController, AssetsDispatcher } from '@work/assets';
+import {
+  AssetCategoryController,
+  AssetController,
+  AssetCustodyController,
+  AssetsDispatcher,
+  CustodyController,
+} from '@work/assets';
 import { Dispatcher } from '@work/kernel';
 
 import { DISPATCHER } from '../identity/identity.tokens.js';
@@ -17,9 +23,16 @@ import { IdentityModule } from '../identity/identity.module.js';
   imports: [IdentityModule],
   // Order matters, and it is load-bearing rather than cosmetic. Nest resolves a route by the order
   // its controllers were declared. `AssetCategoryController` owns the literal `assets/categories`
-  // prefix and is declared first; `AssetController` would otherwise swallow it with `:assetId`. A
-  // route test asserts the resolution rather than trusting this comment.
-  controllers: [AssetCategoryController, AssetController],
+  // prefix and `CustodyController` owns `assets/custody`; both are declared before the controllers
+  // that take an `:assetId`, which would otherwise swallow them. `AssetCustodyController` shares the
+  // `assets` prefix with `AssetController` but declares only `:assetId/custody` suffixes, so neither
+  // shadows the other. A route test asserts the resolution rather than trusting this comment.
+  controllers: [
+    AssetCategoryController,
+    CustodyController,
+    AssetCustodyController,
+    AssetController,
+  ],
   providers: [
     {
       provide: AssetsDispatcher,

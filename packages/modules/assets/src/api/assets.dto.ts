@@ -15,6 +15,7 @@ import {
 import { Type } from 'class-transformer';
 
 import { ASSET_STATUSES } from '../domain/assets-vocabulary.js';
+import { CUSTODY_NOTE_LIMIT } from '../domain/custody.js';
 import {
   ASSET_TAG_LIMIT,
   DESCRIPTION_LIMIT,
@@ -40,14 +41,20 @@ import {
  * route, which validates the move. A caller who could set the initial status could register an asset
  * directly as `retired` — a disposal nobody recorded.
  *
- * **And no custody, anywhere.** No employment, no person, no holder, no acknowledgement, no condition
- * and no amount. Checkpoint 1 records what the company owns; who holds it is Checkpoint 2's.
+ * **No custody state, and no dates the server owns.** A caller names the day a handover happened and
+ * nothing else: not the custody's state, not the version it will become, not the moment it was
+ * recorded. A future date is refused against the server's own clock, because a caller who could date a
+ * handover forward could record that somebody holds an asset they have not been given.
+ *
+ * **And still no person, no acknowledgement, no condition and no amount.** Custody names an
+ * *employment* (AD-001); the rest are deferred capabilities with open decisions behind them.
  *
  * Nothing in this file is a persistence model. A DTO is the request's shape; the view a handler
  * returns is assembled separately, so a column rename is not an API change.
  */
 
 const CODE = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export class LocalizedNameBody {
   @ApiProperty({ example: 'Laptop' })
@@ -211,4 +218,59 @@ export class ChangeAssetStatusBody {
   @ApiProperty({ enum: ASSET_STATUSES })
   @IsIn(ASSET_STATUSES)
   public status!: string;
+}
+
+/**
+ * Issuing an asset to an employment.
+ *
+ * `employmentId` is an employment and never a person (AD-001), and it is verified against
+ * Employment's own published read before the row is written — an identifier a command supplies is an
+ * identifier a command can invent.
+ *
+ * **There is no `state` field**, and there is no field for who is recording it: the custody starts
+ * `open` because the domain says so, and the actor is the authenticated caller.
+ */
+export class IssueCustodyBody {
+  @ApiProperty({ format: 'uuid', description: 'An employment. Never a person (AD-001).' })
+  @IsUUID()
+  public employmentId!: string;
+
+  @ApiProperty({
+    pattern: ISO_DATE.source,
+    description: 'The day of the handover. Not in the future.',
+  })
+  @Matches(ISO_DATE)
+  public issuedOn!: string;
+
+  @ApiPropertyOptional({ maxLength: CUSTODY_NOTE_LIMIT })
+  @IsOptional()
+  @IsString()
+  @MaxLength(CUSTODY_NOTE_LIMIT)
+  public issueNote?: string;
+}
+
+/**
+ * Recording a return.
+ *
+ * `expectedVersion` is what makes two simultaneous returns produce exactly one: the predicate lives in
+ * the update's `where` clause, so the second caller is refused rather than silently landing second.
+ */
+export class ReturnCustodyBody {
+  @ApiProperty({ minimum: 1 })
+  @IsInt()
+  @Min(1)
+  public expectedVersion!: number;
+
+  @ApiProperty({
+    pattern: ISO_DATE.source,
+    description: 'The day it came back. Not in the future, and not before it was issued.',
+  })
+  @Matches(ISO_DATE)
+  public returnedOn!: string;
+
+  @ApiPropertyOptional({ maxLength: CUSTODY_NOTE_LIMIT })
+  @IsOptional()
+  @IsString()
+  @MaxLength(CUSTODY_NOTE_LIMIT)
+  public returnNote?: string;
 }

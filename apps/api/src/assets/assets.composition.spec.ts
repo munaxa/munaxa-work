@@ -6,31 +6,46 @@ import { InProcessEventDispatcher } from '@work/kernel';
 import { PostgresUnitOfWork } from '@work/persistence';
 import { Pool } from 'pg';
 
+import { EmploymentPermissions } from '@work/employment';
+
 import { assetsModuleFor } from './assets.composition.js';
 
 /**
  * The composition, and the dependencies it deliberately does not have.
  *
- * Checkpoint 1's approved scope has **zero cross-module dependencies**, which makes this the
- * shortest composition in the repository. That is a property worth protecting: the day a second
- * argument appears here, Assets has started asking another module a question, and the assertions
- * below are what make that a deliberate act rather than a quiet one.
+ * Checkpoint 1 had **zero cross-module dependencies**. Checkpoint 2 has exactly **one**, and it
+ * consumes a read Employment already publishes rather than creating a contract.
+ *
+ * The "zero dependencies" assertion this file used to carry became stale when the approved capability
+ * genuinely changed the boundary. It was **replaced with an exact statement of the new one** — one
+ * adapter, one permission, one boolean — rather than deleted, so the next dependency is still a
+ * deliberate act rather than a quiet one.
  */
 
 const SOURCE = readFileSync(join(process.cwd(), 'src', 'assets', 'assets.composition.ts'), 'utf8');
 
 const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
+const ADAPTER = readFileSync(join(process.cwd(), 'src', 'assets', 'assets-sources.ts'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+
+/** Employment's own declaration, resolved at runtime rather than restated as a string. */
+const EMPLOYMENT_READ_PERMISSION = EmploymentPermissions.employmentRead;
+
 const composed = (): ReturnType<typeof assetsModuleFor> => {
   const pool = new Pool({ connectionString: 'postgresql://unused:unused@127.0.0.1:1/unused' });
 
-  return assetsModuleFor(new PostgresUnitOfWork(pool, new InProcessEventDispatcher()));
+  return assetsModuleFor(new PostgresUnitOfWork(pool, new InProcessEventDispatcher()), {
+    ask: () => Promise.reject(new Error('not called')),
+  });
 };
 
 describe('the assets composition', () => {
-  it('takes the unit of work and nothing else', () => {
-    expect(assetsModuleFor).toHaveLength(1);
+  it('takes the unit of work and a dispatcher to ask with, and nothing else', () => {
+    expect(assetsModuleFor).toHaveLength(2);
     expect(CODE).toContain('postgresAssetsStores()');
+    expect(CODE).toContain('new AssetsEmploymentDirectory(dispatcher)');
   });
 
   /**
@@ -40,40 +55,71 @@ describe('the assets composition', () => {
    * checkpoint still builds none; D-5.3-06 settled that approvals stay this module's own and this
    * checkpoint approves nothing; D-5.3-03 remains open and nothing here touches Payroll.
    */
-  it('wires no adapter to any other module', () => {
+  it('wires exactly one adapter to another module, and none of the others', () => {
+    expect(CODE).toContain('AssetsEmploymentDirectory');
+
     for (const absent of [
-      'EmploymentDirectory',
       'MembershipDirectory',
-      'Documents',
       'DocumentReference',
       'ApprovalPort',
       'WorkflowApprovals',
       'StoragePort',
       'Notifications',
       'JobPort',
-      'runWithServiceGrant',
-      'dispatcher',
-      'permissions',
-      'systemClock',
-      'Clock',
+      'PermissionChecker',
+      'ReportingLine',
     ]) {
       expect(CODE).not.toContain(absent);
     }
   });
 
-  it('imports nothing but its own package and the kernel’s types', () => {
-    const imports = [...CODE.matchAll(/from '(@work\/[a-z-]+)'/g)].map((match) => match[1]);
+  /**
+   * The adapter reaches exactly one query and permits exactly one permission.
+   *
+   * Asserted on the adapter's own source rather than on the composition, because that is where the
+   * grant is written and where a second permission would be added.
+   */
+  it('permits one permission, for one query, and nothing wider', () => {
+    const permitted = [...ADAPTER.matchAll(/permits: \[([^\]]+)\]/g)].map((match) => match[1]);
+    // Deduplicated: the query name appears twice by design — once on the typed interface and once at
+    // the call site — and what is under test is that there is one *distinct* query, not one mention.
+    const queries = new Set(
+      [...ADAPTER.matchAll(/queryName: '([a-z.-]+)'/g)].map((match) => match[1]),
+    );
 
-    expect([...new Set(imports)].sort()).toEqual(['@work/assets', '@work/kernel']);
+    expect(permitted).toEqual(['EMPLOYMENT_READ']);
+    expect([...queries]).toEqual(['employment.read-employment']);
+    expect(ADAPTER).not.toContain('commandName');
   });
 
-  it('registers five commands, three queries and four permissions', () => {
+  /**
+   * **The grant's permitted string is Employment's own constant, not a literal typed twice.**
+   *
+   * `GrantAwarePermissionChecker` matches a grant by exact string. Relations permits
+   * `'employment.read'` while `employment.read-employment` declares `employment.employment.read`, so
+   * its employment check cannot succeed through the grant — a shipped defect this repository already
+   * has. Reconciling the two here is what makes the same mistake impossible in Assets.
+   */
+  it('permits exactly the permission Employment’s own read declares', () => {
+    expect(EMPLOYMENT_READ_PERMISSION).toBe(EmploymentPermissions.employmentRead);
+    expect(ADAPTER).toContain('const EMPLOYMENT_READ = EmploymentPermissions.employmentRead');
+    // The literal Relations got wrong must not appear here at all.
+    expect(ADAPTER).not.toContain("'employment.read'");
+  });
+
+  it('imports its own package, the kernel, Employment’s contract and the shared clock', () => {
+    const imports = [...CODE.matchAll(/from '(@work\/[a-z-]+)'/g)].map((match) => match[1]);
+
+    expect([...new Set(imports)].sort()).toEqual(['@work/assets', '@work/kernel', '@work/payroll']);
+  });
+
+  it('registers seven commands, five queries and seven permissions', () => {
     const module = composed();
 
     expect(module.name).toBe('assets');
-    expect(module.commands ?? []).toHaveLength(5);
-    expect(module.queries ?? []).toHaveLength(3);
-    expect(module.permissions ?? []).toHaveLength(4);
+    expect(module.commands ?? []).toHaveLength(7);
+    expect(module.queries ?? []).toHaveLength(5);
+    expect(module.permissions ?? []).toHaveLength(7);
     expect(module.eventHandlers ?? []).toHaveLength(0);
   });
 
@@ -99,7 +145,7 @@ describe('the assets composition', () => {
     );
     const application = readFileSync(join(process.cwd(), 'src', 'app.module.ts'), 'utf8');
 
-    expect(registry).toContain('registry.register(assetsModuleFor(unitOfWork));');
+    expect(registry).toContain('registry.register(assetsModuleFor(unitOfWork, senders.payroll));');
     expect(application).toContain('AssetsModule,');
   });
 

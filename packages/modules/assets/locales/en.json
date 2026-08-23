@@ -21,7 +21,19 @@
       "amendCategory": "Amend asset type",
       "register": "Register an asset",
       "amendAsset": "Amend asset",
-      "changeStatus": "Change status"
+      "changeStatus": "Change status",
+      "custody": "Custody",
+      "custodyHistory": "Custody history",
+      "currentHolder": "Currently held by",
+      "employment": "Employment",
+      "issuedOn": "Issued",
+      "returnedOn": "Returned",
+      "issueNote": "Note on issue",
+      "returnNote": "Note on return",
+      "custodyState": "Custody status",
+      "issue": "Issue to an employment",
+      "return": "Record a return",
+      "openOnly": "Still out"
     },
     "status": {
       "registered": "Registered",
@@ -34,15 +46,24 @@
       "tagIsIdentity": "The asset tag identifies the item and cannot be changed once it is registered.",
       "serialOptional": "A serial number is optional, and no two assets may share one.",
       "statusIsService": "The status says whether the item is in service. It does not say who is holding it.",
-      "custodyNotBuilt": "Issuing an asset to somebody, recording receipt and tracking returns are not part of this release.",
-      "noCustodyStatus": "There is no issued or returned status, because custody is recorded separately and is not part of this release.",
+      "custodyNotBuilt": "Recording receipt by the employee, passing an asset directly to another person, and cancelling or correcting a record are not part of this release.",
+      "noCustodyStatus": "There is no issued or returned status on an asset. Whether it is held is recorded as custody, separately.",
       "retiredIsFinal": "A retired asset stays retired. Nothing brings it back into service.",
       "noDelete": "Assets are retired, never deleted, and asset types are deactivated rather than removed.",
       "locationIsNote": "Where it is is a note you write, not a link to an organizational unit.",
       "purchaseIsNote": "The purchase reference is a note you write. No value, cost or depreciation is held here.",
       "noValuation": "This system holds no asset value, cost or depreciation. That is not what it is for.",
       "noCondition": "Condition is not recorded in this release.",
-      "noDeduction": "No payroll deduction is produced or authorized here."
+      "noDeduction": "No payroll deduction is produced or authorized here.",
+      "custodyIsPeriod": "Each record covers one period: who held the asset, from when, and until when.",
+      "oneHolder": "An asset can be held by one employment at a time.",
+      "returnedIsFinal": "Once a return is recorded it cannot be edited or deleted.",
+      "noTransfer": "Passing an asset straight from one person to another is not part of this release. Record the return, then issue it again.",
+      "noAcknowledgement": "Recording an issue is not the employee’s acknowledgement. Acknowledgement is not part of this release.",
+      "custodyNotStatus": "An asset that is out is still in service. Whether it is held is shown here, not in its status.",
+      "retirementBlocked": "An asset that is still out cannot be retired. Record its return first.",
+      "employmentNotPerson": "Custody is recorded against an employment. No personal details are held here.",
+      "noSelfService": "Employees cannot view or acknowledge their own custody in this release."
     },
     "rejection": {
       "category_code_malformed": "A code may use lower-case letters, digits and hyphens only.",
@@ -55,13 +76,28 @@
       "location_note_too_long": "That location note is too long.",
       "purchase_reference_too_long": "That purchase reference is too long.",
       "asset_status_unknown": "That status is not recognized.",
-      "asset_transition_refused": "An asset cannot move that way from where it is now."
+      "asset_transition_refused": "An asset cannot move that way from where it is now.",
+      "issued_on_malformed": "Give the issue date as YYYY-MM-DD.",
+      "issued_on_in_future": "An asset cannot be issued with a future date.",
+      "issue_note_too_long": "That note is too long.",
+      "returned_on_malformed": "Give the return date as YYYY-MM-DD.",
+      "returned_on_in_future": "A return cannot be recorded with a future date.",
+      "returned_before_issued": "An asset cannot be returned before it was issued.",
+      "return_note_too_long": "That note is too long.",
+      "custody_not_open": "This custody has already been returned."
     },
     "conflict": {
       "category_code_taken": "An asset type already uses that code.",
       "category_inactive": "This asset type is no longer in use.",
       "asset_tag_taken": "An asset already uses that tag.",
-      "serial_number_taken": "An asset already has that serial number."
+      "serial_number_taken": "An asset already has that serial number.",
+      "asset_already_in_custody": "This asset is already held by somebody.",
+      "asset_not_available": "This asset is not available to be issued.",
+      "asset_in_custody": "This asset is still held by somebody and cannot be retired."
+    },
+    "custodyState": {
+      "open": "Out",
+      "returned": "Returned"
     }
   }
 }

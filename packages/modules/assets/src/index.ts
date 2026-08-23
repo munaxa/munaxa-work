@@ -1,25 +1,31 @@
 /**
  * Assets & Custody — Phase 5.3, Checkpoint 1.
  *
- * **What this module holds:** the tenant's asset catalogue — the kinds of thing it issues — and the
- * inventory of individual items it owns, with the identifiers that tell them apart and the status
- * that says whether each is in service.
+ * **What this module holds:** the tenant's asset catalogue — the kinds of thing it issues — the
+ * inventory of individual items it owns, and **custody**: who holds which item, since when, and what
+ * happened when it came back.
  *
- * **What it deliberately does not hold, yet:** custody. Nothing here issues an item to anybody,
- * records an acknowledgement, tracks a return, references an employment or names a person. Custody
- * arrives in Checkpoint 2 with the decisions it needs (D-5.3-01, D-5.3-05); incidents and liability
- * in Checkpoint 3; the clearance projection Offboarding consumes in Checkpoint 4. None is stubbed,
- * flagged or half-modelled here, because a table nothing writes is worse than no table (ADR-0070).
+ * **A custody is a period, and one row is one handover** (AD-003). Issuing opens it, returning closes
+ * it, and a returned custody is immutable at the database. The current holder of an asset is its
+ * **open** custody, derived rather than stored, and at most one can exist — a partial unique index
+ * settles that rather than a read (AD-004, ADR-0071).
  *
- * **The asset status vocabulary lists four of the specification's seven for the same reason.**
- * `issued`, `in_custody` and `returned` are facts about custody, derived from the custody history
- * when it exists — never a second copy on the asset that goes stale.
+ * **The asset status vocabulary still lists four of the specification's seven, and that is now load
+ * bearing rather than merely pending.** `issued`, `in_custody` and `returned` are facts about custody,
+ * so `asset.status` says only whether an item is *in service* — an asset somebody is holding is still
+ * `available`. A second copy on the asset would go stale the moment a custody row was written
+ * (ADR-0070).
  *
- * **What it will never hold:** a person. Custody will reference Employment and never People (AD-001),
- * and this checkpoint references neither.
+ * **What it deliberately does not hold:** transfer, acknowledgement, acceptance, cancellation,
+ * correction, condition, expected-return dates, reminders, incidents, liability, waivers, the
+ * clearance projection, and any deduction. Each arrives with the checkpoint that builds it, several
+ * behind decisions that are still open; none is stubbed, flagged or half-modelled here.
  *
- * **Zero cross-module dependencies.** No port, no service grant, no other module's query. That is the
- * checkpoint's most valuable property and it is asserted rather than promised.
+ * **What it will never hold:** a person. Custody references Employment and never People (AD-001), and
+ * no name, email, national identifier or user account is copied into this module.
+ *
+ * **One cross-module dependency**, and it creates no contract: Employment's already published read,
+ * under a bounded service grant, answering one boolean.
  */
 
 export * from './contracts/index.js';
@@ -37,6 +43,10 @@ export type {
   AssetFilters,
   AssetStore,
   AssetsStores,
+  Clock,
+  CustodyFilters,
+  CustodyStore,
+  EmploymentDirectoryPort,
   Page,
   Paged,
 } from './application/assets-ports.js';
@@ -48,6 +58,7 @@ export { postgresAssetsStores } from './infrastructure/assets-stores.js';
 export { AssetsDispatcher } from './api/assets-dispatcher.js';
 export { AssetCategoryController } from './api/asset-category.controller.js';
 export { AssetController } from './api/asset.controller.js';
+export { AssetCustodyController, CustodyController } from './api/custody.controller.js';
 
 export type {
   AmendAssetCategoryCommand,
@@ -64,8 +75,11 @@ export type { ListAssetCategories, ReadAsset, SearchAssets } from './application
 
 export {
   ASSET_STATUSES,
+  CUSTODY_ELIGIBLE_STATUS,
+  CUSTODY_STATES,
   INITIAL_ASSET_STATUS,
+  INITIAL_CUSTODY_STATE,
   PERMITTED_ASSET_TRANSITIONS,
   permitsAssetTransition,
 } from './domain/assets-vocabulary.js';
-export type { AssetStatus } from './domain/assets-vocabulary.js';
+export type { AssetStatus, CustodyState } from './domain/assets-vocabulary.js';

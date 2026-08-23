@@ -1,5 +1,6 @@
 import type { AssetsStores } from '../application/assets-ports.js';
 import { PostgresAssetCategoryRepository, PostgresAssetRepository } from './assets.repository.js';
+import { PostgresCustodyRepository } from './custody.repository.js';
 
 /**
  * The real stores, assembled.
@@ -10,4 +11,5 @@ import { PostgresAssetCategoryRepository, PostgresAssetRepository } from './asse
 export const postgresAssetsStores = (): AssetsStores => ({
   categories: new PostgresAssetCategoryRepository(),
   assets: new PostgresAssetRepository(),
+  custodies: new PostgresCustodyRepository(),
 });

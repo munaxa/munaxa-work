@@ -156,7 +156,15 @@ describe.skipIf(CONNECTION === undefined)('assets, across tenants', () => {
     expect(role.rows[0]?.rolsuper).toBe(false);
   });
 
-  it('has row-level security enabled and forced on both tables', async () => {
+  /**
+   * Every table this module owns, protected — asserted by name rather than by count.
+   *
+   * The assertion used to say "both tables" and expect two. Custody made that stale, and the
+   * replacement is stricter rather than merely larger: it reconciles the protected set against
+   * `ASSETS_TABLES` in **both directions**, so a table added later without `app_protect_table` fails
+   * here instead of shipping unprotected.
+   */
+  it('has row-level security enabled and forced on every table this module owns', async () => {
     const state = await fixture.admin.query<{
       relname: string;
       relrowsecurity: boolean;
@@ -167,7 +175,8 @@ describe.skipIf(CONNECTION === undefined)('assets, across tenants', () => {
       [ASSETS_TABLES],
     );
 
-    expect(state.rows).toHaveLength(2);
+    expect(state.rows.map((row) => row.relname).sort()).toEqual([...ASSETS_TABLES].sort());
+    expect(ASSETS_TABLES).toContain('asset_custody');
 
     for (const row of state.rows) {
       expect(row.relrowsecurity).toBe(true);

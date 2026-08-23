@@ -1,6 +1,7 @@
 import type { AssetCategoryState } from '../domain/asset-category.js';
 import type { AssetState } from '../domain/asset.js';
-import type { AssetCategoryView, AssetView } from '../contracts/views.js';
+import type { CustodyRecord } from '../domain/custody.js';
+import type { AssetCategoryView, AssetView, CustodyView } from '../contracts/views.js';
 
 /**
  * Domain state into published view, in one direction only.
@@ -34,4 +35,23 @@ export const assetView = (state: AssetState): AssetView => ({
   ...(state.description === undefined ? {} : { description: state.description }),
   ...(state.locationNote === undefined ? {} : { locationNote: state.locationNote }),
   ...(state.purchaseReference === undefined ? {} : { purchaseReference: state.purchaseReference }),
+});
+
+/**
+ * A custody, published.
+ *
+ * `employmentId` is the only personal reference that leaves this module, and it is an employment
+ * rather than a person (AD-001). No name is resolved, joined or cached on the way out — a screen that
+ * wants one asks the module that owns it.
+ */
+export const custodyView = (state: CustodyRecord): CustodyView => ({
+  assetCustodyId: state.assetCustodyId,
+  assetId: state.assetId,
+  employmentId: state.employmentId,
+  issuedOn: state.issuedOn,
+  state: state.state,
+  version: state.version,
+  ...(state.returnedOn === undefined ? {} : { returnedOn: state.returnedOn }),
+  ...(state.issueNote === undefined ? {} : { issueNote: state.issueNote }),
+  ...(state.returnNote === undefined ? {} : { returnNote: state.returnNote }),
 });

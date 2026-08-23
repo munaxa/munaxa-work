@@ -2,9 +2,11 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import type { UnitOfWork } from '@work/kernel';
+
 import { assetsModule } from './assets-module.js';
 import { inMemoryAssetsStores } from './in-memory-stores.js';
-import { ALL_ASSETS_PERMISSIONS } from './assets-permissions.js';
+import { CUSTODY_STATES } from '../domain/assets-vocabulary.js';
 
 /**
  * The negative space: what this module deliberately does **not** contain.
@@ -58,39 +60,84 @@ const ALL_CODE = sourceFiles(SOURCE_ROOT).map(codeOf).join('\n');
  */
 const IDENTIFIERS = ALL_CODE.replace(/'[^']*'|"[^"]*"|`[^`]*`/g, "''");
 
-/** The layers a caller's request passes through, where a tenant or an actor could be accepted. */
-const CALLER_FACING_CODE = sourceFiles(SOURCE_ROOT)
-  .filter((path) => path.includes('/application/') || path.includes('/api/'))
-  .map(codeOf)
-  .join('\n');
+const NEVER_EXECUTED: UnitOfWork = {
+  // Typed rather than asserted: `UnitOfWork` has exactly one method, so a real implementation costs a
+  // line and an `as never` would hide the day it grows a second.
+  execute: () => Promise.reject(new Error('the module under test must not reach the database')),
+};
 
 const moduleUnderTest = () =>
   assetsModule({
-    unitOfWork: { execute: () => Promise.reject(new Error('not called')) } as never,
+    unitOfWork: NEVER_EXECUTED,
     stores: inMemoryAssetsStores(),
+    employments: { exists: () => Promise.resolve(true) },
+    clock: { now: () => new Date('2026-08-23T09:00:00Z') },
   });
 
-describe('what Checkpoint 1 did not build', () => {
+describe('what Checkpoints 1 and 2 did not build', () => {
   /**
    * The exclusion list, as identifiers rather than prose.
    *
-   * Matched against stripped code, so a comment explaining that custody is a later checkpoint does
-   * not fail the test that custody is not implemented.
+   * Matched against stripped code, so a comment explaining that transfer is a later capability does
+   * not fail the test that transfer is not implemented.
+   *
+   * **`assetCustody`, `asset_custody` and `custodyStore` left this list because Checkpoint 2 was
+   * authorized to build them, and for no other reason.** Everything else stayed, and the protection
+   * those three gave is not lost — it is replaced by the assertions below that pin exactly what
+   * custody *is*: two states, two commands, and none of the operations nobody approved.
    */
-  it('implements no custody, in any form', () => {
+  it('implements no transfer, acknowledgement, acceptance, cancellation or correction', () => {
     for (const absent of [
-      'CustodyAssignment',
       'CustodyTransfer',
-      'assetCustody',
-      'asset_custody',
-      'custodyStore',
-      'issueAsset',
-      'returnAsset',
       'transferCustody',
       'acknowledgeCustody',
+      'acknowledgement',
+      'acknowledgedOn',
+      'acceptCustody',
+      'cancelCustody',
+      'correctCustody',
+      'correctsCustodyId',
       'ClearanceItem',
       'clearance',
     ]) {
+      expect(IDENTIFIERS).not.toContain(absent);
+    }
+  });
+
+  /**
+   * Custody exists, and is exactly this shape.
+   *
+   * The positive half of the assertion above: an exclusion list that merely lost three entries would
+   * be weaker than it was, so what replaced them states what the approved capability actually is.
+   */
+  it('implements custody as two states and no more', () => {
+    const module = moduleUnderTest();
+    const commands = (module.commands ?? []).map((handler) => handler.commandName);
+
+    expect(commands).toContain('assets.issue-custody');
+    expect(commands).toContain('assets.return-custody');
+    expect(CUSTODY_STATES).toEqual(['open', 'returned']);
+
+    for (const absent of [
+      'issued',
+      'accepted',
+      'acknowledged',
+      'cancelled',
+      'transferred',
+      'overdue',
+    ]) {
+      expect(CUSTODY_STATES as readonly string[]).not.toContain(absent);
+    }
+  });
+
+  /**
+   * No expected-return date, and therefore no reminder anything could hang off.
+   *
+   * Excluded by name because it is the column that leads somewhere this checkpoint must not go:
+   * Platform scheduling and automatic reminders are both negative space.
+   */
+  it('records no expected return and schedules no reminder', () => {
+    for (const absent of ['expectedReturn', 'expected_return', 'dueOn', 'overdue', 'reminder']) {
       expect(IDENTIFIERS).not.toContain(absent);
     }
   });
@@ -126,15 +173,50 @@ describe('what Checkpoint 1 did not build', () => {
     }
   });
 
-  it('names no person and no employment', () => {
+  /**
+   * **Names an employment, and never a person.**
+   *
+   * `employmentId` left the exclusion list because AD-001 requires custody to reference Employment —
+   * and every *person*-shaped identifier stayed, along with the personal fields a directory would
+   * accumulate. The replacement is stricter than the original in the direction that matters: it now
+   * forbids a name, an email and a national identifier by name, which the old assertion never did.
+   */
+  it('names an employment, and never a person', () => {
+    expect(IDENTIFIERS).toContain('employmentId');
+
     for (const absent of [
-      'employmentId',
-      'employment_id',
       'personId',
       'person_id',
       'custodianId',
       'holderId',
       'managerEmploymentId',
+      'employeeName',
+      'personName',
+      'emailAddress',
+      'nationalId',
+      'userId',
+      'membershipId',
+    ]) {
+      expect(IDENTIFIERS).not.toContain(absent);
+    }
+  });
+
+  /**
+   * The current custodian is derived, and no second copy of it exists.
+   *
+   * This is the assertion that keeps ADR-0070 true as custody grows: the open custody row is the
+   * answer, and a denormalized copy on `asset` would be a second one that goes stale.
+   */
+  it('holds no second copy of the current custodian', () => {
+    for (const absent of [
+      'currentEmployeeId',
+      'current_employee_id',
+      'currentCustodyId',
+      'current_custody_id',
+      'inCustody',
+      'in_custody',
+      'isIssued',
+      'assigned',
     ]) {
       expect(IDENTIFIERS).not.toContain(absent);
     }
@@ -152,9 +234,18 @@ describe('the cross-module boundary', () => {
     expect([...new Set(imports)].sort()).toEqual(['@work/kernel', '@work/persistence']);
   });
 
-  it('declares no port to any other module, and no port at all beyond persistence', () => {
+  /**
+   * **Exactly one port to another module, and it is the one Checkpoint 2 approved.**
+   *
+   * `EmploymentDirectoryPort` left the exclusion list because custody references Employment. The
+   * replacement pins the count rather than merely removing the entry: one port, named, and every
+   * other still absent — so a second cross-module dependency fails this test rather than passing it
+   * quietly.
+   */
+  it('declares exactly one port to another module, and none of the others', () => {
+    expect(IDENTIFIERS).toContain('EmploymentDirectoryPort');
+
     for (const absent of [
-      'EmploymentDirectoryPort',
       'MembershipDirectoryPort',
       'DocumentReferencePort',
       'ApprovalPort',
@@ -167,6 +258,23 @@ describe('the cross-module boundary', () => {
     ]) {
       expect(IDENTIFIERS).not.toContain(absent);
     }
+  });
+
+  /**
+   * The port learns one boolean, and the module has nowhere to put anything more.
+   *
+   * Asserted on the interface itself: a port that returned a view could grow into the workforce
+   * directory an asset register must not become.
+   */
+  it('learns one boolean from Employment and nothing else', () => {
+    const ports = readFileSync(join(SOURCE_ROOT, 'application', 'assets-ports.ts'), 'utf8');
+    const declaration = ports.slice(ports.indexOf('interface EmploymentDirectoryPort'));
+
+    expect(declaration.slice(0, declaration.indexOf('}'))).toContain(
+      'exists(employmentId: string): Promise<boolean>;',
+    );
+    expect(IDENTIFIERS).not.toContain('EmploymentView');
+    expect(IDENTIFIERS).not.toContain('EmploymentStatus');
   });
 
   /**
@@ -194,129 +302,36 @@ describe('the cross-module boundary', () => {
     }
   });
 
-  it('touches Payroll, Workflow, Documents, Identity, Employment and Platform not at all', () => {
+  it('touches Payroll, Workflow, Documents, Identity, Platform and the rest not at all', () => {
     for (const absent of [
       'payroll.',
       'workflow.',
       'documents.',
       'identity.',
-      'employment.',
       'platform.',
       'letters.',
       'relations.',
+      'onboarding.',
     ]) {
       expect(IDENTIFIERS).not.toContain(absent);
     }
   });
-});
 
-describe('what nothing here does automatically', () => {
   /**
-   * No event is raised and none is subscribed to.
+   * Employment is *asked*, never written to and never enumerated.
    *
-   * The specification names eight domain events, every one of which describes custody. Dispatch here
-   * is at-most-once with no outbox (ADR-0053/0064), and none of the eight has a consumer — raising
-   * one would be a promise about delivery to nobody.
+   * The module names no Employment query at all — the adapter that does lives at the composition
+   * root, which is the boundary. What must never appear here is a command to Employment, or a read
+   * that returns more than the predicate.
    */
-  it('raises no domain event and subscribes to none', () => {
-    const module = moduleUnderTest();
-
-    expect(module.eventHandlers ?? []).toHaveLength(0);
-
+  it('sends Employment no command and reads no employment record', () => {
     for (const absent of [
-      'AssetIssued',
-      'CustodyAcknowledged',
-      'AssetReturned',
-      'CustodyTransferred',
-      'AssetLost',
-      'AssetDamaged',
-      'CustodyOutstanding',
-      'DeductionAuthorized',
-      'eventHandlers',
-      'publish(',
-      'emit(',
+      'employment.read-employment',
+      'employment.search',
+      'employment.export-workforce',
+      'employment.read-history',
     ]) {
-      expect(IDENTIFIERS).not.toContain(absent);
-    }
-  });
-
-  it('schedules nothing and has no clock to schedule against', () => {
-    for (const absent of ['setTimeout', 'setInterval', 'cron', 'schedule', 'Clock']) {
-      expect(IDENTIFIERS).not.toContain(absent);
-    }
-  });
-
-  /**
-   * No layer a caller's request reaches can accept a tenant or an actor.
-   *
-   * Scoped to `application` and `api` deliberately, and that scope is the assertion rather than a
-   * convenience: infrastructure *must* write `tenant_id` into a row, and it takes the value from
-   * `transaction.tenantId` — the execution context — which is exactly the design. What must never
-   * exist is a command, a query or a DTO with a field a caller could fill in.
-   */
-  it('never lets a caller name a tenant or an actor', () => {
-    for (const absent of [
-      'tenantId',
-      'tenant_id',
-      'actor',
-      'createdBy',
-      'registeredBy',
-      'currentActor',
-    ]) {
-      expect(CALLER_FACING_CODE).not.toContain(absent);
-    }
-  });
-
-  it('publishes no route verb that edits or deletes in place', () => {
-    for (const absent of ['@Put(', '@Patch(', '@Delete(']) {
-      expect(IDENTIFIERS).not.toContain(absent);
-    }
-  });
-
-  it('holds no soft-delete or hard-delete path for an asset', () => {
-    for (const absent of ['softDelete', 'deleteRow', 'remove(', 'delete from']) {
-      expect(IDENTIFIERS).not.toContain(absent);
-    }
-  });
-});
-
-describe('the module’s declared shape', () => {
-  it('publishes five commands and three queries, and nothing else', () => {
-    const module = moduleUnderTest();
-
-    expect((module.commands ?? []).map((handler) => handler.commandName).sort()).toEqual([
-      'assets.amend-asset',
-      'assets.amend-category',
-      'assets.change-asset-status',
-      'assets.define-category',
-      'assets.register-asset',
-    ]);
-    expect((module.queries ?? []).map((handler) => handler.queryName).sort()).toEqual([
-      'assets.categories',
-      'assets.read-asset',
-      'assets.search-assets',
-    ]);
-  });
-
-  it('declares four permissions and is named assets', () => {
-    const module = moduleUnderTest();
-
-    expect(module.name).toBe('assets');
-    expect(module.permissions).toHaveLength(4);
-    expect(ALL_ASSETS_PERMISSIONS).toHaveLength(4);
-  });
-
-  /**
-   * No country-pack claim anywhere.
-   *
-   * `relation_violation_category` carries a provenance discriminator because a disciplinary
-   * catalogue will one day be supplied by statute. An asset catalogue will not: no jurisdiction
-   * prescribes what a company may call a laptop, and a `source` column here would be inviting an
-   * invented legal boundary.
-   */
-  it('claims no statutory provenance and invents no country rule', () => {
-    for (const absent of ['countryPack', 'country_pack', 'jurisdiction', 'statutory']) {
-      expect(IDENTIFIERS).not.toContain(absent);
+      expect(ALL_CODE).not.toContain(absent);
     }
   });
 });

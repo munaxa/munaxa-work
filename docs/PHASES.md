@@ -25,7 +25,7 @@ ADRs updated.
 | 5   | Employment                  | [`06_PHASE_5_EMPLOYMENT.md`](../work%20prompts/06_PHASE_5_EMPLOYMENT.md)                              | Awaiting approval |
 | 5.1 | Employee letters            | [`06A_PHASE_5.1_EMPLOYEE_LETTERS.md`](../work%20prompts/06A_PHASE_5.1_EMPLOYEE_LETTERS.md)            | Complete    |
 | 5.2 | Employee relations          | [`06B_PHASE_5.2_EMPLOYEE_RELATIONS.md`](../work%20prompts/06B_PHASE_5.2_EMPLOYEE_RELATIONS.md)        | Complete    |
-| 5.3 | Assets & custody            | [`06C_PHASE_5.3_ASSETS_CUSTODY.md`](../work%20prompts/06C_PHASE_5.3_ASSETS_CUSTODY.md)                | In progress — Checkpoint 1 of 4 complete |
+| 5.3 | Assets & custody            | [`06C_PHASE_5.3_ASSETS_CUSTODY.md`](../work%20prompts/06C_PHASE_5.3_ASSETS_CUSTODY.md)                | In progress — Checkpoints 1–2 of 4 complete |
 | 6   | Recruitment                 | [`07_PHASE_6_RECRUITMENT.md`](../work%20prompts/07_PHASE_6_RECRUITMENT.md)                            | Not started |
 | 7   | Onboarding                  | [`08_PHASE_7_ONBOARDING.md`](../work%20prompts/08_PHASE_7_ONBOARDING.md)                              | Not started |
 | 8   | Attendance                  | [`09_PHASE_8_ATTENDANCE.md`](../work%20prompts/09_PHASE_8_ATTENDANCE.md)                              | Awaiting approval |

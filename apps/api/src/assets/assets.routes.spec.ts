@@ -18,7 +18,11 @@ import { assetsModuleFor } from './assets.composition.js';
 
 const ASSETS_API = join(process.cwd(), '..', '..', 'packages', 'modules', 'assets', 'src', 'api');
 
-const CONTROLLER_FILES = ['asset-category.controller.ts', 'asset.controller.ts'];
+const CONTROLLER_FILES = [
+  'asset-category.controller.ts',
+  'asset.controller.ts',
+  'custody.controller.ts',
+];
 
 const sourceOf = (file: string): string => readFileSync(join(ASSETS_API, file), 'utf8');
 
@@ -30,7 +34,9 @@ const codeOf = (file: string): string =>
 const composed = (): ReturnType<typeof assetsModuleFor> => {
   const pool = new Pool({ connectionString: 'postgresql://unused:unused@127.0.0.1:1/unused' });
 
-  return assetsModuleFor(new PostgresUnitOfWork(pool, new InProcessEventDispatcher()));
+  return assetsModuleFor(new PostgresUnitOfWork(pool, new InProcessEventDispatcher()), {
+    ask: () => Promise.reject(new Error('not called')),
+  });
 };
 
 const dispatchedNames = (): readonly string[] =>
@@ -41,11 +47,11 @@ const dispatchedNames = (): readonly string[] =>
     .map((match) => match.slice(match.indexOf("'") + 1, -1));
 
 describe('the assets HTTP surface', () => {
-  it('dispatches exactly the eight names the module registers, and no ninth', () => {
+  it('dispatches exactly the twelve names the module registers, and no thirteenth', () => {
     const dispatched = dispatchedNames();
 
-    expect(dispatched).toHaveLength(8);
-    expect(new Set(dispatched).size).toBe(8);
+    expect(dispatched).toHaveLength(12);
+    expect(new Set(dispatched).size).toBe(12);
   });
 
   /**
@@ -89,13 +95,17 @@ describe('the assets HTTP surface', () => {
    * `assets/categories` would otherwise be swallowed by `assets/:assetId`, and the failure mode is a
    * caller listing the catalogue and receiving "no such asset".
    */
-  it('declares the catalogue controller before the inventory controller', () => {
+  it('declares both literal prefixes before the controllers that take an :assetId', () => {
     const module = readFileSync(join(process.cwd(), 'src', 'assets', 'assets.module.ts'), 'utf8');
-    const categories = module.indexOf('AssetCategoryController');
-    const assets = module.indexOf('AssetController,');
+    const declaration = module.slice(module.indexOf('controllers: ['));
+    const order = ['AssetCategoryController', 'CustodyController', 'AssetController,'].map((name) =>
+      declaration.indexOf(name),
+    );
 
-    expect(categories).toBeGreaterThan(-1);
-    expect(assets).toBeGreaterThan(categories);
+    for (const position of order) expect(position).toBeGreaterThan(-1);
+    // `assets/categories` and `assets/custody` are literals; `assets/:assetId` would swallow either.
+    expect(order[0]).toBeLessThan(order[2] as number);
+    expect(order[1]).toBeLessThan(order[2] as number);
   });
 
   it('declares its own collection and create routes before its parameterised one', () => {
@@ -120,45 +130,58 @@ describe('the assets HTTP surface', () => {
   });
 
   /**
-   * No route for a capability Checkpoint 1 did not build.
+   * The exact route surface, as the decorators declare it.
    *
-   * A route is the first thing that exists for a feature and the last thing anybody removes, so the
-   * absence is asserted rather than left to review.
+   * The Checkpoint 1 assertion here forbade every custody route by name. Two of those words —
+   * `custody` and `return` — describe an approved capability now, so the blanket ban became stale.
+   * It is **replaced with an exact set**: these twelve paths and no thirteenth, plus a still-exact
+   * ban on the words that describe capabilities nobody has authorized. It was not deleted, and the
+   * replacement is stricter, because an exact set forbids everything a list of words would miss.
    */
-  it('publishes no custody, acknowledgement, incident, waiver or deduction route', () => {
+  it('publishes exactly the twelve paths this checkpoint approves, and no other', () => {
     const code = CONTROLLER_FILES.map(codeOf).join('\n');
-    // The routes themselves, as the decorator declares them — `@Post(':assetId/status')` gives
-    // `:assetId/status`. Scanning the whole file would fail on the `return` of every handler body,
-    // which is why this reads the paths rather than the source: the assertion is about the surface a
-    // caller can reach, not about the words the file happens to contain.
+    const paths = [...code.matchAll(/@(?:Get|Post)\(\s*'?([^')]*)'?\s*\)/g)].map(
+      (match) => match[1] ?? '',
+    );
+
+    expect(paths.filter((path) => path !== '').sort()).toEqual([
+      ':assetCategoryId',
+      ':assetCustodyId/return',
+      ':assetId',
+      ':assetId',
+      ':assetId/custody',
+      ':assetId/custody',
+      ':assetId/status',
+    ]);
+  });
+
+  it('publishes no route for a capability nobody has authorized', () => {
+    const code = CONTROLLER_FILES.map(codeOf).join('\n');
     const paths = [...code.matchAll(/@(?:Get|Post)\(\s*'([^']*)'/g)].map((match) => match[1] ?? '');
 
-    expect(paths).toContain(':assetId/status');
-
     for (const absent of [
-      'custody',
       'acknowledge',
+      'accept',
       'incident',
       'waiver',
       'deduction',
       'clearance',
       'transfer',
-      'issue',
-      'return',
-      'assign',
+      'cancel',
+      'correct',
+      'condition',
     ]) {
       for (const path of paths) expect(path).not.toContain(absent);
-    }
-
-    // And no *handler method* named for one either, which is where such a route would be added.
-    for (const absent of ['issue(', 'returnAsset(', 'transfer(', 'acknowledge(', 'assign(']) {
-      expect(code).not.toContain(absent);
+      expect(code).not.toContain(`${absent}(`);
     }
   });
 
-  it('exposes both controllers under the versioned prefix', () => {
+  it('exposes every controller under the versioned prefix', () => {
     expect(codeOf('asset-category.controller.ts')).toContain(
       "@Controller({ path: 'assets/categories', version: '1' })",
+    );
+    expect(codeOf('custody.controller.ts')).toContain(
+      "@Controller({ path: 'assets/custody', version: '1' })",
     );
     expect(codeOf('asset.controller.ts')).toContain(
       "@Controller({ path: 'assets', version: '1' })",

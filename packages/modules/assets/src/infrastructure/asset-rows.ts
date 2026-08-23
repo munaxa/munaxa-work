@@ -1,7 +1,8 @@
 import type { AssetCategoryState, LocalizedName } from '../domain/asset-category.js';
 import type { AssetState } from '../domain/asset.js';
-import type { AssetStatus } from '../domain/assets-vocabulary.js';
-import { asNumber, orNull, orUndefined, type RowValues } from './row-writer.js';
+import type { AssetStatus, CustodyState } from '../domain/assets-vocabulary.js';
+import type { CustodyRecord } from '../domain/custody.js';
+import { asNumber, civilDateColumn, orNull, orUndefined, type RowValues } from './row-writer.js';
 
 /**
  * Rows into domain state and back, in one file.
@@ -15,11 +16,12 @@ import { asNumber, orNull, orUndefined, type RowValues } from './row-writer.js';
  * column twice in one statement. That is the defect Phase 5.2's integration suite found, and this
  * module inherits the rule rather than rediscovering it.
  *
- * **Every select names its columns.** There is no civil date on either table in this checkpoint, so
- * the `to_char` projection Phase 5.2 needed does not appear — but the reason it was needed does: the
- * driver decides how a column type arrives, and `select *` hands the mapper whatever the driver chose.
- * Naming the columns is what makes the row interface a description of the query rather than a hope
- * about the table. The first date column this module stores will be projected as text on the way out.
+ * **Every select names its columns, and every civil date is projected as text.** `asset_custody` is
+ * the first table here to hold a date, and `issued_on` and `returned_on` are both wrapped in
+ * `to_char`: the driver returns a `date` as a JavaScript `Date` at the process's local midnight, so
+ * `select *` would hand the mapper an object where the row type promises `'YYYY-MM-DD'`. That
+ * mismatch sat unnoticed in Relations for three checkpoints. Naming the columns is what makes the row
+ * interface a description of the query rather than a hope about the table.
  */
 
 export const ASSET_CATEGORY_COLUMNS = `id, tenant_id, code, name, sequence, active, version`;
@@ -94,4 +96,45 @@ export const assetValues = (state: AssetState, tenantId: string): RowValues => (
   location_note: orNull(state.locationNote),
   purchase_reference: orNull(state.purchaseReference),
   status: state.status,
+});
+
+/** Custody's columns, with both civil dates as strings, for the reason at the top of this file. */
+export const CUSTODY_COLUMNS = `id, tenant_id, asset_id, employment_id,
+  ${civilDateColumn('issued_on', 'issued_on')}, ${civilDateColumn('returned_on', 'returned_on')},
+  state, issue_note, return_note, version`;
+
+export interface CustodyRow {
+  readonly id: string;
+  readonly asset_id: string;
+  readonly employment_id: string;
+  readonly issued_on: string;
+  readonly returned_on: string | null;
+  readonly state: string;
+  readonly issue_note: string | null;
+  readonly return_note: string | null;
+  readonly version: number | string;
+}
+
+export const custodyState = (row: CustodyRow): CustodyRecord => ({
+  assetCustodyId: row.id,
+  assetId: row.asset_id,
+  employmentId: row.employment_id,
+  issuedOn: row.issued_on,
+  state: row.state as CustodyState,
+  version: asNumber(row.version),
+  ...(orUndefined(row.returned_on) === undefined ? {} : { returnedOn: row.returned_on as string }),
+  ...(orUndefined(row.issue_note) === undefined ? {} : { issueNote: row.issue_note as string }),
+  ...(orUndefined(row.return_note) === undefined ? {} : { returnNote: row.return_note as string }),
+});
+
+export const custodyValues = (state: CustodyRecord, tenantId: string): RowValues => ({
+  id: state.assetCustodyId,
+  tenant_id: tenantId,
+  asset_id: state.assetId,
+  employment_id: state.employmentId,
+  issued_on: state.issuedOn,
+  returned_on: orNull(state.returnedOn),
+  state: state.state,
+  issue_note: orNull(state.issueNote),
+  return_note: orNull(state.returnNote),
 });

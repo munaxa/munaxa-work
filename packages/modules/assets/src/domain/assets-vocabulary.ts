@@ -50,6 +50,35 @@ export const permitsAssetTransition = (from: AssetStatus, to: AssetStatus): bool
 export const INITIAL_ASSET_STATUS: AssetStatus = 'registered';
 
 /**
+ * Where a custody has got to — **two values, and no third**.
+ *
+ * A custody is a period: it is `open` while somebody holds the asset, and `returned` once they have
+ * given it back. The specification's wider lifecycle — accepted, acknowledged, cancelled, corrected,
+ * transferred, overdue — is reached by capabilities Checkpoint 2 does not build, and a vocabulary
+ * listing a state nothing can produce is a promise the code cannot keep. The database CHECK is closed
+ * at these two and widens by an approved change.
+ *
+ * **`returned` is terminal at the database.** A returned custody refuses every update and delete from
+ * any path (AD-003), so there is no transition out of it and none is listed.
+ */
+export const CUSTODY_STATES = ['open', 'returned'] as const;
+export type CustodyState = (typeof CUSTODY_STATES)[number];
+
+export const isCustodyState = (value: string): value is CustodyState =>
+  (CUSTODY_STATES as readonly string[]).includes(value);
+
+/** Where a custody starts. There is no prior state, and the caller does not choose it. */
+export const INITIAL_CUSTODY_STATE: CustodyState = 'open';
+
+/**
+ * The one asset status from which a custody may open.
+ *
+ * `registered` is not yet in service, `under_repair` is out of it, and `retired` is out of it for
+ * good. Issuing from any of the three would record a handover that could not have happened.
+ */
+export const CUSTODY_ELIGIBLE_STATUS: AssetStatus = 'available';
+
+/**
  * The shape a code must take: lower-case, digits and hyphens, no leading or trailing hyphen.
  *
  * The same expression `document_type`, `letter_template` and `relation_violation_category` already

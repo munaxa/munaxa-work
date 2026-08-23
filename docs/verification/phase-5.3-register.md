@@ -1,10 +1,11 @@
 # Phase 5.3 — Assets & Custody · Decision Register
 
-## Status: **CHECKPOINT 1 IMPLEMENTED** · Checkpoint 2 **READY, NOT AUTHORIZED** · Checkpoints 3–4 not started
+## Status: **CHECKPOINTS 1 AND 2 IMPLEMENTED** · Checkpoints 3–4 not started
 
 *Opened 2026-08-23 against `3ad9fd7` (`main`, immediately after Phase 5.2 merged as PR #14).
 Checkpoint 1 implemented 2026-08-23 — see
-[`phase-5.3-checkpoint-1.md`](./phase-5.3-checkpoint-1.md).*
+[`phase-5.3-checkpoint-1.md`](./phase-5.3-checkpoint-1.md). Checkpoint 2 implemented the same day —
+see [`phase-5.3-checkpoint-2.md`](./phase-5.3-checkpoint-2.md).*
 
 > **Historical note · the register when it opened.** The paragraph below was true when this register
 > was written and is preserved rather than rewritten: *"Nothing in Phase 5.3 is implemented. There is
@@ -36,7 +37,7 @@ Checkpoint 1.
 
 ## Summary
 
-| # | Decision | State | Blocks Checkpoint 1? |
+| # | Decision | State | Blocked Checkpoint 1? |
 |---|---|---|---|
 | D-5.3-01 | What custody attaches to, when an employment ends | **OPEN** | **no** — Checkpoint 1 creates no custody |
 | D-5.3-02 | Whether acknowledgement can be by the employee | **SETTLED BY EXISTING EVIDENCE** | no |
@@ -46,7 +47,7 @@ Checkpoint 1.
 | D-5.3-06 | Whether liability and waiver adopt Workflow | **SETTLED BY EXISTING EVIDENCE** | no |
 | D-5.3-07 | Whether issuing custody requires an *active* employment | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
 | D-5.3-08 | Whether a direct transfer is its own authority | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
-| D-5.3-09 | Whether an asset in open custody may be retired | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
+| D-5.3-09 | Whether an asset in open custody may be retired | **APPROVED 2026-08-23 · IMPLEMENTED** | n/a — opened later |
 | D-5.3-10 | Whether custody may be cancelled or corrected | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
 
 **Checkpoint 1 depended on no open decision, and the implementation kept it that way.** The condition
@@ -494,7 +495,7 @@ blocked.
 
 ---
 
-## D-5.3-09 — Whether an asset in open custody may be retired · **OPEN**
+## D-5.3-09 — Whether an asset in open custody may be retired · **APPROVED 2026-08-23**
 
 ### The question
 
@@ -530,6 +531,32 @@ transition table and the persisted/derived split are all untouched.
 
 **Checkpoint 2 must choose a behaviour**, so the owner should confirm this at authorization. It blocks
 no schema and no other capability, and the recommendation is the reversible one.
+
+### Owner approval · 2026-08-23
+
+Option **(a)** approved, in the owner's own terms:
+
+> *"An asset cannot be retired while it has an open custody. This is an operational invariant, not a
+> new persisted status. Therefore: `asset.status` remains unchanged; no new status is introduced; no
+> custody is automatically returned; retirement does not mutate custody; `change-asset-status` must
+> reject `retired` when an open custody exists; the rejection must be transactional and race-safe; the
+> error must be explicit and deterministic."* — with the instruction *"do not reinterpret this as a
+> termination rule."*
+
+### As implemented · 2026-08-23
+
+`assets.change-asset-status` refuses `asset_in_custody` when a retirement is attempted against an asset
+with an open custody. Nothing else changed: no status was introduced, no custody is closed, no other
+transition is affected — an asset in custody can still go for repair, and that is asserted.
+
+**Race-safety is a row lock, not a pre-check.** The invariant spans two tables, so no constraint
+expresses it. `change-asset-status` and `issue-custody` both take `select … for update` on the asset row
+**before** either checks, so the two transactions serialize on that row and the second re-reads the
+committed truth on unblocking. Proved against two real connections: exactly one survives, and the
+database is queried directly for the forbidden combination — `retired` **and** held — which never
+occurs. The `LockRows` node is asserted in the query plan, so the lock is verified rather than assumed.
+
+**It is not a termination rule**, and D-5.3-01 remains untouched below.
 
 ---
 
@@ -600,6 +627,7 @@ made twice.
 
 | Date | Change |
 |---|---|
+| 2026-08-23 | **Checkpoint 2 implemented.** One table, two commands, two reads, three permissions, one additive migration, one cross-module read that creates no contract. **D-5.3-09 approved and implemented**; D-5.3-01, D-5.3-03, D-5.3-05, D-5.3-07, D-5.3-08 and D-5.3-10 all remain **OPEN and untouched**, and no settled decision was reopened. Seven negative-space assertions became stale because the approved capability genuinely changed the boundary; each was **replaced with a more exact statement**, none deleted. |
 | 2026-08-23 | **Checkpoint 2 investigation.** Four decisions opened — D-5.3-07 (active versus existing employment), D-5.3-08 (transfer authority), D-5.3-09 (retirement while in custody), D-5.3-10 (correction and cancellation). **None approved.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged. A shipped Relations defect was found and recorded rather than fixed. Checkpoint 2 confirmed to be blocked by no decision; D-5.3-09 is a behaviour the owner should confirm at authorization. |
 | 2026-08-23 | **Checkpoint 1 implemented.** Two tables, five commands, three reads, four permissions, one additive migration, zero cross-module dependencies. **No decision approved, none reopened.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged; the recommendations for D-5.3-01 and D-5.3-05 are documented and were **not** turned into behaviour or into columns. |
 | 2026-08-23 | Register opened against `3ad9fd7`. D-5.3-02, D-5.3-04 and D-5.3-06 moved from OPEN to **SETTLED BY EXISTING EVIDENCE** with the settling code named. D-5.3-01, D-5.3-03 and D-5.3-05 confirmed **OPEN** with evidence, options and one recommendation each. Checkpoint 1 confirmed to depend on no open decision. **No decision approved.** |

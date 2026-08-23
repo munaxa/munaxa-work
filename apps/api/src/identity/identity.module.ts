@@ -270,11 +270,11 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // addressed to a membership and the request has already resolved one (Checkpoint 4).
         registry.register(permissionAware.workflow);
         registry.register(permissionAware.relations);
-        // Assets last, and it is the only module in this registry that takes nothing but the unit of
-        // work. Checkpoint 1 is an asset catalogue and an inventory: it reads no other module, is
-        // read by none, holds no custody and references no employment. The first cross-module read
-        // arrives with custody, and it will be Employment's published one under a bounded grant.
-        registry.register(assetsModuleFor(unitOfWork));
+        // Assets last. Checkpoint 2 gave it its first and only cross-module read: whether the
+        // employment an asset is being issued to exists, asked of Employment's own published query
+        // under a bounded grant and answering one boolean. It is read by nobody — Offboarding will
+        // pull custody through the published contract when Checkpoint 4 gives it one to pull.
+        registry.register(assetsModuleFor(unitOfWork, senders.payroll));
         return registry;
       },
     },

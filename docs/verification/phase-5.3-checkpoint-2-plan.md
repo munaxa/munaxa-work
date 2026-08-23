@@ -590,3 +590,67 @@ Checkpoint 2 is blocked by no decision — D-5.3-09 is a behaviour the owner sho
 authorization, and its recommendation is the reversible one. Nothing in
 `packages/modules/assets`, `apps/api/src/assets`, `prisma/schema.prisma` or `prisma/migrations` should
 change until the owner authorizes this checkpoint explicitly.
+
+---
+
+## 27. As built — what changed between the plan and the implementation
+
+*Added after Checkpoint 2 was implemented and verified. The plan above is left unedited: it is the
+record of what was intended, and this section records where reality differed.*
+
+### 27.1 The plan held, with one vocabulary change and three additions
+
+**§17's table shipped as designed** — one table, the same columns, the same three indexes, the same
+conditional trigger. **§18's two commands and two queries, §12's three permissions and §16's RLS all
+shipped as written.** §22 predicted one additive migration modifying nothing existing, and that is what
+`20260823180000_assets_custody` is.
+
+Four differences, each decided on existing precedent:
+
+1. **The closed state is `returned`, not `closed`.** The plan wrote `open → closed`; the authorization
+   wrote `open → returned`, which is the better word — it says what happened rather than what the row
+   became. One value, changed before anything was built.
+
+2. **`AssetStore.byIdForUpdate` was added.** §11 of the authorization required the D-5.3-09 rule to be
+   race-safe, and the plan had not named the mechanism. It is a `select … for update` on the asset row,
+   taken **first** by both `issue-custody` and `change-asset-status` so the two serialize — see §3 of
+   the verification report. Nothing else in the module takes a lock.
+
+3. **`paging.ts` and `query-numbers.ts` were extracted.** Custody's reads needed the same page bounds
+   and the same query-string parsing as the inventory's. Extracted rather than copied: a second copy of
+   a page bound eventually disagrees, and the copy that is wrong is the one that lets a caller ask for
+   an entire register.
+
+4. **`civilDateColumn` returned to `row-writer.ts`**, exactly as §17 predicted it would.
+
+### 27.2 Four files were split at their seams to meet budgets
+
+Split, never exempted, and each where the seam already was:
+
+| File | Split into |
+|---|---|
+| `assets.repository.ts` (367 lines) | `custody.repository.ts` — the third repository moved out |
+| `custody.test.ts` (548) | `custody-register.test.ts` — issuing and returning in one, the register they produce in the other |
+| `assets-boundaries.test.ts` (463) | `assets-shape.test.ts` — the exclusions in one, the module's declared shape in the other |
+| `assets-custody.integration.test.ts` (531) | `assets-custody-boundaries.integration.test.ts` — what a custody *is*, and what surrounds it |
+
+No assertion was lost in any split, and no budget was exempted.
+
+### 27.3 Two of my own test expectations were wrong, and were corrected rather than relaxed
+
+1. **A "stale return" test expected a lost-update rejection.** It never gets one: the domain refuses
+   `custody_not_open` *before* the version predicate is consulted, which is the better refusal — the
+   caller gets a sentence rather than a concurrency error. The test was replaced with an exact one:
+   however many returns are attempted, the row moves **exactly once**, and the genuine simultaneous
+   race is proved against two real connections instead, where a map cannot contend with itself.
+
+2. **A harness helper defined a second catalogue category per asset**, so any suite registering three
+   assets met `category_code_taken` — a refusal about the fixture rather than about the assertion. The
+   helper now reuses the existing category, which is also what a real tenant does.
+
+### 27.4 The prose correction §5 predicted was needed, and made
+
+Checkpoint 1's report glossed `available` as *"in service and not held by anybody"*. The second half
+was written before custody existed. It is corrected in §5 of this plan and in §2 of the Checkpoint 2
+verification report, and the behaviour is now **asserted**: an asset in somebody's custody is still
+`available`.

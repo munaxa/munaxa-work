@@ -10,6 +10,7 @@ import type { ReadAsset, SearchAssets } from '../application/assets-queries.js';
 
 import { AmendAssetBody, ChangeAssetStatusBody, RegisterAssetBody } from './assets.dto.js';
 import { AssetsDispatcher } from './assets-dispatcher.js';
+import { numbered } from './query-numbers.js';
 import { unwrapOrThrow } from './handler-result.js';
 
 /**
@@ -22,8 +23,9 @@ import { unwrapOrThrow } from './handler-result.js';
  * **No `PUT`, `PATCH` or `DELETE`.** An amendment is a `POST` to the resource and a status change is
  * a `POST` to a sub-resource; an asset leaves service by retirement, never by deletion.
  *
- * **No route here issues, returns, transfers or acknowledges anything**, and none names an employment
- * or a person. Custody is Checkpoint 2.
+ * **No route here issues, returns or acknowledges anything**, and none names an employment or a
+ * person. Custody has its own controllers, behind its own permissions, so reading the inventory never
+ * implies reading who holds what.
  */
 @ApiTags('assets')
 @ApiForbiddenResponse({ description: 'The caller lacks the permission the operation requires.' })
@@ -106,18 +108,3 @@ export class AssetController {
     );
   }
 }
-
-/**
- * A query-string number, or nothing.
- *
- * A page parameter arrives as text and an unparseable one must not become `NaN` on the query: the
- * handler bounds what it receives, and a `NaN` would fall through its integer check to the default
- * anyway — but only by accident. Omitting it says the caller did not ask.
- */
-const numbered = (field: string, value: string | undefined): Readonly<Record<string, number>> => {
-  if (value === undefined) return {};
-
-  const parsed = Number(value);
-
-  return Number.isInteger(parsed) ? { [field]: parsed } : {};
-};

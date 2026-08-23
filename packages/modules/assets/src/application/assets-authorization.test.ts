@@ -5,11 +5,15 @@ import {
   STOREKEEPER,
   attempt,
   givenAsset,
+  givenAvailableAsset,
   givenCategory,
+  givenCustody,
   harnessFor,
   tryAsk,
 } from './assets-test-harness.js';
 import { ALL_ASSETS_PERMISSIONS, AssetsPermissions } from './assets-permissions.js';
+import type { UnitOfWork } from '@work/kernel';
+
 import { assetsModule } from './assets-module.js';
 import { inMemoryAssetsStores } from './in-memory-stores.js';
 
@@ -21,22 +25,33 @@ import { inMemoryAssetsStores } from './in-memory-stores.js';
  * an operation needs is refused, and a caller holding another module's grant is refused too.
  */
 
+const NEVER_EXECUTED: UnitOfWork = {
+  // Typed rather than asserted: `UnitOfWork` has exactly one method, so a real implementation costs a
+  // line and an `as never` would hide the day it grows a second.
+  execute: () => Promise.reject(new Error('the module under test must not reach the database')),
+};
+
 const moduleUnderTest = () =>
   assetsModule({
-    unitOfWork: { execute: () => Promise.reject(new Error('not called')) } as never,
+    unitOfWork: NEVER_EXECUTED,
     stores: inMemoryAssetsStores(),
+    employments: { exists: () => Promise.resolve(true) },
+    clock: { now: () => new Date('2026-08-23T09:00:00Z') },
   });
 
 const withoutPermission = (withheld: string): readonly string[] =>
   ALL_ASSETS_PERMISSIONS.filter((permission) => permission !== withheld);
 
 describe('the permission set', () => {
-  it('is exactly four, per resource per capability', () => {
+  it('is exactly seven, per resource per capability', () => {
     expect([...ALL_ASSETS_PERMISSIONS].sort()).toEqual([
       'assets.asset.manage',
       'assets.asset.read',
       'assets.category.manage',
       'assets.category.read',
+      'assets.custody.assign',
+      'assets.custody.read',
+      'assets.custody.return',
     ]);
   });
 
@@ -54,9 +69,10 @@ describe('the permission set', () => {
       'assets.write-all',
       'assets.*',
       '*',
-      'assets.custody.read',
-      'assets.custody.assign',
-      'assets.custody.return',
+      'assets.custody.manage',
+      'assets.custody.admin',
+      'assets.custody.read-own',
+      'assets.custody.transfer',
       'assets.acknowledge',
       'assets.incident.record',
       'assets.incident.assess',
@@ -157,6 +173,121 @@ describe('a caller without the grant an operation needs', () => {
       expect(refused.error).toMatchObject({
         kind: 'forbidden',
         permission: AssetsPermissions.assetManage,
+      });
+    }
+  });
+
+  /**
+   * **Issuing and returning are different authorities, and neither implies the other.**
+   *
+   * A false return is the more dangerous direction: it makes an outstanding asset disappear from the
+   * register offboarding clearance will read. This is the assertion that keeps that separation real
+   * rather than decorative.
+   */
+  it('does not let the assign grant record a return, or the reverse', async () => {
+    const full = harnessFor();
+    const { assetId, assetCustodyId } = await givenCustody(full);
+    const assignOnly = harnessFor({
+      permissions: withoutPermission(AssetsPermissions.custodyReturn),
+    });
+    const returnOnly = harnessFor({
+      permissions: withoutPermission(AssetsPermissions.custodyAssign),
+    });
+
+    const returning = await assignOnly.as(STOREKEEPER, () =>
+      attempt(assignOnly, {
+        commandName: 'assets.return-custody',
+        assetCustodyId,
+        expectedVersion: 1,
+        returnedOn: '2026-08-22',
+      }),
+    );
+    const issuing = await returnOnly.as(STOREKEEPER, () =>
+      attempt(returnOnly, {
+        commandName: 'assets.issue-custody',
+        assetId,
+        employmentId: '01940000-0000-7000-8000-0000000000aa',
+        issuedOn: '2026-08-22',
+      }),
+    );
+
+    expect(returning.ok).toBe(false);
+    expect(issuing.ok).toBe(false);
+    if (returning.ok || issuing.ok) return;
+    expect(returning.error).toMatchObject({
+      kind: 'forbidden',
+      permission: AssetsPermissions.custodyReturn,
+    });
+    expect(issuing.error).toMatchObject({
+      kind: 'forbidden',
+      permission: AssetsPermissions.custodyAssign,
+    });
+  });
+
+  /**
+   * Managing the inventory does not reach custody, in either direction.
+   *
+   * This is why `assets.asset.manage` was not reused: maintaining a register of things and creating an
+   * obligation for a named person are different authorities.
+   */
+  it('does not let an inventory grant issue custody, or a custody grant amend an asset', async () => {
+    const full = harnessFor();
+    const assetId = await givenAvailableAsset(full);
+    const inventoryOnly = harnessFor({
+      permissions: [AssetsPermissions.assetRead, AssetsPermissions.assetManage],
+    });
+    const custodyOnly = harnessFor({
+      permissions: [
+        AssetsPermissions.custodyRead,
+        AssetsPermissions.custodyAssign,
+        AssetsPermissions.custodyReturn,
+      ],
+    });
+
+    const issuing = await inventoryOnly.as(STOREKEEPER, () =>
+      attempt(inventoryOnly, {
+        commandName: 'assets.issue-custody',
+        assetId,
+        employmentId: '01940000-0000-7000-8000-0000000000aa',
+        issuedOn: '2026-08-22',
+      }),
+    );
+    const amending = await custodyOnly.as(STOREKEEPER, () =>
+      attempt(custodyOnly, {
+        commandName: 'assets.amend-asset',
+        assetId,
+        expectedVersion: 1,
+        description: 'x',
+      }),
+    );
+
+    expect(issuing.ok).toBe(false);
+    expect(amending.ok).toBe(false);
+  });
+
+  /**
+   * Reading the inventory does not imply reading who holds what.
+   *
+   * A custody row names an employment; an asset row does not. Separating the grants is what keeps an
+   * asset register from being a directory of who has what.
+   */
+  it('does not let the inventory read reach custody', async () => {
+    const harness = harnessFor({ permissions: withoutPermission(AssetsPermissions.custodyRead) });
+
+    for (const query of [
+      { queryName: 'assets.asset-custody', assetId: '01940000-0000-7000-8000-0000000000ff' },
+      {
+        queryName: 'assets.employment-custody',
+        employmentId: '01940000-0000-7000-8000-0000000000aa',
+      },
+    ]) {
+      const refused = await harness.as(STOREKEEPER, () => tryAsk(harness, query));
+
+      expect(refused.ok).toBe(false);
+      if (refused.ok) continue;
+      expect(refused.error).toMatchObject({
+        kind: 'forbidden',
+        permission: AssetsPermissions.custodyRead,
       });
     }
   });

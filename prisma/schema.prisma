@@ -5783,7 +5783,45 @@ model Asset {
 
   category AssetCategory @relation(fields: [asset_category_id], references: [id], map: "asset_category_fk")
 
+  custodies AssetCustody[]
+
   @@index([tenant_id, asset_category_id], map: "asset_category_ref_idx")
   @@index([tenant_id, status, asset_tag], map: "asset_status_idx")
   @@map("asset")
+}
+
+/// One custody period: one employment held one asset from one day until another (Phase 5.3
+/// Checkpoint 2). One row is one handover (AD-003). Editable while `open`; **immutable once
+/// `returned`** — the trigger refuses every update and delete on a returned row from any path.
+model AssetCustody {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  asset_id      String    @db.Uuid
+  /// Employment, never person (AD-001). No cross-module foreign key: existence is confirmed through
+  /// Employment's published read before the insert, under a bounded service grant (ADR-0043).
+  employment_id String    @db.Uuid
+  /// The day of the handover. A date, not a timestamp: it is a day in the tenant's world.
+  issued_on     DateTime  @db.Date
+  /// Null while open; the day it came back once returned.
+  returned_on   DateTime? @db.Date
+  /// `open` or `returned`, and nothing else. The wider lifecycle is a later capability.
+  state         String    @db.VarChar(16)
+  issue_note    String?   @db.VarChar(500)
+  return_note   String?   @db.VarChar(500)
+  metadata      Json
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  /// Present because every table carries them. A soft delete is an update, so the trigger refuses one
+  /// on a returned custody.
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  asset Asset @relation(fields: [asset_id], references: [id], map: "asset_custody_asset_fk")
+
+  @@index([tenant_id, asset_id, issued_on], map: "asset_custody_asset_idx")
+  @@index([tenant_id, employment_id, issued_on], map: "asset_custody_employment_idx")
+  @@map("asset_custody")
 }
