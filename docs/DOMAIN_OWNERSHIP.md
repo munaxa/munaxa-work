@@ -46,7 +46,8 @@ them afterwards.
 | External system integration               | `integration`   | Phase 22      |
 | Document type, document, document version, verification decision, access trail | `documents` | Phase 12 ✅ |
 | Letter template, template version, letter request, approval decision, issued letter, reference sequence | `letters` | Phase 12 ✅ |
-| Violation, disciplinary action, grievance | `relations`     | Phase 5.2     |
+| Violation category, violation, investigation, case lifecycle, repeat-violation context, disciplinary ladder, issued disciplinary action, disciplinary access trail | `relations` | Phase 5.2 ✅ |
+| Grievance, appeal, acknowledgement, warning expiry, evidence attachment | — | not owned; **deliberately unbuilt** by Phase 5.2. Grievance is blocked on self-service routing (`read-own` is unimplementable under ADR-0032, D-5.2-13); evidence is deferred to a Documents contract (D-5.2-08); expiry stays **derived**, as it does for approvals above |
 | Asset, custody assignment                 | `assets`        | Phase 5.3     |
 | Loan, advance, repayment schedule         | `loans`         | Phase 10.1    |
 | Statutory rule, country pack, end of service | `statutory`  | Phase 11.1    |

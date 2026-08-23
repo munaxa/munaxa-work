@@ -1,32 +1,62 @@
 # Phase 5.2 — Employee Relations & Disciplinary · Decision Register
 
-**Status** Six approved · **Checkpoint 1 implemented** · **Date** 2026-08-22 · **Baseline** `d5c24b7`
+## Status: **COMPLETE**
 
-**Implementation status:** Checkpoint 1 is built, tested and verified — module `@work/relations`,
-three tables, one additive migration, three commands, three queries, four permissions, 188 module
-tests plus 26 in `apps/api`. The report is
-[`phase-5.2-checkpoint-1.md`](phase-5.2-checkpoint-1.md). **The eight remaining decisions are
-untouched and none was needed.**
+**Closed** 2026-08-23 · **Head** `b0020a1` · **Four checkpoints** · **Twenty decisions**
 
-**Six decisions were approved by the owner on 2026-08-22** — D-5.2-03, D-5.2-04, D-5.2-05, D-5.2-06,
-D-5.2-07 and D-5.2-14. Each carries an **Owner approval** block recording the approval in the owner's
-own terms, appended beneath the analysis rather than replacing it, so what was recommended and what
-was approved stay separately readable. **Checkpoint 1 is authorized and implemented** — see
-[`phase-5.2-checkpoint-1.md`](phase-5.2-checkpoint-1.md).
+| | |
+|---|---|
+| **Settled by existing evidence** | 2 — D-5.2-01, D-5.2-02 |
+| **Approved and implemented** | 12 — D-5.2-03 · 04 · 05 · 06 · 07 · 14 · 15 · 16 · 17 · 18 · 19 · 20 |
+| **OPEN, and deferred by design** | 6 — D-5.2-08 · 09 · 10 · 11 · 12 · 13 |
 
-The remaining eight decisions are unchanged. Every decision below is **OPEN** unless its Status says otherwise. A decision marked
-*SETTLED BY EXISTING EVIDENCE* is one the repository has already decided in a document that predates
-this register; the evidence is cited so the claim can be checked rather than trusted.
+**The six that remain OPEN are deferred scope, not unfinished work**, and the distinction is the
+point of this line. Each governs a capability Phase 5.2 deliberately did not build — evidence
+attachments, warning expiry, Payroll intake, the Employment recommendation contract, Workflow
+approval, and grievance confidentiality. None blocks closure, none is half-built, and **no
+placeholder table, command, permission or route exists for any of them**. Their `OPEN` status is
+what makes that visible: the capability is absent because nobody decided it, not because somebody
+forgot it. §"Deferred scope at closure" below records what each still needs.
+
+**What was built**, across four checkpoints in `@work/relations`: seven tables, four additive
+migrations, nine commands, ten queries, nine permissions, five immutability triggers, RLS enabled
+**and forced** on every table. Reports:
+[Checkpoint 1](phase-5.2-checkpoint-1.md) ·
+[Checkpoint 2](phase-5.2-checkpoint-2.md) ·
+[Checkpoint 3](phase-5.2-checkpoint-3-plan.md) ·
+[Checkpoint 4](phase-5.2-checkpoint-4.md).
+
+---
+
+## How to read this register
+
+Every decision keeps its **full history**: the original analysis, each checkpoint's investigation of
+it, and — where one was given — the owner's approval in the owner's own terms, appended beneath
+rather than replacing what came before. What was recommended and what was approved stay separately
+readable, and a recommendation that was later overtaken is corrected in place with the reason rather
+than deleted.
+
+A decision marked *SETTLED BY EXISTING EVIDENCE* is one the repository had already decided in a
+document predating this register; the evidence is cited so the claim can be checked rather than
+trusted.
 
 **A recommendation is not an approval.** Where this register recommends an option, that is analysis
-offered to the owner. The eight decisions still `OPEN` carry no approval date, because none has been
+offered to the owner. The six decisions still `OPEN` carry no approval date, because none has been
 given for them.
+
+### Historical note · the register at Checkpoint 1 (2026-08-22)
+
+Preserved because the closure above supersedes it rather than erases it: at that date six decisions
+were approved — D-5.2-03, 04, 05, 06, 07 and 14 — Checkpoint 1 was built with three tables, one
+migration, three commands, three queries and four permissions, and the eight remaining decisions were
+untouched. Checkpoints 2, 3 and 4 approved six more and opened three that Checkpoint 1 could not have
+known about (D-5.2-18, 19, 20).
 
 ---
 
 ## Summary
 
-| ID | Question | Status | Blocks checkpoint 1? |
+| ID | Question | Final status | Implemented, or deferred? |
 |---|---|---|---|
 | D-5.2-01 | Module name and boundary | **SETTLED BY EXISTING EVIDENCE** | no |
 | D-5.2-02 | What Relations references — Employment, never Person | **SETTLED BY EXISTING EVIDENCE** | no |
@@ -1214,3 +1244,46 @@ name.
    its own window. That would have written a plausible number nobody could justify onto a disciplinary
    record. Replaced with the Checkpoint 3 ordinal measured from the violation's own conduct date, and
    an unanswerable case is refused rather than guessed.
+
+
+---
+
+# Deferred scope at closure
+
+Six decisions remain `OPEN` at closure. **Each is deferred, not missing**, and this section records
+what each still needs so a later phase inherits the reasoning rather than rediscovering it.
+
+**Nothing was built for any of them.** No placeholder table, no stub command, no unused permission,
+no "future-ready" abstraction and no dormant route. That is deliberate and it is asserted: a
+negative-space suite fails if a storage adapter, an expiry sweep, a Workflow subject, a Payroll write
+or a grievance concept appears in this module.
+
+| Decision | Capability | Why it is still open | What would unblock it |
+|---|---|---|---|
+| **D-5.2-08** | Evidence attachments | No `StoragePort` adapter exists anywhere in the repository, and `document_source` is a closed vocabulary with no `relations` value | A Documents contract decision, plus a storage adapter Platform or Documents owns |
+| **D-5.2-09** | Warning expiry (AD-006) | Expiry stays **derived**; a persisted expiry would need a sweep, and the job runner is Platform's and unbuilt (D-16E-03) | Either a named derived rule, or Platform's runner |
+| **D-5.2-10** | Payroll penalty intake (AD-004) | Payroll is pull-oriented and has **no inbound instruction seam**; creating one would invert an established boundary | Payroll deciding to consume a bounded Relations read |
+| **D-5.2-11** | Employment termination recommendation (AD-005) | Checkpoint 4 records `termination_recommendation` as **Relations' own record**, exactly as this decision recommended — but the *cross-module contract* was never opened. Confirmation is still needed that a recommendation creates no obligation in Employment, and whether Employment should consume a published read | An owner decision on the contract; no code change is implied by leaving it open |
+| **D-5.2-12** | Workflow approval of actions (AD-008) | Checkpoint 4 issues an action **directly**, with no approval step. `pending_approval` is asserted un-nameable, and Workflow is untouched | An owner decision to adopt Workflow's existing `subjectType` model |
+| **D-5.2-13** | Grievance confidentiality | *"The raiser can see their own grievance"* is **not implementable today** — ADR-0032 resolves a principal to a tenant membership, not an employment, so `read-own` is declared and enforced nowhere across ten modules | A repository-wide self-service routing capability |
+
+**D-5.2-11 and D-5.2-12 deserve the closest reading**, because Checkpoint 4 shipped code adjacent to
+both and neither was resolved by it. What Checkpoint 4 built is the *Relations-side* half each
+decision recommended: a recommendation recorded as this module's own fact, and an action issued
+without an approval step. What stays open in both cases is the **cross-module contract** — and it
+stays open because opening one was never authorized, not because the code is incomplete.
+
+# Closure verification · 2026-08-23
+
+Verified against the repository rather than against this register:
+
+| Claim | Evidence |
+|---|---|
+| Four checkpoints implemented | 19 handlers registered; 7 tables mapped in `schema.prisma` |
+| Four additive migrations | `20260822100000` · `20260823060000` · `20260823090000` · `20260823120000`, timestamps strictly ascending, none modified after the fact |
+| 29 migrations total, no drift | `prisma migrate status` — *"Database schema is up to date!"* |
+| RLS enabled **and forced** on all seven tables | `pg_class` query, one policy per table |
+| Five immutability triggers | violation · access event · case event · concluded investigation · issued action |
+| No client tenant, no `BYPASSRLS`, no wildcard, no fake actor | Source sweep — the only textual matches are comments explaining the absence |
+| No `.only`, no `any`, no lint suppressions | Source sweep, module-wide |
+| No other module absorbed | Whole-phase diff touches Workflow only in **one test file**, where a stale assertion was narrowed; Payroll, Employment, Documents, Letters, Identity, Platform and country-packs are untouched |
