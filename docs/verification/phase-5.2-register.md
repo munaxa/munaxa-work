@@ -45,8 +45,9 @@ given for them.
 | D-5.2-15 | How the violation lifecycle advances, given an immutable violation row | **APPROVED** 2026-08-23 | **resolved** |
 | D-5.2-16 | What an investigation is, and who may run one | **APPROVED** 2026-08-23 | **resolved** |
 | D-5.2-17 | Whether findings are immutable, and how a correction is made (AD-003) | **APPROVED** 2026-08-23 | **resolved** |
-| **D-5.2-18** | **Whether investigations need permissions of their own** | **OPEN** | no — Checkpoint 2 shipped without them |
-| **D-5.2-19** | **How a concluded investigation is corrected** | **OPEN** | no — deferred out of Checkpoint 2 |
+| **D-5.2-18** | **Whether investigations need permissions of their own** | **OPEN** · investigated 2026-08-23, recommendation **Option C** | no — does not block Checkpoint 3 |
+| **D-5.2-19** | **How a concluded investigation is corrected** | **OPEN** · investigated 2026-08-23, recommendation **Option D via C** | no — does not block Checkpoint 3 |
+| **D-5.2-20** | **The penalty ladder — whether a repeat count maps to a prescribed action** | **OPEN** | **no — deliberately outside Checkpoint 3** |
 
 All six of Checkpoint 1's blocking decisions are **APPROVED**, and none required a new architectural
 pattern: every one resolved onto a mechanism this repository already runs.
@@ -833,6 +834,74 @@ first appears.
 conclude an inquiry. If that is wrong for a customer, the fix is a new permission, which is additive
 and needs no data migration.
 
+### Checkpoint 3 investigation · 2026-08-23 — evidence, options, recommendation
+
+**The repository has one permission shape, and it is per-resource-per-capability.** Every sensitive
+module names `<module>.<resource>.<verb>`: Employment has thirteen across six resources, Identity
+seventeen across eight, Career twenty-one, Performance twenty-two, Payroll twelve. **No module in
+this repository shares one resource's permission with a second resource.** Relations is currently the
+only place where a resource — the investigation — has no permission naming it, and that is an
+inconsistency with the repository rather than a deliberate economy.
+
+**The decisive precedent is Documents, and it names this domain explicitly.**
+`documents-permissions.ts` separates `document.read`, `document.read-sensitive`, `document.download`
+and `document.audit` **within one resource**, on the reasoning that *"reading that a document exists
+is not reading it, and reading it is not downloading it"*. Its stated justification is Phase 4.1
+AD-007 — *"seeing an employee never implies seeing their medical or **disciplinary** attachments"* —
+and it enforces the split with `hiddenFromCaller`, a `PermissionChecker.holds` call applied **inside
+the query**, so a caller without the second permission *"neither receives a confidential document nor
+learns how many were withheld — a count is itself a disclosure."*
+
+**Applied here, that distinction is real and currently absent.** `relations.violation.read` today
+returns two materially different things: that an employment has a violation of a given category on a
+given date, and an investigator's free-text `findings` and `recommendation`. The second is the most
+sensitive text this module holds — a colleague's account of another colleague's conduct — and
+Documents' own argument is that the first does not imply the second.
+
+**Attendance is the counter-precedent, and it agrees.** Corrections there are not folded into the
+record permission: `attendance.correct.request` and `attendance.correct.approve` are separate from
+recording, because requesting a change and deciding one are different acts.
+
+| | Option A — reuse | Option B — full dedicated set | Option C — bounded capability split |
+|---|---|---|---|
+| **New permissions** | 0 | 4 (`investigation.read`, `.open`, `.conclude`, `.read-sensitive`) | **2** — `relations.investigation.conduct`, `relations.investigation.read-findings` |
+| **Blast radius** | Anyone who may file a report may conclude an inquiry | Four grants to configure for one capability | Two grants; violation permissions unchanged |
+| **Precedent** | None — no module does this | Employment/Identity granularity | **Documents `read-sensitive`; Attendance `correct.*`** |
+| **API** | No change | Four route-permission changes | Two: the two commands, and findings-bearing reads |
+| **RLS** | No change — RLS is tenancy, never capability | No change | **No change** (ADR-0030 unaffected) |
+| **Admin** | Nothing new to grant | Four rows in the permission screen | Two rows |
+| **Grievance/confidentiality future** | Nothing to build on | Over-specified before grievances exist | **`read-findings` is the seam D-5.2-13 will reuse** |
+| **Privilege escalation** | **Yes, latent** — record implies conclude | No | No |
+
+**On the "buys less than it appears" argument recorded above.** It is half right and I am correcting
+it rather than repeating it. Recording an allegation and concluding an inquiry are both consequential,
+but they are not the same risk: an allegation is a *claim* that an investigation can refute, whereas a
+conclusion is the finding a penalty is later justified by. Documents drew the line in exactly this
+place — existence versus content — and Relations currently does not.
+
+**Recommendation — Option C.** Two permissions, no framework, no role logic, no wildcard:
+
+* `relations.investigation.conduct` — open and conclude an inquiry. Replaces
+  `relations.violation.record` on the two commands.
+* `relations.investigation.read-findings` — required **in addition to** `relations.violation.read`
+  for any payload carrying `findings` or `recommendation`, applied inside the query in Documents'
+  shape, with a miss answering **not found** rather than forbidden.
+
+Everything else stays: case history and the investigation's existence remain under
+`relations.violation.read`, because where a case has got to is not the investigator's account of it.
+
+**Dependencies.** `RelationsDependencies` currently has **no `PermissionChecker`** — Checkpoint 1
+deliberately omitted it, noting *"a caller either may read a violation or may not, and the pipeline
+settles it before a handler runs."* Option C makes that no longer true and requires adding one, the
+same dependency Documents already carries. No other module is affected.
+
+**Risks.** Existing grants do not carry the new permissions, so a tenant upgrading finds investigation
+operations refused until an administrator grants them. Additive and reversible; no data migration.
+
+**Blocks Checkpoint 3: NO.** Checkpoint 3 as scoped introduces no investigation operation and no
+findings-bearing payload. Recommended before disciplinary actions, which is where a wrong grant first
+causes a penalty.
+
 ## D-5.2-19 — How a concluded investigation is corrected · **OPEN**
 
 **What Checkpoint 2 did.** Nothing. There is no `relations.correct-investigation` command, and the
@@ -848,3 +917,102 @@ database refuses it, which is correct under AD-003 — but AD-003's other half, 
 linked record with a stated reason"*, has no implementation yet. Until it does, a mistake in a
 concluded investigation's findings is uncorrectable, not merely unedited. That is the honest state of
 the module and the reason this decision is recorded rather than left implicit.
+
+### Checkpoint 3 investigation · 2026-08-23 — evidence, options, recommendation
+
+**This repository has corrected immutable records three times, and never once by updating one.**
+
+* **Letters.** `letter_issued` does not extend `Repository` at all, *"because somebody may be holding
+  a printed copy of this letter, and a register whose rows can be edited afterwards cannot answer for
+  what it issued. A correction is a **new** letter that supersedes this one."* Migration
+  `20260811150000_letter_issued_supersede_once` then narrowed the trigger so the supersession stamp is
+  **write-once in both directions** — *"a supersession pointer that can be moved afterwards lets
+  somebody rewrite which letter replaced which"* — and stated the principle this decision turns on:
+  *"The rule is narrowed rather than relaxed."*
+* **Payroll.** `payroll.reverse-approval`: *"A reversal is a **new row that names the decision it
+  undoes**. Neither row is deleted, and the chain reads as what actually happened — somebody approved,
+  somebody reversed it — rather than as though the first decision never occurred."* It appends at
+  `sequence = chain.length + 1`, the same shape `relation_case_event` already uses.
+* **Attendance.** A whole correction aggregate: request → decision by a named human → **a new event
+  that supersedes the original**. *"Applying a correction inserts an event; it never updates one. The
+  superseded event stays in the table, stays readable, and simply leaves the day's arithmetic."*
+
+| | A — UPDATE after conclusion | B — correction record superseding | C — new linked investigation | D — narrow correction command |
+|---|---|---|---|---|
+| Preserves evidence | **No** | Yes | Yes | Yes |
+| Rewrites history | **Yes** | No | No | No |
+| Prevents silent alteration | **No** | Yes | Yes | Yes |
+| Precedent | **None — contradicts three** | Letters | Letters/Attendance | Attendance |
+| Trigger change | Weakens it | Write-once pointer needed | **None** | **None** |
+| Reopens D-5.2-17 | **Yes** | Arguably | **No** | **No** |
+| Fits derived state | n/a | Partly — a stored pointer | **Yes** | **Yes** |
+
+**Option A is rejected on repository evidence, not on preference.** Three modules refuse it in three
+different aggregates, and D-5.2-17's approved text made the concluded row immutable.
+
+**B and C differ in one respect that matters here.** Letters uses a *forward* pointer
+(`superseded_by_id` on the original) because `letter_issued` has no ordering from which "which one is
+operative" could be derived. **Relations does.** It already derives current case state from an
+append-only sequence and stores no copy (D-5.2-16), and a forward pointer would be a stored fact that
+can disagree with the history — the second copy ADR-0070 warns about. A *backward* pointer on the
+correcting row needs no write to the corrected one, so **the concluded investigation is never touched
+and the Checkpoint 2 trigger does not change at all**.
+
+**Recommendation — Option D implemented as C.** One narrowly defined command,
+`relations.correct-investigation`, which inside one transaction:
+
+1. reads the concluded investigation being corrected and refuses if it is not concluded, is already
+   corrected, or belongs to another tenant;
+2. **inserts a new `relation_investigation` row** carrying `corrects_investigation_id`, its own
+   findings, recommendation and a **required** correction reason;
+3. **appends a `relation_case_event`** recording the correction, with actor, server timestamp and
+   reason, arbitrated by the existing `sequence` unique index.
+
+The corrected row is never updated, never deleted and never re-pointed. "Which conclusion is
+operative" is **derived** — the newest uncorrected investigation in the chain — exactly as current
+case state is. Concurrency needs no new mechanism: a partial unique index on
+`(tenant_id, corrects_investigation_id)` makes two simultaneous corrections of one conclusion resolve
+the way two simultaneous transitions already do (ADR-0071).
+
+**Dependencies.** One nullable self-referencing column and one partial unique index. **No change to
+`relation_violation`, `relation_case_event`, or either existing trigger**, so D-5.2-03, D-5.2-15,
+D-5.2-16 and D-5.2-17 all stand untouched. A new `findings` case state is *not* required — a
+correction replaces a conclusion's content, it does not move the case.
+
+**Risks.** A correction chain can grow without bound; mitigated by refusing to correct an
+already-corrected row, so the chain is linear. The word "correction" must not become a rewrite route
+for an inconvenient finding — hence the required reason and the audited, immutable case event.
+
+**Blocks Checkpoint 3: NO.** Checkpoint 3 as scoped neither concludes nor corrects an investigation.
+It should be approved before the disciplinary actions that rely on a conclusion being right.
+
+
+## D-5.2-20 — The penalty ladder: whether a repeat count maps to a prescribed action · **OPEN**
+
+*Opened by the Checkpoint 3 investigation, 2026-08-23. Not taken.*
+
+**The evidence that opened it.** `relation_violation_category` has carried `repeat_window_days` since
+Checkpoint 1, and a scan of the module shows it reaching the domain, the view and the DTO **and being
+read by no logic anywhere** — it appears only in mapping and configuration paths, never in a
+comparison, a count or a predicate. Checkpoint 1 said so at the time: *"Configuration; **nothing
+counts with it yet**."* That is the ADR-0070 shape — *"a stored flag that nothing maintains is worse
+than no flag"* — and Checkpoint 3 exists to close it.
+
+**The decision, stated narrowly.** The specification's `ViolationCategory` includes a *"penalty
+ladder"*. Counting prior violations inside the configured window and **prescribing what the third one
+attracts** are two different capabilities:
+
+* the **count** is a fact derived from records this module already holds;
+* the **ladder** is a rule that names disciplinary action types — a vocabulary this module does not
+  have, whose legal validity is jurisdiction-specific, and which AD-004 and AD-005 connect to Payroll
+  and Employment.
+
+**Checkpoint 3 builds the count and not the ladder**, and this decision records why that line was
+drawn rather than leaving the omission to be read as an oversight. A ladder built now would either
+invent disciplinary action types before the checkpoint that owns them, or hard-code a jurisdiction's
+progression — which D-5.2-06 forbids and Phase 11.1 owns.
+
+**Recommendation.** Take this decision *with* the disciplinary-actions checkpoint, not before it: the
+ladder's output is an action, and a rule whose output does not exist yet cannot be specified honestly.
+
+**Blocks Checkpoint 3: NO** — Checkpoint 3 is scoped to exclude it deliberately.
