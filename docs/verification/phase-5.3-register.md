@@ -49,6 +49,7 @@ Checkpoint 1.
 | D-5.3-08 | Whether a direct transfer is its own authority | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
 | D-5.3-09 | Whether an asset in open custody may be retired | **APPROVED 2026-08-23 · IMPLEMENTED** | n/a — opened later |
 | D-5.3-10 | Whether custody may be cancelled or corrected | **OPEN** *(opened at Checkpoint 2)* | n/a — opened later |
+| D-5.3-11 | Whether Assets learns that an employment has ended by subscription | **SETTLED BY EXISTING EVIDENCE** *(opened at Checkpoint 3)* | n/a — opened later |
 
 **Checkpoint 1 depended on no open decision, and the implementation kept it that way.** The condition
 scale was excluded from the catalogue precisely so D-5.3-05 would not be answered by accident, and no
@@ -623,10 +624,87 @@ made twice.
 
 ---
 
+# Decision opened by the Checkpoint 3 investigation
+
+---
+
+## D-5.3-11 — Whether Assets learns that an employment has ended by subscription · **SETTLED BY EXISTING EVIDENCE**
+
+### The question
+
+Checkpoint 2 implemented no termination behaviour, and the register recorded that this was the *absence*
+of behaviour rather than a choice. The Checkpoint 3 authorization put the choice explicitly: **Option A**
+— Assets subscribes to an existing Employment contract and reacts to an employment ending; **Option B** —
+Assets keeps custody independent of termination and answers through reads when somebody asks.
+
+This decision settles the **mechanism** only. It does **not** settle what *should* happen to a custody
+whose employment has ended — that is D-5.3-01, it is a business rule, and it stays OPEN.
+
+### Why this is settled rather than open
+
+**Option A is reachable, which is why the refusal has to be a real one.** The mechanism exists:
+`EventHandler` (`packages/kernel/src/persistence/unit-of-work.ts:43`), `InProcessEventDispatcher`
+(`packages/kernel/src/domain/in-process-dispatcher.ts`), and `ModuleRegistry.eventHandlers`. Employment
+already raises the event: `EmploymentEvents.employmentEnded = 'employment.employment.ended'`
+(`packages/modules/employment/src/domain/employment-events.ts:35`), raised at
+`packages/modules/employment/src/domain/employment.ts:195`. Nothing is missing.
+
+**But no module in this repository subscribes to another module's event.** The only `EventHandler` that
+exists is `onMembershipEnded`
+(`packages/modules/identity/src/application/on-membership-ended.ts`, registered at
+`identity-module.ts:70`), and it is Identity reacting to Identity's own event — *intra*-module. Eight
+module declarations state the rule in their own words.
+
+**`EmploymentEvents` is not exported from Employment's contract.**
+`packages/modules/employment/src/contracts/index.ts` publishes views, statuses and transitions, and no
+event name. A subscriber would have to reach past the file whose entire purpose is to be the only thing
+consumers depend on.
+
+**Three ADRs answer the question directly, and they agree.**
+
+- **ADR-0050** states the delivery facts as verified properties of `PostgresUnitOfWork`: commit then
+  dispatch, in-process, no broker, no retry, **no outbox**, no replay — and *"no published event contract
+  and no cross-module subscription contract."* Its conclusion: an event is at-most-once, and that it was
+  raised is not evidence anything happened.
+- **ADR-0058** is the closest structural analogue — a downstream module needing an upstream change. It
+  refuses the push design: *"The dependency points one way, and the module that needs the information
+  asks for it,"* and refuses a stored cursor with it: *"No cursor table, no feed, no subscription."*
+- **ADR-0053** supplies the positive half: *"Reconciliation is a first-class query … the count is on the
+  administrator's dashboard rather than in an operations script. It is the number that reveals a failure,
+  and a number a human can see is a number a human notices growing."*
+
+**What Option A would cost here specifically.** Automatic custody closure driven by the ended event means
+a process that restarts mid-dispatch leaves an asset permanently recorded as held by somebody who has
+left, with nothing able to replay the event and nothing recording that it was owed. The failure is silent
+and unrecoverable by design, and the subject is company property.
+
+### Settled position
+
+Assets does not subscribe to any event, consumes no Employment event, closes no custody automatically,
+and schedules nothing. It answers when it is asked. Whichever way D-5.3-01 is later settled, the trigger
+will be a command or a read — never a subscription.
+
+Checkpoint 3 implements the ADR-0053 half of this: custody ageing and an aggregate outstanding summary,
+both derived, so the situation is **visible** without anything reacting to it.
+
+### What this decision does not do
+
+It does not decide D-5.3-01, and Checkpoint 3's reads are built so they cannot decide it by accident:
+the custody reads never ask Employment anything, so a custody held by an ended employment ages exactly
+like one held by an active employment. Options (a) and (c) of D-5.3-01 both remain reachable, and each
+still costs one migration.
+
+### Blocking
+
+Blocks nothing. It removes a question from Checkpoint 4's path rather than adding one.
+
+---
+
 ## Change log
 
 | Date | Change |
 |---|---|
+| 2026-08-24 | **Checkpoint 3 investigation and implementation.** **D-5.3-11 opened and settled by existing evidence** — Assets does not subscribe to Employment; ADR-0050, ADR-0058 and ADR-0053 answer it, and the repository's only `EventHandler` is intra-module. **D-5.3-01 remains OPEN and undecided**, and the new reads are built so they cannot decide it by accident. D-5.3-03, D-5.3-05, D-5.3-07, D-5.3-08 and D-5.3-10 remain OPEN and untouched; D-5.3-02, D-5.3-04, D-5.3-06 and D-5.3-09 were not reopened or weakened. Checkpoint 3 added **no table, no column, no migration and no permission**. |
 | 2026-08-23 | **Checkpoint 2 implemented.** One table, two commands, two reads, three permissions, one additive migration, one cross-module read that creates no contract. **D-5.3-09 approved and implemented**; D-5.3-01, D-5.3-03, D-5.3-05, D-5.3-07, D-5.3-08 and D-5.3-10 all remain **OPEN and untouched**, and no settled decision was reopened. Seven negative-space assertions became stale because the approved capability genuinely changed the boundary; each was **replaced with a more exact statement**, none deleted. |
 | 2026-08-23 | **Checkpoint 2 investigation.** Four decisions opened — D-5.3-07 (active versus existing employment), D-5.3-08 (transfer authority), D-5.3-09 (retirement while in custody), D-5.3-10 (correction and cancellation). **None approved.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged. A shipped Relations defect was found and recorded rather than fixed. Checkpoint 2 confirmed to be blocked by no decision; D-5.3-09 is a behaviour the owner should confirm at authorization. |
 | 2026-08-23 | **Checkpoint 1 implemented.** Two tables, five commands, three reads, four permissions, one additive migration, zero cross-module dependencies. **No decision approved, none reopened.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged; the recommendations for D-5.3-01 and D-5.3-05 are documented and were **not** turned into behaviour or into columns. |
