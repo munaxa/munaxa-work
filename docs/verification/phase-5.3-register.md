@@ -1,11 +1,12 @@
 # Phase 5.3 — Assets & Custody · Decision Register
 
-## Status: **CHECKPOINTS 1 AND 2 IMPLEMENTED** · Checkpoints 3–4 not started
+## Status: **CHECKPOINTS 1, 2 AND 3 IMPLEMENTED** · Checkpoint 4 not started
 
 *Opened 2026-08-23 against `3ad9fd7` (`main`, immediately after Phase 5.2 merged as PR #14).
 Checkpoint 1 implemented 2026-08-23 — see
 [`phase-5.3-checkpoint-1.md`](./phase-5.3-checkpoint-1.md). Checkpoint 2 implemented the same day —
-see [`phase-5.3-checkpoint-2.md`](./phase-5.3-checkpoint-2.md).*
+see [`phase-5.3-checkpoint-2.md`](./phase-5.3-checkpoint-2.md). Checkpoint 3 implemented 2026-08-24 —
+see [`phase-5.3-checkpoint-3.md`](./phase-5.3-checkpoint-3.md).*
 
 > **Historical note · the register when it opened.** The paragraph below was true when this register
 > was written and is preserved rather than rewritten: *"Nothing in Phase 5.3 is implemented. There is
