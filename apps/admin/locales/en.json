@@ -60,7 +60,8 @@
       "assets": "Assets in custody",
       "boundaries": "What this record does not show",
       "notFound": "No employment with this identifier was returned.",
-      "backToDirectory": "Back to the workforce directory"
+      "backToDirectory": "Back to the workforce directory",
+      "nothingReadable": "Nothing on this record could be read."
     },
     "notice": {
       "readOnly": "This portal reads; it writes nothing. Every change is an API capability the server decides.",
@@ -79,7 +80,8 @@
       "personId": "Person",
       "asOf": "As at",
       "empty": "Nothing to show.",
-      "unavailable": "Unavailable."
+      "unavailable": "Unavailable.",
+      "notResolved": "Not resolved"
     }
   }
 }

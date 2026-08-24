@@ -10,7 +10,7 @@ import type {
   ReportingLineView,
 } from '@work/employment/contracts';
 import type { LearningHistoryView } from '@work/learning/contracts';
-import type { LeaveBalanceView } from '@work/leave/contracts';
+import type { LeaveBalanceView, LeaveTypeView } from '@work/leave/contracts';
 import type { IssuedLetterView } from '@work/letters/contracts';
 import type { PersonProfileView } from '@work/people/contracts';
 import type { ViolationView } from '@work/relations/contracts';
@@ -104,11 +104,28 @@ export interface EmployeeRecord {
   readonly documents: readonly DocumentView[] | undefined;
   readonly letters: readonly IssuedLetterView[] | undefined;
   readonly balances: readonly LeaveBalanceView[] | undefined;
+  /**
+   * The tenant's leave types, so a balance can say which leave it is.
+   *
+   * A balance carries `leaveTypeId` and no name, and two balances in the same leave year are
+   * otherwise two identical rows with different numbers. The list is the tenant's own configuration
+   * — a handful of rows, not a table that grows with the workforce — and Leave publishes it.
+   */
+  readonly leaveTypes: readonly LeaveTypeView[] | undefined;
   readonly attendanceDays: readonly AttendanceDayView[] | undefined;
   readonly career: CareerSummaryView | undefined;
   readonly learning: LearningHistoryView | undefined;
   readonly violations: readonly ViolationView[] | undefined;
   readonly clearance: AssetClearanceView | undefined;
+  /**
+   * The manager's name, when the reporting line names one and the caller may read them.
+   *
+   * The only cross-module identifier this record resolves to a name, because it is the only one an
+   * existing bounded read answers: `GET /employments/:id` returns `personName` when the caller may
+   * see the person. A unit and a position need a lookup by identifier that Organization publishes
+   * no route for, so those stay identifiers and the screen says why.
+   */
+  readonly managerName: Readonly<Record<string, string>> | undefined;
 }
 
 /**
@@ -116,7 +133,7 @@ export interface EmployeeRecord {
  *
  * Every other read is keyed on an employment that exists, so asking for twelve more things about
  * an identifier the API would not resolve is twelve refusals to render nothing with. It also keeps
- * the "no such employment" page a single round trip rather than thirteen.
+ * the "no such employment" page a single round trip rather than fifteen.
  */
 export const loadEmployment = async (
   employmentId: string,
@@ -127,7 +144,7 @@ export const loadEmployment = async (
 /**
  * Everything else, in one round of parallel requests.
  *
- * Issued together rather than in sequence: twelve requests one after another is twelve times the
+ * Issued together rather than in sequence: fourteen requests one after another is fourteen times the
  * latency for a page that needs all of them before it renders. The page budget is two seconds and
  * a serial chain would spend it on waiting.
  */
@@ -146,11 +163,13 @@ export const loadRecord = async (
     documents,
     letters,
     balances,
+    leaveTypes,
     attendanceDays,
     career,
     learning,
     violations,
     clearance,
+    manager,
   ] = await Promise.all([
     read<PersonProfileView>(`/people/${employment.personId}/profile${dated}`),
     items<AssignmentView>(`/employments/${id}/assignments`),
@@ -159,11 +178,17 @@ export const loadRecord = async (
     items<DocumentView>(`/documents?ownerType=employment&ownerId=${id}&size=${RECENT}`),
     items<IssuedLetterView>(`/letters/issued?employmentId=${id}&size=${RECENT}`),
     items<LeaveBalanceView>(`/leave/balances?employmentId=${id}&limit=${RECENT}`),
+    items<LeaveTypeView>('/leave/types'),
     items<AttendanceDayView>(`/attendance/days?employmentId=${id}&size=${RECENT}`),
     read<CareerSummaryView>(`/career/summary/${id}`),
     read<LearningHistoryView>(`/learning/history/${id}`),
     items<ViolationView>(`/relations/violations?employmentId=${id}&pageSize=${RECENT}`),
     read<AssetClearanceView>(`/assets/custody/clearance?employmentId=${id}`),
+    // The manager, by employment. Asked only when there is one to ask about: an employment with no
+    // manager must not cost a request, and `undefined` in means `undefined` out.
+    employment.managerEmploymentId === undefined
+      ? Promise.resolve(undefined)
+      : read<EmploymentView>(`/employments/${employment.managerEmploymentId}${dated}`),
   ]);
 
   return {
@@ -175,10 +200,12 @@ export const loadRecord = async (
     documents,
     letters,
     balances,
+    leaveTypes,
     attendanceDays,
     career,
     learning,
     violations,
     clearance,
+    managerName: manager?.personName,
   };
 };

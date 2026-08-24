@@ -53,10 +53,10 @@ const LeavePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
   const leave = await loadLeave();
 
   return (
-    <main
+    <div
       dir={directionOf(language)}
       lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
+      className="mx-auto flex max-w-4xl flex-col gap-6 p-8"
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('leave.label.leave')}</h1>
@@ -78,7 +78,7 @@ const LeavePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
       <TypesSection t={t} language={language} types={leave.types} />
       <PoliciesSection t={t} language={language} policies={leave.policies} />
       <BoundariesSection t={t} language={language} />
-    </main>
+    </div>
   );
 };
 

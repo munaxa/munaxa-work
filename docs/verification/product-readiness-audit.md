@@ -278,9 +278,18 @@ there are no actions.
 ### 4.14 Workflow clarity
 
 Approvals are visible as data (`/workflow` lists instances, steps, decisions, history, service
-levels, escalation) and are **not** visible as work. There is no "waiting for me" queue on any
-screen, no badge, no notification, and no way to decide anything. `GET /workflow/approvals/pending`
-— the first routed and enforced `read-own` in the product — has **no screen at all**.
+levels, escalation) and are **not** visible as work. There is no "waiting for me" destination, no
+badge, no notification, and no way to decide anything.
+
+> **Correction, 2026-08-24.** This section originally said `GET /workflow/approvals/pending` — the
+> first routed and enforced `read-own` in the product — *"has no screen at all"*. **That is wrong.**
+> The Approvals slice investigation found `PendingSection` and `DecidedSection` in
+> `apps/admin/src/workflow/approvals.tsx`, both consuming the real queues, both rendered by
+> `/workflow`. The finding is corrected rather than removed because it changes the shape of the
+> P1-1 backlog item: the work is not building a queue that does not exist, it is **promoting a
+> queue that exists from one section of a fourteen-section administration page into its own
+> destination, with an instance detail behind it**. See
+> [`slice-approvals-as-work.md`](slice-approvals-as-work.md).
 
 ### 4.15 The highest-impact UX problems, ranked
 
@@ -351,7 +360,7 @@ Classification: **usable** (a person can complete the task in the product) · **
 | 12 | **Leave** | **partially usable** | 32 | 14 | dashboard + types/policies | No request list, no balance screen, no calendar, no approval screen |
 | 13 | **Payroll** | **partially usable** | 28 | 14 | dashboard + one approval chain + one payslip | No run list a user can open, no result browsing, no per-employee payslip |
 | 14 | **Compensation** | **partially usable** | 36 | 14 | dashboard + configuration | No per-employee compensation screen |
-| 15 | **Workflow** | **partially usable** | 23 | 9 | 5 read-only sections | Instances, steps, history, service levels, escalation are visible. **`GET /workflow/approvals/pending` — the routed `read-own` queue — has no screen** |
+| 15 | **Workflow** | **partially usable** | 23 | 9 | 14 read-only sections on one page | Instances, steps, history, service levels, escalation, groups, branches **and both `read-own` queues** are visible — all on a single administration screen, with no detail route and no way to decide. Corrected 2026-08-24; see §4.14 |
 | 16 | **Performance** | **partially usable** | 49 | 23 | configuration + one review | Largest module by tables; smallest screen relative to it |
 | 17 | **Relations** | **backend-only** | 19 | 7 | **none** | Phase 5.2 shipped four checkpoints and no screen |
 | 18 | **Assets** | **backend-only** | 14 | 3 | **none** | Phase 5.3 shipped four checkpoints and no screen. `/assets` is declared in navigation and does not exist |
@@ -581,7 +590,9 @@ column contradicts its own narrative for eight phases.
 
 **P1-1 · Approvals as work** — the "waiting for me" queue, instance detail, decision history and
 service-level state, on a screen. *Module*: `apps/admin` + `workflow`. *UI*: queue, badge, detail.
-*Backend*: none — `GET /workflow/approvals/pending` is routed and enforced. *Dependencies*: P0-1,
+*Backend*: none — `GET /workflow/approvals/pending` is routed, enforced and already consumed by one
+section of `/workflow`; the work is promoting it to its own destination with a detail behind it.
+*Dependencies*: P0-1,
 and a decision on rendering it while `read-own` cannot resolve a caller. *Reuse*: five existing
 reads. *Reason*: approvals are the spine of the benchmark product and the one place the engine's
 depth becomes visible.

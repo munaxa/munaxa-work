@@ -7,26 +7,27 @@ import type { Language } from '../shell/locale';
 import {
   Cell,
   DASH,
-  Empty,
   Fact,
   Facts,
   Identifier,
+  NothingToShow,
+  RecordSection,
   Row,
   Rows,
-  Section,
   Withheld,
   orDash,
   type SectionProps,
 } from './record-frame';
+import { nameIn } from './locale';
 import { dayOf, short, textIn } from './record-locale';
 import type { EmployeeRecord } from './record-api';
 
 /**
- * Who this person is, and what their employment is — the two facts every other section hangs off.
+ * Who this person is, where they sit, and what they signed.
  *
  * **Identity is People's and employment is Employment's, and they stay that way.** The record shows
- * them side by side because that is what a reader needs; nothing here merges them into one object,
- * and the person's identifier and the employment's identifier are both on the page because they are
+ * them together because that is what a reader needs; nothing here merges them into one object, and
+ * the person's identifier and the employment's identifier are both available because they are
  * different things and an administrator raising a support call needs the right one.
  *
  * **Sensitive fields are the API's decision, not this screen's.** `PersonView` carries
@@ -47,7 +48,7 @@ const Identity = ({
   const withheld = person.sensitiveWithheld || profile.withheld.length > 0;
 
   return (
-    <Section title={t('admin.record.identity')}>
+    <RecordSection title={t('admin.record.identity')}>
       <Facts>
         <Fact
           label={t('people.label.legalName')}
@@ -56,15 +57,17 @@ const Identity = ({
         <Fact label={t('people.label.personNumber')} value={person.personNumber} />
         <Fact label={t('people.label.status')} value={t(`people.status.${person.status}`)} />
         <Fact label={t('admin.label.personId')} value={short(person.personId)} />
-        <Fact label={t('admin.label.asOf')} value={person.asOf} />
+        <Fact label={t('people.label.asOf')} value={person.asOf} />
         <Fact
           label={t('people.label.nationalities')}
           value={orDash(profile.nationalities?.length)}
         />
       </Facts>
 
-      {withheld ? <p className="text-xs opacity-70">{t('people.hint.sensitiveWithheld')}</p> : null}
-    </Section>
+      {withheld ? (
+        <p className="text-xs text-muted-foreground">{t('people.hint.sensitiveWithheld')}</p>
+      ) : null}
+    </RecordSection>
   );
 };
 
@@ -82,31 +85,6 @@ export const IdentitySection = ({
     <Identity t={t} language={language} profile={record.profile} />
   );
 
-export const EmploymentSection = ({
-  t,
-  record,
-}: SectionProps & { readonly record: EmployeeRecord }): ReactNode => {
-  const employment = record.employment;
-
-  if (employment === undefined) return <Withheld t={t} title={t('admin.record.employment')} />;
-
-  return (
-    <Section title={t('admin.record.employment')}>
-      <Facts>
-        <Fact label={t('employment.label.employmentNumber')} value={employment.employmentNumber} />
-        <Fact
-          label={t('employment.label.status')}
-          value={t(`employment.status.${employment.status}`)}
-        />
-        <Fact label={t('employment.label.employmentType')} value={employment.employmentTypeCode} />
-        <Fact label={t('employment.label.originalHireDate')} value={employment.originalHireDate} />
-        <Fact label={t('employment.label.startDate')} value={employment.startDate} />
-        <Fact label={t('employment.label.endDate')} value={orDash(employment.endDate)} />
-      </Facts>
-    </Section>
-  );
-};
-
 const AssignmentRows = ({
   t,
   assignments,
@@ -120,13 +98,14 @@ const AssignmentRows = ({
       t('employment.label.effectiveFrom'),
       t('employment.label.effectiveTo'),
     ]}
+    numeric={[3]}
   >
     {assignments.map((assignment) => (
       <Row key={assignment.assignmentId}>
         <Cell>{t(`employment.assignmentType.${assignment.assignmentType}`)}</Cell>
         <Identifier value={short(assignment.unitId)} />
         <Identifier value={short(assignment.positionId)} />
-        <Cell>{assignment.fte}</Cell>
+        <Cell numeric>{assignment.fte}</Cell>
         <Cell>{dayOf(assignment.effectiveFrom)}</Cell>
         <Cell>{dayOf(assignment.effectiveTo)}</Cell>
       </Row>
@@ -137,7 +116,11 @@ const AssignmentRows = ({
 const ReportingRows = ({
   t,
   lines,
-}: SectionProps & { readonly lines: readonly ReportingLineView[] }): ReactNode => (
+  managerName,
+}: SectionProps & {
+  readonly lines: readonly ReportingLineView[];
+  readonly managerName: string | undefined;
+}): ReactNode => (
   <Rows
     headings={[
       t('employment.label.lineType'),
@@ -149,7 +132,7 @@ const ReportingRows = ({
     {lines.map((line) => (
       <Row key={line.reportingLineId}>
         <Cell>{t(`employment.lineType.${line.lineType}`)}</Cell>
-        <Identifier value={short(line.managerEmploymentId)} />
+        <Cell>{managerName ?? short(line.managerEmploymentId)}</Cell>
         <Cell>{dayOf(line.effectiveFrom)}</Cell>
         <Cell>{dayOf(line.effectiveTo)}</Cell>
       </Row>
@@ -160,15 +143,20 @@ const ReportingRows = ({
 /**
  * Where this employment sits, and who it reports to — both **as at a date**, never "now".
  *
- * The unit, the position and the manager are shown as identifiers. Resolving a unit to a name is
- * Organization's read behind Organization's permission and resolving a manager to a person is
- * People's; this section has asked for neither, and the notice under the tables says exactly that
- * rather than leaving a reader to conclude the data is missing.
+ * The manager is a name, because Employment publishes a bounded read for one employment and that
+ * read carries the person's name when the caller may see it. The unit and the position are not:
+ * resolving either needs a lookup by identifier that Organization does not publish, so the record
+ * shows the identifier and the notice under the tables says exactly why rather than leaving a
+ * reader to conclude the data is missing.
  */
 export const PlacementSection = ({
   t,
+  language,
   record,
-}: SectionProps & { readonly record: EmployeeRecord }): ReactNode => {
+}: SectionProps & {
+  readonly language: Language;
+  readonly record: EmployeeRecord;
+}): ReactNode => {
   const assignments = record.assignments;
   const lines = record.reportingLines;
 
@@ -177,11 +165,11 @@ export const PlacementSection = ({
   }
 
   return (
-    <Section title={t('admin.record.placement')}>
+    <RecordSection title={t('admin.record.placement')}>
       <AssignmentRows t={t} assignments={assignments ?? []} />
-      <ReportingRows t={t} lines={lines ?? []} />
-      <p className="text-xs opacity-70">{t('admin.notice.identifiersNotNames')}</p>
-    </Section>
+      <ReportingRows t={t} lines={lines ?? []} managerName={nameIn(record.managerName, language)} />
+      <p className="text-xs text-muted-foreground">{t('admin.notice.identifiersNotNames')}</p>
+    </RecordSection>
   );
 };
 
@@ -221,11 +209,11 @@ export const ContractsSection = ({
   const contracts = record.contracts;
 
   if (contracts === undefined) return <Withheld t={t} title={t('admin.record.contracts')} />;
-  if (contracts.length === 0) return <Empty t={t} title={t('admin.record.contracts')} />;
+  if (contracts.length === 0) return <NothingToShow t={t} title={t('admin.record.contracts')} />;
 
   return (
-    <Section title={t('admin.record.contracts')}>
+    <RecordSection title={t('admin.record.contracts')}>
       <ContractRows t={t} contracts={contracts} />
-    </Section>
+    </RecordSection>
   );
 };

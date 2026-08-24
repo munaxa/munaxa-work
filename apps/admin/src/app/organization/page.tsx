@@ -43,10 +43,10 @@ const OrganizationPage = async ({ searchParams }: PageProps): Promise<ReactNode>
   const organization = await loadOrganization(asOf);
 
   return (
-    <main
+    <div
       dir={directionOf(language)}
       lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
+      className="mx-auto flex max-w-4xl flex-col gap-6 p-8"
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('organization.label.structure')}</h1>
@@ -64,7 +64,7 @@ const OrganizationPage = async ({ searchParams }: PageProps): Promise<ReactNode>
       <UnitTypesSection t={t} language={language} unitTypes={organization.unitTypes} />
       <LegalEntitiesSection t={t} language={language} legalEntities={organization.legalEntities} />
       <SettingsSection t={t} settings={organization.settings} />
-    </main>
+    </div>
   );
 };
 

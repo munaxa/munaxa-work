@@ -134,11 +134,47 @@ describe('reading one employee', () => {
 
     await loadRecord(anEmployment());
 
-    expect(asked).toHaveLength(12);
+    // Thirteen: the employment's own facts, the operational modules, and the tenant's leave types.
+    // The manager is the fourteenth and is not among them, because this employment names none.
+    expect(asked).toHaveLength(13);
     const other = '01900000-0000-7000-8000-00000000e002';
     for (const url of asked) expect(url).not.toContain(other);
     // The person's own read is keyed on the person; every other read is keyed on the employment.
     expect(asked.filter((url) => url.includes('00000000p001'))).toHaveLength(1);
+  });
+
+  /**
+   * The manager costs a request only when there is a manager.
+   *
+   * An employment with no reporting line is the ordinary case for the top of an organization, and
+   * spending a round trip to be told so on every one of those records is latency for nothing.
+   */
+  it('asks about the manager only when the employment names one', async () => {
+    const manager = '01900000-0000-7000-8000-00000000e002';
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', (input: string) => {
+      asked.push(input);
+      return Promise.resolve(new Response('', { status: 401 }));
+    });
+
+    await loadRecord({ ...anEmployment(), managerEmploymentId: manager });
+
+    expect(asked).toHaveLength(14);
+    expect(asked.filter((url) => url.includes(manager))).toHaveLength(1);
+  });
+
+  it('resolves the manager to a name, and only the manager', async () => {
+    const manager = '01900000-0000-7000-8000-00000000e002';
+    answerOnly(`/api/v1/employments/${manager}`, {
+      ...anEmployment(),
+      personName: { en: 'Omar Nasser', ar: 'عمر ناصر' },
+    });
+
+    const record = await loadRecord({ ...anEmployment(), managerEmploymentId: manager });
+
+    expect(record.managerName).toEqual({ en: 'Omar Nasser', ar: 'عمر ناصر' });
+    // Nothing else was resolved to a name: a unit and a position have no bounded read by identifier.
+    expect(record.assignments).toBeUndefined();
   });
 
   it('never caches a page of one named person’s data', async () => {

@@ -44,7 +44,7 @@ export default async function DocumentsPage({
   const props = { t, language };
 
   return (
-    <main dir={directionOf(language)} className="flex flex-col gap-6 p-8">
+    <div dir={directionOf(language)} className="flex flex-col gap-6 p-8">
       <h1 className="text-2xl font-medium">{t('documents.label.documents')}</h1>
 
       <TypesSection {...props} types={documents.types} />
@@ -63,6 +63,6 @@ export default async function DocumentsPage({
       />
       <AuditSection {...props} trail={documents.trail} withheld={documents.trailWithheld} />
       <FindingsSection {...props} findings={documents.findings} />
-    </main>
+    </div>
   );
 }

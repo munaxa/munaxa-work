@@ -628,7 +628,12 @@ direction, the four gates, negative-space tests and ADRs.
 
 | # | Slice | Record | Status |
 |---|---|---|---|
-| 1 | **The Employee Record** — an application shell for the Admin portal, and a cross-module employee directory and profile composing eleven modules | [`verification/employee-record-slice.md`](verification/employee-record-slice.md) | Delivered 2026-08-24 |
+| 1 | **The Employee Record** — an application shell for the Admin portal, and a cross-module employee directory and profile composing eleven modules | [`verification/employee-record-slice.md`](verification/employee-record-slice.md) · verified and refined in [`verification/employee-record-verification.md`](verification/employee-record-verification.md) | Delivered and verified 2026-08-24 |
+| 2 | **Approvals as Work** — the caller's own approval queue as its own destination, and an approval detail behind it | [`verification/slice-approvals-as-work.md`](verification/slice-approvals-as-work.md) | **Investigated · Definition of Ready met · awaiting authorization** |
+
+The Employee Record is the **visual and product reference** for every screen that follows; what a
+later screen should copy from it is §7 of
+[`verification/employee-record-verification.md`](verification/employee-record-verification.md).
 
 The backlog the audit produced — P0 through P3 — is [§13 of the audit](verification/product-readiness-audit.md).
 The one question that needs an owner, and the only thing blocking every write surface in the

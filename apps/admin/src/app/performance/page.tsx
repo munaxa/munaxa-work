@@ -65,7 +65,7 @@ export default async function PerformancePage({
   const props = { t, language };
 
   return (
-    <main dir={directionOf(language)} className="flex flex-col gap-6 p-8">
+    <div dir={directionOf(language)} className="flex flex-col gap-6 p-8">
       <h1 className="text-2xl font-medium">{t('performance.label.performance')}</h1>
 
       <OverviewSection
@@ -83,7 +83,7 @@ export default async function PerformancePage({
       <Outcomes {...props} performance={performance} />
 
       <UnavailableSection {...props} />
-    </main>
+    </div>
   );
 }
 

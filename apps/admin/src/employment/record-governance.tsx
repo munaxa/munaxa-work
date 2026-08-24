@@ -5,12 +5,14 @@ import type { ViolationView } from '@work/relations/contracts';
 
 import {
   Cell,
-  Empty,
   Fact,
   Facts,
+  Isolated,
+  NothingToShow,
+  RecordSection,
   Row,
   Rows,
-  Section,
+  Status,
   Withheld,
   orDash,
   type SectionProps,
@@ -28,6 +30,12 @@ import type { EmployeeRecord } from './record-api';
  * a caller who may not read one meets a withheld section rather than an empty list — because an
  * empty disciplinary section reads as "this person has a clean record", which is a statement this
  * screen must never make on a refusal.
+ *
+ * **The severity is the tenant's word and the state is the module's.** `severity` is deliberately
+ * not a closed set — a tenant chooses its own grades — so it is rendered as stored and never
+ * translated, and nothing here orders by it. `state` *is* one of Relations' closed vocabularies and
+ * the module ships it in both languages, so it is translated: an Arabic reader meeting `reported`
+ * in Latin is a translation this product owes them.
  *
  * **`occurrence` is the module's derived ordinal, and nothing here acts on it.** What a repeat
  * *produces* is still an open decision (D-5.2-20), so the record shows the number where the module
@@ -56,14 +64,23 @@ const ViolationRows = ({
       t('relations.label.state'),
       t('relations.label.occurrence'),
     ]}
+    numeric={[4]}
   >
     {violations.map((violation) => (
       <Row key={violation.violationId}>
-        <Cell>{violation.occurredOn}</Cell>
-        <Cell>{violation.categoryCode}</Cell>
-        <Cell>{violation.severity}</Cell>
-        <Cell>{violation.state}</Cell>
-        <Cell>{orDash(violation.occurrence)}</Cell>
+        <Cell>
+          <Isolated>{violation.occurredOn}</Isolated>
+        </Cell>
+        <Cell>
+          <Isolated>{violation.categoryCode}</Isolated>
+        </Cell>
+        <Cell>
+          <Isolated>{violation.severity}</Isolated>
+        </Cell>
+        <Cell>
+          <Status tone="muted">{t(`relations.state.${violation.state}`)}</Status>
+        </Cell>
+        <Cell numeric>{orDash(violation.occurrence)}</Cell>
       </Row>
     ))}
   </Rows>
@@ -76,12 +93,12 @@ export const RelationsSection = ({
   const violations = record.violations;
 
   if (violations === undefined) return <Withheld t={t} title={t('admin.record.relations')} />;
-  if (violations.length === 0) return <Empty t={t} title={t('admin.record.relations')} />;
+  if (violations.length === 0) return <NothingToShow t={t} title={t('admin.record.relations')} />;
 
   return (
-    <Section title={t('admin.record.relations')}>
+    <RecordSection title={t('admin.record.relations')}>
       <ViolationRows t={t} violations={violations} />
-    </Section>
+    </RecordSection>
   );
 };
 
@@ -89,32 +106,50 @@ const Custody = ({
   t,
   clearance,
 }: SectionProps & { readonly clearance: AssetClearanceView }): ReactNode => (
-  <Section title={t('admin.record.assets')}>
+  <RecordSection title={t('admin.record.assets')}>
     <Facts>
-      <Fact label={t('assets.label.outstanding')} value={clearance.outstandingCount} />
+      <Fact
+        label={t('assets.label.outstanding')}
+        value={
+          clearance.assetsClear ? (
+            clearance.outstandingCount
+          ) : (
+            <Status tone="warning">{clearance.outstandingCount}</Status>
+          )
+        }
+      />
       <Fact label={t('relations.label.asAt')} value={clearance.asAt} />
     </Facts>
 
-    <Rows
-      headings={[
-        t('assets.label.assetTag'),
-        t('assets.label.category'),
-        t('assets.label.issuedOn'),
-        t('assets.label.daysOutstanding'),
-      ]}
-    >
-      {clearance.blockers.map((blocker) => (
-        <Row key={blocker.assetCustodyId}>
-          <Cell>{blocker.assetTag}</Cell>
-          <Cell>{short(blocker.assetCategoryId)}</Cell>
-          <Cell>{blocker.issuedOn}</Cell>
-          <Cell>{orDash(blocker.daysOutstanding)}</Cell>
-        </Row>
-      ))}
-    </Rows>
+    {clearance.blockers.length === 0 ? null : (
+      <Rows
+        headings={[
+          t('assets.label.assetTag'),
+          t('assets.label.category'),
+          t('assets.label.issuedOn'),
+          t('assets.label.daysOutstanding'),
+        ]}
+        numeric={[3]}
+      >
+        {clearance.blockers.map((blocker) => (
+          <Row key={blocker.assetCustodyId}>
+            <Cell>
+              <Isolated>{blocker.assetTag}</Isolated>
+            </Cell>
+            <Cell>
+              <Isolated>{short(blocker.assetCategoryId)}</Isolated>
+            </Cell>
+            <Cell>
+              <Isolated>{blocker.issuedOn}</Isolated>
+            </Cell>
+            <Cell numeric>{orDash(blocker.daysOutstanding)}</Cell>
+          </Row>
+        ))}
+      </Rows>
+    )}
 
-    <p className="text-xs opacity-70">{t('assets.note.custodyIsPeriod')}</p>
-  </Section>
+    <p className="text-xs text-muted-foreground">{t('assets.note.custodyIsPeriod')}</p>
+  </RecordSection>
 );
 
 export const AssetsSection = ({
@@ -165,17 +200,20 @@ export const CareerSection = ({
   record.career === undefined ? (
     <Withheld t={t} title={t('admin.record.career')} />
   ) : (
-    <Section title={t('admin.record.career')}>
+    <RecordSection title={t('admin.record.career')}>
       <CareerFacts t={t} summary={record.career} />
-    </Section>
+    </RecordSection>
   );
 
 /**
- * What this record does not show, said rather than left as an absence.
+ * What this record does not show, said rather than left as an absence — and said quietly.
  *
  * Every line is a boundary this repository actually holds, not a wish list. A reader who finds no
  * payslip on an employee record needs to know whether payroll is missing or withheld, and a reader
  * who finds no review needs to know that Performance publishes no per-employment read at all.
+ *
+ * It is a footnote rather than a section: it competes with nothing, and a reader looking for a fact
+ * about an employee never has to scroll past it to reach one.
  */
 const BOUNDARIES = [
   'admin.notice.eachSectionIsItsOwnPermission',
@@ -187,12 +225,15 @@ const BOUNDARIES = [
   'admin.notice.readOnly',
 ] as const;
 
-export const BoundariesSection = ({ t }: SectionProps): ReactNode => (
-  <Section title={t('admin.record.boundaries')}>
-    <ul className="flex list-disc flex-col gap-1 ps-5 text-sm opacity-80">
+export const BoundariesNote = ({ t }: SectionProps): ReactNode => (
+  <footer className="border-t border-border pt-4">
+    <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {t('admin.record.boundaries')}
+    </h2>
+    <ul className="mt-2 flex list-disc flex-col gap-1 ps-5 text-xs text-muted-foreground">
       {BOUNDARIES.map((key) => (
         <li key={key}>{t(key)}</li>
       ))}
     </ul>
-  </Section>
+  </footer>
 );

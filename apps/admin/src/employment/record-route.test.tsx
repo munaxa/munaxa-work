@@ -10,6 +10,7 @@ import {
   aClearance,
   aContract,
   aDocument,
+  aLeaveType,
   aLearningHistory,
   aProfile,
   aReportingLine,
@@ -52,6 +53,7 @@ const ANSWERS: readonly (readonly [string, () => unknown])[] = [
   ['/documents', () => ({ items: [aDocument()] })],
   ['/letters/issued', () => ({ items: [anIssuedLetter()] })],
   ['/leave/balances', () => ({ items: [aBalance()] })],
+  ['/leave/types', () => ({ items: [aLeaveType()] })],
   ['/attendance/days', () => ({ items: [anAttendanceDay()] })],
   ['/career/summary', aCareerSummary],
   ['/learning/history', aLearningHistory],
@@ -107,6 +109,7 @@ describe('the employee record route', () => {
       'LATENESS', // relations
       'LT-00841', // assets — the tag, not an identifier
       '194', // assets — days outstanding
+      'Annual leave', // leave — the tenant's own type name
     ]) {
       expect([value, markup.includes(value)]).toEqual([value, true]);
     }
@@ -134,6 +137,33 @@ describe('the employee record route', () => {
    * `not-found.tsx`. Asserting that it throws is asserting that the page did not render an employee
    * whose every section was withheld — which would look, to a reader, like a person with no data.
    */
+  /**
+   * The state a deployment with no Platform authentication adapter is actually in.
+   *
+   * The employment resolves — it has to, or the route is a 404 — and every other module refuses. The
+   * record must say that once, not repeat it under twelve headings, which is what it used to do.
+   */
+  it('says once that nothing could be read, rather than twelve times', async () => {
+    vi.stubGlobal('fetch', (input: string) =>
+      Promise.resolve(
+        /\/employments\/[^/?]+(\?|$)/.test(input)
+          ? new Response(JSON.stringify(anEmployment()), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            })
+          : new Response('', { status: 401 }),
+      ),
+    );
+
+    const markup = await render();
+    const withheld = markup.split('This section was withheld').length - 1;
+
+    expect(withheld).toBe(0);
+    expect(markup).toContain('Nothing on this record could be read.');
+    // The employment's own facts still stand: the reader knows who they are looking at.
+    expect(markup).toContain('EMP-000417');
+  });
+
   it('answers not found rather than rendering an employee nobody could read', async () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('', { status: 401 })));
 

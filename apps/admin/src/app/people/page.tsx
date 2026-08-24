@@ -42,10 +42,10 @@ const PeoplePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
   const register = await loadRegister(asOf);
 
   return (
-    <main
+    <div
       dir={directionOf(language)}
       lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
+      className="mx-auto flex max-w-4xl flex-col gap-6 p-8"
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('people.label.register')}</h1>
@@ -61,7 +61,7 @@ const PeoplePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
       />
       <DuplicatesSection t={t} duplicates={register.duplicates} />
       <BoundariesSection t={t} />
-    </main>
+    </div>
   );
 };
 

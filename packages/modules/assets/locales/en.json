@@ -35,8 +35,7 @@
       "return": "Record a return",
       "openOnly": "Still out",
       "daysOutstanding": "Days outstanding",
-      "outstanding": "Outstanding",
-      "clearance": "Assets clearance"
+      "outstanding": "Outstanding"
     },
     "status": {
       "registered": "Registered",

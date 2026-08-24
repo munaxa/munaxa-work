@@ -9,7 +9,7 @@ import type {
   ReportingLineView,
 } from '@work/employment/contracts';
 import type { LearningHistoryView } from '@work/learning/contracts';
-import type { LeaveBalanceView } from '@work/leave/contracts';
+import type { LeaveBalanceView, LeaveTypeView } from '@work/leave/contracts';
 import type { IssuedLetterView } from '@work/letters/contracts';
 import type { PersonProfileView } from '@work/people/contracts';
 import type { ViolationView } from '@work/relations/contracts';
@@ -139,6 +139,22 @@ export const aBalance = (): LeaveBalanceView => ({
   entryCount: 12,
 });
 
+export const aLeaveType = (): LeaveTypeView => ({
+  leaveTypeId: '01900000-0000-7000-8000-00000000y001',
+  code: 'ANNUAL',
+  name: { en: 'Annual leave', ar: 'إجازة سنوية' },
+  unit: 'day',
+  paidTreatmentCode: 'PAID',
+  accrues: true,
+  requiresAttachment: false,
+  requiresReplacement: false,
+  requiresContact: false,
+  requiresAddress: false,
+  status: 'published',
+  versionNumber: 1,
+  version: 1,
+});
+
 export const anAttendanceDay = (): AttendanceDayView => ({
   attendanceDayId: '01900000-0000-7000-8000-00000000w001',
   employmentId: EMPLOYMENT_ID,
@@ -223,11 +239,13 @@ export const aFullRecord = (): EmployeeRecord => ({
   documents: [aDocument()],
   letters: [anIssuedLetter()],
   balances: [aBalance()],
+  leaveTypes: [aLeaveType()],
   attendanceDays: [anAttendanceDay()],
   career: aCareerSummary(),
   learning: aLearningHistory(),
   violations: [aViolation()],
   clearance: aClearance(),
+  managerName: { en: 'Omar Nasser', ar: 'عمر ناصر' },
 });
 
 /** Nothing answered — the ordinary state of this deployment, and the one every screen must survive. */
@@ -240,11 +258,13 @@ export const aWithheldRecord = (): EmployeeRecord => ({
   documents: undefined,
   letters: undefined,
   balances: undefined,
+  leaveTypes: undefined,
   attendanceDays: undefined,
   career: undefined,
   learning: undefined,
   violations: undefined,
   clearance: undefined,
+  managerName: undefined,
 });
 
 /** Every module answered, and every answer was empty. Not the same thing as the above. */
@@ -257,9 +277,11 @@ export const anEmptyRecord = (): EmployeeRecord => ({
   documents: [],
   letters: [],
   balances: [],
+  leaveTypes: [],
   attendanceDays: [],
   career: aCareerSummary(),
   learning: aLearningHistory(),
   violations: [],
   clearance: { ...aClearance(), assetsClear: true, outstandingCount: 0, blockers: [] },
+  managerName: undefined,
 });

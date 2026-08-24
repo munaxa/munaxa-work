@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
+import { EmptyState, Page, PageHeader, Stack } from '@munaxa/ui';
 
 import { directionOf, isLanguage, type Language } from '../../../shell/locale';
-import { loadEmployment, loadRecord } from '../../../employment/record-api';
+import { loadEmployment, loadRecord, type EmployeeRecord } from '../../../employment/record-api';
 import { nameIn } from '../../../employment/locale';
 import { recordTranslator, short } from '../../../employment/record-locale';
+import { EmploymentSummary, employmentTone } from '../../../employment/record-summary';
 import {
   ContractsSection,
-  EmploymentSection,
   IdentitySection,
   PlacementSection,
 } from '../../../employment/record-identity';
@@ -21,10 +22,11 @@ import {
 } from '../../../employment/record-operations';
 import {
   AssetsSection,
-  BoundariesSection,
+  BoundariesNote,
   CareerSection,
   RelationsSection,
 } from '../../../employment/record-governance';
+import { Isolated, Status } from '../../../employment/record-frame';
 
 /**
  * One employee, as an HR administrator needs to see them.
@@ -62,6 +64,65 @@ interface PageProps {
 const single = (value: string | string[] | undefined): string | undefined =>
   Array.isArray(value) ? value[0] : value;
 
+/**
+ * Whether a single module answered anything at all.
+ *
+ * When none did — the ordinary state of a deployment with no Platform authentication adapter — the
+ * record says so once, at the top, instead of repeating the same sentence under twelve headings.
+ */
+const answeredNothing = (record: EmployeeRecord): boolean =>
+  [
+    record.profile,
+    record.assignments,
+    record.reportingLines,
+    record.contracts,
+    record.documents,
+    record.letters,
+    record.balances,
+    record.attendanceDays,
+    record.career,
+    record.learning,
+    record.violations,
+    record.clearance,
+  ].every((answer) => answer === undefined);
+
+/**
+ * The record's twelve sections, or the one sentence that replaces all of them.
+ *
+ * When no module answered — the ordinary state of a deployment with no Platform authentication
+ * adapter — the record says so once. Twelve headings each carrying the same apology is what that
+ * state used to look like, and it read as a broken screen rather than a locked one.
+ */
+const RecordBody = ({
+  t,
+  language,
+  record,
+}: {
+  readonly t: ReturnType<typeof recordTranslator>;
+  readonly language: Language;
+  readonly record: EmployeeRecord;
+}): ReactNode =>
+  answeredNothing(record) ? (
+    <EmptyState
+      title={t('admin.record.nothingReadable')}
+      description={t('admin.notice.notSignedIn')}
+    />
+  ) : (
+    <Stack gap={8}>
+      <IdentitySection t={t} language={language} record={record} />
+      <PlacementSection t={t} language={language} record={record} />
+      <ContractsSection t={t} record={record} />
+      <DocumentsSection t={t} language={language} record={record} />
+      <LettersSection t={t} record={record} />
+      <LeaveSection t={t} language={language} record={record} />
+      <AttendanceSection t={t} record={record} />
+      <CareerSection t={t} record={record} />
+      <LearningSection t={t} record={record} />
+      <RelationsSection t={t} record={record} />
+      <AssetsSection t={t} record={record} />
+    </Stack>
+  );
+
 const EmployeeRecordPage = async ({ params, searchParams }: PageProps): Promise<ReactNode> => {
   const { employmentId } = await params;
   const parameters = await searchParams;
@@ -80,39 +141,36 @@ const EmployeeRecordPage = async ({ params, searchParams }: PageProps): Promise<
   const name = nameIn(employment.personName, language);
 
   return (
-    <div
-      dir={directionOf(language)}
-      lang={language}
-      className="mx-auto flex max-w-5xl flex-col gap-6 p-8"
-    >
-      <header className="flex flex-col gap-2">
-        <a
-          href={`/employment?lang=${language}`}
-          className="text-xs underline underline-offset-4 opacity-70"
-        >
-          {t('admin.record.backToDirectory')}
-        </a>
-        <h1 className="text-2xl font-semibold">{name ?? short(employment.personId)}</h1>
-        <p className="text-sm opacity-80">
-          {t('employment.label.employmentNumber')}: {employment.employmentNumber} ·{' '}
-          {t('employment.label.status')}: {t(`employment.status.${employment.status}`)} ·{' '}
-          {t('admin.label.asOf')}: {employment.asOf}
-        </p>
-      </header>
+    <div dir={directionOf(language)} lang={language}>
+      <Page width="wide">
+        <PageHeader
+          above={
+            <a
+              href={`/employment?lang=${language}`}
+              className="text-xs text-muted-foreground underline underline-offset-4"
+            >
+              {t('admin.record.backToDirectory')}
+            </a>
+          }
+          title={name ?? short(employment.personId)}
+          description={
+            <>
+              {t('admin.label.asOf')}: <Isolated>{employment.asOf}</Isolated>
+            </>
+          }
+          actions={
+            <Status tone={employmentTone(employment.status)}>
+              {t(`employment.status.${employment.status}`)}
+            </Status>
+          }
+        />
 
-      <IdentitySection t={t} language={language} record={record} />
-      <EmploymentSection t={t} record={record} />
-      <PlacementSection t={t} record={record} />
-      <ContractsSection t={t} record={record} />
-      <DocumentsSection t={t} language={language} record={record} />
-      <LettersSection t={t} record={record} />
-      <LeaveSection t={t} record={record} />
-      <AttendanceSection t={t} record={record} />
-      <CareerSection t={t} record={record} />
-      <LearningSection t={t} record={record} />
-      <RelationsSection t={t} record={record} />
-      <AssetsSection t={t} record={record} />
-      <BoundariesSection t={t} />
+        <EmploymentSummary t={t} language={language} record={record} />
+
+        <RecordBody t={t} language={language} record={record} />
+
+        <BoundariesNote t={t} />
+      </Page>
     </div>
   );
 };

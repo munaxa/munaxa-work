@@ -105,6 +105,9 @@
       "pending": "Pending",
       "passed": "Passed",
       "waived": "Waived"
+    },
+    "hint": {
+      "everyRowOpens": "Every row opens the employee record."
     }
   }
 }

@@ -52,10 +52,10 @@ const CompensationPage = async ({ searchParams }: PageProps): Promise<ReactNode>
   const compensation = await loadCompensation();
 
   return (
-    <main
+    <div
       dir={directionOf(language)}
       lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
+      className="mx-auto flex max-w-4xl flex-col gap-6 p-8"
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('compensation.label.compensation')}</h1>
@@ -88,7 +88,7 @@ const CompensationPage = async ({ searchParams }: PageProps): Promise<ReactNode>
       />
       <ImportsSection t={t} language={language} imports={compensation.imports} />
       <BoundariesSection t={t} language={language} />
-    </main>
+    </div>
   );
 };
 

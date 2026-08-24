@@ -35,8 +35,7 @@
       "return": "تسجيل إرجاع",
       "openOnly": "ما زال خارج المخزن",
       "daysOutstanding": "أيام العُهدة المفتوحة",
-      "outstanding": "غير مُعاد",
-      "clearance": "إخلاء العُهد"
+      "outstanding": "غير مُعاد"
     },
     "status": {
       "registered": "مسجَّل",

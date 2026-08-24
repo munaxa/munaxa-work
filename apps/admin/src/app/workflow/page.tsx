@@ -58,7 +58,7 @@ export default async function WorkflowPage({
   const props = { t, language };
 
   return (
-    <main dir={directionOf(language)} className="flex flex-col gap-6 p-8">
+    <div dir={directionOf(language)} className="flex flex-col gap-6 p-8">
       <h1 className="text-2xl font-medium">{t('workflow.label.workflow')}</h1>
 
       <OverviewSection
@@ -78,7 +78,7 @@ export default async function WorkflowPage({
 
       <ProvidedSection {...props} />
       <StatusSection {...props} />
-    </main>
+    </div>
   );
 }
 

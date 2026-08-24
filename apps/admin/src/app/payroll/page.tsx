@@ -67,10 +67,10 @@ const PayrollPage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
   const shared = { t, language } as const;
 
   return (
-    <main
+    <div
       dir={directionOf(language)}
       lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
+      className="mx-auto flex max-w-4xl flex-col gap-6 p-8"
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('payroll.label.payroll')}</h1>
@@ -98,7 +98,7 @@ const PayrollPage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
       <PaymentsSection {...shared} payments={payroll.payments} />
       <PayslipSection {...shared} payslip={payroll.payslip} />
       <ReportsSection {...shared} />
-    </main>
+    </div>
   );
 };
 

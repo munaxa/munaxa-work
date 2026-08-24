@@ -24,6 +24,25 @@ const html = (asOf?: string): string =>
   );
 
 describe('the workforce directory', () => {
+  /**
+   * A column of shortened identifiers is not a column.
+   *
+   * The directory used to carry the organizational unit and the manager as `01900000…`: two of five
+   * columns that told a reader nothing and cost the width a real value would have had. Neither has a
+   * bounded lookup by identifier, so the directory carries what `EmploymentView` answers for
+   * directly and the record carries the placement in full.
+   */
+  it('shows no shortened identifier anywhere', () => {
+    expect(html()).not.toContain('01900000…');
+  });
+
+  it('states how many employments the answer holds, and the date it was resolved at', () => {
+    const markup = html();
+
+    expect(markup).toContain('1');
+    expect(markup).toContain('2026-08-24');
+  });
+
   it('opens the record from the employment number and from the name', () => {
     const markup = html();
     const href = '/employment/01900000-0000-7000-8000-00000000e001?lang=en';

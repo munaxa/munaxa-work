@@ -5,12 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { translator as shellTranslator } from '../shell/locale';
 
 import { recordTranslator } from './record-locale';
-import {
-  ContractsSection,
-  EmploymentSection,
-  IdentitySection,
-  PlacementSection,
-} from './record-identity';
+import { ContractsSection, IdentitySection, PlacementSection } from './record-identity';
+import { EmploymentSummary } from './record-summary';
 import {
   AttendanceSection,
   DocumentsSection,
@@ -20,7 +16,7 @@ import {
 } from './record-operations';
 import {
   AssetsSection,
-  BoundariesSection,
+  BoundariesNote,
   CareerSection,
   RelationsSection,
 } from './record-governance';
@@ -60,19 +56,19 @@ const everySection = (
   record: ReturnType<typeof aFullRecord>,
 ): string =>
   [
+    html(<EmploymentSummary t={t} language={language} record={record} />),
     html(<IdentitySection t={t} language={language} record={record} />),
-    html(<EmploymentSection t={t} record={record} />),
-    html(<PlacementSection t={t} record={record} />),
+    html(<PlacementSection t={t} language={language} record={record} />),
     html(<ContractsSection t={t} record={record} />),
     html(<DocumentsSection t={t} language={language} record={record} />),
     html(<LettersSection t={t} record={record} />),
-    html(<LeaveSection t={t} record={record} />),
+    html(<LeaveSection t={t} language={language} record={record} />),
     html(<AttendanceSection t={t} record={record} />),
     html(<CareerSection t={t} record={record} />),
     html(<LearningSection t={t} record={record} />),
     html(<RelationsSection t={t} record={record} />),
     html(<AssetsSection t={t} record={record} />),
-    html(<BoundariesSection t={t} />),
+    html(<BoundariesNote t={t} />),
   ].join('\n');
 
 describe('the employee record', () => {
@@ -126,11 +122,11 @@ describe('the employee record', () => {
     const record = aWithheldRecord();
     const refusable = [
       html(<IdentitySection t={en} language="en" record={record} />),
-      html(<PlacementSection t={en} record={record} />),
+      html(<PlacementSection t={en} language="en" record={record} />),
       html(<ContractsSection t={en} record={record} />),
       html(<DocumentsSection t={en} language="en" record={record} />),
       html(<LettersSection t={en} record={record} />),
-      html(<LeaveSection t={en} record={record} />),
+      html(<LeaveSection t={en} language="en" record={record} />),
       html(<AttendanceSection t={en} record={record} />),
       html(<CareerSection t={en} record={record} />),
       html(<LearningSection t={en} record={record} />),
@@ -157,7 +153,7 @@ describe('the employee record', () => {
   });
 
   it('shows an identifier where a name belongs to a module it did not ask, and says why', () => {
-    const markup = html(<PlacementSection t={en} record={aFullRecord()} />);
+    const markup = html(<PlacementSection t={en} language="en" record={aFullRecord()} />);
 
     // A shortened identifier for the unit, the position and the manager — never a name.
     expect(markup).toContain('01900000…');
@@ -214,7 +210,7 @@ describe('the employee record', () => {
    * unbuilt. A reader must not have to guess which of "missing" and "withheld" they are looking at.
    */
   it('names what the record does not show', () => {
-    const markup = html(<BoundariesSection t={en} />);
+    const markup = html(<BoundariesNote t={en} />);
 
     for (const key of [
       'admin.notice.eachSectionIsItsOwnPermission',
@@ -227,6 +223,73 @@ describe('the employee record', () => {
     ]) {
       expect([key, markup.includes(escaped(admin(key)))]).toEqual([key, true]);
     }
+  });
+
+  /**
+   * Every quantity a module publishes in minutes carries the word for one.
+   *
+   * A bare `9600` in a leave balance is the defect class the audit named in the benchmark product —
+   * a raw figure with no unit — and the caption that used to sit under the table rendered the
+   * formatter's own placeholder, `{minutes} min`, as literal text.
+   */
+  it('renders every minute quantity with its unit, and no placeholder', () => {
+    const markup = everySection(en, 'en', aFullRecord());
+
+    expect(markup).toContain('9600 min');
+    expect(markup).toContain('7200 min');
+    expect(markup).toContain('480 min');
+    expect(markup).not.toContain('{minutes}');
+  });
+
+  it('renders the Arabic unit in Arabic, not the English one', () => {
+    const markup = everySection(ar, 'ar', aFullRecord());
+
+    expect(markup).toContain(`9600 ${ar('leave.label.minutes').replace('{minutes} ', '')}`);
+    expect(markup).not.toContain('{minutes}');
+  });
+
+  /**
+   * A violation's state is one of Relations' own closed vocabularies and the module ships it in
+   * both languages; its severity is a word the tenant chose and is rendered as stored.
+   */
+  it('translates the violation state and leaves the tenant severity alone', () => {
+    const english = html(<RelationsSection t={en} record={aFullRecord()} />);
+    const arabic = html(<RelationsSection t={ar} record={aFullRecord()} />);
+
+    expect(english).toContain(en('relations.state.reported'));
+    expect(arabic).toContain(ar('relations.state.reported'));
+    expect(arabic).not.toContain('>reported<');
+    // The severity is the tenant's word in both languages.
+    expect(english).toContain('minor');
+    expect(arabic).toContain('minor');
+  });
+
+  /** A balance without its leave type is two identical rows with different numbers. */
+  it('names the leave type on every balance', () => {
+    const markup = html(<LeaveSection t={en} language="en" record={aFullRecord()} />);
+
+    expect(markup).toContain('Annual leave');
+  });
+
+  it('names the manager where a bounded read answered, and never invents the rest', () => {
+    const markup = everySection(en, 'en', aFullRecord());
+
+    expect(markup).toContain('Omar Nasser');
+    // The unit and the position stay identifiers: Organization publishes no lookup by identifier.
+    expect(markup).toContain('01900000…');
+  });
+
+  /**
+   * A value that must keep its own direction inside Arabic text is isolated.
+   *
+   * Without `<bdi>` an employment number or a date inside an Arabic sentence is reordered by the
+   * bidirectional algorithm, which is how `EMP-000417` renders as `417-EMP-000` on the page.
+   */
+  it('isolates every Latin run it puts inside Arabic text', () => {
+    const markup = html(<EmploymentSummary t={ar} language="ar" record={aFullRecord()} />);
+
+    expect(markup).toContain('<bdi>EMP-000417</bdi>');
+    expect(markup).toContain('<bdi>2021-03-01</bdi>');
   });
 
   it('says that sensitive fields were withheld rather than rendering them blank', () => {
