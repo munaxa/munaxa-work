@@ -18,6 +18,7 @@ import { CompensationModule } from './compensation/compensation.module.js';
 import { PayrollModule } from './payroll/payroll.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
 import { RelationsModule } from './relations/relations.module.js';
+import { AssetsModule } from './assets/assets.module.js';
 import { LettersModule } from './letters/letters.module.js';
 import { PerformanceModule } from './performance/performance.module.js';
 import { CareerModule } from './career/career.module.js';
@@ -51,6 +52,7 @@ import { loggingOptions } from './observability/logging.js';
     PayrollModule,
     DocumentsModule,
     RelationsModule,
+    AssetsModule,
     LettersModule,
     PerformanceModule,
     LearningModule,

@@ -2,7 +2,7 @@
   "name": "@work/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Munaxa Work API. Transport only — no business logic.",
+  "description": "Munaxa Work API. Transport only \u2014 no business logic.",
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
@@ -19,6 +19,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
     "@prisma/client": "^6.2.0",
+    "@work/assets": "workspace:*",
     "@work/attendance": "workspace:*",
     "@work/career": "workspace:*",
     "@work/compensation": "workspace:*",

@@ -71,6 +71,7 @@ import { performanceModuleFor } from '../performance/performance.composition.js'
 import { learningModuleFor } from '../learning/learning.composition.js';
 import { careerModuleFor } from '../career/career.composition.js';
 import { relationsModuleFor } from '../relations/relations.composition.js';
+import { assetsModuleFor } from '../assets/assets.composition.js';
 import { workflowModuleFor } from '../workflow/workflow.composition.js';
 
 import {
@@ -269,6 +270,11 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         // addressed to a membership and the request has already resolved one (Checkpoint 4).
         registry.register(permissionAware.workflow);
         registry.register(permissionAware.relations);
+        // Assets last. Checkpoint 2 gave it its first and only cross-module read: whether the
+        // employment an asset is being issued to exists, asked of Employment's own published query
+        // under a bounded grant and answering one boolean. It is read by nobody — Offboarding will
+        // pull custody through the published contract when Checkpoint 4 gives it one to pull.
+        registry.register(assetsModuleFor(unitOfWork, senders.payroll));
         return registry;
       },
     },

@@ -5721,3 +5721,107 @@ model RelationDisciplinaryAction {
   @@index([tenant_id, issued_on, id], map: "relation_disciplinary_action_issued_idx")
   @@map("relation_disciplinary_action")
 }
+
+// ==================================================================================================
+// Phase 5.3 — Assets & Custody · Checkpoint 1
+//
+// Two tables: the tenant's asset catalogue, and the individual items it owns. **No custody.** Nothing
+// here references an employment or a person, and no table names a holder — custody is Checkpoint 2's,
+// with the decisions it needs (D-5.3-01, D-5.3-05).
+// ==================================================================================================
+
+/// What a tenant calls a kind of asset. Tenant configuration; nothing ships in it (AD-002).
+model AssetCategory {
+  id         String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  code       String    @db.VarChar(64)
+  name       Json
+  /// What ordering uses (D-5.2-07). Not unique: reads order by `(sequence, code)`.
+  sequence   Int
+  /// How an entry leaves service. There is no delete: assets classified under it must still read.
+  active     Boolean
+  metadata   Json
+  created_at DateTime  @db.Timestamptz(6)
+  created_by String    @db.VarChar(255)
+  updated_at DateTime  @db.Timestamptz(6)
+  updated_by String    @db.VarChar(255)
+  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_by String?   @db.VarChar(255)
+  version    Int
+
+  assets Asset[]
+
+  @@index([tenant_id, sequence, code], map: "asset_category_order_idx")
+  @@map("asset_category")
+}
+
+/// One item the company owns. Mutable: a description is corrected and a serial number entered late.
+model Asset {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  asset_category_id  String    @db.Uuid
+  /// The tenant's own identifier — the thing written on the sticker. Required, unique per tenant.
+  asset_tag          String    @db.VarChar(64)
+  /// The manufacturer's. Optional — a chair has none — and unique per tenant when present.
+  serial_number      String?   @db.VarChar(128)
+  description        String?   @db.VarChar(500)
+  /// A note. Deliberately **not** an Organization unit reference: Organization owns units.
+  location_note      String?   @db.VarChar(255)
+  /// A note. Deliberately **not** a Finance reference, and never an amount: no module owns one.
+  purchase_reference String?   @db.VarChar(128)
+  /// Whether the item is in service. **Never who holds it** — `issued`, `in_custody` and `returned`
+  /// are facts about custody, derived from the custody history rather than copied here (ADR-0070).
+  status             String    @db.VarChar(24)
+  metadata           Json
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  category AssetCategory @relation(fields: [asset_category_id], references: [id], map: "asset_category_fk")
+
+  custodies AssetCustody[]
+
+  @@index([tenant_id, asset_category_id], map: "asset_category_ref_idx")
+  @@index([tenant_id, status, asset_tag], map: "asset_status_idx")
+  @@map("asset")
+}
+
+/// One custody period: one employment held one asset from one day until another (Phase 5.3
+/// Checkpoint 2). One row is one handover (AD-003). Editable while `open`; **immutable once
+/// `returned`** — the trigger refuses every update and delete on a returned row from any path.
+model AssetCustody {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  asset_id      String    @db.Uuid
+  /// Employment, never person (AD-001). No cross-module foreign key: existence is confirmed through
+  /// Employment's published read before the insert, under a bounded service grant (ADR-0043).
+  employment_id String    @db.Uuid
+  /// The day of the handover. A date, not a timestamp: it is a day in the tenant's world.
+  issued_on     DateTime  @db.Date
+  /// Null while open; the day it came back once returned.
+  returned_on   DateTime? @db.Date
+  /// `open` or `returned`, and nothing else. The wider lifecycle is a later capability.
+  state         String    @db.VarChar(16)
+  issue_note    String?   @db.VarChar(500)
+  return_note   String?   @db.VarChar(500)
+  metadata      Json
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  /// Present because every table carries them. A soft delete is an update, so the trigger refuses one
+  /// on a returned custody.
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  asset Asset @relation(fields: [asset_id], references: [id], map: "asset_custody_asset_fk")
+
+  @@index([tenant_id, asset_id, issued_on], map: "asset_custody_asset_idx")
+  @@index([tenant_id, employment_id, issued_on], map: "asset_custody_employment_idx")
+  @@map("asset_custody")
+}
