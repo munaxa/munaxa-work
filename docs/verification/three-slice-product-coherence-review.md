@@ -597,8 +597,11 @@ are **stub artefacts, not product defects**, and are excluded from every finding
 ## R. Git state
 
 - **Head at review:** `1c100f7` — *Record the Hiring as Work slice commit hash*
-- **Branch:** `claude/munaxa-product-readiness-audit-8mr34d`
-- **Working tree:** clean apart from this document, which is the only file this task adds.
+- **This review's commit:** `7813d62` — *Three-slice product coherence review*, whose only file is
+  this document. (A commit cannot record its own identifier; the hash is filled in by the small
+  follow-up commit directly after it, as the hiring record did.)
+- **Branch:** `claude/munaxa-product-readiness-audit-8mr34d`, pushed to `origin`
+- **Working tree:** clean. This document is the only file the task adds; no production code changed.
 - **No local registry workaround committed.** The `@munaxa/*` packages live in GitHub Packages and
   this session's token carries no `read:packages` scope, so the platform packages were built from
   public source in the scratchpad and linked through seven `pnpm.overrides` entries in the root
