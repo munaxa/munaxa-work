@@ -34,7 +34,8 @@
       "performance": "Performance",
       "career": "Career",
       "learning": "Learning",
-      "workflow": "Approvals"
+      "workflow": "Workflow configuration",
+      "approvals": "Approvals"
     },
     "home": {
       "title": "Munaxa Work",
@@ -82,6 +83,27 @@
       "empty": "Nothing to show.",
       "unavailable": "Unavailable.",
       "notResolved": "Not resolved"
+    },
+    "approvals": {
+      "title": "Approvals",
+      "lead": "What is waiting on you, and what you have already answered.",
+      "waiting": "Waiting",
+      "waitingForYou": "Waiting for you",
+      "decidedByYou": "Decided by you",
+      "nothingWaiting": "Nothing is waiting for you.",
+      "nothingDecided": "You have not decided anything yet.",
+      "nothingDecidedYet": "Nobody has answered this yet.",
+      "approval": "Approval",
+      "backToQueue": "Back to approvals",
+      "notFound": "No approval with this identifier was returned.",
+      "boundaries": "What this screen does not do",
+      "decidingIsApi": "Approving and rejecting are API capabilities the server decides. This screen reads; it offers no decision control, because a request from this portal carries no authenticated principal.",
+      "subjectIsOpaque": "A subject is a type and an identifier. Workflow never interprets what a requisition is, and neither does this screen; describing one in business terms means asking the module that owns it.",
+      "membershipsAreIdentifiers": "A membership is shown in full and never as a name: no module publishes a lookup from a membership to a person.",
+      "onlyRecruitmentRaises": "Recruitment is the only module that currently raises approvals. Leave, payroll, compensation and attendance publish their own approval records and do not yet route through this engine.",
+      "nothingExpires": "Nothing expires, escalates or is reminded on its own. Every figure here was counted by the server; none is computed on this screen.",
+      "portVocabulary": "The same approval as a requesting module sees it, in the approval port’s own five-state vocabulary.",
+      "decisions": "Decisions"
     }
   }
 }

@@ -22,6 +22,27 @@ describe('the navigation map', () => {
     }
   });
 
+  /**
+   * The two destinations this portal deliberately keeps apart.
+   *
+   * `approvals` is what somebody is being asked to answer; `workflow` is how a tenant configures
+   * approval routing. They were one screen — the queues were the last two sections of the
+   * configuration page — and an approval somebody has to find at the bottom of a settings screen is
+   * not work.
+   */
+  it('separates the approvals a person answers from the workflow they are routed by', () => {
+    const keys = DESTINATIONS.map((destination) => destination.key);
+
+    expect(keys).toContain('approvals');
+    expect(keys).toContain('workflow');
+
+    for (const language of LANGUAGES) {
+      const t = translator(language);
+
+      expect(t('admin.nav.approvals')).not.toBe(t('admin.nav.workflow'));
+    }
+  });
+
   it('uses each key once, and derives the href from it', () => {
     const keys = DESTINATIONS.map((destination) => destination.key);
 

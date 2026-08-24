@@ -46,6 +46,9 @@ export const NAVIGATION: readonly NavigationSection[] = [
   {
     key: 'operations',
     destinations: [
+      // Approvals first: it is the only destination in this portal whose content is addressed to
+      // the reader personally, and a queue somebody has to go looking for is not work.
+      destination('approvals'),
       destination('attendance'),
       destination('leave'),
       destination('compensation'),
@@ -58,6 +61,8 @@ export const NAVIGATION: readonly NavigationSection[] = [
   },
   {
     key: 'governance',
+    // `workflow` is the *configuration* of approval processes — definitions, versions, groups,
+    // routing. The approvals somebody is being asked to answer are `approvals`, in Operations.
     destinations: [destination('documents'), destination('letters'), destination('workflow')],
   },
 ];

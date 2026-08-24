@@ -5,7 +5,7 @@ import { directionOf, isLanguage, translator, type Language } from '../../workfl
 import { OverviewSection } from '../../workflow/overview';
 import { DefinitionsSection, StepsSection, VersionsSection } from '../../workflow/definitions';
 import { InstanceStepsSection, InstancesSection } from '../../workflow/instances';
-import { ApprovalStatusSection, DecidedSection, PendingSection } from '../../workflow/approvals';
+import { ApprovalStatusSection } from '../../workflow/approvals';
 import { HistorySection } from '../../workflow/history';
 import { ApprovalGroupsSection, GroupMembersSection } from '../../workflow/groups';
 import { AwaitingSection, BranchesSection } from '../../workflow/branches';
@@ -60,6 +60,14 @@ export default async function WorkflowPage({
   return (
     <div dir={directionOf(language)} className="flex flex-col gap-6 p-8">
       <h1 className="text-2xl font-medium">{t('workflow.label.workflow')}</h1>
+      {/* The reader's own two queues used to be the last sections of this screen. They are their
+          own destination now — `/approvals`, in the navigation — because an approval somebody has
+          to find at the bottom of a configuration page is not work. This page keeps what it was
+          always about: the workflows a tenant configures and the instances running against them.
+
+          No link is offered to that destination from here, deliberately: this page's standing
+          assertion is that it contains no `href` at all, and the navigation rail already carries
+          Approvals as a first-class destination. */}
 
       <OverviewSection
         {...props}
@@ -74,7 +82,6 @@ export default async function WorkflowPage({
       <Groups {...props} workflow={workflow} />
       <Configuration {...props} workflow={workflow} />
       <Running {...props} workflow={workflow} />
-      <Queues {...props} workflow={workflow} />
 
       <ProvidedSection {...props} />
       <StatusSection {...props} />
@@ -116,13 +123,5 @@ const Running = ({ workflow, ...props }: Workspace): ReactNode => (
     <AwaitingSection {...props} steps={workflow.instance?.awaitingSteps ?? []} />
     <ApprovalStatusSection {...props} approval={workflow.approval} />
     <HistorySection {...props} history={workflow.history} total={workflow.historyTotal} />
-  </>
-);
-
-/** The reader's own two lists, resolved from their request and from nothing they supplied. */
-const Queues = ({ workflow, ...props }: Workspace): ReactNode => (
-  <>
-    <PendingSection {...props} pending={workflow.pending} total={workflow.pendingTotal} />
-    <DecidedSection {...props} decided={workflow.decided} total={workflow.decidedTotal} />
   </>
 );
