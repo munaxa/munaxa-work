@@ -114,18 +114,20 @@ describe('the assets composition', () => {
   });
 
   /**
-   * Checkpoint 3 added one query and no permission, and both halves of that are asserted.
+   * Checkpoints 3 and 4 each added one query and no permission, and both halves of that are asserted.
    *
-   * A reporting read that arrived with a permission of its own would be a permission minted for a
-   * capability; `assets.custody-summary` sits behind the `assets.custody.read` that already existed
-   * and discloses strictly less than the two reads beside it.
+   * A read that arrived with a permission of its own would be a permission minted for a capability;
+   * `assets.custody-summary` and `assets.employment-clearance` both sit behind the
+   * `assets.custody.read` that already existed, because both are projections of custody rows.
    */
-  it('registers seven commands, six queries and seven permissions', () => {
+  it('registers seven commands, seven queries and seven permissions', () => {
     const module = composed();
 
     expect(module.name).toBe('assets');
     expect(module.commands ?? []).toHaveLength(7);
-    expect(module.queries ?? []).toHaveLength(6);
+    expect(module.queries ?? []).toHaveLength(7);
+    // Still seven. Checkpoints 3 and 4 each added a read and neither added a permission: both sit
+    // behind `assets.custody.read`, because both are projections of custody and nothing else.
     expect(module.permissions ?? []).toHaveLength(7);
   });
 

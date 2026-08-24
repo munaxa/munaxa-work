@@ -1,7 +1,7 @@
 import { success, type Query, type QueryHandler } from '@work/kernel';
 
-import { accept, refuse, type AssetsResult } from '../domain/assets-rejection.js';
-import { civilDateOf, isCivilDate, wholeDaysBetween } from '../domain/custody-ageing.js';
+import { wholeDaysBetween } from '../domain/custody-ageing.js';
+import { asAtFrom } from './as-at.js';
 import { notFound, refusedBy } from './assets-context.js';
 import { AssetsPermissions } from './assets-permissions.js';
 import { custodyView } from './assets-views.js';
@@ -35,20 +35,6 @@ import type { AssetCustodyView, CustodyPageView, CustodySummaryView } from '../c
  * exactly like one held by an active employment, which is what keeps these reads from answering
  * D-5.3-01 — still open — by accident.
  */
-
-/**
- * The date a read measures against: the caller's if they gave one, otherwise the server's own day.
- *
- * **A future `asAt` is permitted.** "How old will this be at year end" is a fair question, the
- * arithmetic is identical, and nothing is persisted, so no future date can reach a record.
- */
-const asAtFrom = (
-  asAt: string | undefined,
-  dependencies: AssetsDependencies,
-): AssetsResult<string> => {
-  if (asAt === undefined) return accept(civilDateOf(dependencies.clock.now()));
-  return isCivilDate(asAt) ? accept(asAt) : refuse('as_at_malformed', { field: 'asAt' });
-};
 
 export interface ReadAssetCustody extends Query, PageRequest {
   readonly queryName: 'assets.asset-custody';

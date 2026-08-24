@@ -3,6 +3,7 @@ import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nes
 
 import type { ReturnCustodyCommand } from '../application/custody.use-case.js';
 import type { ReadCustodySummary, ReadEmploymentCustody } from '../application/custody-queries.js';
+import type { ReadEmploymentClearance } from '../application/clearance-queries.js';
 
 import { ReturnCustodyBody } from './assets.dto.js';
 import { AssetsDispatcher } from './assets-dispatcher.js';
@@ -44,6 +45,28 @@ export class CustodyController {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadCustodySummary>({
         queryName: 'assets.custody-summary',
+        ...(asAt === undefined ? {} : { asAt }),
+      }),
+    );
+  }
+
+  /**
+   * A literal segment too, and declared before `GET ''` for the same reason `summary` is.
+   */
+  @Get('clearance')
+  @ApiOperation({ summary: 'What one employment still holds, and why clearance cannot complete' })
+  @ApiOkResponse({
+    description:
+      'Reports persisted facts and changes nothing. `assetsClear` covers company assets only — Offboarding decides whether a person is cleared.',
+  })
+  public async clearance(
+    @Query('employmentId') employmentId: string,
+    @Query('asAt') asAt?: string,
+  ): Promise<unknown> {
+    return unwrapOrThrow(
+      await this.dispatcher.ask<unknown, ReadEmploymentClearance>({
+        queryName: 'assets.employment-clearance',
+        employmentId,
         ...(asAt === undefined ? {} : { asAt }),
       }),
     );

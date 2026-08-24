@@ -154,13 +154,16 @@ describe('what nothing here does automatically', () => {
 
 describe('the module’s declared shape', () => {
   /**
-   * Checkpoint 3 added one query and this list grew by exactly one entry.
+   * Checkpoints 3 and 4 added one query each, and this list grew by exactly one entry per checkpoint.
    *
    * The count in the name is deliberate: the assertion is the full set rather than a length, so a
-   * handler appearing here has to be added on purpose. `assets.custody-summary` is the addition, and
-   * the test below states what it is allowed to be.
+   * handler appearing here has to be added on purpose. `assets.custody-summary` and
+   * `assets.employment-clearance` are the additions, and the test below states what they may be.
+   *
+   * **The command list has not moved since Checkpoint 2**, which is the more interesting half: the two
+   * checkpoints since added only reads, so nothing new can write.
    */
-  it('publishes seven commands and six queries, and nothing else', () => {
+  it('publishes seven commands and seven queries, and nothing else', () => {
     const module = moduleUnderTest();
 
     expect((module.commands ?? []).map((handler) => handler.commandName).sort()).toEqual([
@@ -176,6 +179,7 @@ describe('the module’s declared shape', () => {
       'assets.asset-custody',
       'assets.categories',
       'assets.custody-summary',
+      'assets.employment-clearance',
       'assets.employment-custody',
       'assets.read-asset',
       'assets.search-assets',
@@ -190,16 +194,17 @@ describe('the module’s declared shape', () => {
    * authority, which the phase's authorizations forbid. It discloses strictly less than the two
    * custody reads that already sit behind `assets.custody.read`.
    */
-  it('adds its reporting read behind the custody permission that already existed', () => {
+  it('adds its reporting and clearance reads behind the custody permission that already existed', () => {
     const module = moduleUnderTest();
-    const summary = (module.queries ?? []).find(
-      (handler) => handler.queryName === 'assets.custody-summary',
-    );
+    const added = ['assets.custody-summary', 'assets.employment-clearance'];
 
-    expect(summary?.permission).toBe(AssetsPermissions.custodyRead);
-    expect((module.commands ?? []).map((handler) => handler.commandName)).not.toContain(
-      'assets.custody-summary',
-    );
+    for (const queryName of added) {
+      const handler = (module.queries ?? []).find((entry) => entry.queryName === queryName);
+
+      expect(handler?.permission).toBe(AssetsPermissions.custodyRead);
+      // A read, never a command: neither reports state by changing any.
+      expect((module.commands ?? []).map((entry) => entry.commandName)).not.toContain(queryName);
+    }
   });
 
   it('declares seven permissions and is named assets', () => {

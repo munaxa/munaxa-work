@@ -47,7 +47,7 @@ export const inMemoryAssetsStores = (): InMemoryAssetsStores => {
     custodyRows,
     categories: categoryStore(categoryRows),
     assets: assetStore(assetRows),
-    custodies: custodyStore(custodyRows),
+    custodies: custodyStore(custodyRows, assetRows),
   };
 };
 
@@ -137,7 +137,10 @@ const pageOf = (items: readonly AssetState[], paged: Paged): Page<AssetState> =>
  * Ordered newest-issued first, then by identifier, because that is what the SQL does — a fake that
  * ordered differently would let a test pass on behaviour the database does not have.
  */
-const custodyStore = (rows: Map<string, CustodyRecord>): CustodyStore => ({
+const custodyStore = (
+  rows: Map<string, CustodyRecord>,
+  assetRows: Map<string, AssetState>,
+): CustodyStore => ({
   byId: (_transaction: Transaction, id: string) => Promise.resolve(rows.get(id)),
 
   openFor: (_transaction: Transaction, assetId: string) =>
@@ -152,6 +155,42 @@ const custodyStore = (rows: Map<string, CustodyRecord>): CustodyStore => ({
         paged,
       ),
     ),
+
+  /**
+   * The clearance read, with the same two-statement shape the SQL has: an authoritative count over
+   * custody alone, and a bounded list joined to the asset. A fake that derived both from the join
+   * would hide exactly the failure the real one is arranged to survive.
+   */
+  outstandingForEmployment: (_transaction: Transaction, employmentId: string, limit: number) => {
+    const open = [...rows.values()]
+      .filter((row) => row.employmentId === employmentId && row.state === 'open')
+      .sort((left, right) =>
+        left.issuedOn === right.issuedOn
+          ? left.assetCustodyId.localeCompare(right.assetCustodyId)
+          : left.issuedOn.localeCompare(right.issuedOn),
+      );
+
+    return Promise.resolve({
+      total: open.length,
+      items: open.slice(0, limit).flatMap((row) => {
+        const asset = assetRows.get(row.assetId);
+
+        // The join, and its absence behaves as the SQL's does: the row drops out of the list while
+        // `total` still counts it, so the caller stays blocked rather than being told it is clear.
+        return asset === undefined
+          ? []
+          : [
+              {
+                assetCustodyId: row.assetCustodyId,
+                assetId: row.assetId,
+                assetTag: asset.assetTag,
+                assetCategoryId: asset.assetCategoryId,
+                issuedOn: row.issuedOn,
+              },
+            ];
+      }),
+    });
+  },
 
   // The same aggregate the SQL computes: a count and the earliest issue date, and no identifier.
   openSummary: (_transaction: Transaction) => {

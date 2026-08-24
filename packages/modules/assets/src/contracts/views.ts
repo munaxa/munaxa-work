@@ -124,6 +124,51 @@ export interface CustodyPageView {
  * It publishes no 30/60/90-day bucketing. Those are business thresholds, and this module does not
  * invent one.
  */
+/**
+ * One reason clearance cannot complete: an asset this employment still holds.
+ *
+ * Named well enough to be acted on — the tag is the label somebody uses to go and find the item — and
+ * no further. There is no employment status here, no person, no note and no tenant.
+ */
+export interface CustodyBlockerView {
+  readonly assetCustodyId: string;
+  readonly assetId: string;
+  readonly assetTag: string;
+  readonly assetCategoryId: string;
+  readonly issuedOn: string;
+  /** Days outstanding as at the response's `asAt`. Absent when `asAt` precedes the issue. */
+  readonly daysOutstanding?: number;
+}
+
+/**
+ * What Assets contributes to an offboarding clearance (AD-006).
+ *
+ * **`assetsClear`, not `clear`.** Assets does not decide whether a person is cleared; Offboarding
+ * (Phase 11.2) will, across domains this module knows nothing about — accounts, finance, keys. A field
+ * called `clear` on an Assets contract would be read as the whole answer and would be wrong the first
+ * time anything outside Assets blocked an exit. This states only what this module knows: as far as
+ * company assets are concerned, this employment has nothing outstanding.
+ *
+ * **The truth is the custody row and nothing else** (D-5.3-01, approved option (a)): an open custody is
+ * outstanding, a returned one is not, and an employment ending changes neither. Nothing here asks
+ * Employment anything, so a custody held by an ended employment appears exactly like any other.
+ *
+ * **`assetsClear` follows `outstandingCount`, never `blockers.length`.** The list is bounded; the count
+ * is not. If the bound truncates, `outstandingCount` exceeds the list and clearance stays blocked — a
+ * truncated list can never report an employment as clear.
+ *
+ * **This read decides nothing and writes nothing.** It reports persisted facts. A blocker is resolved
+ * by a human returning the asset through the ordinary return command, never automatically.
+ */
+export interface AssetClearanceView {
+  readonly employmentId: string;
+  /** The civil date `daysOutstanding` was measured against. */
+  readonly asAt: string;
+  readonly assetsClear: boolean;
+  readonly outstandingCount: number;
+  readonly blockers: readonly CustodyBlockerView[];
+}
+
 export interface CustodySummaryView {
   /** The civil date the figures were measured against. */
   readonly asAt: string;

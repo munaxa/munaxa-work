@@ -11,6 +11,95 @@ import { ALL_CODE, ASSETS_MIGRATION_SQL, IDENTIFIERS } from './source-scan.fixtu
  * and an elapsed-days report is one threshold away from asserting a business rule nobody agreed.
  */
 
+describe('what clearance deliberately does not persist, own or automate', () => {
+  /**
+   * Clearance is **derived on every read**, and there is nowhere to record an answer.
+   *
+   * A persisted clearance status would be a second source of truth that goes stale the moment somebody
+   * returns a laptop, and the first thing anybody would then build is a job to refresh it. Asserted
+   * against the migration SQL as well as the types, because a column is added in SQL first.
+   */
+  it('persists no clearance state and no employment-ended concept', () => {
+    for (const absent of [
+      'clearance_status',
+      'clearanceStatus',
+      'clearance_blocked',
+      'clearedAt',
+      'cleared_at',
+      'closed_reason',
+      'closedReason',
+      'returned_reason',
+      'employment_ended',
+      'employmentEnded',
+      'outstanding_at',
+      'is_outstanding',
+    ]) {
+      expect(IDENTIFIERS).not.toContain(absent);
+      expect(ASSETS_MIGRATION_SQL).not.toContain(absent);
+    }
+
+    // Non-vacuous: the tables are named, so a moved migration fails here rather than passing silently.
+    expect(ASSETS_MIGRATION_SQL).toContain('create table asset_custody');
+
+    // Custody still has exactly the two states Checkpoint 2 approved. Clearance added none.
+    expect(ASSETS_MIGRATION_SQL).toContain("check (state in ('open', 'returned'))");
+  });
+
+  /**
+   * **Assets contributes to a clearance; it does not decide one.**
+   *
+   * Offboarding (Phase 11.2) owns the decision, and Employment says so itself — *"deliberately not
+   * offboarding: no exit interview, no clearance, no asset return, no final settlement."* The field is
+   * `assetsClear`, and a bare `clear` appearing on this module's contract would be this module
+   * answering a question it cannot see the whole of.
+   */
+  it('claims no authority over the clearance decision itself', () => {
+    expect(IDENTIFIERS).toContain('assetsClear');
+
+    for (const absent of [
+      'ClearanceState',
+      'clearanceWorkflow',
+      'ClearanceItem',
+      'markCleared',
+      'completeClearance',
+      'waiveClearance',
+      'OffboardingPort',
+      'offboardingCase',
+    ]) {
+      expect(IDENTIFIERS).not.toContain(absent);
+    }
+  });
+
+  /**
+   * Nothing resolves a blocker except a person.
+   *
+   * The approval is explicit that an employment ending alters no custody, so the absences that make
+   * that true are the ones worth pinning: no closure path, no automatic return, no inference that
+   * something came back, and nothing scheduled to go looking.
+   */
+  it('closes, returns and resolves nothing automatically', () => {
+    for (const absent of [
+      'autoClose',
+      'autoReturn',
+      'closeOnTermination',
+      'onEmploymentEnded',
+      'EventHandler',
+      'eventHandlers',
+      'subscribe',
+      'setTimeout',
+      'setInterval',
+      'cron',
+      'JobPort',
+      'schedule',
+    ]) {
+      expect(IDENTIFIERS).not.toContain(absent);
+    }
+
+    // The only path that closes a custody is the command a human sends.
+    expect(ALL_CODE).toContain("'assets.return-custody'");
+  });
+});
+
 describe('what reporting deliberately does not persist, publish or decide', () => {
   /**
    * Checkpoint 3 publishes elapsed days and persists none of them.

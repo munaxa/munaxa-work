@@ -102,6 +102,12 @@ export interface CustodyStore {
   ): Promise<Page<CustodyRecord>>;
   /** Counts what is open across the tenant and names the oldest issue date. Publishes no identifier. */
   openSummary(transaction: Transaction): Promise<CustodySummary>;
+  /** What one employment still holds: the authoritative count, and a bounded, named list. */
+  outstandingForEmployment(
+    transaction: Transaction,
+    employmentId: string,
+    limit: number,
+  ): Promise<OutstandingCustodies>;
   insert(transaction: Transaction, state: CustodyRecord): Promise<void>;
   update(transaction: Transaction, state: CustodyRecord, expected: number): Promise<void>;
 }
@@ -126,6 +132,35 @@ export interface CustodySummary {
   readonly openCount: number;
   /** Absent when nothing is out — an absence rather than a date nobody can interpret. */
   readonly oldestIssuedOn?: string;
+}
+
+/**
+ * One open custody, named well enough for somebody to go and find the item.
+ *
+ * `assetTag` is joined here rather than left to the caller because a blocker that cannot name the
+ * physical thing is not actionable — "return asset `019a3f…`" is not an instruction anybody can follow.
+ * It is the tenant's own label, and the read it appears in is bounded to a single employment's open
+ * custodies, so it cannot be used to enumerate an inventory.
+ */
+export interface OutstandingCustody {
+  readonly assetCustodyId: string;
+  readonly assetId: string;
+  readonly assetTag: string;
+  readonly assetCategoryId: string;
+  readonly issuedOn: string;
+}
+
+/**
+ * What one employment still holds.
+ *
+ * **`total` is counted over `asset_custody` alone; `items` is the join, and bounded.** The two are
+ * separate on purpose: `total` is the authoritative answer to "is anything outstanding", so a bound
+ * that truncates `items` — or a join that ever dropped a row — leaves `total` larger and clearance
+ * blocked. A truncated list can never turn a blocked employment into a clear one.
+ */
+export interface OutstandingCustodies {
+  readonly total: number;
+  readonly items: readonly OutstandingCustody[];
 }
 
 /**

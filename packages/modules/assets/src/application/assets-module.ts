@@ -20,11 +20,12 @@ import {
   readCustodySummaryHandler,
   readEmploymentCustodyHandler,
 } from './custody-queries.js';
+import { readEmploymentClearanceHandler } from './clearance-queries.js';
 import { ALL_ASSETS_PERMISSIONS, AssetsPermissions } from './assets-permissions.js';
 import type { AssetsDependencies } from './assets-dependencies.js';
 
 /**
- * Assets & Custody's module declaration: seven commands, six queries, one navigation entry.
+ * Assets & Custody's module declaration: seven commands, seven queries, one navigation entry.
  *
  * Registered on the same dispatcher as every other module. **Nothing here subscribes to an event and
  * nothing raises one.** The specification names eight domain events; dispatch in this repository is
@@ -83,4 +84,5 @@ const queriesOf = (dependencies: AssetsDependencies): readonly QueryHandler<Quer
     readAssetCustodyHandler(dependencies),
     readEmploymentCustodyHandler(dependencies),
     readCustodySummaryHandler(dependencies),
+    readEmploymentClearanceHandler(dependencies),
   ] as readonly QueryHandler<Query, unknown>[];

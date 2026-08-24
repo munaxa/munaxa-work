@@ -36,7 +36,7 @@ const moduleUnderTest = () =>
     clock: { now: () => new Date('2026-08-23T09:00:00Z') },
   });
 
-describe('what Checkpoints 1 and 2 did not build', () => {
+describe('what Checkpoints 1 to 4 did not build', () => {
   /**
    * The exclusion list, as identifiers rather than prose.
    *
@@ -47,6 +47,14 @@ describe('what Checkpoints 1 and 2 did not build', () => {
    * authorized to build them, and for no other reason.** Everything else stayed, and the protection
    * those three gave is not lost — it is replaced by the assertions below that pin exactly what
    * custody *is*: two states, two commands, and none of the operations nobody approved.
+   *
+   * **`clearance` left it at Checkpoint 4, and `ClearanceItem` did not.** The distinction is the point.
+   * Checkpoint 4 was authorized to publish what Assets *contributes* to a clearance — an
+   * `AssetClearanceView` derived from custody rows. It was not authorized to define the clearance
+   * entity itself: `ClearanceItem` is the specification's name for the thing Offboarding (Phase 11.2)
+   * will own, and this module defining one would be it claiming a decision it cannot see the whole of.
+   * `assets-reporting-boundaries.test.ts` states the replacement in full — `assetsClear` exists, and
+   * no clearance state, state machine or completion path does.
    */
   it('implements no transfer, acknowledgement, acceptance, cancellation or correction', () => {
     for (const absent of [
@@ -60,7 +68,6 @@ describe('what Checkpoints 1 and 2 did not build', () => {
       'correctCustody',
       'correctsCustodyId',
       'ClearanceItem',
-      'clearance',
     ]) {
       expect(IDENTIFIERS).not.toContain(absent);
     }

@@ -11,3 +11,12 @@
  */
 
 export type { AssetCategoryView, AssetPageView, AssetView, LocalizedTextView } from './views.js';
+
+/**
+ * The clearance contract, published because it has a named consumer.
+ *
+ * AD-006 says offboarding clearance reads custody **through public contracts**, and Offboarding
+ * (Phase 11.2) is the module that will do it. This is the surface it pulls: a bounded answer about one
+ * employment, carrying no employment status, no person and no tenant.
+ */
+export type { AssetClearanceView, CustodyBlockerView } from './views.js';

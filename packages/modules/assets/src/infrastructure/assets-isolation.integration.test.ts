@@ -69,6 +69,23 @@ describe.skipIf(CONNECTION === undefined)('assets, across tenants', () => {
       return id;
     });
 
+  const givenCustodyFor = (
+    tenantId: string,
+    assetId: string,
+    employmentId: string,
+    issuedOn: string,
+  ): Promise<void> =>
+    fixture.asTenant(tenantId, (transaction) =>
+      fixture.stores.custodies.insert(transaction, {
+        assetCustodyId: uuidV7(),
+        assetId,
+        employmentId,
+        issuedOn,
+        state: 'open',
+        version: 1,
+      }),
+    );
+
   const givenCustody = (tenantId: string, assetId: string, issuedOn: string): Promise<void> =>
     fixture.asTenant(tenantId, (transaction) =>
       fixture.stores.custodies.insert(transaction, {
@@ -222,6 +239,55 @@ describe.skipIf(CONNECTION === undefined)('assets, across tenants', () => {
         fixture.stores.custodies.openSummary(transaction),
       ),
     ).toEqual({ openCount: 0 });
+  });
+
+  /**
+   * The clearance read, isolated in both directions against real PostgreSQL.
+   *
+   * This is the read a future Offboarding will pull, and the failure that matters is the quiet one:
+   * a leaked row makes another organisation's employment look blocked, and a wrongly-filtered count
+   * makes a genuinely blocked one look **clear** — which is the direction that lets an asset walk out
+   * of the building with the paperwork signed.
+   *
+   * The join is exercised too, not just the count: `assetTag` comes from `asset`, so a policy that
+   * covered `asset_custody` and not `asset` would surface here rather than in production.
+   */
+  it('answers clearance from its own tenant only, in both directions', async () => {
+    const employmentId = uuidV7();
+    const categoryA = await givenCategory(TENANT_A, 'laptop');
+    const categoryB = await givenCategory(TENANT_B, 'laptop');
+    const assetA = await givenAsset(TENANT_A, categoryA, 'A-1');
+    const assetB = await givenAsset(TENANT_B, categoryB, 'B-1');
+
+    // The *same* employment identifier holds an asset in each tenant — the strongest form of the
+    // question, because a leak here cannot be explained away as a different subject.
+    await givenCustodyFor(TENANT_A, assetA, employmentId, '2026-07-01');
+    await givenCustodyFor(TENANT_B, assetB, employmentId, '2026-01-15');
+
+    const seenByA = await fixture.asTenant(TENANT_A, (transaction) =>
+      fixture.stores.custodies.outstandingForEmployment(transaction, employmentId, 200),
+    );
+    const seenByB = await fixture.asTenant(TENANT_B, (transaction) =>
+      fixture.stores.custodies.outstandingForEmployment(transaction, employmentId, 200),
+    );
+
+    expect(seenByA.total).toBe(1);
+    expect(seenByB.total).toBe(1);
+    expect(seenByA.items.map((item) => item.assetTag)).toEqual(['A-1']);
+    expect(seenByB.items.map((item) => item.assetTag)).toEqual(['B-1']);
+
+    // Both rows genuinely exist, so neither answer is a policy hiding an empty table.
+    const all = await fixture.admin.query('select id from asset_custody');
+
+    expect(all.rows).toHaveLength(2);
+  });
+
+  it('reports an employment that holds nothing here as holding nothing', async () => {
+    const outstanding = await fixture.asTenant(TENANT_A, (transaction) =>
+      fixture.stores.custodies.outstandingForEmployment(transaction, uuidV7(), 200),
+    );
+
+    expect(outstanding).toEqual({ total: 0, items: [] });
   });
 
   it('cannot be reached by the application role bypassing the policy', async () => {

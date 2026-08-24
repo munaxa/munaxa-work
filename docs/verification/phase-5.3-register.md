@@ -40,7 +40,7 @@ Checkpoint 1.
 
 | # | Decision | State | Blocked Checkpoint 1? |
 |---|---|---|---|
-| D-5.3-01 | What custody attaches to, when an employment ends | **OPEN** | **no** — Checkpoint 1 creates no custody |
+| D-5.3-01 | What custody attaches to, when an employment ends | **APPROVED 2026-08-24 · option (a) · IMPLEMENTED** | **no** — Checkpoint 1 creates no custody |
 | D-5.3-02 | Whether acknowledgement can be by the employee | **SETTLED BY EXISTING EVIDENCE** | no |
 | D-5.3-03 | How a non-return deduction reaches Payroll | **OPEN** | **no** — Checkpoint 1 authorizes no deduction |
 | D-5.3-04 | Whether an asset may reference a document | **SETTLED BY EXISTING EVIDENCE** | no |
@@ -59,7 +59,7 @@ were open on before.
 
 ---
 
-## D-5.3-01 — What custody attaches to, when an employment ends · **OPEN**
+## D-5.3-01 — What custody attaches to, when an employment ends · **APPROVED 2026-08-24 · option (a)**
 
 ### The question
 
@@ -129,6 +129,31 @@ way it is taken.
 
 **Revised: does not block Checkpoint 2. Blocks Checkpoint 4**, where clearance must decide what an
 outstanding item is. This decision remains **OPEN** and unapproved.
+
+### Approved · 2026-08-24 · option (a)
+
+*Everything above is preserved as the record of what was investigated, recommended and believed while
+this decision was open. Nothing in it has been rewritten to make the approval look predetermined — the
+recommendation was made before the approval and is left exactly as it was made.*
+
+**The owner approved option (a), in these words:**
+
+> *An employment ending does not automatically close, cancel, transfer, or alter an open asset custody
+> period. The custody remains an `open` period until an authorized human explicitly returns the asset.*
+
+**What the approval explicitly does not authorize**, each recorded because it is a plausible misreading:
+employment termination closing custody · Assets subscribing to Employment · Assets receiving termination
+events · automatic return · automatic transfer · a special `outstanding` state · any new persisted
+custody state.
+
+**The consequence stays explicit and is intentional.** An employee who leaves holding an asset leaves an
+open custody, and it remains outstanding until somebody resolves the physical item. That may block
+clearance for that employment and keeps the asset unavailable for another assignment. This is the
+approved rule working, not a defect — and it is the cost the recommendation above stated in advance.
+
+**Implemented at Checkpoint 4** as a derived read and nothing more: no table, no column, no migration,
+no new persisted state, and no employment-ended concept inside Assets. The Assets-side truth is
+`open custody → outstanding`, `returned custody → not outstanding`.
 
 ---
 

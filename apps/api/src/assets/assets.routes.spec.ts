@@ -48,11 +48,11 @@ const dispatchedNames = (): readonly string[] =>
     .map((match) => match.slice(match.indexOf("'") + 1, -1));
 
 describe('the assets HTTP surface', () => {
-  it('dispatches exactly the thirteen names the module registers, and no fourteenth', () => {
+  it('dispatches exactly the fourteen names the module registers, and no fifteenth', () => {
     const dispatched = dispatchedNames();
 
-    expect(dispatched).toHaveLength(13);
-    expect(new Set(dispatched).size).toBe(13);
+    expect(dispatched).toHaveLength(14);
+    expect(new Set(dispatched).size).toBe(14);
   });
 
   /**
@@ -139,8 +139,8 @@ describe('the assets HTTP surface', () => {
    * words that describe capabilities nobody has authorized. It was not deleted, and the replacement
    * is stricter, because an exact set forbids everything a list of words would miss.
    *
-   * Checkpoint 3 added exactly one entry — `summary`, the aggregate read. It is a literal segment,
-   * which is why the ordering assertion below matters as much as this one.
+   * Checkpoint 3 added `summary` and Checkpoint 4 added `clearance`, both aggregate reads and both
+   * literal segments — which is why the ordering assertion below matters as much as this one.
    */
   it('publishes exactly the paths this checkpoint approves, and no other', () => {
     const code = CONTROLLER_FILES.map(codeOf).join('\n');
@@ -156,6 +156,7 @@ describe('the assets HTTP surface', () => {
       ':assetId/custody',
       ':assetId/custody',
       ':assetId/status',
+      'clearance',
       'summary',
     ]);
   });
@@ -167,13 +168,23 @@ describe('the assets HTTP surface', () => {
    * one declared after a parameterised sibling would not. Asserting the order rather than the outcome
    * is what stops a later route being inserted above it.
    */
-  it('declares the literal summary segment before the collection read it shares a controller with', () => {
+  it('declares its literal segments before the collection read they share a controller with', () => {
     const code = codeOf('custody.controller.ts');
 
-    expect(code.indexOf("@Get('summary')")).toBeGreaterThan(-1);
-    expect(code.indexOf("@Get('summary')")).toBeLessThan(code.indexOf('@Get()'));
+    for (const literal of ["@Get('summary')", "@Get('clearance')"]) {
+      expect(code.indexOf(literal)).toBeGreaterThan(-1);
+      expect(code.indexOf(literal)).toBeLessThan(code.indexOf('@Get()'));
+    }
   });
 
+  /**
+   * **`clearance` left this list at Checkpoint 4, and `waiver` did not.**
+   *
+   * AD-006 has two halves — clearance is blocked by outstanding custody, *"unless explicitly waived
+   * with a reason and an approval"*. Checkpoint 4 was authorized to publish the first half and not the
+   * second, so the word that describes the unbuilt half stays forbidden by name. The test below states
+   * what the approved half is allowed to be, so removing the entry cannot weaken the file.
+   */
   it('publishes no route for a capability nobody has authorized', () => {
     const code = CONTROLLER_FILES.map(codeOf).join('\n');
     const paths = [...code.matchAll(/@(?:Get|Post)\(\s*'([^']*)'/g)].map((match) => match[1] ?? '');
@@ -184,7 +195,6 @@ describe('the assets HTTP surface', () => {
       'incident',
       'waiver',
       'deduction',
-      'clearance',
       'transfer',
       'cancel',
       'correct',
@@ -193,6 +203,22 @@ describe('the assets HTTP surface', () => {
       for (const path of paths) expect(path).not.toContain(absent);
       expect(code).not.toContain(`${absent}(`);
     }
+  });
+
+  /**
+   * The clearance route exists, is a `GET`, and takes an employment rather than anything wider.
+   *
+   * The positive half of the assertion above: an exclusion list that merely lost an entry would be
+   * weaker than it was, so this states exactly what replaced it.
+   */
+  it('publishes clearance as a bounded read and nothing more', () => {
+    const code = codeOf('custody.controller.ts');
+
+    expect(code).toContain("@Get('clearance')");
+    expect(code).toContain("queryName: 'assets.employment-clearance'");
+    expect(code).toContain("@Query('employmentId')");
+    // No command reaches it, so nothing about a clearance can be written through this surface.
+    expect(code).not.toContain("commandName: 'assets.employment-clearance'");
   });
 
   it('exposes every controller under the versioned prefix', () => {

@@ -6,11 +6,34 @@ import type {
   CustodyFilters,
   CustodyStore,
   CustodySummary,
+  OutstandingCustodies,
   Page,
   Paged,
 } from '../application/assets-ports.js';
 import { CUSTODY_COLUMNS, custodyState, custodyValues, type CustodyRow } from './asset-rows.js';
-import { insertRow, mutable, pageOf, predicateFor, type Filter } from './row-writer.js';
+import {
+  civilDateColumn,
+  insertRow,
+  mutable,
+  pageOf,
+  predicateFor,
+  type Filter,
+} from './row-writer.js';
+
+/** One row of the clearance join. Only what a blocker needs — no note, no status, no tenant. */
+interface OutstandingRow {
+  readonly id: string;
+  readonly asset_id: string;
+  readonly asset_tag: string;
+  readonly asset_category_id: string;
+  readonly issued_on: string;
+}
+
+/** The aggregate's own row shape. `min` over no rows is `null`, which is the empty tenant. */
+interface CustodySummaryRow {
+  readonly open_count: string;
+  readonly oldest_issued_on: string | null;
+}
 
 /**
  * Custody, in PostgreSQL.
@@ -23,16 +46,12 @@ import { insertRow, mutable, pageOf, predicateFor, type Filter } from './row-wri
  * `asset_custody_open_idx` is, because a read that precedes an insert decides nothing under
  * concurrency (ADR-0071).
  *
- * Both collection reads take a subject, so nothing here can enumerate a tenant's custodies at large,
- * and both order newest-issued first with the identifier as a tiebreak so a page boundary never lands
- * in the middle of two custodies issued on one day.
+ * Every read that returns rows takes a subject, so nothing here can enumerate a tenant's custodies at
+ * large. `openSummary` is the one read without one and it returns no identifier at all — a count and a
+ * date. The two collection reads order newest-issued first with the identifier as a tiebreak, so a page
+ * boundary never lands in the middle of two custodies issued on one day; the clearance read orders
+ * oldest first instead, because the item held longest is where a clearance conversation starts.
  */
-/** The aggregate's own row shape. `min` over no rows is `null`, which is the empty tenant. */
-interface CustodySummaryRow {
-  readonly open_count: string;
-  readonly oldest_issued_on: string | null;
-}
-
 export class PostgresCustodyRepository
   extends Repository<CustodyRow & { version: number }>
   implements CustodyStore
@@ -118,6 +137,57 @@ export class PostgresCustodyRepository
     return {
       openCount: Number(row.open_count),
       ...(row.oldest_issued_on === null ? {} : { oldestIssuedOn: row.oldest_issued_on }),
+    };
+  }
+
+  /**
+   * What one employment still holds — the clearance answer (AD-006, D-5.3-01 option (a)).
+   *
+   * **Two statements, deliberately.** The count is taken over `asset_custody` alone, because that is
+   * the authoritative answer to "is anything outstanding"; the list joins `asset` to name each item and
+   * is bounded. Deriving both from the join would make a dropped row invisible — here it leaves the
+   * count larger than the list, and the caller keeps clearance blocked. The failure direction is the
+   * safe one.
+   *
+   * Ordered oldest first: the item somebody has held longest is the one a clearance conversation
+   * starts with. `c.id` breaks ties so a bound never lands mid-way through one day's issues.
+   *
+   * Row-level security confines both statements to the tenant, and the join is keyed on the tenant as
+   * well so a mis-scoped asset row could not be reached even if a policy were dropped.
+   */
+  public async outstandingForEmployment(
+    transaction: Transaction,
+    employmentId: string,
+    limit: number,
+  ): Promise<OutstandingCustodies> {
+    const parameters = [transaction.tenantId, employmentId];
+    const counted = await transaction.execute<{ total: string }>(
+      `select count(*)::text as total from asset_custody
+         where tenant_id = $1 and employment_id = $2 and state = 'open' and deleted_at is null`,
+      parameters,
+    );
+
+    const rows = await transaction.execute<OutstandingRow>(
+      `select c.id, c.asset_id, ${civilDateColumn('c.issued_on', 'issued_on')},
+              a.asset_tag, a.asset_category_id
+         from asset_custody c
+         join asset a on a.id = c.asset_id and a.tenant_id = c.tenant_id
+        where c.tenant_id = $1 and c.employment_id = $2
+          and c.state = 'open' and c.deleted_at is null
+        order by c.issued_on, c.id
+        limit $3`,
+      [...parameters, limit],
+    );
+
+    return {
+      total: Number(counted[0]?.total ?? '0'),
+      items: rows.map((row) => ({
+        assetCustodyId: row.id,
+        assetId: row.asset_id,
+        assetTag: row.asset_tag,
+        assetCategoryId: row.asset_category_id,
+        issuedOn: row.issued_on,
+      })),
     };
   }
 

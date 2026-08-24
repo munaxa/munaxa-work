@@ -55,7 +55,18 @@ export const custodyAgeing = (custody: CustodyRecord, asAt: string): CustodyAgei
       : { daysHeld: wholeDaysBetween(custody.issuedOn, custody.returnedOn) };
   }
 
-  const days = wholeDaysBetween(custody.issuedOn, asAt);
+  return outstandingSince(custody.issuedOn, asAt);
+};
+
+/**
+ * The open case on its own, for a caller that holds an issue date rather than a whole custody.
+ *
+ * The clearance projection reads a join and never rehydrates a `CustodyRecord`; without this it would
+ * have to invent one with empty fields to ask the question, and a fake built only to satisfy a
+ * signature is the kind of thing that later gets returned to somebody by accident.
+ */
+export const outstandingSince = (issuedOn: string, asAt: string): CustodyAgeing => {
+  const days = wholeDaysBetween(issuedOn, asAt);
 
   return days < 0 ? {} : { daysOutstanding: days };
 };
