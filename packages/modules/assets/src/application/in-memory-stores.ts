@@ -10,6 +10,9 @@ import type {
   AssetsStores,
   CustodyFilters,
   CustodyStore,
+  CustodySummary,
+  OutstandingCustodies,
+  OutstandingCustody,
   Page,
   Paged,
 } from './assets-ports.js';
@@ -132,10 +135,80 @@ const pageOf = (items: readonly AssetState[], paged: Paged): Page<AssetState> =>
 });
 
 /**
+ * The clearance read, with the same two-statement shape the SQL has: an authoritative count over
+ * custody alone, and a bounded list joined to the asset. A fake that derived both from the join would
+ * hide exactly the failure the real one is arranged to survive.
+ *
+ * A module-level helper rather than an inline body, matching `matching` and `pageOf` above — the store
+ * literal is a list of the port's methods, and a method that grew a paragraph of logic inside it is
+ * how that list stops being readable.
+ */
+const outstandingFor = (
+  rows: Map<string, CustodyRecord>,
+  assetRows: Map<string, AssetState>,
+  employmentId: string,
+  limit: number,
+): OutstandingCustodies => {
+  const open = [...rows.values()]
+    .filter((row) => row.employmentId === employmentId && row.state === 'open')
+    .sort((left, right) =>
+      left.issuedOn === right.issuedOn
+        ? left.assetCustodyId.localeCompare(right.assetCustodyId)
+        : left.issuedOn.localeCompare(right.issuedOn),
+    );
+
+  return {
+    total: open.length,
+    items: open.slice(0, limit).flatMap((row) => joined(row, assetRows)),
+  };
+};
+
+/**
+ * One row through the join.
+ *
+ * Its absence behaves as the SQL's does: the row drops out of the list while `total` still counts it,
+ * so the caller stays blocked rather than being told it is clear.
+ */
+const joined = (
+  row: CustodyRecord,
+  assetRows: Map<string, AssetState>,
+): readonly OutstandingCustody[] => {
+  const asset = assetRows.get(row.assetId);
+
+  return asset === undefined
+    ? []
+    : [
+        {
+          assetCustodyId: row.assetCustodyId,
+          assetId: row.assetId,
+          assetTag: asset.assetTag,
+          assetCategoryId: asset.assetCategoryId,
+          issuedOn: row.issuedOn,
+        },
+      ];
+};
+
+/** The same aggregate the SQL computes: a count and the earliest issue date, and no identifier. */
+const summaryOf = (rows: Map<string, CustodyRecord>): CustodySummary => {
+  const open = [...rows.values()].filter((row) => row.state === 'open');
+  const oldest = open.reduce<string | undefined>(
+    (earliest, row) =>
+      earliest === undefined || row.issuedOn < earliest ? row.issuedOn : earliest,
+    undefined,
+  );
+
+  return {
+    openCount: open.length,
+    ...(oldest === undefined ? {} : { oldestIssuedOn: oldest }),
+  };
+};
+
+/**
  * Custody, as a map.
  *
- * Ordered newest-issued first, then by identifier, because that is what the SQL does — a fake that
- * ordered differently would let a test pass on behaviour the database does not have.
+ * The two paged reads order newest-issued first, then by identifier, because that is what the SQL
+ * does — a fake that ordered differently would let a test pass on behaviour the database does not
+ * have. The clearance read orders oldest first, for the same reason its SQL does.
  */
 const custodyStore = (
   rows: Map<string, CustodyRecord>,
@@ -156,56 +229,10 @@ const custodyStore = (
       ),
     ),
 
-  /**
-   * The clearance read, with the same two-statement shape the SQL has: an authoritative count over
-   * custody alone, and a bounded list joined to the asset. A fake that derived both from the join
-   * would hide exactly the failure the real one is arranged to survive.
-   */
-  outstandingForEmployment: (_transaction: Transaction, employmentId: string, limit: number) => {
-    const open = [...rows.values()]
-      .filter((row) => row.employmentId === employmentId && row.state === 'open')
-      .sort((left, right) =>
-        left.issuedOn === right.issuedOn
-          ? left.assetCustodyId.localeCompare(right.assetCustodyId)
-          : left.issuedOn.localeCompare(right.issuedOn),
-      );
+  outstandingForEmployment: (_transaction: Transaction, employmentId: string, limit: number) =>
+    Promise.resolve(outstandingFor(rows, assetRows, employmentId, limit)),
 
-    return Promise.resolve({
-      total: open.length,
-      items: open.slice(0, limit).flatMap((row) => {
-        const asset = assetRows.get(row.assetId);
-
-        // The join, and its absence behaves as the SQL's does: the row drops out of the list while
-        // `total` still counts it, so the caller stays blocked rather than being told it is clear.
-        return asset === undefined
-          ? []
-          : [
-              {
-                assetCustodyId: row.assetCustodyId,
-                assetId: row.assetId,
-                assetTag: asset.assetTag,
-                assetCategoryId: asset.assetCategoryId,
-                issuedOn: row.issuedOn,
-              },
-            ];
-      }),
-    });
-  },
-
-  // The same aggregate the SQL computes: a count and the earliest issue date, and no identifier.
-  openSummary: (_transaction: Transaction) => {
-    const open = [...rows.values()].filter((row) => row.state === 'open');
-    const oldest = open.reduce<string | undefined>(
-      (earliest, row) =>
-        earliest === undefined || row.issuedOn < earliest ? row.issuedOn : earliest,
-      undefined,
-    );
-
-    return Promise.resolve({
-      openCount: open.length,
-      ...(oldest === undefined ? {} : { oldestIssuedOn: oldest }),
-    });
-  },
+  openSummary: (_transaction: Transaction) => Promise.resolve(summaryOf(rows)),
 
   forEmployment: (
     _transaction: Transaction,
