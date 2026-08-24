@@ -173,8 +173,31 @@ prisma validate       valid
 prisma migrate status 31 migrations, up to date — no drift, none added
 ```
 
-Full gate results in the final report, with Turbo's own exit code read directly and not piped through
-`tail`, `grep`, `tee` or `echo`.
+```
+pnpm exec turbo run build lint typecheck test --force --concurrency=1
+
+  Tasks:    116 successful, 116 total
+  Cached:   0 cached, 116 total
+  Time:     17m12.176s
+  TURBO_EXIT=0
+```
+
+**4,863 tests passed · 0 failed · 0 skipped · no `.only`.** `@work/assets` contributes 224 across 18
+files; `@work/api` 827 across 88.
+
+The status is **Turbo's own exit code**, read directly and not piped through `tail`, `grep`, `tee` or
+`echo`.
+
+**The first run of this gate returned `TURBO_EXIT=1`, and it is recorded rather than quietly re-run.**
+`@work/assets#lint` failed: the clearance read pushed the in-memory store literal to 84 lines against a
+60-line `max-lines-per-function` budget. `pnpm standards` does not run ESLint, which is why it passed
+while the gate did not. Fixed by splitting at the file's own seam — `outstandingFor`, `joined` and
+`summaryOf` as module-level helpers, matching the `matching`/`pageOf` pattern already there — with no
+exemption, no suppression and no behaviour change. Lint was then run across all 51 packages before the
+gate was re-run.
+
+**CI has not run.** `.github/workflows/ci.yml` triggers `on: pull_request` to `main`, and no pull
+request is open for this branch. Local verification is the record.
 
 No lint suppression, no architecture exemption, no standards exception, no `any`, no `as never`, no
 weakened test, and no unrelated module modified.
