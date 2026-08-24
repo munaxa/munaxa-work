@@ -140,7 +140,7 @@ The summary is a single aggregate statement — no read-then-assume, and nothing
 | `custody-reporting.test.ts` *(new)* | 15 — `asAt` echoed on both reads, server-day fallback, malformed date refused on both, summary counts, agreement between summary and item reads, no identifier in the payload, permission boundary, Employment never consulted |
 | `assets-reporting-boundaries.test.ts` *(new)* | 4 — no persisted ageing figure, no tenant-wide listing, no invented threshold, no employment status |
 | `assets-isolation.integration.test.ts` | +3 — the summary's tenant isolation in **both directions** against real PostgreSQL as an **unprivileged role**, the civil-date projection, and the empty tenant |
-| **`@work/assets` total** | **204** across 16 files |
+| **`@work/assets` total** | **204** across 17 files |
 | **`@work/api` assets specs** | **20** across 2 files |
 
 **Stale assertions reconciled, none deleted.** Four exact assertions became stale because the query set
@@ -171,9 +171,20 @@ prisma validate       valid
 prisma migrate status 31 migrations, database schema up to date — no drift, and none added
 ```
 
-Full gate: `pnpm exec turbo run build lint typecheck test --force --concurrency=1`, with Turbo's own
-exit code read directly and the command not piped through `tail`, `grep`, `tee` or `echo`. Results in
-the final report.
+```
+pnpm exec turbo run build lint typecheck test --force --concurrency=1
+
+  Tasks:    116 successful, 116 total
+  Cached:   0 cached, 116 total
+  Time:     16m37.616s
+  TURBO_EXIT=0
+```
+
+**4,842 tests passed · 0 failed · 0 skipped · no `.only`.** `@work/assets` contributes 204 across 17
+files (46 against real PostgreSQL); `@work/api` 826 across 88.
+
+The status is **Turbo's own exit code**, read directly. The command was not piped through `tail`,
+`grep`, `tee` or `echo`.
 
 No lint suppression, no architecture exemption, no standards exception, no `any`, no `as never`, no
 blanket cast, and no unrelated module modified to make the gate pass.
@@ -186,6 +197,10 @@ blanket cast, and no unrelated module modified to make the gate pass.
 - `assets-boundaries.test.ts` (455/400) → the Checkpoint 3 negative space moved to
   `assets-reporting-boundaries.test.ts`, over a shared `source-scan.fixture.ts`. One scanner, so two
   copies cannot drift about what counts as source.
+
+**CI has not run.** `.github/workflows/ci.yml` triggers `on: pull_request` targeting `main`, and no
+pull request is open for this branch — every prior PR (#5–#14) is closed. Opening one requires explicit
+authorization, so the local gate above is the verification of record; it runs the same task set CI would.
 
 ---
 
