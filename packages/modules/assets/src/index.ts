@@ -58,7 +58,8 @@ export { postgresAssetsStores } from './infrastructure/assets-stores.js';
 export { AssetsDispatcher } from './api/assets-dispatcher.js';
 export { AssetCategoryController } from './api/asset-category.controller.js';
 export { AssetController } from './api/asset.controller.js';
-export { AssetCustodyController, CustodyController } from './api/custody.controller.js';
+export { AssetCustodyController } from './api/asset-custody.controller.js';
+export { CustodyController } from './api/custody.controller.js';
 
 export type {
   AmendAssetCategoryCommand,

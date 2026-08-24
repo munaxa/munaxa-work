@@ -100,6 +100,8 @@ export interface CustodyStore {
     filters: CustodyFilters,
     paged: Paged,
   ): Promise<Page<CustodyRecord>>;
+  /** Counts what is open across the tenant and names the oldest issue date. Publishes no identifier. */
+  openSummary(transaction: Transaction): Promise<CustodySummary>;
   insert(transaction: Transaction, state: CustodyRecord): Promise<void>;
   update(transaction: Transaction, state: CustodyRecord, expected: number): Promise<void>;
 }
@@ -107,6 +109,23 @@ export interface CustodyStore {
 /** What a caller may narrow a custody list by. Never a tenant — the context already determines it. */
 export interface CustodyFilters {
   readonly openOnly?: boolean;
+}
+
+/**
+ * What is still out across a tenant, as an **aggregate and nothing else**.
+ *
+ * No asset, no custody and no employment identifier appears here, which is what separates it from the
+ * "every custody in this organisation" listing this module deliberately does not publish. It is
+ * ADR-0053's *"number a human can see is a number a human notices growing"* — enough to discover that
+ * a dozen items have been out for two years, and not enough to be a list of who holds them.
+ *
+ * The oldest issue date is published rather than an elapsed count, so the elapsed arithmetic happens
+ * in exactly one place for both this and the item reads.
+ */
+export interface CustodySummary {
+  readonly openCount: number;
+  /** Absent when nothing is out — an absence rather than a date nobody can interpret. */
+  readonly oldestIssuedOn?: string;
 }
 
 /**

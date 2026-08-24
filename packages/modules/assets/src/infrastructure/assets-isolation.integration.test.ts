@@ -69,6 +69,18 @@ describe.skipIf(CONNECTION === undefined)('assets, across tenants', () => {
       return id;
     });
 
+  const givenCustody = (tenantId: string, assetId: string, issuedOn: string): Promise<void> =>
+    fixture.asTenant(tenantId, (transaction) =>
+      fixture.stores.custodies.insert(transaction, {
+        assetCustodyId: uuidV7(),
+        assetId,
+        employmentId: uuidV7(),
+        issuedOn,
+        state: 'open',
+        version: 1,
+      }),
+    );
+
   it('shows a tenant its own catalogue and none of its neighbour’s', async () => {
     const mine = await givenCategory(TENANT_A, 'laptop');
     const theirs = await givenCategory(TENANT_B, 'vehicle');
@@ -145,6 +157,71 @@ describe.skipIf(CONNECTION === undefined)('assets, across tenants', () => {
         }),
       ),
     ).resolves.toBeUndefined();
+  });
+
+  /**
+   * The tenant-wide summary is the one read in this module that names no subject, and that is exactly
+   * why its isolation is proved here rather than assumed from the others.
+   *
+   * A count is the easiest read to get wrong: `select count(*)` over a table whose policy did not
+   * apply returns a number with no row to point at, so nothing about the result looks suspicious. The
+   * assertion is therefore in both directions and against a known total the admin connection can see.
+   */
+  it('counts only its own tenant’s open custody, in both directions', async () => {
+    const categoryA = await givenCategory(TENANT_A, 'laptop');
+    const categoryB = await givenCategory(TENANT_B, 'laptop');
+    const assetA = await givenAsset(TENANT_A, categoryA, 'A-1');
+    const assetB1 = await givenAsset(TENANT_B, categoryB, 'B-1');
+    const assetB2 = await givenAsset(TENANT_B, categoryB, 'B-2');
+
+    await givenCustody(TENANT_A, assetA, '2026-07-01');
+    await givenCustody(TENANT_B, assetB1, '2026-01-15');
+    await givenCustody(TENANT_B, assetB2, '2026-08-01');
+
+    const summaryA = await fixture.asTenant(TENANT_A, (transaction) =>
+      fixture.stores.custodies.openSummary(transaction),
+    );
+    const summaryB = await fixture.asTenant(TENANT_B, (transaction) =>
+      fixture.stores.custodies.openSummary(transaction),
+    );
+
+    expect(summaryA).toEqual({ openCount: 1, oldestIssuedOn: '2026-07-01' });
+    expect(summaryB).toEqual({ openCount: 2, oldestIssuedOn: '2026-01-15' });
+
+    // Three rows genuinely exist, so neither count above is a policy hiding an empty table. And
+    // neither tenant's oldest date is the other's, which is what a leaking `min` would produce.
+    const all = await fixture.admin.query('select id from asset_custody');
+
+    expect(all.rows).toHaveLength(3);
+  });
+
+  /**
+   * The date comes back as the civil date it was written as, not as an instant a timezone moved.
+   *
+   * `min(issued_on)` over a `date` column returns a driver `Date` unless it is projected with
+   * `to_char`, and a server an hour west of UTC would then report the previous day. The elapsed
+   * figures are computed from this string, so a shift here is a wrong number on a dashboard.
+   */
+  it('projects the oldest issue date as a civil date, never as an instant', async () => {
+    const category = await givenCategory(TENANT_A, 'laptop');
+    const asset = await givenAsset(TENANT_A, category, 'A-1');
+
+    await givenCustody(TENANT_A, asset, '2026-01-01');
+
+    const summary = await fixture.asTenant(TENANT_A, (transaction) =>
+      fixture.stores.custodies.openSummary(transaction),
+    );
+
+    expect(summary.oldestIssuedOn).toBe('2026-01-01');
+    expect(typeof summary.oldestIssuedOn).toBe('string');
+  });
+
+  it('reports an empty tenant as zero with no date at all', async () => {
+    expect(
+      await fixture.asTenant(TENANT_A, (transaction) =>
+        fixture.stores.custodies.openSummary(transaction),
+      ),
+    ).toEqual({ openCount: 0 });
   });
 
   it('cannot be reached by the application role bypassing the policy', async () => {

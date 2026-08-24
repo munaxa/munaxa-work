@@ -86,12 +86,52 @@ export interface CustodyView {
   readonly state: string;
   readonly issueNote?: string;
   readonly returnNote?: string;
+  /**
+   * Whole days this custody has been open, as at the `asAt` the response echoes — **derived, never
+   * stored**, and absent on a returned custody.
+   *
+   * The day of issue is day zero. It is also absent when `asAt` precedes the issue, because as at that
+   * date the custody had not been issued and zero would be a claim rather than an answer.
+   *
+   * **This is elapsed time, not overdue.** No expected return is recorded anywhere in this module, so
+   * overdue cannot be computed and is not stated.
+   */
+  readonly daysOutstanding?: number;
+  /**
+   * Whole days this custody ran, issue to return — present only once it has come back.
+   *
+   * A closed fact: it does not depend on `asAt`, and the row it describes is immutable from the moment
+   * it closed.
+   */
+  readonly daysHeld?: number;
   readonly version: number;
 }
 
 export interface CustodyPageView {
   readonly items: readonly CustodyView[];
+  /** The civil date every `daysOutstanding` above was measured against. Echoed so a figure is reproducible. */
+  readonly asAt: string;
   readonly total: number;
+}
+
+/**
+ * What is still out across the tenant, as an aggregate.
+ *
+ * **No identifier of any kind appears here** — not an asset, not a custody, not an employment. That is
+ * what separates it from the tenant-wide custody *listing* this module deliberately does not publish,
+ * and it is why it sits behind the same `assets.custody.read` as the two reads that disclose more.
+ *
+ * It publishes no 30/60/90-day bucketing. Those are business thresholds, and this module does not
+ * invent one.
+ */
+export interface CustodySummaryView {
+  /** The civil date the figures were measured against. */
+  readonly asAt: string;
+  readonly openCount: number;
+  /** Absent when nothing is out. */
+  readonly oldestIssuedOn?: string;
+  /** The largest `daysOutstanding` among open custodies. Absent when nothing is out. */
+  readonly longestDaysOutstanding?: number;
 }
 
 /**
@@ -105,4 +145,6 @@ export interface AssetCustodyView {
   readonly assetId: string;
   readonly current?: CustodyView;
   readonly history: CustodyPageView;
+  /** The civil date the ageing figures below were measured against. */
+  readonly asAt: string;
 }

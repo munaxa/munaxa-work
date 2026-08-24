@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import type { IssueCustodyCommand, ReturnCustodyCommand } from '../application/custody.use-case.js';
-import type { ReadAssetCustody, ReadEmploymentCustody } from '../application/custody-queries.js';
+import type { ReturnCustodyCommand } from '../application/custody.use-case.js';
+import type { ReadCustodySummary, ReadEmploymentCustody } from '../application/custody-queries.js';
 
-import { IssueCustodyBody, ReturnCustodyBody } from './assets.dto.js';
+import { ReturnCustodyBody } from './assets.dto.js';
 import { AssetsDispatcher } from './assets-dispatcher.js';
 import { numbered } from './query-numbers.js';
 import { unwrapOrThrow } from './handler-result.js';
@@ -28,6 +28,27 @@ import { unwrapOrThrow } from './handler-result.js';
 export class CustodyController {
   public constructor(private readonly dispatcher: AssetsDispatcher) {}
 
+  /**
+   * Declared before `GET ''` and before any parameterized route, so the literal `summary` segment
+   * resolves to this rather than being read as an identifier.
+   */
+  @Get('summary')
+  @ApiOperation({
+    summary: 'How much is out across the tenant, and how long the oldest has been out',
+  })
+  @ApiOkResponse({
+    description:
+      'A count and two dates. No asset, custody or employment identifier appears, which is what separates it from a tenant-wide listing.',
+  })
+  public async summary(@Query('asAt') asAt?: string): Promise<unknown> {
+    return unwrapOrThrow(
+      await this.dispatcher.ask<unknown, ReadCustodySummary>({
+        queryName: 'assets.custody-summary',
+        ...(asAt === undefined ? {} : { asAt }),
+      }),
+    );
+  }
+
   @Get()
   @ApiOperation({ summary: 'What one employment holds, and what it held before' })
   @ApiOkResponse({
@@ -37,6 +58,7 @@ export class CustodyController {
   public async forEmployment(
     @Query('employmentId') employmentId: string,
     @Query('openOnly') openOnly?: string,
+    @Query('asAt') asAt?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ): Promise<unknown> {
@@ -45,6 +67,7 @@ export class CustodyController {
         queryName: 'assets.employment-custody',
         employmentId,
         ...(openOnly === undefined ? {} : { openOnly: openOnly === 'true' }),
+        ...(asAt === undefined ? {} : { asAt }),
         ...numbered('page', page),
         ...numbered('pageSize', pageSize),
       }),
@@ -65,59 +88,6 @@ export class CustodyController {
       await this.dispatcher.send<unknown, ReturnCustodyCommand>({
         commandName: 'assets.return-custody',
         assetCustodyId,
-        ...body,
-      }),
-    );
-  }
-}
-
-/**
- * The custody of one asset — issuing it, and reading who holds it.
- *
- * These two live under `assets/:assetId/custody` because the asset is the subject, and they are
- * declared on their own controller so the literal `assets/custody` prefix above stays unshadowed.
- */
-@ApiTags('assets')
-@ApiForbiddenResponse({ description: 'The caller lacks the permission the operation requires.' })
-@Controller({ path: 'assets', version: '1' })
-export class AssetCustodyController {
-  public constructor(private readonly dispatcher: AssetsDispatcher) {}
-
-  @Get(':assetId/custody')
-  @ApiOperation({ summary: 'Who holds this asset now, and who held it before' })
-  @ApiOkResponse({
-    description:
-      'The current holder is the open custody, derived rather than stored. Its absence means nobody holds the asset.',
-  })
-  public async forAsset(
-    @Param('assetId') assetId: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.ask<unknown, ReadAssetCustody>({
-        queryName: 'assets.asset-custody',
-        assetId,
-        ...numbered('page', page),
-        ...numbered('pageSize', pageSize),
-      }),
-    );
-  }
-
-  @Post(':assetId/custody')
-  @ApiOperation({ summary: 'Issue an asset to an employment. The asset must be available' })
-  @ApiOkResponse({
-    description:
-      'Refused if the asset is already held, is not available, or the employment does not exist in this tenant.',
-  })
-  public async issue(
-    @Param('assetId') assetId: string,
-    @Body() body: IssueCustodyBody,
-  ): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.send<unknown, IssueCustodyCommand>({
-        commandName: 'assets.issue-custody',
-        assetId,
         ...body,
       }),
     );

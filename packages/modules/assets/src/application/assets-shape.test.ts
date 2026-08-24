@@ -6,7 +6,7 @@ import type { UnitOfWork } from '@work/kernel';
 
 import { assetsModule } from './assets-module.js';
 import { inMemoryAssetsStores } from './in-memory-stores.js';
-import { ALL_ASSETS_PERMISSIONS } from './assets-permissions.js';
+import { ALL_ASSETS_PERMISSIONS, AssetsPermissions } from './assets-permissions.js';
 
 /**
  * The module's declared shape, and what it never does on its own.
@@ -153,7 +153,14 @@ describe('what nothing here does automatically', () => {
 });
 
 describe('the module’s declared shape', () => {
-  it('publishes seven commands and five queries, and nothing else', () => {
+  /**
+   * Checkpoint 3 added one query and this list grew by exactly one entry.
+   *
+   * The count in the name is deliberate: the assertion is the full set rather than a length, so a
+   * handler appearing here has to be added on purpose. `assets.custody-summary` is the addition, and
+   * the test below states what it is allowed to be.
+   */
+  it('publishes seven commands and six queries, and nothing else', () => {
     const module = moduleUnderTest();
 
     expect((module.commands ?? []).map((handler) => handler.commandName).sort()).toEqual([
@@ -168,10 +175,31 @@ describe('the module’s declared shape', () => {
     expect((module.queries ?? []).map((handler) => handler.queryName).sort()).toEqual([
       'assets.asset-custody',
       'assets.categories',
+      'assets.custody-summary',
       'assets.employment-custody',
       'assets.read-asset',
       'assets.search-assets',
     ]);
+  });
+
+  /**
+   * The reporting query Checkpoint 3 added is a **read**, behind a permission that already existed.
+   *
+   * A summary that arrived as a command would be a reporting run that wrote something; a summary
+   * behind a permission of its own would be a permission minted for a capability rather than for an
+   * authority, which the phase's authorizations forbid. It discloses strictly less than the two
+   * custody reads that already sit behind `assets.custody.read`.
+   */
+  it('adds its reporting read behind the custody permission that already existed', () => {
+    const module = moduleUnderTest();
+    const summary = (module.queries ?? []).find(
+      (handler) => handler.queryName === 'assets.custody-summary',
+    );
+
+    expect(summary?.permission).toBe(AssetsPermissions.custodyRead);
+    expect((module.commands ?? []).map((handler) => handler.commandName)).not.toContain(
+      'assets.custody-summary',
+    );
   });
 
   it('declares seven permissions and is named assets', () => {

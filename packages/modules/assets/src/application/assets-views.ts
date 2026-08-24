@@ -1,5 +1,6 @@
 import type { AssetCategoryState } from '../domain/asset-category.js';
 import type { AssetState } from '../domain/asset.js';
+import { custodyAgeing } from '../domain/custody-ageing.js';
 import type { CustodyRecord } from '../domain/custody.js';
 import type { AssetCategoryView, AssetView, CustodyView } from '../contracts/views.js';
 
@@ -43,8 +44,12 @@ export const assetView = (state: AssetState): AssetView => ({
  * `employmentId` is the only personal reference that leaves this module, and it is an employment
  * rather than a person (AD-001). No name is resolved, joined or cached on the way out — a screen that
  * wants one asks the module that owns it.
+ *
+ * **`asAt` is a parameter rather than a clock read.** The ageing figures are computed here, from the
+ * dates already on the row, against a date the caller can see in the response. A view that reached for
+ * the clock itself would publish a number nobody could reproduce.
  */
-export const custodyView = (state: CustodyRecord): CustodyView => ({
+export const custodyView = (state: CustodyRecord, asAt: string): CustodyView => ({
   assetCustodyId: state.assetCustodyId,
   assetId: state.assetId,
   employmentId: state.employmentId,
@@ -54,4 +59,5 @@ export const custodyView = (state: CustodyRecord): CustodyView => ({
   ...(state.returnedOn === undefined ? {} : { returnedOn: state.returnedOn }),
   ...(state.issueNote === undefined ? {} : { issueNote: state.issueNote }),
   ...(state.returnNote === undefined ? {} : { returnNote: state.returnNote }),
+  ...custodyAgeing(state, asAt),
 });

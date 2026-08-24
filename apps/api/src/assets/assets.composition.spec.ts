@@ -113,14 +113,40 @@ describe('the assets composition', () => {
     expect([...new Set(imports)].sort()).toEqual(['@work/assets', '@work/kernel', '@work/payroll']);
   });
 
-  it('registers seven commands, five queries and seven permissions', () => {
+  /**
+   * Checkpoint 3 added one query and no permission, and both halves of that are asserted.
+   *
+   * A reporting read that arrived with a permission of its own would be a permission minted for a
+   * capability; `assets.custody-summary` sits behind the `assets.custody.read` that already existed
+   * and discloses strictly less than the two reads beside it.
+   */
+  it('registers seven commands, six queries and seven permissions', () => {
     const module = composed();
 
     expect(module.name).toBe('assets');
     expect(module.commands ?? []).toHaveLength(7);
-    expect(module.queries ?? []).toHaveLength(5);
+    expect(module.queries ?? []).toHaveLength(6);
     expect(module.permissions ?? []).toHaveLength(7);
-    expect(module.eventHandlers ?? []).toHaveLength(0);
+  });
+
+  /**
+   * **No event handler, at the composition root — which is where one would actually be registered.**
+   *
+   * This is D-5.3-11 as a test rather than as prose. The mechanism exists and Employment already
+   * raises `employment.employment.ended`, so subscribing is reachable; the repository's only
+   * `EventHandler` is Identity reacting to its own event, and dispatch here is post-commit,
+   * in-process and at-most-once with no outbox (ADR-0050). A module that closed custody on an event
+   * it might never receive would lose an asset to any restart mid-dispatch.
+   *
+   * Assets is asked; it never subscribes. An entry appearing in this array is that decision being
+   * reversed, and it should fail here.
+   */
+  it('subscribes to no event, and registers no handler that could receive one', () => {
+    expect(composed().eventHandlers ?? []).toHaveLength(0);
+
+    for (const absent of ['eventHandlers', 'EventHandler', 'onEmploymentEnded', 'subscribe']) {
+      expect(SOURCE).not.toContain(absent);
+    }
   });
 
   /**

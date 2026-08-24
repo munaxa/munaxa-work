@@ -2,7 +2,13 @@ import { Repository } from '@work/persistence';
 import type { Transaction } from '@work/kernel';
 
 import type { CustodyRecord } from '../domain/custody.js';
-import type { CustodyFilters, CustodyStore, Page, Paged } from '../application/assets-ports.js';
+import type {
+  CustodyFilters,
+  CustodyStore,
+  CustodySummary,
+  Page,
+  Paged,
+} from '../application/assets-ports.js';
 import { CUSTODY_COLUMNS, custodyState, custodyValues, type CustodyRow } from './asset-rows.js';
 import { insertRow, mutable, pageOf, predicateFor, type Filter } from './row-writer.js';
 
@@ -21,6 +27,12 @@ import { insertRow, mutable, pageOf, predicateFor, type Filter } from './row-wri
  * and both order newest-issued first with the identifier as a tiebreak so a page boundary never lands
  * in the middle of two custodies issued on one day.
  */
+/** The aggregate's own row shape. `min` over no rows is `null`, which is the empty tenant. */
+interface CustodySummaryRow {
+  readonly open_count: string;
+  readonly oldest_issued_on: string | null;
+}
+
 export class PostgresCustodyRepository
   extends Repository<CustodyRow & { version: number }>
   implements CustodyStore
@@ -74,6 +86,39 @@ export class PostgresCustodyRepository
       ],
       paged,
     );
+  }
+
+  /**
+   * What is open across the tenant, counted rather than listed.
+   *
+   * A count over a whole tenant cannot be assembled from pages in the application, so it is computed
+   * where the rows are. **It selects no identifier** — a count and a minimum date, and nothing that
+   * names an asset, a custody or an employment.
+   *
+   * The oldest issue date is projected with `to_char` for the same reason every civil date in this
+   * module is: a `date` that came back as a driver's `Date` would arrive shifted by a timezone nobody
+   * chose. The elapsed days are then derived in the application, so one implementation of that
+   * arithmetic serves both this and the item reads.
+   *
+   * Row-level security is what confines this to one tenant; the predicate names no tenant column of
+   * its own beyond the one every read here carries.
+   */
+  public async openSummary(transaction: Transaction): Promise<CustodySummary> {
+    const rows = await transaction.execute<CustodySummaryRow>(
+      `select count(*)::text as open_count,
+              to_char(min(issued_on), 'YYYY-MM-DD') as oldest_issued_on
+         from asset_custody
+        where tenant_id = $1 and state = 'open' and deleted_at is null`,
+      [transaction.tenantId],
+    );
+    const row = rows[0];
+
+    if (row === undefined) return { openCount: 0 };
+
+    return {
+      openCount: Number(row.open_count),
+      ...(row.oldest_issued_on === null ? {} : { oldestIssuedOn: row.oldest_issued_on }),
+    };
   }
 
   public insert(transaction: Transaction, state: CustodyRecord): Promise<void> {

@@ -84,7 +84,8 @@
       "returned_on_in_future": "لا يمكن تسجيل إرجاع بتاريخ مستقبلي.",
       "returned_before_issued": "لا يمكن إرجاع أصل قبل تاريخ تسليمه.",
       "return_note_too_long": "الملاحظة طويلة أكثر من اللازم.",
-      "custody_not_open": "تم تسجيل إرجاع هذه العهدة بالفعل."
+      "custody_not_open": "تم تسجيل إرجاع هذه العهدة بالفعل.",
+      "as_at_malformed": "أدخل تاريخ الاحتساب بالصيغة YYYY-MM-DD."
     },
     "conflict": {
       "category_code_taken": "هذا الرمز مستخدم بالفعل لنوع أصل آخر.",

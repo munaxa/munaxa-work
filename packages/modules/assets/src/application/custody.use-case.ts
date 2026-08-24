@@ -1,6 +1,7 @@
 import { success, uuidV7, type Command, type CommandHandler } from '@work/kernel';
 
 import { CUSTODY_ELIGIBLE_STATUS } from '../domain/assets-vocabulary.js';
+import { civilDateOf } from '../domain/custody-ageing.js';
 import { issueCustody, returnCustody } from '../domain/custody.js';
 import { conflicted, notFound, refusedBy } from './assets-context.js';
 import { AssetsPermissions } from './assets-permissions.js';
@@ -131,11 +132,3 @@ export const returnCustodyHandler = (
       return success({ assetCustodyId: held.assetCustodyId });
     }),
 });
-
-/**
- * The civil date at an instant, in UTC.
- *
- * The same helper and the same stated limitation every module before this one carries: near midnight
- * far from UTC the server's day may differ from the tenant's by one.
- */
-const civilDateOf = (instant: Date): string => instant.toISOString().slice(0, 10);

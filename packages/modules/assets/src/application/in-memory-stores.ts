@@ -153,6 +153,21 @@ const custodyStore = (rows: Map<string, CustodyRecord>): CustodyStore => ({
       ),
     ),
 
+  // The same aggregate the SQL computes: a count and the earliest issue date, and no identifier.
+  openSummary: (_transaction: Transaction) => {
+    const open = [...rows.values()].filter((row) => row.state === 'open');
+    const oldest = open.reduce<string | undefined>(
+      (earliest, row) =>
+        earliest === undefined || row.issuedOn < earliest ? row.issuedOn : earliest,
+      undefined,
+    );
+
+    return Promise.resolve({
+      openCount: open.length,
+      ...(oldest === undefined ? {} : { oldestIssuedOn: oldest }),
+    });
+  },
+
   forEmployment: (
     _transaction: Transaction,
     employmentId: string,

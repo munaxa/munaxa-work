@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -7,6 +7,7 @@ import type { UnitOfWork } from '@work/kernel';
 import { assetsModule } from './assets-module.js';
 import { inMemoryAssetsStores } from './in-memory-stores.js';
 import { CUSTODY_STATES } from '../domain/assets-vocabulary.js';
+import { ALL_CODE, IDENTIFIERS, SOURCE_ROOT, codeOf, sourceFiles } from './source-scan.fixture.js';
 
 /**
  * The negative space: what this module deliberately does **not** contain.
@@ -20,45 +21,6 @@ import { CUSTODY_STATES } from '../domain/assets-vocabulary.js';
  * scan that could not tell prose from code would force those explanations out of exactly the files
  * that most need them.
  */
-
-const SOURCE_ROOT = join(process.cwd(), 'src');
-
-const sourceFiles = (directory: string): readonly string[] =>
-  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
-
-    if (entry.isDirectory()) return sourceFiles(path);
-    if (!entry.name.endsWith('.ts')) return [];
-    // Test doubles, suites and the database fixture describe absences in order to assert them, and
-    // the fixture legitimately constructs the event dispatcher `PostgresUnitOfWork` requires.
-    // Scanning them would make this file fail on its own supporting cast rather than on the module.
-    if (
-      entry.name.includes('.test.') ||
-      entry.name.includes('test-harness') ||
-      entry.name.includes('.fixture.')
-    ) {
-      return [];
-    }
-    return [path];
-  });
-
-const codeOf = (path: string): string =>
-  readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
-
-const ALL_CODE = sourceFiles(SOURCE_ROOT).map(codeOf).join('\n');
-
-/**
- * The same code with its string literals removed as well.
- *
- * Used by the scans that ask whether a *concept* is implemented. A Swagger description saying "no
- * valuation basis: neither is built" is prose that happens to live in a string, and a scan that could
- * not tell it from an identifier would force the API to stop documenting its own boundaries — which
- * is the same mistake as scanning comments, one layer down. The scans that read command and query
- * *names* deliberately use `ALL_CODE`, because there the string literal is the thing under test.
- */
-const IDENTIFIERS = ALL_CODE.replace(/'[^']*'|"[^"]*"|`[^`]*`/g, "''");
 
 const NEVER_EXECUTED: UnitOfWork = {
   // Typed rather than asserted: `UnitOfWork` has exactly one method, so a real implementation costs a

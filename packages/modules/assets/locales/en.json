@@ -84,7 +84,8 @@
       "returned_on_in_future": "A return cannot be recorded with a future date.",
       "returned_before_issued": "An asset cannot be returned before it was issued.",
       "return_note_too_long": "That note is too long.",
-      "custody_not_open": "This custody has already been returned."
+      "custody_not_open": "This custody has already been returned.",
+      "as_at_malformed": "Give the as-at date as YYYY-MM-DD."
     },
     "conflict": {
       "category_code_taken": "An asset type already uses that code.",

@@ -21,6 +21,7 @@ const ASSETS_API = join(process.cwd(), '..', '..', 'packages', 'modules', 'asset
 const CONTROLLER_FILES = [
   'asset-category.controller.ts',
   'asset.controller.ts',
+  'asset-custody.controller.ts',
   'custody.controller.ts',
 ];
 
@@ -47,11 +48,11 @@ const dispatchedNames = (): readonly string[] =>
     .map((match) => match.slice(match.indexOf("'") + 1, -1));
 
 describe('the assets HTTP surface', () => {
-  it('dispatches exactly the twelve names the module registers, and no thirteenth', () => {
+  it('dispatches exactly the thirteen names the module registers, and no fourteenth', () => {
     const dispatched = dispatchedNames();
 
-    expect(dispatched).toHaveLength(12);
-    expect(new Set(dispatched).size).toBe(12);
+    expect(dispatched).toHaveLength(13);
+    expect(new Set(dispatched).size).toBe(13);
   });
 
   /**
@@ -134,11 +135,14 @@ describe('the assets HTTP surface', () => {
    *
    * The Checkpoint 1 assertion here forbade every custody route by name. Two of those words —
    * `custody` and `return` — describe an approved capability now, so the blanket ban became stale.
-   * It is **replaced with an exact set**: these twelve paths and no thirteenth, plus a still-exact
-   * ban on the words that describe capabilities nobody has authorized. It was not deleted, and the
-   * replacement is stricter, because an exact set forbids everything a list of words would miss.
+   * It is **replaced with an exact set**: these paths and no other, plus a still-exact ban on the
+   * words that describe capabilities nobody has authorized. It was not deleted, and the replacement
+   * is stricter, because an exact set forbids everything a list of words would miss.
+   *
+   * Checkpoint 3 added exactly one entry — `summary`, the aggregate read. It is a literal segment,
+   * which is why the ordering assertion below matters as much as this one.
    */
-  it('publishes exactly the twelve paths this checkpoint approves, and no other', () => {
+  it('publishes exactly the paths this checkpoint approves, and no other', () => {
     const code = CONTROLLER_FILES.map(codeOf).join('\n');
     const paths = [...code.matchAll(/@(?:Get|Post)\(\s*'?([^')]*)'?\s*\)/g)].map(
       (match) => match[1] ?? '',
@@ -152,7 +156,22 @@ describe('the assets HTTP surface', () => {
       ':assetId/custody',
       ':assetId/custody',
       ':assetId/status',
+      'summary',
     ]);
+  });
+
+  /**
+   * `summary` is a literal segment on a controller that also publishes a collection read.
+   *
+   * Nest resolves in declaration order, so a `summary` declared after `@Get()` would still work while
+   * one declared after a parameterised sibling would not. Asserting the order rather than the outcome
+   * is what stops a later route being inserted above it.
+   */
+  it('declares the literal summary segment before the collection read it shares a controller with', () => {
+    const code = codeOf('custody.controller.ts');
+
+    expect(code.indexOf("@Get('summary')")).toBeGreaterThan(-1);
+    expect(code.indexOf("@Get('summary')")).toBeLessThan(code.indexOf('@Get()'));
   });
 
   it('publishes no route for a capability nobody has authorized', () => {
