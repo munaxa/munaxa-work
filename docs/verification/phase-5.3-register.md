@@ -1,12 +1,17 @@
 # Phase 5.3 — Assets & Custody · Decision Register
 
-## Status: **CHECKPOINTS 1, 2 AND 3 IMPLEMENTED** · Checkpoint 4 not started
+## Status: **ALL FOUR CHECKPOINTS IMPLEMENTED · PHASE 5.3 NOT CLOSED**
+
+*Four of four checkpoints are built and verified. The phase is **not** complete: several capabilities
+its specification requires are unbuilt because the decisions behind them are still open — see
+**Phase 5.3 scope, reconciled** below. A checkpoint count is not an acceptance criterion.*
 
 *Opened 2026-08-23 against `3ad9fd7` (`main`, immediately after Phase 5.2 merged as PR #14).
 Checkpoint 1 implemented 2026-08-23 — see
 [`phase-5.3-checkpoint-1.md`](./phase-5.3-checkpoint-1.md). Checkpoint 2 implemented the same day —
 see [`phase-5.3-checkpoint-2.md`](./phase-5.3-checkpoint-2.md). Checkpoint 3 implemented 2026-08-24 —
-see [`phase-5.3-checkpoint-3.md`](./phase-5.3-checkpoint-3.md).*
+see [`phase-5.3-checkpoint-3.md`](./phase-5.3-checkpoint-3.md). Checkpoint 4 implemented the same day —
+see [`phase-5.3-checkpoint-4.md`](./phase-5.3-checkpoint-4.md).*
 
 > **Historical note · the register when it opened.** The paragraph below was true when this register
 > was written and is preserved rather than rewritten: *"Nothing in Phase 5.3 is implemented. There is
@@ -726,10 +731,45 @@ Blocks nothing. It removes a question from Checkpoint 4's path rather than addin
 
 ---
 
+## Phase 5.3 scope, reconciled · 2026-08-24
+
+Recorded so a checkpoint count is never mistaken for a completed phase.
+
+### Built and verified
+
+The asset catalogue and inventory · the custody lifecycle, with one custodian per asset enforced by a
+partial unique index and a returned custody immutable at the database · derived custody ageing and an
+aggregate outstanding summary · the Assets-side offboarding clearance contribution.
+
+### Required by the specification and **not built**
+
+| Capability | Why not |
+|---|---|
+| `AssetIncident` — loss, damage, theft, assessment | **D-5.3-05** (condition scale) is OPEN |
+| Liability decision and authorized deduction (AD-005) | **D-5.3-03** is OPEN |
+| `CustodyTransfer` — direct handover | **D-5.3-08** is OPEN |
+| Custody cancellation and correction | **D-5.3-10** is OPEN |
+| Acknowledgement of receipt and of liability | Settled in principle by **D-5.3-02**, and still unbuilt — Checkpoint 2 built the custody period without it |
+| The AD-006 clearance **waiver** with reason and approval | Not authorized in any checkpoint; the blocking half of AD-006 is built and the waiver half is not |
+| Whether custody requires an *active* employment | **D-5.3-07** is OPEN |
+| Condition at issue and at return, expected return, valuation basis | Downstream of D-5.3-05 and D-5.3-03 |
+
+### Outside this phase
+
+Self-service custody with employee acknowledgement is **`NOT VERIFIED` repository-wide** (ADR-0032):
+a principal resolves to a tenant membership rather than to an employment, which is why `read-own` is
+declared in ten modules and enforced in none. Nothing is stubbed for it here.
+
+Offboarding itself — the clearance decision, the case, the settlement — is **Phase 11.2** and is not
+Assets' to own.
+
+---
+
 ## Change log
 
 | Date | Change |
 |---|---|
+| 2026-08-24 | **Checkpoint 4 implemented, and Phase 5.3 reconciled without being closed.** **D-5.3-01 approved by the owner as option (a)** and implemented as approved: an employment ending alters no custody, and the Assets-side truth is `open → outstanding`. One derived read, **no table, no column, no migration, no permission and no cross-module contract**. D-5.3-11 preserved — nothing subscribes. D-5.3-03, D-5.3-05, D-5.3-07, D-5.3-08 and D-5.3-10 remain **OPEN and untouched**; D-5.3-02, D-5.3-04, D-5.3-06 and D-5.3-09 were not reopened or weakened. Six exact assertions became stale because the query and route sets genuinely grew; each was reconciled and paired with a positive assertion, and none was deleted. **The phase is recorded as not complete**, with the unbuilt capabilities named above. |
 | 2026-08-24 | **Checkpoint 3 investigation and implementation.** **D-5.3-11 opened and settled by existing evidence** — Assets does not subscribe to Employment; ADR-0050, ADR-0058 and ADR-0053 answer it, and the repository's only `EventHandler` is intra-module. **D-5.3-01 remains OPEN and undecided**, and the new reads are built so they cannot decide it by accident. D-5.3-03, D-5.3-05, D-5.3-07, D-5.3-08 and D-5.3-10 remain OPEN and untouched; D-5.3-02, D-5.3-04, D-5.3-06 and D-5.3-09 were not reopened or weakened. Checkpoint 3 added **no table, no column, no migration and no permission**. |
 | 2026-08-23 | **Checkpoint 2 implemented.** One table, two commands, two reads, three permissions, one additive migration, one cross-module read that creates no contract. **D-5.3-09 approved and implemented**; D-5.3-01, D-5.3-03, D-5.3-05, D-5.3-07, D-5.3-08 and D-5.3-10 all remain **OPEN and untouched**, and no settled decision was reopened. Seven negative-space assertions became stale because the approved capability genuinely changed the boundary; each was **replaced with a more exact statement**, none deleted. |
 | 2026-08-23 | **Checkpoint 2 investigation.** Four decisions opened — D-5.3-07 (active versus existing employment), D-5.3-08 (transfer authority), D-5.3-09 (retirement while in custody), D-5.3-10 (correction and cancellation). **None approved.** D-5.3-01, D-5.3-03 and D-5.3-05 remain OPEN and unchanged. A shipped Relations defect was found and recorded rather than fixed. Checkpoint 2 confirmed to be blocked by no decision; D-5.3-09 is a behaviour the owner should confirm at authorization. |
