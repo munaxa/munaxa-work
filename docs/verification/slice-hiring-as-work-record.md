@@ -330,7 +330,9 @@ slice adds no migration; the run confirms the schema this branch carries is stil
 
 ## L. Git state
 
-- **Commit:** `6e72f94` — *Product Slice — Hiring as Work*
+- **Commit:** `12f0edf` — *Product Slice — Hiring as Work*, which carries every file listed above.
+  This document's own hash line is filled in by the small follow-up commit directly after it, since
+  a commit cannot record its own identifier.
 - **Branch:** `claude/munaxa-product-readiness-audit-8mr34d`, pushed to `origin`
 - **26 files changed**: 24 under `apps/admin`, 2 locale catalogues. `sections.tsx` deleted.
 
