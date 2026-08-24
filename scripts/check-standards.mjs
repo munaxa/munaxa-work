@@ -90,6 +90,24 @@ const ANDROID_CLASS_FILE = /^[A-Z][A-Za-z0-9]*\.(kt|java)$/;
 /** Names the Android build looks up literally. */
 const ANDROID_FIXED_NAMES = new Set(['AndroidManifest.xml']);
 
+/**
+ * A Next.js App Router directory, whose dynamic segments the router names (ADR-0075).
+ *
+ * `[employmentId]`, `[...slug]`, `[[...slug]]`, `(group)` and `@slot` are routing syntax rather
+ * than folders somebody named badly, and the identifier inside is still checked: it is `camelCase`,
+ * exactly as an identifier in this workspace is. A folder that is neither routing syntax nor
+ * kebab-case is still a violation, so the directory every future screen lives in stays checked.
+ */
+const APP_ROUTER = /^apps\/[a-z0-9-]+\/src\/app\//;
+const ROUTE_PARAMETER = '[a-z][a-zA-Z0-9]*';
+const ROUTE_SEGMENT = new RegExp(
+  `^(\\[${ROUTE_PARAMETER}\\]` + // [employmentId]
+    `|\\[\\.\\.\\.${ROUTE_PARAMETER}\\]` + // [...slug]
+    `|\\[\\[\\.\\.\\.${ROUTE_PARAMETER}\\]\\]` + // [[...slug]]
+    `|\\([a-z0-9]+(-[a-z0-9]+)*\\)` + // (group)
+    `|@${ROUTE_PARAMETER})$`, // @slot
+);
+
 /** Dotfiles are named by the tool that reads them, in every ecosystem. */
 const DOTFILE = /^\./;
 /** Ecosystem files whose names are fixed by the tools that read them. */
@@ -145,9 +163,11 @@ const checkNaming = (file) => {
     ? [SNAKE_FILE, SNAKE_FOLDER, 'snake_case']
     : [KEBAB_FILE, KEBAB_FOLDER, 'kebab-case'];
 
+  const routed = APP_ROUTER.test(file);
   const segments = file.split('/');
   const name = segments.pop();
   for (const folder of segments) {
+    if (routed && ROUTE_SEGMENT.test(folder)) continue;
     // These ecosystems sit under kebab-case folders that predate their own convention.
     const pattern = snake && !folder.includes('_') ? KEBAB_FOLDER : folderPattern;
     if (!pattern.test(folder)) fail(file, `Folder "${folder}" is not ${convention}.`);

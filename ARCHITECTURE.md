@@ -60,6 +60,17 @@ private, and the lint layer enforces that rather than a review comment.
 | [`recruitment`](docs/modules/recruitment.md) | Hiring: requisitions and their approval, vacancies, candidates, applications and their pipeline, interviews and feedback, offers, and the transition that turns an accepted offer into a Person and an Employment | 6 |
 | [`onboarding`](docs/modules/onboarding.md) | The induction: configurable plans and their immutable versions, the onboarding of one employment, tasks with owners and due dates, completion and cancellation, and the reconciliation that guarantees a joiner has one | 7 |
 | [`attendance`](docs/modules/attendance.md) | When people actually worked: raw time events, shifts, schedules and rosters, attendance policies, the calculated day with its exceptions, corrections that never rewrite a punch, and the frozen snapshot Payroll reads | 8 |
+| [`leave`](docs/modules/leave.md) | Authorized absence: tenant-configured types and versioned policies, entitlement, an append-only ledger with a derived balance, requests and their approval, accrual, leave-year closure and carry-over expiry | 9 |
+| [`compensation`](docs/modules/compensation.md) | What somebody is entitled to: versioned plans, the salary structure, components, effective-dated recurring and one-time compensation, adjustments and the set-based contract Payroll consumes | 10 |
+| [`payroll`](docs/modules/payroll.md) | What is actually paid: groups and calendars, periods, runs from an immutable snapshot, results whose lines explain their own arithmetic, exceptions, adjustments, approval, finalization, reversal and reconciliation | 11 |
+| [`documents`](docs/modules/documents.md) | Documents as records rather than as bytes: types, stable identities, insert-only versions, verification decisions and a queryable access trail | 4.1 |
+| [`letters`](docs/modules/letters.md) | Letters the organization issues: templates and their immutable versions, requests, approval, and an issued letter carrying a frozen snapshot of everything it stated | 5.1 |
+| [`performance`](docs/modules/performance.md) | What somebody was rated, against what, and why: scales, competency frameworks, goals, cycles, reviews, assessments, calibration and the immutable snapshot a completed rating is explained from | 13 |
+| [`learning`](docs/modules/learning.md) | What somebody was asked to do and what they hold: courses and versions, paths, mandatory rules, assignments, enrolments, assessments and certifications | 14A |
+| [`career`](docs/modules/career.md) | Where somebody could go next: career paths and plans, talent pools, succession plans, readiness stated by a person, development plans and advisory mobility recommendations | 15 |
+| [`workflow`](docs/modules/workflow.md) | Approvals about records other modules own: definitions and versions, approval groups, instances, sequential and parallel steps with quorum and conditions, delegation, manager routing, service levels, escalation and an automatic reminder | 16A–16E |
+| `relations` | Employee relations: the violation catalogue, immutable violations, investigations, a derived case lifecycle, corrections, repeat counting and the tenant's disciplinary ladder | 5.2 |
+| `assets` | Assets and custody: the tenant's catalogue, the inventory, the custody period, ageing, and the outstanding custody Offboarding will read as a clearance blocker | 5.3 |
 
 ### Acting inside another module
 
@@ -113,17 +124,32 @@ the platform, and retuning it there updates this product with no change here.
 ```text
 munaxa-work/
 ├── apps/
-│   ├── api/        # the product API
-│   ├── admin/      # the product's web client
-│   └── mobile/     # the product's mobile client
-├── packages/       # domain, contracts, utils, i18n — this product's own
-├── prisma/         # this product's schema and migrations, shared with no one
-└── infra/          # database roles, load tests
+│   ├── api/               # the product API
+│   ├── admin/             # HR administration
+│   ├── employee-portal/   # employee self-service — bootstrap only, Phase 18
+│   ├── manager-portal/    # manager self-service — bootstrap only, Phase 19
+│   └── mobile/            # the Flutter client — bootstrap only, Phase 19.1
+├── packages/
+│   ├── kernel/            # the shared kernel: CQRS, tenancy, effective dating, ports
+│   ├── modules/<module>/  # the business modules
+│   ├── config/            # the only place process.env is read
+│   ├── contracts/ sdk/ testing/ persistence/ country-packs/
+├── prisma/                # this product's schema and migrations, shared with no one
+└── scripts/ tooling/      # the gates, and the configuration they enforce
 ```
 
 ## Status
 
-No application code has been written yet. This repository was separated out of the AXA
-monorepo carrying the product's README and its history; the workspace, task graph, lint and
-TypeScript configuration, engineering standards, registry auth and CI above are real and run
-today, so the first app added here is checked from its first commit.
+**Eighteen business modules, 186 tables, 32 migrations, 513 HTTP routes and 285 declared
+permissions are built and tested.** The API, the Admin portal, the two self-service portal shells
+and the Flutter host all exist; [`docs/PHASES.md`](docs/PHASES.md) is the ledger of what each phase
+delivered and [`docs/verification/`](docs/verification/) holds every phase's report.
+
+Two things this repository deliberately does **not** contain, and both are why a deployment answers
+`401` until Platform supplies them: an implementation of `PlatformAuthenticationPort` beyond
+`UnauthenticatedPort`, and a `PermissionChecker` that grants anything (ADR-0001, ADR-0032). A
+`StoragePort` adapter and a `JobPort` adapter do not exist either — the first is unowned and the
+second was assigned to Platform by D-16E-03.
+
+Where the product stands *as a product*, area by area, with what is usable and what is not, is
+[`docs/verification/product-readiness-audit.md`](docs/verification/product-readiness-audit.md).

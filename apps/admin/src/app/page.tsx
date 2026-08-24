@@ -1,36 +1,67 @@
 import type { ReactNode } from 'react';
-import { Button, Card, ProductLogo } from '@munaxa/ui';
+import { Card } from '@munaxa/ui';
+
+import { NAVIGATION } from '../shell/navigation';
+import { isLanguage, translator, type Language } from '../shell/locale';
 
 /**
- * Bootstrap page. It consumes the platform design system and the product API; it owns no
- * business logic and holds no state a domain owns.
+ * The portal's home.
  *
- * The Button and Card are here deliberately rather than as decoration: they prove the design
- * system resolves, renders and themes correctly in a real build. A dependency nothing imports
- * is a dependency nobody has verified. `ProductLogo` earns its place the same way — it proves
- * the approved Work artwork is actually being served from this application's `public/`, which
- * a path in a config file does not.
+ * It was a card with a `Continue` button that continued to nothing — a control that did not do what
+ * it appeared to do, on the first screen anybody sees. It is now what a home should be when the
+ * product is a set of screens: the screens, named, in the reader's language, each one a link.
  *
- * The heading was the product's name set as text. This surface is where somebody first sees
- * which product they are in, and that is what the approved lockup is for; the name is the
- * logo's own accessible name, so nothing is lost to a screen reader and nothing is said twice.
- * The lockup says "Munaxa Work"; which surface of it this is belongs to the browser tab
- * and to the navigation this application grows later, not to a second line under the mark.
+ * It states nothing about the domain and fetches nothing. Every figure an HR administrator would
+ * want here — joiners this month, approvals waiting, documents expiring — is a cross-module read
+ * that does not exist yet, and inventing one on the home page would be the same failure as the
+ * button it replaces.
+ *
+ * The lockup is in the sidebar now, so the heading is text again: repeating the mark beside the
+ * mark is the product's name said twice.
  */
-const HomePage = (): ReactNode => (
-  <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 p-8">
-    <Card className="flex flex-col gap-4 p-6">
-      <h1>
-        <ProductLogo variant="horizontal" height={34} compactBelow="sm" priority />
-      </h1>
-      <p className="text-sm opacity-80">
-        Enterprise HR administration. Business screens arrive with the phase that owns them.
-      </p>
-      <div>
-        <Button>Continue</Button>
-      </div>
-    </Card>
-  </main>
-);
+
+interface PageProps {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+const single = (value: string | string[] | undefined): string | undefined =>
+  Array.isArray(value) ? value[0] : value;
+
+const HomePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
+  const parameters = await searchParams;
+  const requested = single(parameters['lang']);
+  const language: Language = isLanguage(requested) ? requested : 'en';
+  const t = translator(language);
+
+  return (
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold">{t('admin.home.title')}</h1>
+        <p className="text-sm opacity-80">{t('admin.home.lead')}</p>
+      </header>
+
+      {NAVIGATION.map((section) => (
+        <Card key={section.key} className="flex flex-col gap-3 p-6">
+          <h2 className="text-lg font-medium">{t(`admin.group.${section.key}`)}</h2>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {section.destinations.map((entry) => (
+              <li key={entry.key}>
+                <a
+                  href={`${entry.href}?lang=${language}`}
+                  className="text-sm underline underline-offset-4"
+                >
+                  {t(`admin.nav.${entry.key}`)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ))}
+
+      <p className="text-xs opacity-70">{t('admin.notice.readOnly')}</p>
+      <p className="text-xs opacity-70">{t('admin.notice.notSignedIn')}</p>
+    </div>
+  );
+};
 
 export default HomePage;

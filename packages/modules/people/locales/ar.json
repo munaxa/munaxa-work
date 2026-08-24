@@ -11,7 +11,6 @@
       "period_already_closed": "هذه الفترة انتهت بالفعل.",
       "country_code_malformed": "\"{country}\" ليس رمز دولة من حرفين.",
       "language_tag_malformed": "هذا ليس رمز لغة.",
-
       "date_of_birth_in_the_future": "تاريخ الميلاد لا يمكن أن يكون في المستقبل.",
       "date_of_birth_implausible": "تاريخ الميلاد هذا قديم أكثر من المعقول. تحقق من وجود خطأ في الإدخال.",
       "person_already_in_status": "هذا الشخص بالفعل {status}.",
@@ -20,27 +19,20 @@
       "person_cannot_merge_into_itself": "لا يمكن دمج الشخص في نفسه.",
       "person_cannot_duplicate_itself": "لا يمكن أن يكون الشخص تكرارًا لنفسه.",
       "document_reference_malformed": "هذا ليس مرجع مستند صحيحًا.",
-
       "identifier_value_empty": "قيمة المُعرِّف مطلوبة.",
       "identifier_expires_before_issue": "لا يمكن أن ينتهي المُعرِّف قبل تاريخ إصداره.",
       "identifier_withdrawn": "تم سحب هذا المُعرِّف. سجّل البديل بدلًا منه.",
-
       "nationality_already_held": "هذا الشخص يحمل هذه الجنسية بالفعل.",
-
       "email_malformed": "هذا ليس بريدًا إلكترونيًا.",
       "telephone_malformed": "هذا ليس رقم هاتف. أدخل رمز الدولة، مثل ‎+966500000000.",
       "priority_out_of_range": "الأولوية يجب أن تكون بين ١ و{limit}. الرقم ١ يُتصل به أولًا.",
-
       "address_requires_a_line": "العنوان يحتاج إلى سطر واحد على الأقل.",
       "address_has_too_many_lines": "عدد أسطر العنوان أكثر من اللازم.",
-
       "capability_level_unknown": "\"{level}\" ليس مستوى ضمن هذا المقياس.",
       "skill_requires_a_name": "المهارة تحتاج إلى اسم بالعربية والإنجليزية معًا.",
       "years_out_of_range": "سنوات الخبرة يجب أن تكون بين ٠ و{limit}.",
-
       "field_of_study_only_on_education": "التخصص يخص سجل التعليم، لا سجل {kind}.",
       "only_a_certification_expires": "الشهادة المهنية وحدها تنتهي صلاحيتها. أما {kind} فلا.",
-
       "record_already_withdrawn": "تم سحب هذا السجل بالفعل.",
       "duplicate_already_reviewed": "تمت مراجعة هذا بالفعل بنتيجة {status}."
     },
@@ -108,7 +100,8 @@
       "duplicates": "تكرارات محتملة",
       "asOf": "بتاريخ",
       "confidence": "درجة الثقة",
-      "reviewedBy": "راجعها"
+      "reviewedBy": "راجعها",
+      "status": "الحالة"
     },
     "hint": {
       "identityIsPermanent": "يُنشأ الشخص مرة واحدة. التوظيف والحضور والرواتب تشير إلى هذا السجل، وهو لا يشير إلى أيٍّ منها.",

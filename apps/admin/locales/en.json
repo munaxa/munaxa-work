@@ -1,0 +1,85 @@
+{
+  "admin": {
+    "shell": {
+      "skipToContent": "Skip to content",
+      "workspace": "Workspace",
+      "mainNavigation": "Main",
+      "navigation": "Navigation",
+      "openNavigation": "Open navigation",
+      "collapse": "Collapse navigation",
+      "expand": "Expand navigation",
+      "language": "Language",
+      "english": "English",
+      "arabic": "العربية"
+    },
+    "group": {
+      "workforce": "Workforce",
+      "operations": "Operations",
+      "talent": "Talent",
+      "governance": "Governance"
+    },
+    "nav": {
+      "home": "Home",
+      "people": "People",
+      "employment": "Employment",
+      "organization": "Organization",
+      "recruitment": "Recruitment",
+      "onboarding": "Onboarding",
+      "attendance": "Attendance",
+      "leave": "Leave",
+      "compensation": "Compensation",
+      "payroll": "Payroll",
+      "documents": "Documents",
+      "letters": "Letters",
+      "performance": "Performance",
+      "career": "Career",
+      "learning": "Learning",
+      "workflow": "Approvals"
+    },
+    "home": {
+      "title": "Munaxa Work",
+      "lead": "Enterprise HR administration. Every screen below reads the product API and shows what it returned.",
+      "screens": "Screens",
+      "openDirectory": "Open the workforce directory"
+    },
+    "record": {
+      "title": "Employee record",
+      "openRecord": "Open",
+      "identity": "Identity",
+      "employment": "Employment",
+      "placement": "Placement and manager",
+      "contracts": "Contracts",
+      "documents": "Documents",
+      "letters": "Letters",
+      "leave": "Leave",
+      "attendance": "Attendance",
+      "performance": "Performance",
+      "career": "Career",
+      "learning": "Learning",
+      "relations": "Employee relations",
+      "assets": "Assets in custody",
+      "boundaries": "What this record does not show",
+      "notFound": "No employment with this identifier was returned.",
+      "backToDirectory": "Back to the workforce directory"
+    },
+    "notice": {
+      "readOnly": "This portal reads; it writes nothing. Every change is an API capability the server decides.",
+      "sectionWithheld": "This section was withheld: the API did not answer for this caller.",
+      "eachSectionIsItsOwnPermission": "Each section is a separate request under its own permission, so a section may be withheld while its neighbours are not.",
+      "identifiersNotNames": "Where a name belongs to another module and was not returned, a shortened identifier is shown rather than a name this screen invented.",
+      "noDocumentContent": "Document content is not stored by this product: there is no storage adapter, so nothing here can be opened or downloaded.",
+      "notSignedIn": "No principal is authenticated: this deployment has no Platform authentication adapter, so every read fails closed and every section is empty.",
+      "noOffboarding": "Offboarding, final settlement, loans and benefits are not built.",
+      "noSelfService": "This record is the administrator's view. Employee and manager self-service are not built.",
+      "noPerformanceRead": "Performance publishes no per-employment review read: the module holds that confirming a review exists for a named employment is itself a disclosure, so this record does not ask for one.",
+      "noCompensationOnRecord": "Salary and compensation are not on this record. Compensation publishes per-employment reads and putting them on the record everybody opens is a decision nobody has taken."
+    },
+    "label": {
+      "employmentId": "Employment",
+      "personId": "Person",
+      "asOf": "As at",
+      "empty": "Nothing to show.",
+      "unavailable": "Unavailable."
+    }
+  }
+}

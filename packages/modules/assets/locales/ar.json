@@ -33,7 +33,10 @@
       "custodyState": "حالة العهدة",
       "issue": "تسليم إلى موظف",
       "return": "تسجيل إرجاع",
-      "openOnly": "ما زال خارج المخزن"
+      "openOnly": "ما زال خارج المخزن",
+      "daysOutstanding": "أيام العُهدة المفتوحة",
+      "outstanding": "غير مُعاد",
+      "clearance": "إخلاء العُهد"
     },
     "status": {
       "registered": "مسجَّل",

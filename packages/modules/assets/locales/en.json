@@ -33,7 +33,10 @@
       "custodyState": "Custody status",
       "issue": "Issue to an employment",
       "return": "Record a return",
-      "openOnly": "Still out"
+      "openOnly": "Still out",
+      "daysOutstanding": "Days outstanding",
+      "outstanding": "Outstanding",
+      "clearance": "Assets clearance"
     },
     "status": {
       "registered": "Registered",

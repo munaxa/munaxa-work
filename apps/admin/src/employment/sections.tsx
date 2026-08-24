@@ -20,6 +20,11 @@ import { dateOf, nameIn, type Language } from './locale';
  * Organization's to resolve, and this screen has not asked it. Rendering a truncated identifier is
  * honest; caching a name here would be a second answer that goes stale on the first rename.
  *
+ * **Every row opens.** The listing was a dead end until the employee record existed: a workforce of
+ * ten thousand people that could not be opened is a report rather than a directory. The link
+ * carries the reader's language and the date the answer was resolved at, so the record opens
+ * showing the same day the list was showing.
+ *
  * **It says what Employment does not hold.** The boundaries section is not decoration: it is the
  * place a customer's administrator learns that leave status is Leave's and that work location is
  * not modelled, instead of concluding the field is missing.
@@ -34,6 +39,50 @@ interface SectionProps {
 
 /** An identifier, shortened for a table cell. Never a name this screen does not own. */
 const short = (id: string | undefined): string => (id === undefined ? '—' : `${id.slice(0, 8)}…`);
+
+/** The record's address, carrying the reader's language and the date the list was resolved at. */
+const recordHref = (employmentId: string, language: Language, asOf: string | undefined): string =>
+  `/employment/${employmentId}?lang=${language}${asOf === undefined ? '' : `&asOf=${asOf}`}`;
+
+/**
+ * One row of the directory, and the two cells that open the record.
+ *
+ * Both the number and the name link, because a reader reaches for whichever they were looking at;
+ * a row that is only clickable on one cell is a row people click twice.
+ *
+ * A plain anchor rather than `next/link`: every screen here is server-rendered with
+ * `cache: 'no-store'`, so a client-side transition would fetch the same page from the same server,
+ * and `next/link`'s default export is named `Link`, which this workspace's naming rule refuses.
+ */
+const WorkforceRow = ({
+  t,
+  language,
+  employment,
+  asOf,
+}: SectionProps & {
+  readonly employment: EmploymentView;
+  readonly asOf: string | undefined;
+}): ReactNode => {
+  const href = recordHref(employment.employmentId, language, asOf);
+
+  return (
+    <>
+      <td className="py-1 font-mono text-xs">
+        <a href={href} className="underline underline-offset-4">
+          {employment.employmentNumber}
+        </a>
+      </td>
+      <td className="py-1">
+        <a href={href} className="underline underline-offset-4">
+          {nameIn(employment.personName, language) ?? short(employment.personId)}
+        </a>
+      </td>
+      <td className="py-1">{t(`employment.status.${employment.status}`)}</td>
+      <td className="py-1 font-mono text-xs">{short(employment.assignment?.unitId)}</td>
+      <td className="py-1 font-mono text-xs">{short(employment.managerEmploymentId)}</td>
+    </>
+  );
+};
 
 export const WorkforceSection = ({
   t,
@@ -82,13 +131,7 @@ export const WorkforceSection = ({
         <tbody>
           {employments.map((employment) => (
             <tr key={employment.employmentId} className="border-t border-current/10">
-              <td className="py-1 font-mono text-xs">{employment.employmentNumber}</td>
-              <td className="py-1">
-                {nameIn(employment.personName, language) ?? short(employment.personId)}
-              </td>
-              <td className="py-1">{t(`employment.status.${employment.status}`)}</td>
-              <td className="py-1 font-mono text-xs">{short(employment.assignment?.unitId)}</td>
-              <td className="py-1 font-mono text-xs">{short(employment.managerEmploymentId)}</td>
+              <WorkforceRow t={t} language={language} employment={employment} asOf={asOf} />
             </tr>
           ))}
         </tbody>
