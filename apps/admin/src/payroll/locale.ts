@@ -1,61 +1,69 @@
-import ar from '@work/payroll/locales/ar.json';
-import en from '@work/payroll/locales/en.json';
+import adminAr from '../../locales/ar.json';
+import adminEn from '../../locales/en.json';
+import payrollAr from '@work/payroll/locales/ar.json';
+import payrollEn from '@work/payroll/locales/en.json';
+
+import type { Language, Translate } from '../shell/locale';
+
+export type { Language, Translate };
+export { directionOf, isLanguage } from '../shell/locale';
 
 /**
- * The payroll screens' text, in both first-class languages.
+ * The payroll screens' text: Payroll's own catalogue, and the portal's for the frame.
  *
- * The catalogues are the module's own — the same files `scripts/check-localization.mjs` gates —
- * rather than a second copy kept in the portal. A portal with its own strings is a portal whose
- * Arabic falls behind the module's on the first change nobody remembers to mirror.
+ * Every word a run, a period, an approval and an exception are described by belongs to Payroll — its
+ * eight run statuses, its period statuses and the twelve exception codes it can raise, each already
+ * shipping in both languages. What a *screen* is called belongs to no module and comes from the
+ * portal's own catalogue under `admin.`.
  *
- * A *code* is never translated here. A payroll-treatment code, an account reference, a payment
- * method and a deduction code are tenant or country-pack values, so the screen renders what the
- * customer stored rather than looking it up in a list this product ships — the same reason the
- * domain refuses to interpret them. A **status** and an **exception code** are different: those are
- * this module's own closed vocabularies, and a payroll operator reading `net_would_be_negative` in
- * English on an Arabic screen is a translation this product owes them.
+ * A **code** is never translated. A run kind, a treatment code, a payment method, an account
+ * reference, a rounding mode and a country-pack identifier are tenant or country-pack values, so the
+ * screen renders what the customer stored rather than looking it up in a list this product ships.
  */
 
-export const LANGUAGES = ['en', 'ar'] as const;
-export type Language = (typeof LANGUAGES)[number];
+const CATALOGUES: Record<Language, readonly unknown[]> = {
+  en: [adminEn, payrollEn],
+  ar: [adminAr, payrollAr],
+};
 
-export const isLanguage = (value: string | undefined): value is Language =>
-  value === 'en' || value === 'ar';
+const lookup = (catalogue: unknown, path: readonly string[]): string | undefined => {
+  let value: unknown = catalogue;
 
-/** Direction follows language. It is never a separate toggle — that is how they drift apart. */
-export const directionOf = (language: Language): 'ltr' | 'rtl' =>
-  language === 'ar' ? 'rtl' : 'ltr';
-
-const CATALOGUES: Record<Language, unknown> = { en, ar };
+  for (const segment of path) {
+    if (typeof value !== 'object' || value === null) return undefined;
+    value = (value as Record<string, unknown>)[segment];
+  }
+  return typeof value === 'string' ? value : undefined;
+};
 
 /**
- * Looks a catalogue key up, returning the key itself if it is missing.
+ * Looks a key up across both catalogues, returning the key itself if neither has it.
  *
  * Returning the key rather than an empty string is deliberate: a blank label looks like a design
- * choice and survives review, whereas `payroll.label.groups` on the screen is unmistakably a
- * missing translation. The gate makes this unreachable in a merged build.
+ * choice and survives review, whereas `payroll.label.runs` on the screen is unmistakably a missing
+ * translation. The localization gate makes this unreachable in a merged build.
  */
-export const translator =
-  (language: Language) =>
+export const payrollTranslator =
+  (language: Language): Translate =>
   (key: string): string => {
     const path = key.split('.');
-    let value: unknown = CATALOGUES[language];
 
-    for (const segment of path) {
-      if (typeof value !== 'object' || value === null) return key;
-      value = (value as Record<string, unknown>)[segment];
+    for (const catalogue of CATALOGUES[language]) {
+      const found = lookup(catalogue, path);
+
+      if (found !== undefined) return found;
     }
-    return typeof value === 'string' ? value : key;
+    return key;
   };
 
 /**
- * A bilingual value in the reader's language, falling back to the other one.
+ * A bilingual name in the reader's language, falling back to the other one.
  *
  * Both languages are required by the domain, so the fallback should never fire — it is here because
  * a screen that rendered nothing for a value the API did have would be a blank cell nobody could
  * explain.
  */
-export const textIn = (
+export const nameIn = (
   text: { readonly en: string; readonly ar: string } | undefined,
   language: Language,
 ): string => {

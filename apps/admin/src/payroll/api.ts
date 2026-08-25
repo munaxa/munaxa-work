@@ -2,8 +2,6 @@ import { loadPortalProcessEnvironment } from '@work/config';
 import type {
   AccountingLineView,
   DeductionDefinitionView,
-  DeductionLineView,
-  EarningLineView,
   PaymentInstructionView,
   PayrollAdjustmentView,
   PayrollApprovalChainView,
@@ -18,57 +16,55 @@ import type {
 } from '@work/payroll/contracts';
 
 /**
- * Reading the payroll from the API.
+ * Reading payroll from the API.
  *
  * The types come from the module's published *contracts*, never from its internals — which is what
- * the lint layer enforces, and what keeps this screen from breaking on a refactor it has no business
- * knowing about. **Nothing here touches a repository or a database.** Every figure on the screen
- * came out of an HTTP response.
+ * the lint layer enforces, and what keeps these screens from breaking on a refactor they have no
+ * business knowing about.
  *
- * **What this cannot do yet, and why.** Every business endpoint returns 401 until Platform's
- * authentication adapter is supplied; this repository authenticates nobody, by design (ADR-0032).
- * So these calls are written against the real contract and fail closed: an unreachable or
- * unauthorized API renders the empty state rather than an error page, because "not signed in yet" is
- * the expected condition today rather than a fault.
+ * **No screen reads the first row of anything.** The previous composition asked for the page of runs
+ * and then described `runs[0]` as though it were *the* run, and did the same with
+ * `results.items[0]`: an operator could not look at last month's payroll, and had no way to know
+ * they were not already. A run and a result are each addressed by a bounded read keyed on their own
+ * identifier — `payroll.run` and `payroll.payslip`, both of which answer `notFound` for an
+ * identifier they will not resolve — so a route resolves one, or renders not-found.
  *
- * **Several reads are expected to fail for most callers, and that is the design.** Results sit
- * behind `payroll.read-result`, adjustment *reasons* behind `payroll.adjust`, the accounting export
- * behind `payroll.accounting` and the payment file behind `payroll.payment`. A caller who can see
- * that a run covered 1,400 people and not what any of them was paid gets an empty results table —
- * which is exactly what that permission separation means, and the screen says so rather than
- * showing a blank.
+ * **Four permissions, four different refusals.** Payroll separates `payroll.read` (a run's shape and
+ * counts) from `payroll.read-result` (what a named person was paid), `payroll.accounting` (the
+ * journal) and `payroll.payment` (the instructions). A caller may hold the first and none of the
+ * rest, so each of those reads is kept as its own `undefined`-or-value and the screen says which was
+ * withheld rather than showing an empty table.
  *
- * **Every amount is rendered as the string the API sent.** Nothing here parses a monetary value into
- * a JavaScript number: 9,007,199,254,740,993 minor units becomes 9,007,199,254,740,992 the moment
- * anything does, and a payroll is exactly where that matters.
+ * **The total is the server's, always.** Both paged reads return `{ items, total }` counted in the
+ * database; a screen reporting `items.length` would tell somebody with fourteen hundred results that
+ * they have fifty.
+ *
+ * **Nothing here computes.** No net from a gross, no total of a column, no "latest" run, no period
+ * duration. Every figure is published or it is not shown.
  */
-
-export interface PayrollForDisplay {
-  readonly dashboard: PayrollDashboardView | undefined;
-  readonly groups: readonly PayrollGroupView[];
-  readonly definitions: readonly DeductionDefinitionView[];
-  readonly periods: readonly PayrollPeriodView[];
-  readonly runs: readonly PayrollRunView[];
-  /** The run the detail sections describe: the most recent one, or nothing. */
-  readonly run: PayrollRunView | undefined;
-  readonly exceptions: readonly PayrollExceptionView[];
-  readonly results: readonly PayrollResultView[];
-  readonly earnings: readonly EarningLineView[];
-  readonly deductions: readonly DeductionLineView[];
-  readonly payslip: PayslipView | undefined;
-  readonly approvals: PayrollApprovalChainView | undefined;
-  readonly adjustments: readonly PayrollAdjustmentView[];
-  readonly reconciliation: readonly PayrollReconciliationView[];
-  readonly accounting: readonly AccountingLineView[];
-  readonly payments: readonly PaymentInstructionView[];
-  /** True when the API could not be reached or refused the caller — the ordinary state today. */
-  readonly unavailable: boolean;
-  /** True when the run is visible but its figures are not: a permission boundary, not an error. */
-  readonly figuresWithheld: boolean;
-}
 
 const BASE = loadPortalProcessEnvironment().WORK_API_URL;
 
+/** What one screen shows at once. The server clamps its own bound; this is the request. */
+const PAGE = 'page=1&size=50';
+
+interface Paged<TItem> {
+  readonly items: readonly TItem[];
+  readonly total: number;
+}
+
+/** A page, or the fact that there was not one. Rows and the server's total travel together. */
+export interface Listing<TItem> {
+  readonly items: readonly TItem[];
+  readonly total: number;
+}
+
+/**
+ * One fetch, failing closed.
+ *
+ * `cache: 'no-store'` because a payroll page holds what named people were paid, and a cached copy of
+ * it is a company's salary bill sitting somewhere nobody chose.
+ */
 const read = async <TValue>(path: string): Promise<TValue | undefined> => {
   try {
     const response = await fetch(`${BASE}/api/v1/payroll${path}`, { cache: 'no-store' });
@@ -80,125 +76,115 @@ const read = async <TValue>(path: string): Promise<TValue | undefined> => {
   }
 };
 
-interface Page<TItem> {
-  readonly items: readonly TItem[];
+const listing = <TItem>(page: Paged<TItem> | undefined): Listing<TItem> | undefined =>
+  page === undefined ? undefined : { items: page.items, total: page.total };
+
+const itemsOf = <TItem>(
+  wrapper: { readonly items: readonly TItem[] } | undefined,
+): readonly TItem[] | undefined => wrapper?.items;
+
+export interface PayrollWorkspace {
+  /** Absent means refused. The cheapest read, and the signal for the rest. */
+  readonly dashboard: PayrollDashboardView | undefined;
+  readonly runs: Listing<PayrollRunView> | undefined;
+  readonly periods: Listing<PayrollPeriodView> | undefined;
+  readonly groups: readonly PayrollGroupView[] | undefined;
+  /** Deduction definitions are **per group**, so this is the first group's or nothing. */
+  readonly definitions: readonly DeductionDefinitionView[] | undefined;
+  /** Which group the definitions belong to, so the screen can name it rather than imply a tenant rule. */
+  readonly definitionsGroup: PayrollGroupView | undefined;
 }
 
-const itemsOf = <TItem>(page: Page<TItem> | undefined): readonly TItem[] => page?.items ?? [];
-
-const EMPTY: PayrollForDisplay = {
-  dashboard: undefined,
-  groups: [],
-  definitions: [],
-  periods: [],
-  runs: [],
-  run: undefined,
-  exceptions: [],
-  results: [],
-  earnings: [],
-  deductions: [],
-  payslip: undefined,
-  approvals: undefined,
-  adjustments: [],
-  reconciliation: [],
-  accounting: [],
-  payments: [],
-  unavailable: true,
-  figuresWithheld: false,
-};
-
 /**
- * The reads the screen makes.
+ * The payroll workspace: what is open, what has been run, and what the runs are configured from.
  *
- * The dashboard is read first and its failure is the signal: if the service will not answer the
- * cheapest question, the rest is a page of empty tables and a wall of failed requests.
+ * Four reads under one permission, issued together. Deduction definitions are asked for last because
+ * the module scopes them to a payroll group and publishes no tenant-wide read — asking for the first
+ * group's is the honest version, and the screen names the group.
  */
-export const loadPayroll = async (): Promise<PayrollForDisplay> => {
-  const dashboard = await read<PayrollDashboardView>('/dashboard');
-
-  if (dashboard === undefined) return EMPTY;
-
-  const configuration = await configured();
-  const runs = itemsOf(await read<Page<PayrollRunView>>('/runs?page=1&size=50'));
-  const run = runs[0];
+export const loadPayrollWorkspace = async (): Promise<PayrollWorkspace> => {
+  const [dashboard, runs, periods, groups] = await Promise.all([
+    read<PayrollDashboardView>('/dashboard'),
+    read<Paged<PayrollRunView>>(`/runs?${PAGE}`),
+    read<Paged<PayrollPeriodView>>(`/periods?${PAGE}`),
+    read<Paged<PayrollGroupView>>('/groups'),
+  ]);
+  const first = groups?.items[0];
 
   return {
-    ...EMPTY,
     dashboard,
-    unavailable: false,
-    ...configuration,
-    runs,
-    ...(run === undefined ? {} : await forRun(run)),
-  };
-};
-
-const configured = async (): Promise<
-  Pick<PayrollForDisplay, 'groups' | 'definitions' | 'periods'>
-> => {
-  const groups = itemsOf(await read<Page<PayrollGroupView>>('/groups'));
-  const first = groups[0];
-
-  return {
-    groups,
-    periods: itemsOf(await read<Page<PayrollPeriodView>>('/periods?page=1&size=50')),
-    // Deduction definitions are **per group**, so the screen shows the first group's rather than
-    // pretending there is a tenant-wide answer. There is no tenant-wide endpoint, and inventing
-    // one here would be a screen answering a question the module deliberately scopes.
+    runs: listing(runs),
+    periods: listing(periods),
+    groups: groups?.items,
+    definitionsGroup: first,
     definitions:
       first === undefined
-        ? []
+        ? undefined
         : itemsOf(
-            await read<Page<DeductionDefinitionView>>(
+            await read<{ readonly items: readonly DeductionDefinitionView[] }>(
               `/deduction-definitions?payrollGroupId=${first.payrollGroupId}`,
             ),
           ),
   };
 };
 
-/** Everything about one run. Each read stands on its own permission and may legitimately fail. */
-const forRun = async (
-  run: PayrollRunView,
-): Promise<
-  Omit<PayrollForDisplay, 'dashboard' | 'groups' | 'definitions' | 'periods' | 'runs'>
-> => {
+export interface RunForDisplay {
+  readonly run: PayrollRunView;
+  /** Absent means `payroll.read-result` was refused — not that the run produced nothing. */
+  readonly results: Listing<PayrollResultView> | undefined;
+  readonly exceptions: readonly PayrollExceptionView[] | undefined;
+  readonly adjustments: readonly PayrollAdjustmentView[] | undefined;
+  readonly approvals: PayrollApprovalChainView | undefined;
+  readonly reconciliation: readonly PayrollReconciliationView[] | undefined;
+  /** Absent means `payroll.accounting` was refused. Its own permission, its own answer. */
+  readonly accounting: Listing<AccountingLineView> | undefined;
+  /** Absent means `payroll.payment` was refused. */
+  readonly payments: Listing<PaymentInstructionView> | undefined;
+}
+
+/**
+ * One run, asked for first and on its own.
+ *
+ * An identifier the API will not resolve is a 404 rather than a page of refusals about a run that
+ * may not exist, and asking for seven more things about it would be seven requests spent to render
+ * nothing.
+ */
+export const loadRun = async (payrollRunId: string): Promise<PayrollRunView | undefined> =>
+  read<PayrollRunView>(`/runs/${payrollRunId}`);
+
+/** Everything else about it, in one round. */
+export const loadRunDetail = async (run: PayrollRunView): Promise<RunForDisplay> => {
   const id = run.payrollRunId;
-  const results = await read<Page<PayrollResultView>>(`/runs/${id}/results?page=1&size=50`);
-  const first = results?.items[0];
+  const [results, exceptions, adjustments, approvals, reconciliation, accounting, payments] =
+    await Promise.all([
+      read<Paged<PayrollResultView>>(`/runs/${id}/results?${PAGE}`),
+      read<{ readonly items: readonly PayrollExceptionView[] }>(`/runs/${id}/exceptions`),
+      read<{ readonly items: readonly PayrollAdjustmentView[] }>(`/runs/${id}/adjustments`),
+      read<PayrollApprovalChainView>(`/runs/${id}/approval-chain`),
+      read<{ readonly items: readonly PayrollReconciliationView[] }>(`/runs/${id}/reconciliation`),
+      read<Paged<AccountingLineView>>(`/runs/${id}/accounting-output?${PAGE}`),
+      read<Paged<PaymentInstructionView>>(`/runs/${id}/payment-instructions?${PAGE}`),
+    ]);
 
   return {
     run,
-    unavailable: false,
-    // The run reports how many results it produced. If it produced some and this caller was shown
-    // none, the difference is `payroll.read-result` — a boundary, not an outage.
-    figuresWithheld: results === undefined && run.resultCount > 0,
-    results: itemsOf(results),
-    exceptions: itemsOf(await read<Page<PayrollExceptionView>>(`/runs/${id}/exceptions`)),
-    approvals: await read<PayrollApprovalChainView>(`/runs/${id}/approval-chain`),
-    adjustments: itemsOf(await read<Page<PayrollAdjustmentView>>(`/runs/${id}/adjustments`)),
-    reconciliation: itemsOf(
-      await read<Page<PayrollReconciliationView>>(`/runs/${id}/reconciliation`),
-    ),
-    accounting: itemsOf(
-      await read<Page<AccountingLineView>>(`/runs/${id}/accounting-output?page=1&size=50`),
-    ),
-    payments: itemsOf(
-      await read<Page<PaymentInstructionView>>(`/runs/${id}/payment-instructions?page=1&size=50`),
-    ),
-    ...(await forResult(first?.payrollResultId)),
+    results: listing(results),
+    exceptions: itemsOf(exceptions),
+    adjustments: itemsOf(adjustments),
+    approvals,
+    reconciliation: itemsOf(reconciliation),
+    accounting: listing(accounting),
+    payments: listing(payments),
   };
 };
 
-/** One result's lines and payslip data, or nothing when the caller cannot see the figures. */
-const forResult = async (
-  payrollResultId: string | undefined,
-): Promise<Pick<PayrollForDisplay, 'earnings' | 'deductions' | 'payslip'>> => {
-  if (payrollResultId === undefined) return { earnings: [], deductions: [], payslip: undefined };
-
-  return {
-    earnings: itemsOf(await read<Page<EarningLineView>>(`/results/${payrollResultId}/earnings`)),
-    deductions: itemsOf(
-      await read<Page<DeductionLineView>>(`/results/${payrollResultId}/deductions`),
-    ),
-    payslip: await read<PayslipView>(`/results/${payrollResultId}/payslip`),
-  };
-};
+/**
+ * One employee's result, whole, from one bounded read.
+ *
+ * `PayslipView` carries the period, the payment date, the currency, the three published totals and
+ * **both line sets** together, so nothing here asks for earnings or deductions a second time — the
+ * module returns them together precisely so a screen cannot show one line set from one state beside
+ * a total from another. It answers `notFound` for a result it will not resolve.
+ */
+export const loadPayslip = async (payrollResultId: string): Promise<PayslipView | undefined> =>
+  read<PayslipView>(`/results/${payrollResultId}/payslip`);
