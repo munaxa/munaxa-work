@@ -324,7 +324,7 @@ migrations**, with **31 of 31 applied**. This slice adds none.
 
 ## L. Git state
 
-- **Commit:** `PAYROLL_COMMIT` — *Product Slice — Payroll as Work*, which carries every file listed
+- **Commit:** `9c27a54` — *Product Slice — Payroll as Work*, which carries every file listed
   above. (A commit cannot record its own identifier; the hash is filled in by the small follow-up
   commit directly after it, as the two previous slices did.)
 - **Branch:** `claude/munaxa-product-readiness-audit-8mr34d`, pushed to `origin`
