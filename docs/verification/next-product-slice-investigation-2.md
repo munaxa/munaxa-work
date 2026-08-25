@@ -750,6 +750,8 @@ Working tree: this document only. `package.json` carries seven local `pnpm.overr
 platform packages are built from source in this environment, and those are reverted before the
 commit so CI's `--frozen-lockfile` is unaffected.
 
+Commit carrying this document: `81b01aa`, on `claude/munaxa-product-readiness-audit-8mr34d`.
+
 ---
 
 # INVESTIGATION COMPLETE — AWAITING OWNER REVIEW AND SLICE AUTHORIZATION
