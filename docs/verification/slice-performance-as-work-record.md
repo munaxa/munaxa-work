@@ -432,7 +432,7 @@ was wired.
 | | |
 | --- | --- |
 | Branch | `claude/munaxa-product-readiness-audit-8mr34d` |
-| Commit | `COMMIT_HASH` |
+| Commit | ``0029811`` |
 | Working tree after commit | clean |
 | Registry workaround in `package.json` | none — `pnpm.overrides` holds only `sharp`, `postcss`, `js-yaml`, `deepmerge-ts` |
 | Files changed | 40 (5,524 insertions, 2,028 deletions) |
