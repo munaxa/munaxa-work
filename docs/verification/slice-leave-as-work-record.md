@@ -311,7 +311,7 @@ The admin build emits all three leave routes:
 ## L. Git state
 
 - Branch: `claude/munaxa-product-readiness-audit-8mr34d`
-- Commit: `COMMIT_HASH`
+- Commit: `45716fd`
 - Working tree clean after the commit.
 - **No local registry workaround committed.** The seven `pnpm.overrides` entries that point
   `@munaxa/*` at a source build in this environment are reverted before every commit, so CI's
