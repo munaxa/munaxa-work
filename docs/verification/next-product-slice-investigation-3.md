@@ -705,7 +705,7 @@ Run on the finished tree. **No result is a cache replay** — every task forced,
 ## R. Git
 
 - Branch: `claude/munaxa-product-readiness-audit-8mr34d`
-- Investigation commit: `COMMIT_HASH`
+- Investigation commit: `d619f37`
 - Working tree clean; this document is the only change.
 - **No local registry workaround committed.** `git diff` on `package.json` and `pnpm-lock.yaml` is
   empty.
