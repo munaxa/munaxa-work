@@ -1,138 +1,126 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { EmptyState, Page, PageHeader, Stack } from '@munaxa/ui';
 
-import { loadPerformance, type PerformanceForDisplay } from '../../performance/api';
-import { directionOf, isLanguage, translator, type Language } from '../../performance/locale';
+import { loadPerformanceRegister, registerAnsweredNothing } from '../../performance/api';
+import {
+  directionOf,
+  isLanguage,
+  performanceTranslator,
+  type Language,
+} from '../../performance/locale';
+import { Boundaries } from '../../performance/frame';
+import {
+  CyclesSection,
+  CycleSummary,
+  GoalsSection,
+  ReviewQueueSection,
+} from '../../performance/register';
 import {
   CategoriesSection,
-  CyclesSection,
   FrameworksSection,
   ScalesSection,
   TemplatesSection,
 } from '../../performance/configuration';
-import { GoalsSection, ProgressSection } from '../../performance/goals';
-import { OverviewSection, UnavailableSection } from '../../performance/overview';
 import {
   CalibrationSection,
   FeedbackSection,
   FindingsSection,
-  PanelSection,
   TalentSection,
-} from '../../performance/panel';
-import {
-  AssessmentsSection,
-  RatingSection,
-  ReviewQueueSection,
-  WorkingSection,
-} from '../../performance/reviews';
-import type { SectionProps } from '../../performance/sections';
+} from '../../performance/outcomes';
 
 /**
- * The performance screen: cycles, configuration, goals, reviews, the panel, calibration, the
- * nine-box and feedback.
+ * Performance, as work rather than as sixteen cards.
  *
- * Presentation only: it consumes the module's published contracts through the API and holds no
- * business logic of its own — no score computed a second time, no rule about who may read a review,
- * no rating derived here. Those live in the domain and the application service, and a screen that
- * reimplemented them would be a second, weaker answer to a question the API already decided. **It
- * reaches no repository and no database.**
+ * The screen this replaced stacked sixteen sections down one column, and five of them — the rating,
+ * the working, the assessments, the panel and the progress history — described **whichever record
+ * happened to be first** in the page the API returned, with nothing anywhere naming it. It opened
+ * nothing at all: there was no route in this application that could show one review or one goal.
  *
- * **`?lang=ar`** switches language *and* direction together. Direction follows language and is never
- * a separate control — separating them is how a page ends up left-aligned in Arabic.
+ * The order here is an HR administrator's own: which cycle is running, then **the review queue**,
+ * because that is the work, then the goals those reviews are measured against, then what came out
+ * of the cycle, and only then the configuration everybody is rated by.
  *
- * **Nothing on this page mutates anything.** There is no form, no button that posts and no state
- * this screen owns, which is the shape every Admin screen in this product has. Where a state permits
- * an action, the page names it and says the server decides — see `lifecycle.ts`. A workspace that
- * offered controls would be a second UI architecture, and one that offered controls the API would
- * refuse would be worse than offering none.
+ * **Every figure is the server's.** The cycle block is the cycle's own published fields; the count
+ * beside each section is `PagedResult.total`. The three figures the old overview counted in the
+ * browser from one page of fifty rows — completed, awaiting manager assessment, awaiting
+ * calibration — are gone, and the third was worse than a miscount: it derived a state the domain
+ * does not publish from "has a score and is not completed".
  *
- * **There is no "My Team".** The API honours a manager filter only for a caller who could already
- * read everything, so a picker here would be an administrator's filter wearing an employee's
- * identity. This product cannot yet resolve a signed-in person to their employment; the screen says
- * so rather than faking it.
+ * **`?lang=ar`** switches language *and* direction together.
+ *
+ * **It offers no control.** Opening a cycle, assessing, scoring, calibrating, completing and
+ * archiving are writes, and a request from this portal carries no principal, so a button here would
+ * post unauthenticated and answer 401.
+ *
+ * **There is no "My Team".** The API honours `managerEmploymentId` only for a caller who could
+ * already read everything, so a picker here would be an administrator's filter wearing an
+ * employee's identity. This product cannot yet resolve a signed-in person to their employment.
  */
-export default async function PerformancePage({
-  searchParams,
-}: {
-  readonly searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}): Promise<ReactNode> {
-  const parameters = (await searchParams) ?? {};
-  const requested = parameters['lang'];
-  const language: Language = isLanguage(typeof requested === 'string' ? requested : undefined)
-    ? (requested as Language)
-    : 'en';
-  const t = translator(language);
-  const performance = await loadPerformance();
+
+export const metadata: Metadata = { title: 'Performance' };
+
+interface PageProps {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+const single = (value: string | string[] | undefined): string | undefined =>
+  Array.isArray(value) ? value[0] : value;
+
+const BOUNDARIES = [
+  'performance.notice.readTeamUnavailable',
+  'performance.notice.noNotifications',
+  'performance.notice.noSchedule',
+  'performance.notice.noDocumentBytes',
+  'performance.notice.notAnonymous',
+  'performance.notice.noOkr',
+];
+
+const PerformancePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
+  const parameters = await searchParams;
+  const requested = single(parameters['lang']);
+  const language: Language = isLanguage(requested) ? requested : 'en';
+  const t = performanceTranslator(language);
+  const register = await loadPerformanceRegister();
   const props = { t, language };
 
   return (
-    <div dir={directionOf(language)} className="flex flex-col gap-6 p-8">
-      <h1 className="text-2xl font-medium">{t('performance.label.performance')}</h1>
+    <div dir={directionOf(language)} lang={language}>
+      <Page width="wide">
+        <PageHeader
+          title={t('performance.label.performance')}
+          description={t('performance.label.performanceLead')}
+        />
 
-      <OverviewSection
-        {...props}
-        cycle={performance.cycle}
-        cycles={performance.cycles}
-        reviews={performance.reviews}
-        reviewsTotal={performance.reviewsTotal}
-        goalsTotal={performance.goalsTotal}
-        unavailable={performance.unavailable}
-      />
+        {registerAnsweredNothing(register) ? (
+          <EmptyState
+            title={t('performance.label.nothingReadable')}
+            description={t('performance.notice.unauthenticated')}
+          />
+        ) : (
+          <>
+            <CycleSummary {...props} cycle={register.cycle} />
 
-      <Configuration {...props} performance={performance} />
-      <Work {...props} performance={performance} />
-      <Outcomes {...props} performance={performance} />
+            <Stack gap={8}>
+              <ReviewQueueSection {...props} reviews={register.reviews} cycle={register.cycle} />
+              <GoalsSection t={t} goals={register.goals} cycle={register.cycle} />
+              <CalibrationSection {...props} sessions={register.sessions} cycle={register.cycle} />
+              <TalentSection t={t} placements={register.placements} cycle={register.cycle} />
+              <FeedbackSection {...props} feedback={register.feedback} cycle={register.cycle} />
+              <FindingsSection t={t} findings={register.findings} cycle={register.cycle} />
+              <CyclesSection {...props} cycles={register.cycles} />
+              <ScalesSection {...props} scales={register.scales} />
+              <FrameworksSection {...props} frameworks={register.frameworks} />
+              <TemplatesSection {...props} templates={register.templates} />
+              <CategoriesSection {...props} categories={register.categories} />
+            </Stack>
+          </>
+        )}
 
-      <UnavailableSection {...props} />
+        <Boundaries t={t} keys={BOUNDARIES} />
+      </Page>
     </div>
   );
-}
+};
 
-interface Workspace extends SectionProps {
-  readonly performance: PerformanceForDisplay;
-}
-
-/** What the tenant rates against, and the cycles that run on it. */
-const Configuration = ({ performance, ...props }: Workspace): ReactNode => (
-  <>
-    <CyclesSection {...props} cycles={performance.cycles} cycle={performance.cycle} />
-    <ScalesSection {...props} scales={performance.scales} />
-    <FrameworksSection {...props} frameworks={performance.frameworks} />
-    <TemplatesSection {...props} templates={performance.templates} />
-    <CategoriesSection {...props} categories={performance.categories} />
-  </>
-);
-
-/** The work being measured, and the reviews measuring it. */
-const Work = ({ performance, ...props }: Workspace): ReactNode => (
-  <>
-    <GoalsSection {...props} goals={performance.goals} total={performance.goalsTotal} />
-    <ProgressSection {...props} goal={performance.goals[0]} />
-    <ReviewQueueSection {...props} reviews={performance.reviews} total={performance.reviewsTotal} />
-    <RatingSection {...props} detail={performance.review} />
-    <WorkingSection {...props} detail={performance.review} />
-    <AssessmentsSection {...props} assessments={performance.review?.assessments ?? []} />
-  </>
-);
-
-/** What came out of it: the panel, the moderation, the matrix, the feedback, the findings. */
-const Outcomes = ({ performance, ...props }: Workspace): ReactNode => (
-  <>
-    <PanelSection
-      {...props}
-      reviewers={performance.review?.reviewers ?? []}
-      aggregate={performance.review?.peerAggregate}
-    />
-    <CalibrationSection {...props} sessions={performance.sessions} />
-    <TalentSection
-      {...props}
-      placements={performance.placements}
-      withheld={performance.talentWithheld}
-    />
-    <FeedbackSection {...props} feedback={performance.feedback} />
-    <FindingsSection
-      {...props}
-      findings={performance.findings}
-      withheld={performance.findingsWithheld}
-    />
-  </>
-);
+export default PerformancePage;
