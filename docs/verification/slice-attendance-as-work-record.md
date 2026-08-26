@@ -400,7 +400,7 @@ The admin build emits both attendance routes:
 ## M. Git state
 
 - Branch: `claude/munaxa-product-readiness-audit-8mr34d`
-- Commit: `COMMIT_HASH`
+- Commit: `5e6fb60`
 - Working tree clean after the commit.
 - **No local registry workaround committed.** The `pnpm.overrides` entries that point `@munaxa/*` at
   a source build in this environment are reverted before every commit; `git diff` on `package.json`
