@@ -1,49 +1,67 @@
-import ar from '@work/attendance/locales/ar.json';
-import en from '@work/attendance/locales/en.json';
+import adminAr from '../../locales/ar.json';
+import adminEn from '../../locales/en.json';
+import attendanceAr from '@work/attendance/locales/ar.json';
+import attendanceEn from '@work/attendance/locales/en.json';
+
+import type { Language, Translate } from '../shell/locale';
+
+export type { Language, Translate };
+export { directionOf, isLanguage } from '../shell/locale';
 
 /**
- * The attendance screens' text, in both first-class languages.
+ * The attendance screens' text: Attendance's own catalogue, and the portal's for the frame.
  *
- * The catalogues are the module's own — the same files `scripts/check-localization.mjs` gates —
- * rather than a second copy kept in the portal. A portal with its own strings is a portal whose
- * Arabic falls behind the module's on the first change nobody remembers to mirror.
+ * **This resolver is where a shipped defect lived.** The catalogue used to store five of its keys
+ * *flat and containing dots* — the literal string `"boundary.employment"` nested under
+ * `attendance.label`. `scripts/check-localization.mjs` flattens a catalogue by **joining** nested
+ * names with a dot, so it saw `attendance.label.boundary.employment` as present and passed. This
+ * resolver does the opposite: it **splits** the requested key on a dot and walks segment by
+ * segment, so it looked for a nested `boundary` object, found none, and returned the key. Five raw
+ * catalogue keys reached customers, in English and in Arabic, past a green gate.
  *
- * A *code* is never translated here. A shift code, a schedule code, a reason code and a policy code
- * are tenant or country-pack values (00B), so the screen renders what the customer stored rather
- * than looking it up in a list this product ships — the same reason the domain refuses to interpret
- * them.
+ * Both halves are fixed in this slice. The keys are nested, and the gate now rejects any key whose
+ * own name contains a dot — which is what makes its flattening and this splitting mean the same
+ * thing. A test in this folder asserts the catalogue's shape so the defect cannot return.
+ *
+ * A **code** is never translated. A shift code, a schedule code, a reason code and a device
+ * reference are tenant or country-pack values (00B), so the screen renders what the customer stored
+ * rather than looking it up in a list this product ships.
  */
 
-export const LANGUAGES = ['en', 'ar'] as const;
-export type Language = (typeof LANGUAGES)[number];
+const CATALOGUES: Record<Language, readonly unknown[]> = {
+  en: [adminEn, attendanceEn],
+  ar: [adminAr, attendanceAr],
+};
 
-export const isLanguage = (value: string | undefined): value is Language =>
-  value === 'en' || value === 'ar';
+const lookup = (catalogue: unknown, path: readonly string[]): string | undefined => {
+  let value: unknown = catalogue;
 
-/** Direction follows language. It is never a separate toggle — that is how they drift apart. */
-export const directionOf = (language: Language): 'ltr' | 'rtl' =>
-  language === 'ar' ? 'rtl' : 'ltr';
-
-const CATALOGUES: Record<Language, unknown> = { en, ar };
+  for (const segment of path) {
+    if (typeof value !== 'object' || value === null) return undefined;
+    value = (value as Record<string, unknown>)[segment];
+  }
+  return typeof value === 'string' ? value : undefined;
+};
 
 /**
- * Looks a catalogue key up, returning the key itself if it is missing.
+ * Looks a key up across both catalogues, returning the key itself if neither has it.
  *
  * Returning the key rather than an empty string is deliberate: a blank label looks like a design
  * choice and survives review, whereas `attendance.label.days` on the screen is unmistakably a
- * missing translation. The gate makes this unreachable in a merged build.
+ * missing translation. That property is what made the defect above *visible* once somebody looked
+ * at the rendered page — and tests here now assert no key reaches the markup in either language.
  */
-export const translator =
-  (language: Language) =>
+export const attendanceTranslator =
+  (language: Language): Translate =>
   (key: string): string => {
     const path = key.split('.');
-    let value: unknown = CATALOGUES[language];
 
-    for (const segment of path) {
-      if (typeof value !== 'object' || value === null) return key;
-      value = (value as Record<string, unknown>)[segment];
+    for (const catalogue of CATALOGUES[language]) {
+      const found = lookup(catalogue, path);
+
+      if (found !== undefined) return found;
     }
-    return typeof value === 'string' ? value : key;
+    return key;
   };
 
 /**
@@ -53,7 +71,7 @@ export const translator =
  * a screen that rendered nothing for a value the API did have would be a blank cell nobody could
  * explain.
  */
-export const textIn = (
+export const nameIn = (
   text: { readonly en: string; readonly ar: string } | undefined,
   language: Language,
 ): string => {

@@ -49,6 +49,32 @@ const keysOf = (file) => {
   return new Set(flatten(parsed, ''));
 };
 
+/**
+ * Every key whose own name contains a dot.
+ *
+ * This gate flattens a catalogue by *joining* nested names with a dot, so a key literally named
+ * `"boundary.employment"` inside `label` flattens to `label.boundary.employment` and looks present.
+ * Every runtime translator in this repository does the opposite — it *splits* the requested key on
+ * a dot and walks segment by segment — so it looks for a nested `boundary` object, finds none, and
+ * renders the raw key to the customer. The gate stayed green while five keys reached customers in
+ * both languages on the attendance screen.
+ *
+ * A dot inside a key name is therefore not a style question: it is the one shape where this gate
+ * and the resolver disagree about what a catalogue says. Rejecting it is what makes the flattening
+ * above and the splitting at runtime mean the same thing.
+ */
+const dottedKeysOf = (file) => {
+  const parsed = JSON.parse(readFileSync(file, 'utf8'));
+  const walk = (value, prefix) =>
+    typeof value === 'object' && value !== null
+      ? Object.entries(value).flatMap(([key, nested]) => [
+          ...(key.includes('.') ? [prefix === '' ? key : `${prefix}.${key}`] : []),
+          ...walk(nested, prefix === '' ? key : `${prefix}.${key}`),
+        ])
+      : [];
+  return walk(parsed, '');
+};
+
 const violations = [];
 
 for (const [owner, files] of byPackage) {
@@ -60,6 +86,16 @@ for (const [owner, files] of byPackage) {
     continue;
   }
   const reference = keysOf(referenceFile);
+
+  for (const { file } of files) {
+    const dotted = dottedKeysOf(file);
+
+    if (dotted.length > 0) {
+      violations.push(
+        `${file}: ${String(dotted.length)} key name(s) contain a dot — ${dotted.slice(0, 5).join(', ')}${dotted.length > 5 ? ', …' : ''}. Nest them instead: a runtime translator splits on the dot and cannot resolve a key that contains one.`,
+      );
+    }
+  }
 
   for (const language of REQUIRED) {
     const file = languages.get(language);
@@ -81,7 +117,9 @@ for (const [owner, files] of byPackage) {
 if (violations.length > 0) {
   console.error(`Localization: ${String(violations.length)} problem(s).\n`);
   for (const violation of violations) console.error(`  ${violation}`);
-  console.error('\nEvery language ships complete. See 00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md.');
+  console.error(
+    '\nEvery language ships complete. See 00B_LOCALIZATION_AND_STATUTORY_FRAMEWORK.md.',
+  );
   process.exit(1);
 }
 
