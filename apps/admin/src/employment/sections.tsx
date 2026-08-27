@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
-import { Card } from '@munaxa/ui';
+import { Section, TBody, TD, TH, THead, TR, Table } from '@munaxa/ui';
 import type { EmploymentHistoryView, EmploymentView } from '@work/employment/contracts';
 
 import { dateOf, nameIn, type Language } from './locale';
+import { Isolated, Status } from './record-frame';
+import { employmentTone } from './record-summary';
 
 /**
  * The sections of the employment screen, one component each.
@@ -16,9 +18,16 @@ import { dateOf, nameIn, type Language } from './locale';
  * whole answer is resolved at — which is what makes "which department was this person in last
  * March" a question the screen can put on the page rather than a query somebody runs by hand.
  *
- * **It shows identifiers for organizational references, not names.** A unit's name is
- * Organization's to resolve, and this screen has not asked it. Rendering a truncated identifier is
- * honest; caching a name here would be a second answer that goes stale on the first rename.
+ * **It shows no organizational identifiers.** A unit's name and a manager's name are other modules'
+ * to resolve, and no bounded read by identifier exists for a unit. A column of `01900000…` is not a
+ * column: it carries nothing a reader can use and costs the width a real value would have had. The
+ * employee record shows the placement in full, with the notice that explains it — so the directory
+ * carries the facts `EmploymentView` answers for directly, and the record carries the rest.
+ *
+ * **Every row opens.** The listing was a dead end until the employee record existed: a workforce of
+ * ten thousand people that could not be opened is a report rather than a directory. The link
+ * carries the reader's language and the date the answer was resolved at, so the record opens
+ * showing the same day the list was showing.
  *
  * **It says what Employment does not hold.** The boundaries section is not decoration: it is the
  * place a customer's administrator learns that leave status is Leave's and that work location is
@@ -35,6 +44,58 @@ interface SectionProps {
 /** An identifier, shortened for a table cell. Never a name this screen does not own. */
 const short = (id: string | undefined): string => (id === undefined ? '—' : `${id.slice(0, 8)}…`);
 
+/** The record's address, carrying the reader's language and the date the list was resolved at. */
+const recordHref = (employmentId: string, language: Language, asOf: string | undefined): string =>
+  `/employment/${employmentId}?lang=${language}${asOf === undefined ? '' : `&asOf=${asOf}`}`;
+
+/**
+ * One row of the directory, and the two cells that open the record.
+ *
+ * Both the number and the name link, because a reader reaches for whichever they were looking at;
+ * a row that is only clickable on one cell is a row people click twice.
+ *
+ * A plain anchor rather than `next/link`: every screen here is server-rendered with
+ * `cache: 'no-store'`, so a client-side transition would fetch the same page from the same server,
+ * and `next/link`'s default export is named `Link`, which this workspace's naming rule refuses.
+ */
+const WorkforceRow = ({
+  t,
+  language,
+  employment,
+  asOf,
+}: SectionProps & {
+  readonly employment: EmploymentView;
+  readonly asOf: string | undefined;
+}): ReactNode => {
+  const href = recordHref(employment.employmentId, language, asOf);
+
+  return (
+    <TR>
+      <TD className="font-mono text-xs">
+        <a href={href} className="underline underline-offset-4">
+          <Isolated>{employment.employmentNumber}</Isolated>
+        </a>
+      </TD>
+      <TD className="font-medium">
+        <a href={href} className="underline underline-offset-4">
+          {nameIn(employment.personName, language) ?? short(employment.personId)}
+        </a>
+      </TD>
+      <TD>
+        <Status tone={employmentTone(employment.status)}>
+          {t(`employment.status.${employment.status}`)}
+        </Status>
+      </TD>
+      <TD>
+        <Isolated>{employment.employmentTypeCode}</Isolated>
+      </TD>
+      <TD>
+        <Isolated>{employment.startDate}</Isolated>
+      </TD>
+    </TR>
+  );
+};
+
 export const WorkforceSection = ({
   t,
   language,
@@ -46,64 +107,49 @@ export const WorkforceSection = ({
   readonly unavailable: boolean;
   readonly asOf: string | undefined;
 }): ReactNode => (
-  <Card className="flex flex-col gap-3 p-6">
-    <div className="flex items-baseline justify-between gap-4">
-      <h2 className="text-lg font-medium">{t('employment.label.workforce')}</h2>
-      <span className="text-xs opacity-60">
-        {t('employment.label.asOf')}: {asOf ?? '—'}
-      </span>
-    </div>
-
+  <Section>
     {unavailable ? (
-      <p className="text-sm opacity-70">{t('employment.label.unavailable')}</p>
+      <p className="text-sm text-muted-foreground">{t('employment.label.unavailable')}</p>
     ) : employments.length === 0 ? (
-      <p className="text-sm opacity-70">{t('employment.label.empty')}</p>
+      <p className="text-sm text-muted-foreground">{t('employment.label.empty')}</p>
     ) : (
-      <table className="w-full text-start text-sm">
-        <thead className="opacity-60">
-          <tr>
-            <th scope="col" className="py-1 text-start font-normal">
-              {t('employment.label.employmentNumber')}
-            </th>
-            <th scope="col" className="py-1 text-start font-normal">
-              {t('employment.label.person')}
-            </th>
-            <th scope="col" className="py-1 text-start font-normal">
-              {t('employment.label.status')}
-            </th>
-            <th scope="col" className="py-1 text-start font-normal">
-              {t('employment.label.unit')}
-            </th>
-            <th scope="col" className="py-1 text-start font-normal">
-              {t('employment.label.manager')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {employments.map((employment) => (
-            <tr key={employment.employmentId} className="border-t border-current/10">
-              <td className="py-1 font-mono text-xs">{employment.employmentNumber}</td>
-              <td className="py-1">
-                {nameIn(employment.personName, language) ?? short(employment.personId)}
-              </td>
-              <td className="py-1">{t(`employment.status.${employment.status}`)}</td>
-              <td className="py-1 font-mono text-xs">{short(employment.assignment?.unitId)}</td>
-              <td className="py-1 font-mono text-xs">{short(employment.managerEmploymentId)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <>
+        <p className="text-sm text-muted-foreground">
+          {employments.length} · {t('employment.label.asOf')}:{' '}
+          <Isolated>{asOf ?? employments[0]?.asOf ?? '—'}</Isolated>
+        </p>
+        <Table>
+          <THead>
+            <TR>
+              <TH>{t('employment.label.employmentNumber')}</TH>
+              <TH>{t('employment.label.person')}</TH>
+              <TH>{t('employment.label.status')}</TH>
+              <TH>{t('employment.label.employmentType')}</TH>
+              <TH>{t('employment.label.startDate')}</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {employments.map((employment) => (
+              <WorkforceRow
+                key={employment.employmentId}
+                t={t}
+                language={language}
+                employment={employment}
+                asOf={asOf}
+              />
+            ))}
+          </TBody>
+        </Table>
+      </>
     )}
-  </Card>
+  </Section>
 );
 
 export const TimelineSection = ({
   t,
   history,
 }: SectionProps & { readonly history: EmploymentHistoryView | undefined }): ReactNode => (
-  <Card className="flex flex-col gap-3 p-6">
-    <h2 className="text-lg font-medium">{t('employment.label.history')}</h2>
-
+  <Section title={t('employment.label.history')}>
     {history === undefined ? (
       <p className="text-sm opacity-70">{t('employment.label.empty')}</p>
     ) : (
@@ -143,7 +189,7 @@ export const TimelineSection = ({
         </div>
       </div>
     )}
-  </Card>
+  </Section>
 );
 
 /**
@@ -154,12 +200,14 @@ export const TimelineSection = ({
  * is a boundary the architecture keeps, written where somebody meets it.
  */
 export const BoundariesSection = ({ t }: SectionProps): ReactNode => (
-  <Card className="flex flex-col gap-2 p-6">
-    <h2 className="text-lg font-medium">{t('employment.label.boundaries')}</h2>
-    <ul className="flex list-disc flex-col gap-1 text-sm opacity-80 ps-5">
+  <footer className="border-t border-border pt-4">
+    <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {t('employment.label.boundaries')}
+    </h2>
+    <ul className="mt-2 flex list-disc flex-col gap-1 ps-5 text-xs text-muted-foreground">
       {['leave', 'payroll', 'location', 'offboarding'].map((key) => (
         <li key={key}>{t(`employment.boundary.${key}`)}</li>
       ))}
     </ul>
-  </Card>
+  </footer>
 );

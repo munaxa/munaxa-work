@@ -39,7 +39,7 @@ export default async function LettersPage({
   const props = { t, language };
 
   return (
-    <main dir={directionOf(language)} className="flex flex-col gap-6 p-8">
+    <div dir={directionOf(language)} className="flex flex-col gap-6 p-8">
       <h1 className="text-2xl font-medium">{t('letters.label.letters')}</h1>
 
       <TemplatesSection {...props} templates={letters.templates} versions={letters.versions} />
@@ -52,6 +52,6 @@ export default async function LettersPage({
       <IssuedSection {...props} issued={letters.issued} />
       <LetterContentSection {...props} detail={letters.detail} withheld={letters.valuesWithheld} />
       <FindingsSection {...props} findings={letters.findings} />
-    </main>
+    </div>
   );
 }

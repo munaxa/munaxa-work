@@ -1,43 +1,56 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { EmptyState, Page, PageHeader, Stack } from '@munaxa/ui';
 
-import { loadAttendance } from '../../attendance/api';
-import { directionOf, isLanguage, translator, type Language } from '../../attendance/locale';
+import { loadAttendanceRegister, registerAnsweredNothing } from '../../attendance/api';
 import {
-  DashboardSection,
+  attendanceTranslator,
+  directionOf,
+  isLanguage,
+  type Language,
+} from '../../attendance/locale';
+import { todayIn } from '../../attendance/exact';
+import {
+  AttendanceOverview,
   DaysSection,
   ExceptionsSection,
-  PunchesSection,
-} from '../../attendance/sections';
+  ReconciliationSection,
+  RegisterBoundaries,
+} from '../../attendance/register';
 import {
-  BoundariesSection,
-  CorrectionsSection,
   ImportsSection,
   RosterSection,
   SchedulesSection,
   ShiftsSection,
 } from '../../attendance/configuration';
+import { CorrectionsSection } from '../../attendance/punches';
 
 /**
- * The attendance administration screen.
+ * Attendance, as work rather than as ten cards.
  *
- * Presentation only: it consumes the module's published contracts and the API, and holds no
- * business logic of its own — no rule about when a day may be signed off, no idea which civil date
- * a punch belongs to. Those live in the domain and the application service, and a screen that
- * reimplemented them would be a second, weaker answer to a question the API already decided.
+ * The screen this replaced stacked ten `Card`s down one column in the order the reads happened to
+ * be issued, opened nothing at all, showed six rows of nine thousand with nothing saying so,
+ * rendered every employment as the same eight truncated characters, and printed five raw catalogue
+ * keys to customers in both languages.
  *
- * **`?lang=ar`** switches language *and* direction together. Direction follows language and is
- * never a separate control — separating them is how a page ends up left-aligned in Arabic.
+ * The order here is an attendance administrator's own: today's six counts, then **the exception
+ * queue**, because that is the work rather than the register behind it, then the days, then what is
+ * quietly not being recalculated, and only then the rota and the definitions people are measured
+ * against.
  *
- * **It is read-only**, consistent with the organization, people, employment, recruitment and
- * onboarding screens. Every mutation goes through the API; the write screens are Phase 18/19's, and
- * building them only here would make Attendance the one module with them. That includes
- * recalculation: the awaiting count is shown, and the `POST` that acts on it is an operator's or a
- * scheduler's.
+ * **Every figure is the server's.** The overview is the dashboard's own counts, every duration is
+ * the minutes the module published, and the totals beside each section are `PagedResult.total`.
+ * Nothing here decides who was late — the module raised an exception carrying its own minutes, its
+ * own severity and its own sentence.
  *
- * **There is no employee self-service and no manager self-service here**, and no mobile app. Those
- * are later phases, and a punch button on an administrator's screen would be the beginning of one
- * built in the wrong place.
+ * **`?lang=ar`** switches language *and* direction together.
+ *
+ * **It offers no control.** Recording a punch, resolving an exception, deciding a correction,
+ * recalculating, approving and locking a day are writes, and a request from this portal carries no
+ * principal, so a button here would post unauthenticated and answer 401.
  */
+
+export const metadata: Metadata = { title: 'Attendance' };
 
 interface PageProps {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -50,35 +63,51 @@ const AttendancePage = async ({ searchParams }: PageProps): Promise<ReactNode> =
   const parameters = await searchParams;
   const requested = single(parameters['lang']);
   const language: Language = isLanguage(requested) ? requested : 'en';
-  const t = translator(language);
-  const attendance = await loadAttendance();
+  const t = attendanceTranslator(language);
+  const register = await loadAttendanceRegister(todayIn(new Date()));
 
   return (
-    <main
-      dir={directionOf(language)}
-      lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
-    >
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{t('attendance.label.attendance')}</h1>
-      </header>
+    <div dir={directionOf(language)} lang={language}>
+      <Page width="wide">
+        <PageHeader
+          title={t('attendance.label.attendance')}
+          description={t('attendance.label.attendanceLead')}
+        />
 
-      <DashboardSection
-        t={t}
-        language={language}
-        dashboard={attendance.dashboard}
-        unavailable={attendance.unavailable}
-      />
-      <DaysSection t={t} language={language} days={attendance.days} />
-      <ExceptionsSection t={t} language={language} exceptions={attendance.exceptions} />
-      <PunchesSection t={t} language={language} events={attendance.events} />
-      <CorrectionsSection t={t} language={language} corrections={attendance.corrections} />
-      <RosterSection t={t} language={language} roster={attendance.roster} />
-      <ShiftsSection t={t} language={language} shifts={attendance.shifts} />
-      <SchedulesSection t={t} language={language} schedules={attendance.schedules} />
-      <ImportsSection t={t} language={language} imports={attendance.imports} />
-      <BoundariesSection t={t} language={language} />
-    </main>
+        {registerAnsweredNothing(register) ? (
+          <EmptyState
+            title={t('attendance.label.nothingReadable')}
+            description={t('attendance.notice.unauthenticated')}
+          />
+        ) : (
+          <>
+            <AttendanceOverview t={t} dashboard={register.dashboard} />
+
+            <Stack gap={8}>
+              <ExceptionsSection t={t} language={language} exceptions={register.exceptions} />
+              <DaysSection t={t} language={language} days={register.days} />
+              <ReconciliationSection
+                t={t}
+                language={language}
+                reconciliation={register.reconciliation}
+              />
+              <CorrectionsSection t={t} language={language} corrections={register.corrections} />
+              <RosterSection
+                t={t}
+                language={language}
+                roster={register.roster}
+                shifts={register.shifts}
+              />
+              <ShiftsSection t={t} language={language} shifts={register.shifts} />
+              <SchedulesSection t={t} language={language} schedules={register.schedules} />
+              <ImportsSection t={t} language={language} imports={register.imports} />
+            </Stack>
+          </>
+        )}
+
+        <RegisterBoundaries t={t} />
+      </Page>
+    </div>
   );
 };
 

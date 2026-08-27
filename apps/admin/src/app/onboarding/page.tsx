@@ -42,10 +42,10 @@ const OnboardingPage = async ({ searchParams }: PageProps): Promise<ReactNode> =
   const onboarding = await loadOnboarding();
 
   return (
-    <main
+    <div
       dir={directionOf(language)}
       lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
+      className="mx-auto flex max-w-4xl flex-col gap-6 p-8"
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">{t('onboarding.label.onboarding')}</h1>
@@ -61,7 +61,7 @@ const OnboardingPage = async ({ searchParams }: PageProps): Promise<ReactNode> =
       <OverdueSection t={t} language={language} overdue={onboarding.overdue} />
       <PlansSection t={t} language={language} plans={onboarding.plans} />
       <BoundariesSection t={t} language={language} />
-    </main>
+    </div>
   );
 };
 

@@ -77,13 +77,37 @@
       "boundaries": "What Employment does not hold",
       "empty": "No employments to show.",
       "unavailable": "The workforce could not be read. Sign-in is not available yet.",
-      "notModelled": "Not modelled in this phase."
+      "notModelled": "Not modelled in this phase.",
+      "assignmentType": "Assignment type",
+      "lineType": "Line type",
+      "contractType": "Contract type",
+      "fte": "FTE",
+      "probationEndDate": "Probation ends",
+      "probationOutcome": "Probation outcome",
+      "effectiveFrom": "Effective from",
+      "effectiveTo": "Effective to"
     },
     "boundary": {
       "leave": "Leave status belongs to the Leave domain, not to an employment's status.",
       "payroll": "No salary, no payroll figure and no attendance: Employment holds the relationship only.",
       "location": "Work location is not modelled: a unit and a physical place of work are different things, and no authoritative model of the second exists yet.",
       "offboarding": "Ending an employment records its final state. Exit interviews, clearance and final settlement belong to Offboarding."
+    },
+    "assignmentType": {
+      "primary": "Primary",
+      "secondary": "Secondary"
+    },
+    "lineType": {
+      "primary": "Primary",
+      "functional": "Functional"
+    },
+    "probationOutcome": {
+      "pending": "Pending",
+      "passed": "Passed",
+      "waived": "Waived"
+    },
+    "hint": {
+      "everyRowOpens": "Every row opens the employee record."
     }
   }
 }

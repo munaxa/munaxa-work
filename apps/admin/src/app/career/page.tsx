@@ -56,7 +56,7 @@ export default async function CareerPage({
   const props = { t, language };
 
   return (
-    <main dir={directionOf(language)} className="flex flex-col gap-6 p-8">
+    <div dir={directionOf(language)} className="flex flex-col gap-6 p-8">
       <h1 className="text-2xl font-medium">{t('career.label.career')}</h1>
 
       <OverviewSection
@@ -80,7 +80,7 @@ export default async function CareerPage({
       <Development {...props} career={career} />
 
       <StatusSection {...props} />
-    </main>
+    </div>
   );
 }
 

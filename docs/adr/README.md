@@ -58,6 +58,7 @@ line; the decision that replaced it is a new record.
 | [0072](0072-a-career-recommendation-is-advisory-and-writes-nothing.md) | A career recommendation is advisory, and Career writes nothing outside itself | Accepted |
 | [0073](0073-a-decision-is-careers-an-observation-stays-where-it-was-made.md) | A decision is Career's; an observation stays where it was made | Accepted |
 | [0074](0074-readiness-is-stated-by-a-person.md) | Readiness is stated by a person, and no formula is invented to replace them | Accepted |
+| [0075](0075-next-route-segment-naming.md)       | A Next.js dynamic route segment is named by the router, and the gate checks the router's grammar | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

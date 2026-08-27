@@ -49,6 +49,7 @@ Inline lint directives are configured inert (`noInlineConfig`), so a committed
 | Files, folders (TypeScript) | `kebab-case`       |
 | Files, folders (Dart)       | `snake_case` (ADR-0029) |
 | Files, folders (Android host) | The Android toolchain's own names (ADR-0031) |
+| Next.js route segments        | The App Router's own syntax — `[employmentId]`, `[...slug]`, `(group)`, `@slot` (ADR-0075) |
 | Database objects            | `snake_case`       |
 
 Wire formats — API payloads, database rows, HTTP headers — keep the names their protocol

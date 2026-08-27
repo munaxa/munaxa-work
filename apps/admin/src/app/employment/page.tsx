@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Page, PageHeader } from '@munaxa/ui';
 
 import { loadWorkforce } from '../../employment/api';
 import { directionOf, isLanguage, translator, type Language } from '../../employment/locale';
@@ -41,28 +42,24 @@ const EmploymentPage = async ({ searchParams }: PageProps): Promise<ReactNode> =
   const workforce = await loadWorkforce(asOf);
 
   return (
-    <main
-      dir={directionOf(language)}
-      lang={language}
-      className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 p-8"
-    >
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{t('employment.label.workforce')}</h1>
-        <p className="text-sm opacity-70">
-          {t('employment.label.asOf')}: {asOf ?? '—'}
-        </p>
-      </header>
+    <div dir={directionOf(language)} lang={language}>
+      <Page width="wide">
+        <PageHeader
+          title={t('employment.label.workforce')}
+          description={t('employment.hint.everyRowOpens')}
+        />
 
-      <WorkforceSection
-        t={t}
-        language={language}
-        employments={workforce.employments}
-        unavailable={workforce.unavailable}
-        asOf={asOf}
-      />
-      <TimelineSection t={t} language={language} history={workforce.history} />
-      <BoundariesSection t={t} language={language} />
-    </main>
+        <WorkforceSection
+          t={t}
+          language={language}
+          employments={workforce.employments}
+          unavailable={workforce.unavailable}
+          asOf={asOf}
+        />
+        <TimelineSection t={t} language={language} history={workforce.history} />
+        <BoundariesSection t={t} language={language} />
+      </Page>
+    </div>
   );
 };
 

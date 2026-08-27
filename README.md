@@ -3,10 +3,13 @@
 **Munaxa Work** is the HCM product. This is its independent repository — it owns its own API,
 apps, database, migrations, infrastructure and CI, and depends on no other product.
 
-> **Nothing is implemented here yet.** The repository was separated out of the AXA monorepo
-> carrying this document and its history, so the shape and the guardrails are settled before
-> development starts — and so the shared design system has a second real consumer to be
-> designed against rather than a hypothetical one.
+> **Where this is.** Eighteen business modules, 186 tables, 32 migrations and 513 routes are
+> built and tested; the ledger is [`docs/PHASES.md`](docs/PHASES.md). The product surface over
+> them is thinner than the domain beneath it, and
+> [`docs/verification/product-readiness-audit.md`](docs/verification/product-readiness-audit.md)
+> says exactly how thin, area by area. Authentication and authorization are Platform's and are
+> not implemented here, so a deployment without Platform's adapters answers `401` to every
+> business route — by design (ADR-0001, ADR-0032).
 
 ## What already exists for you
 
@@ -26,10 +29,10 @@ The Work palette is already authored inside
 [munaxa-platform](https://github.com/tam2om/munaxa-platform). Nothing about starting Work
 requires touching a colour.
 
-## When you start
+## Adding to it
 
-1. Create the app(s) under `apps/` and any product packages under `packages/`, following the
-   shape [munaxa-school](https://github.com/tam2om/munaxa-school) uses.
+1. New apps go under `apps/` and new product packages under `packages/`, following the shape the
+   existing ones use.
 2. Add each new package to [`pnpm-workspace.yaml`](pnpm-workspace.yaml) and, for anything that
    emits declarations, to the `references` in [`tsconfig.json`](tsconfig.json).
 3. Depend on the platform by semantic version, e.g. `"@munaxa/ui": "^1.0.0"`.
@@ -56,8 +59,7 @@ pnpm install
 pnpm verify   # standards · format · lint · typecheck · test · build
 ```
 
-Every gate runs today against an empty workspace, so the first app added here is checked from
-its first commit. `pnpm standards` on its own needs no install and no registry access.
+`pnpm standards` on its own needs no install and no registry access; the rest needs the packages.
 
 ## The rules are enforced, not advisory
 

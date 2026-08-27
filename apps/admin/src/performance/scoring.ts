@@ -1,9 +1,4 @@
-import type {
-  BasisPoints,
-  CalibrationDecisionView,
-  ReviewView,
-  ScoreHundredths,
-} from '@work/performance/contracts';
+import type { BasisPoints, ScoreHundredths } from '@work/performance/contracts';
 
 /**
  * Presenting a score without becoming a second place that computes one.
@@ -62,44 +57,17 @@ export const weightText = (weight: BasisPoints | undefined): string =>
 export const exactText = (value: string | undefined): string => value ?? '—';
 
 /**
- * What a review's rating actually is, and where each number came from.
+ * Why there is no `ratingFor` here any more.
  *
- * **Calibration never replaces the calculated score**, and this shape is what stops a screen from
- * implying it did: the original and the calibrated figure are separate fields, both present, and
- * `moderated` says whether a human moved it. A single "score" field would have made the two
- * indistinguishable on the page, which is precisely the thing the module refuses to do in the
- * database.
- */
-export interface RatingForDisplay {
-  readonly calculated: string;
-  readonly final: string;
-  readonly moderated: boolean;
-  readonly original: string | undefined;
-  readonly reason: string | undefined;
-  readonly decidedBy: string | undefined;
-  readonly decidedAt: string | undefined;
-}
-
-/**
- * Whether a human actually moved the number.
+ * There used to be one, and it did this:
  *
- * A calibration meeting that examined a rating and confirmed the engine's figure is **not** an
- * override, and labelling it one would misrepresent what the panel decided — to the person whose
- * rating it is, most of all.
+ * ```
+ * final: scoreText(review?.finalScore ?? review?.calculatedScore)
+ * ```
+ *
+ * A review the engine had scored and nobody had completed therefore displayed its **calculated**
+ * score in a column headed *Final score*, on the queue and again on the rating block. That is not a
+ * formatting choice: it tells a reader a rating has been settled when it has not, about a person
+ * whose rating it is. The review screen now renders `calculatedScore` and `finalScore` as the two
+ * separate published fields they are, and a review with no final score shows none.
  */
-const wasModerated = (calibration: CalibrationDecisionView | undefined): boolean =>
-  calibration?.originalScore !== undefined &&
-  calibration.originalScore !== calibration.calibratedScore;
-
-export const ratingFor = (
-  review: ReviewView | undefined,
-  calibration: CalibrationDecisionView | undefined,
-): RatingForDisplay => ({
-  calculated: scoreText(review?.calculatedScore),
-  final: scoreText(review?.finalScore ?? review?.calculatedScore),
-  moderated: wasModerated(calibration),
-  original: calibration === undefined ? undefined : scoreText(calibration.originalScore),
-  reason: calibration?.reason,
-  decidedBy: calibration?.decidedBy,
-  decidedAt: calibration?.decidedAt,
-});

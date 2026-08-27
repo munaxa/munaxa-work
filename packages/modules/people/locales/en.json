@@ -108,7 +108,8 @@
       "duplicates": "Possible duplicates",
       "asOf": "As at",
       "confidence": "Confidence",
-      "reviewedBy": "Reviewed by"
+      "reviewedBy": "Reviewed by",
+      "status": "Status"
     },
     "hint": {
       "identityIsPermanent": "A person is created once. Employment, attendance and payroll reference this record; it references none of them.",

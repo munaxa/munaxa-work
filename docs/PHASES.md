@@ -26,20 +26,20 @@ ADRs updated.
 | 5.1 | Employee letters            | [`06A_PHASE_5.1_EMPLOYEE_LETTERS.md`](../work%20prompts/06A_PHASE_5.1_EMPLOYEE_LETTERS.md)            | Complete    |
 | 5.2 | Employee relations          | [`06B_PHASE_5.2_EMPLOYEE_RELATIONS.md`](../work%20prompts/06B_PHASE_5.2_EMPLOYEE_RELATIONS.md)        | Complete    |
 | 5.3 | Assets & custody            | [`06C_PHASE_5.3_ASSETS_CUSTODY.md`](../work%20prompts/06C_PHASE_5.3_ASSETS_CUSTODY.md)                | All four checkpoints complete — **phase not closed**. The catalogue, custody lifecycle, ageing/outstanding reporting and the offboarding clearance contribution are built and verified. Incidents, liability, deductions, transfer, acknowledgement, the clearance waiver and the condition scale remain unbuilt behind open decisions D-5.3-03, D-5.3-05, D-5.3-07, D-5.3-08 and D-5.3-10 — see the Phase 5.3 register |
-| 6   | Recruitment                 | [`07_PHASE_6_RECRUITMENT.md`](../work%20prompts/07_PHASE_6_RECRUITMENT.md)                            | Not started |
-| 7   | Onboarding                  | [`08_PHASE_7_ONBOARDING.md`](../work%20prompts/08_PHASE_7_ONBOARDING.md)                              | Not started |
+| 6   | Recruitment                 | [`07_PHASE_6_RECRUITMENT.md`](../work%20prompts/07_PHASE_6_RECRUITMENT.md)                            | Complete    |
+| 7   | Onboarding                  | [`08_PHASE_7_ONBOARDING.md`](../work%20prompts/08_PHASE_7_ONBOARDING.md)                              | Complete    |
 | 8   | Attendance                  | [`09_PHASE_8_ATTENDANCE.md`](../work%20prompts/09_PHASE_8_ATTENDANCE.md)                              | Awaiting approval |
-| 9   | Leave                       | [`10_PHASE_9_LEAVE.md`](../work%20prompts/10_PHASE_9_LEAVE.md)                                        | Not started |
-| 10  | Compensation                | [`11_PHASE_10_COMPENSATION.md`](../work%20prompts/11_PHASE_10_COMPENSATION.md)                        | Not started |
+| 9   | Leave                       | [`10_PHASE_9_LEAVE.md`](../work%20prompts/10_PHASE_9_LEAVE.md)                                        | Complete    |
+| 10  | Compensation                | [`11_PHASE_10_COMPENSATION.md`](../work%20prompts/11_PHASE_10_COMPENSATION.md)                        | Complete    |
 | 10.1| Loans & advances            | [`11A_PHASE_10.1_LOANS_ADVANCES.md`](../work%20prompts/11A_PHASE_10.1_LOANS_ADVANCES.md)              | Not started |
-| 11  | Payroll engine              | [`12_PHASE_11_PAYROLL_ENGINE.md`](../work%20prompts/12_PHASE_11_PAYROLL_ENGINE.md)                    | Not started |
+| 11  | Payroll engine              | [`12_PHASE_11_PAYROLL_ENGINE.md`](../work%20prompts/12_PHASE_11_PAYROLL_ENGINE.md)                    | Complete    |
 | 11.1| Statutory & country packs   | [`12A_PHASE_11.1_STATUTORY_COUNTRY_PACKS.md`](../work%20prompts/12A_PHASE_11.1_STATUTORY_COUNTRY_PACKS.md) | Not started |
 | 11.2| Offboarding & settlement    | [`12B_PHASE_11.2_OFFBOARDING.md`](../work%20prompts/12B_PHASE_11.2_OFFBOARDING.md)                    | Not started |
 | 12  | Benefits                    | [`13_PHASE_12_BENEFITS.md`](../work%20prompts/13_PHASE_12_BENEFITS.md)                                | Not started |
 | 12.1| Medical & employee claims   | [`13A_PHASE_12.1_MEDICAL_CLAIMS.md`](../work%20prompts/13A_PHASE_12.1_MEDICAL_CLAIMS.md)              | Not started |
-| 13  | Performance                 | [`14_PHASE_13_PERFORMANCE.md`](../work%20prompts/14_PHASE_13_PERFORMANCE.md)                          | Not started |
+| 13  | Performance                 | [`14_PHASE_13_PERFORMANCE.md`](../work%20prompts/14_PHASE_13_PERFORMANCE.md)                          | Complete    |
 | 13.1| Engagement & surveys        | [`14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md`](../work%20prompts/14A_PHASE_13.1_ENGAGEMENT_SURVEYS.md)      | Not started |
-| 14  | Learning                    | [`15_PHASE_14_LEARNING.md`](../work%20prompts/15_PHASE_14_LEARNING.md)                                | Not started |
+| 14  | Learning                    | [`15_PHASE_14_LEARNING.md`](../work%20prompts/15_PHASE_14_LEARNING.md)                                | 14A complete; 14B (sessions, capacity, waitlists, scheduling) not started |
 | 15  | Career and succession       | [`16_PHASE_15_CAREER_SUCCESSION.md`](../work%20prompts/16_PHASE_15_CAREER_SUCCESSION.md)              | Complete    |
 | 16  | Workflow                    | [`17_PHASE_16_WORKFLOW.md`](../work%20prompts/17_PHASE_16_WORKFLOW.md)                                | Awaiting approval |
 | 17  | Communications              | [`18_PHASE_17_COMMUNICATIONS.md`](../work%20prompts/18_PHASE_17_COMMUNICATIONS.md)                    | Not started |
@@ -611,6 +611,35 @@ test rather than a promise, in 79 boundary assertions.
 [`verification/phase-5.2-checkpoint-4.md`](verification/phase-5.2-checkpoint-4.md) carries the schema,
 the proofs, the twelve assertions that were updated and why none was weakened, two defects found
 during implementation, and six stated limitations.
+
+## Product-driven development, from 2026-08-24
+
+Phase-driven development ran to Phase 5.3. The
+[product readiness audit](verification/product-readiness-audit.md) found the reason to stop
+extending it: eighteen modules, 186 tables and 513 routes are built, and **thirteen of the fifteen
+capabilities the product is behind a comparable HR system on are UI gaps over a backend that already
+exists** — only three are genuine backend gaps. From this point work is selected by the value of the
+end-to-end workflow it completes rather than by the next phase number, and a capability is finished
+when a person can use it in the product rather than when its domain is complete.
+
+The engineering discipline is unchanged: RLS, tenant isolation, permission boundaries, immutable
+records, concurrency guarantees, audit, module ownership, cross-module contracts, the layer
+direction, the four gates, negative-space tests and ADRs.
+
+| # | Slice | Record | Status |
+|---|---|---|---|
+| 1 | **The Employee Record** — an application shell for the Admin portal, and a cross-module employee directory and profile composing eleven modules | [`verification/employee-record-slice.md`](verification/employee-record-slice.md) · verified and refined in [`verification/employee-record-verification.md`](verification/employee-record-verification.md) | Delivered and verified 2026-08-24 |
+| 2 | **Approvals as Work** — the caller's own approval queue as its own destination, and an approval detail behind it | [`verification/slice-approvals-as-work.md`](verification/slice-approvals-as-work.md) · delivered per [`verification/slice-approvals-as-work-record.md`](verification/slice-approvals-as-work-record.md) | Delivered 2026-08-24 |
+
+The Employee Record is the **visual and product reference** for every screen that follows; what a
+later screen should copy from it is §7 of
+[`verification/employee-record-verification.md`](verification/employee-record-verification.md).
+
+The backlog the audit produced — P0 through P3 — is [§13 of the audit](verification/product-readiness-audit.md).
+The one question that needs an owner, and the only thing blocking every write surface in the
+product, is [§19](verification/product-readiness-audit.md): **how a deployment authenticates a user
+and holds a permission.** It is Platform's under ADR-0001, and nothing in this repository may answer
+it without an ADR that narrows that decision.
 
 **First commercial milestone** — Phases 0 through 11.2 deliver a sellable product: core HR,
 documents, letters, employee relations, assets, recruitment, onboarding, attendance, leave,

@@ -44,6 +44,9 @@ importers:
       '@munaxa/ui':
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@work/assets':
+        specifier: workspace:*
+        version: link:../../packages/modules/assets
       '@work/attendance':
         specifier: workspace:*
         version: link:../../packages/modules/attendance
@@ -89,6 +92,9 @@ importers:
       '@work/recruitment':
         specifier: workspace:*
         version: link:../../packages/modules/recruitment
+      '@work/relations':
+        specifier: workspace:*
+        version: link:../../packages/modules/relations
       '@work/workflow':
         specifier: workspace:*
         version: link:../../packages/modules/workflow
