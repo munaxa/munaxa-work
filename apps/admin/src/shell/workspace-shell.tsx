@@ -106,6 +106,16 @@ const LanguageSwitch = ({
   </a>
 );
 
+/**
+ * The application shell: the sidebar, the drawer, the language switch and the page.
+ *
+ * **`railLabel` is deliberately not passed to `Sidebar`.** The design system grew that prop in a
+ * release later than the `@munaxa/ui` this repository pins, so passing it fails `tsc` against the
+ * installed version — which is exactly what CI caught. The rail keeps the component's own default
+ * landmark label until the dependency moves. `collapseLabel` and `expandLabel` do exist in the
+ * pinned release and stay translated, so the two controls a reader actually operates are labelled
+ * in their own language.
+ */
 export const WorkspaceShell = ({ children }: { readonly children: ReactNode }): ReactNode => {
   const pathname = usePathname() ?? '/';
   const requested = useSearchParams()?.get('lang') ?? undefined;
@@ -122,7 +132,6 @@ export const WorkspaceShell = ({ children }: { readonly children: ReactNode }): 
           sidebar={
             <Sidebar
               brand={Brand}
-              railLabel={t('admin.shell.workspace')}
               collapseLabel={t('admin.shell.collapse')}
               expandLabel={t('admin.shell.expand')}
             >
