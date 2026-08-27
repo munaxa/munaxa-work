@@ -430,7 +430,38 @@ run rather than letting a reader assume otherwise. CI remains the authority.
 
 ## L. CI
 
-_Filled in from the pull request opened for the changes in Section I; see the branch's CI run._
+PR #17, head `377b476`. All four required checks green:
+
+| Check | Result |
+| --- | --- |
+| Standards · Architecture · Localization | ✅ success |
+| Product isolation | ✅ success |
+| Mobile | ✅ success |
+| Lint · Typecheck · Test · Build | ✅ success |
+
+The standards job runs the gate on a bare checkout with no `pnpm install` at all, which is the
+declaration half — it passed, so the gate does not depend on the registry being reachable, exactly
+like the four gates beside it.
+
+The `node` job runs it after `pnpm install --frozen-lockfile` against `npm.pkg.github.com`, and
+that run is the positive proof this container cannot produce:
+
+```text
+Platform parity: the @munaxa/* this run resolved.
+
+  @munaxa/config-eslint      1.0.0 = lockfile 1.0.0  registry
+  @munaxa/config-typescript  1.0.0 = lockfile 1.0.0  registry
+  @munaxa/platform           1.3.0 = lockfile 1.3.0  registry
+  @munaxa/theme              1.1.1 = lockfile 1.1.1  registry
+  @munaxa/ui                 1.1.1 = lockfile 1.1.1  registry
+
+Platform parity: 5 package(s) match the lockfile, all from the registry.
+```
+
+Two things are settled by those nine lines. The gate goes green on a genuine registry install
+rather than only failing on a bad one — so it is a gate and not a permanent red. And the exact
+versions CI compiled, linted, tested and built are now printed in the CI log itself, next to a
+local run that prints the same table. Comparing the two is the whole mechanism.
 
 ---
 
