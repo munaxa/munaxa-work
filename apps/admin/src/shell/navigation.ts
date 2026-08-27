@@ -53,6 +53,9 @@ export const NAVIGATION: readonly NavigationSection[] = [
       destination('leave'),
       destination('compensation'),
       destination('payroll'),
+      // Assets sits in Operations rather than Governance because issuing a laptop and getting it
+      // back is daily work, like attendance and leave, not a record somebody files.
+      destination('assets'),
     ],
   },
   {
