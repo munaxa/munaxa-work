@@ -641,7 +641,39 @@ inside the 5,306. No class-B or class-D issue was fixed, and no unrelated findin
 
 ## U. CI
 
-_Recorded once the pull request's checks complete; see §V for the branch and pull request._
+PR #18, head `5c44340`. All four required checks green:
+
+| Check | Result |
+| --- | --- |
+| Standards · Architecture · Localization | ✅ success |
+| Product isolation | ✅ success |
+| Mobile | ✅ success |
+| Lint · Typecheck · Test · Build | ✅ success |
+
+The check that matters most here is provenance, and CI reports it in its own log. After
+`pnpm install --frozen-lockfile` against `npm.pkg.github.com`:
+
+```text
+Platform parity: the @munaxa/* this run resolved.
+
+  @munaxa/config-eslint      1.0.0 = lockfile 1.0.0  registry
+  @munaxa/config-typescript  1.0.0 = lockfile 1.0.0  registry
+  @munaxa/platform           1.6.1 = lockfile 1.6.1  registry
+  @munaxa/theme              1.1.1 = lockfile 1.1.1  registry
+  @munaxa/ui                 1.1.1 = lockfile 1.1.1  registry
+
+Platform parity: 5 package(s) match the lockfile, all from the registry.
+```
+
+**That table is identical to the one the local gate printed in §T** — same five packages, same five
+versions, same `registry` provenance, both with the guard enforced and neither under an override.
+
+This is the question the whole parity investigation existed to make answerable, and it is the first
+change in this repository where it can be answered by comparison rather than by hope: *the versions
+this upgrade was verified against locally are the versions CI compiled, linted, tested and built.*
+The `railLabel` class of defect — a local tree ahead of the published package, discovered only when
+CI installs something different — cannot have occurred here, and the gate would have said so if it
+had.
 
 ---
 
@@ -653,6 +685,7 @@ _Recorded once the pull request's checks complete; see §V for the branch and pu
 | Base | `main` at `efa18ce` |
 | Investigation commit | `9331ab5` — sections A–P, no dependency change |
 | Implementation commit | `9c45816` — the upgrade |
+| Pull request | [#18](https://github.com/munaxa/munaxa-work/pull/18) — all four checks green |
 | Status | awaiting review; **not merged** |
 
 ---
