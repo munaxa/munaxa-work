@@ -16,7 +16,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@munaxa/platform": "^1.3.0",
+    "@munaxa/platform": "^1.6.1",
     "@munaxa/theme": "^1.1.1",
     "@munaxa/ui": "^1.1.1",
     "@work/assets": "workspace:*",
