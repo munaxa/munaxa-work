@@ -1,9 +1,14 @@
 # Shared Design System — Platform Upgrade Investigation
 
-An investigation into moving Munaxa Work off `@munaxa/platform@1.3.0`. It was commissioned as a
-1.5.1 upgrade; the evidence changed the target to **1.6.1**, and the environment blocks the
-dependency change itself. No product slice was built, no completed slice was touched, and no
-dependency version was changed.
+Moving Munaxa Work off `@munaxa/platform@1.3.0`. Commissioned as a 1.5.1 upgrade; the evidence
+changed the target to **1.6.1**.
+
+Sections A–P are the investigation, written when this environment could not reach the package
+registry and the upgrade could not be performed. **Sections Q–V are the implementation**, carried
+out once `read:packages` was provisioned, against the real published package. Where the two
+disagree, Q–V is the measurement and A–P is the prediction it confirmed.
+
+No product slice was built and no completed slice was touched.
 
 ---
 
@@ -479,4 +484,177 @@ nothing in this upgrade turns on it.
 
 ---
 
-# PLATFORM UPGRADE INVESTIGATION COMPLETE — AWAITING NEXT PRODUCT DIRECTION
+## Q. Implementation
+
+Five files. Three of them carry one changed line each.
+
+| File | Change |
+| --- | --- |
+| `apps/admin/package.json` | `"@munaxa/platform": "^1.3.0"` → `"^1.6.1"` |
+| `apps/employee-portal/package.json` | the same one line |
+| `apps/manager-portal/package.json` | the same one line |
+| `pnpm-lock.yaml` | relocked by `pnpm install` — 11 insertions, 11 deletions, all of them the platform resolution |
+| `apps/admin/src/shell/workspace-shell.tsx` | `railLabel={t('admin.shell.workspace')}` added to `Sidebar`, and the doc comment explaining its previous absence replaced |
+
+**`@munaxa/ui` and `@munaxa/theme` did not move**, and neither needed a new release. §D predicted
+this from `workspace:^` semantics; the published tarballs now confirm it directly:
+
+```json
+@munaxa/ui@1.1.1     dependencies: { "@munaxa/platform": "^1.3.0" }
+@munaxa/theme@1.1.1  dependencies: { "@munaxa/platform": "^1.3.0" }
+```
+
+A caret, not a pin — so both façades resolve onto 1.6.1 rather than dragging 1.3.0 along beneath
+them. That was the one residual risk §D named and could not settle without registry access. It is
+settled: **the lockfile now contains zero references to `@munaxa/platform@1.3.0`**, and every
+symlink in the tree — the two façades, the hoisted entry and all three applications — points at
+the same 1.6.1 instance. One copy, not two.
+
+No new translation key was created, no Arabic string was hardcoded, and no navigation was
+redesigned. `admin.shell.workspace` already existed in both catalogues and had never been
+referenced by any code; this consumes it.
+
+---
+
+## R. Registry verification
+
+The credential was verified **before** any manifest was touched, per the brief's §1.
+
+`GITHUB_TOKEN` is still the non-secret sentinel `proxy-injected` — that variable was never the one
+that changed. `NODE_AUTH_TOKEN` now carries a real 40-character classic PAT. A probe with it:
+
+```text
+GET https://npm.pkg.github.com/@munaxa%2fplatform   →  HTTP 200
+versions: 1.0.0 1.0.1 1.0.2 1.1.0 1.2.0 1.3.0 1.3.1 1.4.0 1.4.1 1.4.2 1.4.3
+          1.5.0 1.5.1 1.5.2 1.6.0 1.6.1
+```
+
+The registry now answers, and 1.6.1 is present. The credential was installed at the **user** level
+with `pnpm config set --location=user`, which is the mechanism the committed `.npmrc` documents;
+nothing was written to the repository and the working tree stayed clean.
+
+**A clean-room install, not an upgrade of a contaminated tree.** `node_modules` was deleted
+entirely — 921 MB, including every `file:` link the earlier investigation had left behind — and
+rebuilt from the registry. As a control, `pnpm install --frozen-lockfile` was run first at the
+*old* lockfile, and the parity guard passed for the first time in this container's history: five
+packages, all `registry`. Only then was the version bumped and `pnpm install` re-run.
+
+The lockfile records a real resolution and a real integrity hash, neither fabricated:
+
+```yaml
+'@munaxa/platform@1.6.1':
+  resolution:
+    integrity: sha512-2Ls8XgoYW61uCzXoxulOGrS1+4ZwzUxjD+AnuA3Atu7OLBpcutv1phde5WpbhJqoEDYeNzj2vJKj/uDbgGqphQ==
+    tarball: https://npm.pkg.github.com/download/@munaxa/platform/1.6.1/1ba432faad1eb061c591696b39789c4bcc1d4fb6
+```
+
+**Parity guard, enforced and passing** — no `MUNAXA_ALLOW_PLATFORM_SOURCE`, no override:
+
+```text
+  @munaxa/config-eslint      1.0.0 = lockfile 1.0.0  registry
+  @munaxa/config-typescript  1.0.0 = lockfile 1.0.0  registry
+  @munaxa/platform           1.6.1 = lockfile 1.6.1  registry
+  @munaxa/theme              1.1.1 = lockfile 1.1.1  registry
+  @munaxa/ui                 1.1.1 = lockfile 1.1.1  registry
+
+Platform parity: 5 package(s) match the lockfile, all from the registry.
+```
+
+The guard was not modified to accommodate the upgrade. It caught the source-linked state during
+the investigation and passes on its own terms now.
+
+**API reconfirmed against the installed published package**, not against a local build:
+`apps/admin/node_modules/@munaxa/platform/package.json` reports **1.6.1**, and
+`dist/ui/shell/sidebar.d.ts` carries `railLabel?: string` — optional, in the emitted declaration
+CI will typecheck against. The §C surface diff (516 → 527 exports, 902 → 937 props, zero removals,
+zero made required) needs no revision: Work's full gate passing against the published package is
+the same claim, tested end to end.
+
+---
+
+## S. Rail accessibility
+
+Read from the live DOM of the running application, built against the published 1.6.1.
+
+| Language | Rail |
+| --- | --- |
+| English | `<nav aria-label="Workspace">` |
+| Arabic | `<nav aria-label="مساحة العمل">` |
+
+Landmark structure, both languages:
+
+```text
+en:  nav[Workspace]      | nav[Main]      | header | main | header
+ar:  nav[مساحة العمل]     | nav[الرئيسية]   | header | main | header
+```
+
+The rail is a **named `navigation` landmark** in both languages. Compare §H's 1.3.0 baseline:
+`aside(unnamed) · nav[Main] · …` — an anonymous `complementary` holding the brand lockup outside
+the navigation structure.
+
+**Collapsed and expanded both hold**, and the toggle is translated and keyboard-operable:
+
+| | English | Arabic |
+| --- | --- | --- |
+| expanded | `nav[Workspace]`, `aria-expanded=true`, toggle *"Collapse navigation"*, 17 links | `nav[مساحة العمل]`, `aria-expanded=true`, toggle *"طيّ التنقّل"*, 17 links |
+| collapsed | `nav[Workspace]`, `aria-expanded=false`, toggle *"Expand navigation"*, 17 links | `nav[مساحة العمل]`, `aria-expanded=false`, toggle *"بسط التنقّل"*, 17 links |
+| re-expanded by <kbd>Enter</kbd> | `aria-expanded=true` | `aria-expanded=true` |
+
+The landmark keeps its name through the collapse, the navigation keeps all 17 destinations in both
+states, and the toggle's accessible name swaps in the reader's own language. No accessibility
+framework was introduced; this is the repository's existing Playwright rig reading the rendered
+accessibility properties.
+
+---
+
+## T. Full Work verification
+
+`pnpm verify` with `TURBO_FORCE=true`, PostgreSQL 16 live, 31 of 31 migrations applied, against
+the **published** `@munaxa/platform@1.6.1` — and with the parity guard **enforced**, no override:
+
+| Stage | Result |
+| --- | --- |
+| `standards` | 5 gates, no violations — including platform parity, all from the registry |
+| `format:check` | clean |
+| `lint` | **51 successful, 51 total**, 0 cached — 2m20.734s |
+| `typecheck` | **51 successful, 51 total**, 0 cached — 1m14.807s |
+| `test` | **51 successful, 51 total**, 0 cached — 10m6.559s |
+| `build` | **29 successful, 29 total**, 0 cached — 1m46.132s |
+| **`pnpm verify`** | **exit 0** |
+
+**462 test files, 5,306 tests, 0 failed, 0 skipped.** Every turbo task a cache miss — nothing was
+replayed. Identical counts to the 1.3.0 baseline, so no test changed behaviour under the upgrade.
+
+Product verification, at 1440 px and 390 px in both languages across home, Employee Record,
+Approvals, Hiring, Payroll, Leave, Attendance and Performance — **32 screen loads, every one HTTP
+200, zero horizontal page scroll**, landmark structure identical on every screen. At 390 px the
+rail is absent in both languages, which is the component's documented behaviour: `NavigationDrawer`
+owns navigation below the breakpoint.
+
+Regression classification, per the brief's §11: **no class-A finding.** Nothing failed that the
+platform upgrade caused. The `/leave` rig artefact recorded in §J is class C — a scratchpad stub
+that serves two of that screen's seven endpoints and returns a wrong-shaped 200 for
+`balances/reconciliation`; it is version-independent and contradicted by Leave's own tests passing
+inside the 5,306. No class-B or class-D issue was fixed, and no unrelated finding was touched.
+
+---
+
+## U. CI
+
+_Recorded once the pull request's checks complete; see §V for the branch and pull request._
+
+---
+
+## V. Git
+
+| | |
+| --- | --- |
+| Branch | `claude/munaxa-product-readiness-audit-8mr34d` |
+| Base | `main` at `efa18ce` |
+| Investigation commit | `9331ab5` — sections A–P, no dependency change |
+| Implementation commit | `9c45816` — the upgrade |
+| Status | awaiting review; **not merged** |
+
+---
+
+# PLATFORM 1.6.1 UPGRADE READY — AWAITING MERGE
