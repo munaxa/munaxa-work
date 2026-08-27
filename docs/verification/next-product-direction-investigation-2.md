@@ -1075,4 +1075,18 @@ this document.
 
 ## Y. Git
 
-GIT_PLACEHOLDER
+| | |
+| --- | --- |
+| Branch | `claude/munaxa-product-readiness-audit-8mr34d` |
+| Commit | `5f30d48` |
+| Working tree after commit | clean |
+| Registry workaround in `package.json` | none — `pnpm.overrides` holds only `sharp`, `postcss`, `js-yaml`, `deepmerge-ts` |
+| Files changed | 1 — this document |
+
+The local verification rig — the source-built platform packages, the 404-everything stub, the
+browser walk — lives in the session scratchpad and is not committed. `package.json` was checked for
+a `file:` override before committing; there is none.
+
+---
+
+# INVESTIGATION COMPLETE — AWAITING OWNER REVIEW AND NEXT DIRECTION
