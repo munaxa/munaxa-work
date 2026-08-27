@@ -31,7 +31,7 @@
     "measure:workflow": "node scripts/measure-workflow-performance.mjs",
     "prisma:generate": "pnpm --filter @work/api exec prisma generate --schema ../../prisma/schema.prisma",
     "prisma:validate": "pnpm --filter @work/api exec prisma validate --schema ../../prisma/schema.prisma",
-    "standards": "node scripts/check-standards.mjs && node scripts/check-architecture.mjs && node scripts/check-localization.mjs && node scripts/check-dependencies.mjs",
+    "standards": "node scripts/check-standards.mjs && node scripts/check-architecture.mjs && node scripts/check-localization.mjs && node scripts/check-dependencies.mjs && node scripts/check-platform-parity.mjs",
     "test": "turbo run test --concurrency=1",
     "typecheck": "turbo run typecheck",
     "verify": "pnpm standards && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"

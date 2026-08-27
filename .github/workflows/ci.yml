@@ -35,6 +35,12 @@ jobs:
       - name: Dependencies
         run: node scripts/check-dependencies.mjs
 
+      # Without an install this checks declarations only — that no manifest and no lockfile
+      # entry resolves an @munaxa/* package from a path. The `node` job runs it again after
+      # installing, where it can also compare what is on disk. See the script's header.
+      - name: Platform parity
+        run: node scripts/check-platform-parity.mjs
+
   node:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
@@ -80,6 +86,12 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Records the exact @munaxa/* versions the rest of this job compiles, lints and tests
+      # against. That record is what a local run of the same gate has to match before anyone
+      # can say a green local gate means a green CI gate.
+      - name: Platform parity
+        run: node scripts/check-platform-parity.mjs
 
       - name: Format check
         run: pnpm format:check
