@@ -10,6 +10,14 @@
  */
 
 export type {
+  ApplicableActionView,
+  CaseEventView,
+  CaseHistoryView,
+  DisciplinaryActionView,
+  DisciplinaryRuleView,
+  EscalationContextView,
+  InvestigationPageView,
+  InvestigationView,
   LocalizedTextView,
   ViolationCategoryView,
   ViolationPageView,

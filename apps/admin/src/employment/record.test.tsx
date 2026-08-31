@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { translator as shellTranslator } from '../shell/locale';
 
 import { recordTranslator } from './record-locale';
-import { ContractsSection, IdentitySection, PlacementSection } from './record-identity';
+import {
+  ContractsSection,
+  IdentitySection,
+  PlacementSection,
+  StatusHistorySection,
+} from './record-identity';
 import { EmploymentSummary } from './record-summary';
 import {
   AttendanceSection,
@@ -20,7 +25,13 @@ import {
   CareerSection,
   RelationsSection,
 } from './record-governance';
-import { aFullRecord, aWithheldRecord, anEmptyRecord } from './record.fixture';
+import {
+  ANOTHER_EMPLOYMENT_ID,
+  aFullRecord,
+  aHistory,
+  aWithheldRecord,
+  anEmptyRecord,
+} from './record.fixture';
 
 /**
  * What the employee record actually renders, asserted against the markup rather than a description
@@ -60,13 +71,14 @@ const everySection = (
     html(<IdentitySection t={t} language={language} record={record} />),
     html(<PlacementSection t={t} language={language} record={record} />),
     html(<ContractsSection t={t} record={record} />),
+    html(<StatusHistorySection t={t} record={record} />),
     html(<DocumentsSection t={t} language={language} record={record} />),
     html(<LettersSection t={t} record={record} />),
     html(<LeaveSection t={t} language={language} record={record} />),
     html(<AttendanceSection t={t} record={record} />),
     html(<CareerSection t={t} record={record} />),
     html(<LearningSection t={t} record={record} />),
-    html(<RelationsSection t={t} record={record} />),
+    html(<RelationsSection t={t} language={language} record={record} />),
     html(<AssetsSection t={t} record={record} />),
     html(<BoundariesNote t={t} />),
   ].join('\n');
@@ -102,6 +114,32 @@ describe('the employee record', () => {
   });
 
   /**
+   * The repair behind this section: the status timeline renders **the requested employment's**
+   * history, and an arbitrary page row's history is detectably different markup.
+   *
+   * The fixtures carry two distinct employments whose histories disagree on `reasonCode` and
+   * `recordedBy`, so a record wired to the wrong employment's history fails here rather than
+   * rendering something plausible.
+   */
+  it('renders the history of the employment the record is for, and no other', () => {
+    const requested = html(<StatusHistorySection t={en} record={aFullRecord()} />);
+    const leaked = html(
+      <StatusHistorySection
+        t={en}
+        record={{ ...aFullRecord(), history: aHistory(ANOTHER_EMPLOYMENT_ID) }}
+      />,
+    );
+
+    expect(requested).toContain('SANCTION');
+    expect(requested).toContain('membership-hr-041');
+    expect(requested).not.toContain('membership-hr-099');
+    // The two employments' histories are distinguishable, so leaking one into the other cannot
+    // render identical markup — which is what makes every assertion above meaningful.
+    expect(leaked).toContain('membership-hr-099');
+    expect(leaked).not.toContain('membership-hr-041');
+  });
+
+  /**
    * The assertion the whole design turns on.
    *
    * An empty disciplinary section reads as "this person has a clean record". If a refusal rendered
@@ -130,7 +168,7 @@ describe('the employee record', () => {
       html(<AttendanceSection t={en} record={record} />),
       html(<CareerSection t={en} record={record} />),
       html(<LearningSection t={en} record={record} />),
-      html(<RelationsSection t={en} record={record} />),
+      html(<RelationsSection t={en} language="en" record={record} />),
       html(<AssetsSection t={en} record={record} />),
     ];
 
@@ -145,7 +183,7 @@ describe('the employee record', () => {
    * that showed both.
    */
   it('renders no violation content at all when relations was refused', () => {
-    const markup = html(<RelationsSection t={en} record={aWithheldRecord()} />);
+    const markup = html(<RelationsSection t={en} language="en" record={aWithheldRecord()} />);
 
     for (const leak of ['LATENESS', 'minor', 'Arrived after']) {
       expect([leak, markup.includes(leak)]).toEqual([leak, false]);
@@ -253,8 +291,8 @@ describe('the employee record', () => {
    * both languages; its severity is a word the tenant chose and is rendered as stored.
    */
   it('translates the violation state and leaves the tenant severity alone', () => {
-    const english = html(<RelationsSection t={en} record={aFullRecord()} />);
-    const arabic = html(<RelationsSection t={ar} record={aFullRecord()} />);
+    const english = html(<RelationsSection t={en} language="en" record={aFullRecord()} />);
+    const arabic = html(<RelationsSection t={ar} language="ar" record={aFullRecord()} />);
 
     expect(english).toContain(en('relations.state.reported'));
     expect(arabic).toContain(ar('relations.state.reported'));

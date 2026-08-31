@@ -5,6 +5,7 @@ import type { DocumentView } from '@work/documents/contracts';
 import type {
   AssignmentView,
   ContractView,
+  EmploymentHistoryView,
   EmploymentView,
   ReportingLineView,
 } from '@work/employment/contracts';
@@ -212,6 +213,43 @@ export const aViolation = (): ViolationView => ({
   version: 1,
 });
 
+/**
+ * A second, distinct employment — here so a test can prove whose history renders.
+ *
+ * The workforce directory used to show the *first page row's* history under a heading that named
+ * nobody. A fixture with only one employment could never have caught that: with a single identifier
+ * on both sides, "the requested employment's history" and "an arbitrary row's history" render the
+ * same markup. Two distinct identifiers make the difference detectable.
+ */
+export const ANOTHER_EMPLOYMENT_ID = '01900000-0000-7000-8000-00000000e002';
+
+export const aHistory = (employmentId: string = EMPLOYMENT_ID): EmploymentHistoryView => ({
+  employmentId,
+  statusHistory: [
+    {
+      recordId: `${employmentId.slice(0, 30)}h1`,
+      employmentId,
+      toStatus: 'active',
+      effectiveFrom: new Date('2021-03-01T00:00:00.000Z'),
+      recordedBy: employmentId === EMPLOYMENT_ID ? 'membership-hr-041' : 'membership-hr-099',
+      recordedAt: new Date('2021-03-01T08:00:00.000Z'),
+    },
+    {
+      recordId: `${employmentId.slice(0, 30)}h2`,
+      employmentId,
+      fromStatus: 'active',
+      toStatus: 'suspended',
+      reasonCode: employmentId === EMPLOYMENT_ID ? 'SANCTION' : 'SECONDMENT',
+      effectiveFrom: new Date('2024-06-15T00:00:00.000Z'),
+      recordedBy: employmentId === EMPLOYMENT_ID ? 'membership-hr-041' : 'membership-hr-099',
+      recordedAt: new Date('2024-06-15T08:00:00.000Z'),
+    },
+  ],
+  assignments: [],
+  reportingLines: [],
+  contracts: [],
+});
+
 export const aClearance = (): AssetClearanceView => ({
   employmentId: EMPLOYMENT_ID,
   asAt: '2026-08-24',
@@ -241,6 +279,7 @@ export const aFullRecord = (): EmployeeRecord => ({
   balances: [aBalance()],
   leaveTypes: [aLeaveType()],
   attendanceDays: [anAttendanceDay()],
+  history: aHistory(),
   career: aCareerSummary(),
   learning: aLearningHistory(),
   violations: [aViolation()],
@@ -260,6 +299,7 @@ export const aWithheldRecord = (): EmployeeRecord => ({
   balances: undefined,
   leaveTypes: undefined,
   attendanceDays: undefined,
+  history: undefined,
   career: undefined,
   learning: undefined,
   violations: undefined,
@@ -279,6 +319,13 @@ export const anEmptyRecord = (): EmployeeRecord => ({
   balances: [],
   leaveTypes: [],
   attendanceDays: [],
+  history: {
+    employmentId: EMPLOYMENT_ID,
+    statusHistory: [],
+    assignments: [],
+    reportingLines: [],
+    contracts: [],
+  },
   career: aCareerSummary(),
   learning: aLearningHistory(),
   violations: [],

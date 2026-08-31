@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import employeeRecordPage from '../app/employment/[employmentId]/page';
 
 import {
+  aHistory,
   aBalance,
   aCareerSummary,
   aClearance,
@@ -48,6 +49,7 @@ const ANSWERS: readonly (readonly [string, () => unknown])[] = [
   ['/assignments', () => ({ items: [anAssignment()] })],
   ['/reporting-lines', () => ({ items: [aReportingLine()] })],
   ['/contracts', () => ({ items: [aContract()] })],
+  ['/history', aHistory],
   ['/employments/', anEmployment],
   ['/people/', aProfile],
   ['/documents', () => ({ items: [aDocument()] })],

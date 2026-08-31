@@ -12,6 +12,7 @@ import {
   ContractsSection,
   IdentitySection,
   PlacementSection,
+  StatusHistorySection,
 } from '../../../employment/record-identity';
 import {
   AttendanceSection,
@@ -80,6 +81,7 @@ const answeredNothing = (record: EmployeeRecord): boolean =>
     record.letters,
     record.balances,
     record.attendanceDays,
+    record.history,
     record.career,
     record.learning,
     record.violations,
@@ -112,13 +114,14 @@ const RecordBody = ({
       <IdentitySection t={t} language={language} record={record} />
       <PlacementSection t={t} language={language} record={record} />
       <ContractsSection t={t} record={record} />
+      <StatusHistorySection t={t} record={record} />
       <DocumentsSection t={t} language={language} record={record} />
       <LettersSection t={t} record={record} />
       <LeaveSection t={t} language={language} record={record} />
       <AttendanceSection t={t} record={record} />
       <CareerSection t={t} record={record} />
       <LearningSection t={t} record={record} />
-      <RelationsSection t={t} record={record} />
+      <RelationsSection t={t} language={language} record={record} />
       <AssetsSection t={t} record={record} />
     </Stack>
   );

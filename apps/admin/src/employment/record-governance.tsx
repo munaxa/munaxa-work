@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { AssetClearanceView } from '@work/assets/contracts';
+import type { Language } from '../shell/locale';
 import type { CareerSummaryView } from '@work/career/contracts';
 import type { ViolationView } from '@work/relations/contracts';
 
@@ -54,8 +55,12 @@ import type { EmployeeRecord } from './record-api';
 
 const ViolationRows = ({
   t,
+  language,
   violations,
-}: SectionProps & { readonly violations: readonly ViolationView[] }): ReactNode => (
+}: SectionProps & {
+  readonly language: Language;
+  readonly violations: readonly ViolationView[];
+}): ReactNode => (
   <Rows
     headings={[
       t('relations.label.occurredOn'),
@@ -72,7 +77,12 @@ const ViolationRows = ({
           <Isolated>{violation.occurredOn}</Isolated>
         </Cell>
         <Cell>
-          <Isolated>{violation.categoryCode}</Isolated>
+          <a
+            className="underline underline-offset-4"
+            href={`/relations/cases/${violation.violationId}?lang=${language}`}
+          >
+            <Isolated>{violation.categoryCode}</Isolated>
+          </a>
         </Cell>
         <Cell>
           <Isolated>{violation.severity}</Isolated>
@@ -86,18 +96,40 @@ const ViolationRows = ({
   </Rows>
 );
 
+/**
+ * The record's summary of one employment's disciplinary history — and the way into the workflow.
+ *
+ * This section stays a summary: the module's ten most recent violations, exactly as before. What
+ * Slice #9 added is the path out of it — each row opens its case, and the link under the table
+ * opens the employment's full relations record with the server's totals. Nothing is duplicated:
+ * the record answers "is there anything", and the relations screens answer "what exactly, and
+ * where does each case stand".
+ */
 export const RelationsSection = ({
   t,
+  language,
   record,
-}: SectionProps & { readonly record: EmployeeRecord }): ReactNode => {
+}: SectionProps & {
+  readonly language: Language;
+  readonly record: EmployeeRecord;
+}): ReactNode => {
   const violations = record.violations;
+  const employmentId = record.employment?.employmentId;
 
   if (violations === undefined) return <Withheld t={t} title={t('admin.record.relations')} />;
   if (violations.length === 0) return <NothingToShow t={t} title={t('admin.record.relations')} />;
 
   return (
     <RecordSection title={t('admin.record.relations')}>
-      <ViolationRows t={t} violations={violations} />
+      <ViolationRows t={t} language={language} violations={violations} />
+      {employmentId === undefined ? null : (
+        <a
+          className="text-sm underline underline-offset-4"
+          href={`/relations/employments/${employmentId}?lang=${language}`}
+        >
+          {t('relations.label.openRelations')}
+        </a>
+      )}
     </RecordSection>
   );
 };

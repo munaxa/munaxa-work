@@ -59,7 +59,3 @@ export const nameIn = (
   if (text === undefined) return undefined;
   return text[language] || text[language === 'ar' ? 'en' : 'ar'];
 };
-
-/** A civil date as stored. Never reformatted here — the reader's calendar is the kernel's business. */
-export const dateOf = (value: Date | string | undefined): string =>
-  value === undefined ? '—' : new Date(value).toISOString().slice(0, 10);

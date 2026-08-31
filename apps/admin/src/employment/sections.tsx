@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Section, TBody, TD, TH, THead, TR, Table } from '@munaxa/ui';
-import type { EmploymentHistoryView, EmploymentView } from '@work/employment/contracts';
+import type { EmploymentView } from '@work/employment/contracts';
 
-import { dateOf, nameIn, type Language } from './locale';
+import { nameIn, type Language } from './locale';
 import { Isolated, Status } from './record-frame';
 import { employmentTone } from './record-summary';
 
@@ -141,53 +141,6 @@ export const WorkforceSection = ({
           </TBody>
         </Table>
       </>
-    )}
-  </Section>
-);
-
-export const TimelineSection = ({
-  t,
-  history,
-}: SectionProps & { readonly history: EmploymentHistoryView | undefined }): ReactNode => (
-  <Section title={t('employment.label.history')}>
-    {history === undefined ? (
-      <p className="text-sm opacity-70">{t('employment.label.empty')}</p>
-    ) : (
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">{t('employment.label.statusHistory')}</h3>
-          <ul className="flex flex-col gap-1 text-sm">
-            {history.statusHistory.map((entry) => (
-              <li key={entry.recordId} className="flex flex-wrap gap-2 opacity-80">
-                <span>{dateOf(entry.effectiveFrom)}</span>
-                <span>
-                  {entry.fromStatus === undefined
-                    ? t(`employment.status.${entry.toStatus}`)
-                    : `${t(`employment.status.${entry.fromStatus}`)} → ${t(`employment.status.${entry.toStatus}`)}`}
-                </span>
-                <span className="text-xs opacity-60">
-                  {t('employment.label.recordedBy')}: {entry.recordedBy}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">{t('employment.label.assignments')}</h3>
-          <ul className="flex flex-col gap-1 text-sm">
-            {history.assignments.map((assignment) => (
-              <li key={assignment.assignmentId} className="flex flex-wrap gap-2 opacity-80">
-                <span>
-                  {dateOf(assignment.effectiveFrom)} → {dateOf(assignment.effectiveTo)}
-                </span>
-                <span className="font-mono text-xs">{short(assignment.unitId)}</span>
-                <span className="text-xs opacity-60">{assignment.assignmentType}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
     )}
   </Section>
 );

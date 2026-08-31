@@ -1,9 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { loadWorkforce } from './api';
 import { translator } from './locale';
 import { WorkforceSection } from './sections';
-import { anEmployment } from './record.fixture';
+import { ANOTHER_EMPLOYMENT_ID, anEmployment } from './record.fixture';
 
 /**
  * The workforce directory, and the one thing it could not do until the employee record existed:
@@ -78,5 +79,41 @@ describe('the workforce directory', () => {
     expect(refused).toContain(en('employment.label.unavailable'));
     expect(empty).toContain(en('employment.label.empty'));
     expect(empty).not.toContain(en('employment.label.unavailable'));
+  });
+});
+
+/**
+ * The directory reads the workforce and nothing about any single row.
+ *
+ * It used to make a second request — the first page row's employment history — and render it under
+ * a heading that named nobody, which put an arbitrary person's history on a tenant-wide screen.
+ * The history now belongs to the employee record, keyed on the requested employment; this suite
+ * pins the directory to one request so the arbitrary read cannot quietly come back.
+ */
+describe('what the directory asks the API', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('asks for the listing alone, never a row’s history', async () => {
+    const asked: string[] = [];
+    vi.stubGlobal('fetch', (input: string) => {
+      asked.push(input);
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            items: [{ ...anEmployment(), employmentId: ANOTHER_EMPLOYMENT_ID }, anEmployment()],
+            total: 2,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+    });
+
+    const workforce = await loadWorkforce();
+
+    expect(workforce.employments).toHaveLength(2);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).not.toContain('/history');
   });
 });

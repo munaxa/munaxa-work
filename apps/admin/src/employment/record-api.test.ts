@@ -134,9 +134,10 @@ describe('reading one employee', () => {
 
     await loadRecord(anEmployment());
 
-    // Thirteen: the employment's own facts, the operational modules, and the tenant's leave types.
-    // The manager is the fourteenth and is not among them, because this employment names none.
-    expect(asked).toHaveLength(13);
+    // Fourteen: the employment's own facts, its history, the operational modules, and the
+    // tenant's leave types. The manager is the fifteenth and is not among them, because this
+    // employment names none.
+    expect(asked).toHaveLength(14);
     const other = '01900000-0000-7000-8000-00000000e002';
     for (const url of asked) expect(url).not.toContain(other);
     // The person's own read is keyed on the person; every other read is keyed on the employment.
@@ -159,7 +160,7 @@ describe('reading one employee', () => {
 
     await loadRecord({ ...anEmployment(), managerEmploymentId: manager });
 
-    expect(asked).toHaveLength(14);
+    expect(asked).toHaveLength(15);
     expect(asked.filter((url) => url.includes(manager))).toHaveLength(1);
   });
 
@@ -175,6 +176,56 @@ describe('reading one employee', () => {
     expect(record.managerName).toEqual({ en: 'Omar Nasser', ar: 'عمر ناصر' });
     // Nothing else was resolved to a name: a unit and a position have no bounded read by identifier.
     expect(record.assignments).toBeUndefined();
+  });
+
+  /**
+   * The regression behind the status timeline: whose history renders is decided by the requested
+   * employment, never by which row happened to be first in a page.
+   *
+   * The workforce directory used to fetch `page.items[0]`'s history and render it under a heading
+   * that named nobody. The stub here answers a *different* history for each of two employments, so
+   * a loader that asked for any employment other than the requested one returns the wrong
+   * `recordedBy` and fails.
+   */
+  it('returns the requested employment’s history, with two distinct employments on offer', async () => {
+    const requested = '01900000-0000-7000-8000-00000000e001';
+    const other = '01900000-0000-7000-8000-00000000e002';
+    const historyFor = (employmentId: string, recordedBy: string): unknown => ({
+      employmentId,
+      statusHistory: [
+        {
+          recordId: `${employmentId}-h1`,
+          employmentId,
+          toStatus: 'active',
+          effectiveFrom: '2021-03-01',
+          recordedBy,
+          recordedAt: '2021-03-01T08:00:00.000Z',
+        },
+      ],
+      assignments: [],
+      reportingLines: [],
+      contracts: [],
+    });
+    vi.stubGlobal('fetch', (input: string) => {
+      const answers = (body: unknown): Response =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+
+      if (input.startsWith(`${BASE}/api/v1/employments/${requested}/history`)) {
+        return Promise.resolve(answers(historyFor(requested, 'membership-hr-041')));
+      }
+      if (input.startsWith(`${BASE}/api/v1/employments/${other}/history`)) {
+        return Promise.resolve(answers(historyFor(other, 'membership-hr-099')));
+      }
+      return Promise.resolve(new Response('', { status: 401 }));
+    });
+
+    const record = await loadRecord(anEmployment());
+
+    expect(record.history?.employmentId).toBe(requested);
+    expect(record.history?.statusHistory[0]?.recordedBy).toBe('membership-hr-041');
   });
 
   it('never caches a page of one named person’s data', async () => {

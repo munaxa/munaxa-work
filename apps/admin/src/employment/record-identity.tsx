@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
-import type { AssignmentView, ContractView, ReportingLineView } from '@work/employment/contracts';
+import type {
+  AssignmentView,
+  ContractView,
+  ReportingLineView,
+  StatusRecordView,
+} from '@work/employment/contracts';
 import type { PersonProfileView } from '@work/people/contracts';
 
 import type { Language } from '../shell/locale';
@@ -214,6 +219,65 @@ export const ContractsSection = ({
   return (
     <RecordSection title={t('admin.record.contracts')}>
       <ContractRows t={t} contracts={contracts} />
+    </RecordSection>
+  );
+};
+
+const StatusRows = ({
+  t,
+  entries,
+}: SectionProps & { readonly entries: readonly StatusRecordView[] }): ReactNode => (
+  <Rows
+    headings={[
+      t('employment.label.effectiveFrom'),
+      t('employment.label.from'),
+      t('employment.label.to'),
+      t('employment.label.reason'),
+      t('employment.label.recordedBy'),
+    ]}
+  >
+    {entries.map((entry) => (
+      <Row key={entry.recordId}>
+        <Cell>{dayOf(entry.effectiveFrom)}</Cell>
+        <Cell>
+          {entry.fromStatus === undefined ? DASH : t(`employment.status.${entry.fromStatus}`)}
+        </Cell>
+        <Cell>{t(`employment.status.${entry.toStatus}`)}</Cell>
+        <Cell>{orDash(entry.reasonCode)}</Cell>
+        <Identifier value={entry.recordedBy} />
+      </Row>
+    ))}
+  </Rows>
+);
+
+/**
+ * How this employment's status got to where it is — **this** employment's, by construction.
+ *
+ * The status timeline used to render on the workforce directory, fetched for whichever employment
+ * happened to be the first row of the page, under a heading that named nobody. It belongs here:
+ * the record is keyed on one requested employment, `GET /employments/:id/history` is bounded to
+ * that employment, and the module echoes `employmentId` on every entry it returns.
+ *
+ * Only the status timeline renders from the history read. Its other three timelines — assignments,
+ * reporting lines and contracts — already render above from their own dedicated reads, and a second
+ * copy of each would be a second thing that can disagree.
+ */
+export const StatusHistorySection = ({
+  t,
+  record,
+}: SectionProps & { readonly record: EmployeeRecord }): ReactNode => {
+  const history = record.history;
+
+  if (history === undefined) {
+    return <Withheld t={t} title={t('employment.label.statusHistory')} />;
+  }
+  if (history.statusHistory.length === 0) {
+    return <NothingToShow t={t} title={t('employment.label.statusHistory')} />;
+  }
+
+  return (
+    <RecordSection title={t('employment.label.statusHistory')}>
+      <StatusRows t={t} entries={history.statusHistory} />
     </RecordSection>
   );
 };

@@ -3,7 +3,7 @@ import { Page, PageHeader } from '@munaxa/ui';
 
 import { loadWorkforce } from '../../employment/api';
 import { directionOf, isLanguage, translator, type Language } from '../../employment/locale';
-import { BoundariesSection, TimelineSection, WorkforceSection } from '../../employment/sections';
+import { BoundariesSection, WorkforceSection } from '../../employment/sections';
 
 /**
  * The employment administration screen.
@@ -56,7 +56,6 @@ const EmploymentPage = async ({ searchParams }: PageProps): Promise<ReactNode> =
           unavailable={workforce.unavailable}
           asOf={asOf}
         />
-        <TimelineSection t={t} language={language} history={workforce.history} />
         <BoundariesSection t={t} language={language} />
       </Page>
     </div>

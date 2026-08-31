@@ -38,6 +38,8 @@
       "caseHistory": "سجل الحالة",
       "currentState": "الحالة الراهنة",
       "transition": "التغيير",
+      "from": "من",
+      "to": "إلى",
       "actor": "بواسطة",
       "occurredAt": "التاريخ",
       "open": "فتح تحقيق",
@@ -64,7 +66,12 @@
       "applicableAction": "الإجراء المقترح",
       "defineRule": "إضافة قاعدة",
       "amendRule": "تعديل القاعدة",
-      "issueAction": "إصدار إجراء تأديبي"
+      "issueAction": "إصدار إجراء تأديبي",
+      "backToRecord": "العودة إلى ملف الموظف",
+      "backToRelations": "العودة إلى علاقات الموظفين",
+      "openRelations": "فتح سجل علاقات الموظفين",
+      "nothingReadable": "تعذّرت قراءة أي شيء هنا",
+      "boundaries": "ما لا تفعله هذه الشاشة"
     },
     "source": {
       "tenant": "معرّف من قبل المنشأة",
@@ -186,6 +193,20 @@
       "final_warning": "إنذار نهائي",
       "suspension_recommendation": "توصية بالإيقاف",
       "termination_recommendation": "توصية بإنهاء الخدمة"
+    },
+    "empty": {
+      "violations": "لا توجد مخالفات مسجلة على هذا التوظيف.",
+      "investigations": "لم يُفتح أي تحقيق في هذه المخالفة.",
+      "history": "لم يحدث شيء في هذه الحالة بعد.",
+      "action": "لم يصدر أي إجراء تأديبي في هذه الحالة."
+    },
+    "withheld": {
+      "violationRead": "قراءة السجلات التأديبية تتطلّب صلاحية لا يملكها هذا المستخدم.",
+      "caseNotFound": "لا يوجد لدى هذه المنشأة مخالفة بهذا المعرّف."
+    },
+    "prescribedByRule": {
+      "yes": "نعم",
+      "no": "لا"
     }
   }
 }

@@ -38,6 +38,8 @@
       "caseHistory": "Case history",
       "currentState": "Current state",
       "transition": "Change",
+      "from": "From",
+      "to": "To",
       "actor": "By",
       "occurredAt": "When",
       "open": "Open an investigation",
@@ -64,7 +66,12 @@
       "applicableAction": "Suggested action",
       "defineRule": "Add a ladder rule",
       "amendRule": "Amend ladder rule",
-      "issueAction": "Issue disciplinary action"
+      "issueAction": "Issue disciplinary action",
+      "backToRecord": "Back to the employee record",
+      "backToRelations": "Back to employee relations",
+      "openRelations": "Open the employee relations record",
+      "nothingReadable": "Nothing here could be read",
+      "boundaries": "What this screen does not do"
     },
     "source": {
       "tenant": "Defined by this organization",
@@ -186,6 +193,20 @@
       "final_warning": "Final warning",
       "suspension_recommendation": "Recommendation to suspend",
       "termination_recommendation": "Recommendation to terminate"
+    },
+    "empty": {
+      "violations": "No violations are recorded against this employment.",
+      "investigations": "No investigation has been opened into this violation.",
+      "history": "Nothing has happened on this case yet.",
+      "action": "No disciplinary action has been issued on this case."
+    },
+    "withheld": {
+      "violationRead": "Reading disciplinary records needs a permission this caller does not hold.",
+      "caseNotFound": "This organization holds no violation with that identifier."
+    },
+    "prescribedByRule": {
+      "yes": "Yes",
+      "no": "No"
     }
   }
 }

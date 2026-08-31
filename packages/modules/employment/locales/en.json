@@ -74,6 +74,7 @@
       "from": "From",
       "to": "To",
       "recordedBy": "Recorded by",
+      "reason": "Reason",
       "boundaries": "What Employment does not hold",
       "empty": "No employments to show.",
       "unavailable": "The workforce could not be read. Sign-in is not available yet.",

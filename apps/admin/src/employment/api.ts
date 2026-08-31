@@ -1,5 +1,5 @@
 import { loadPortalProcessEnvironment } from '@work/config';
-import type { EmploymentHistoryView, EmploymentView } from '@work/employment/contracts';
+import type { EmploymentView } from '@work/employment/contracts';
 
 /**
  * Reading the workforce from the API.
@@ -17,8 +17,6 @@ import type { EmploymentHistoryView, EmploymentView } from '@work/employment/con
 
 export interface WorkforceForDisplay {
   readonly employments: readonly EmploymentView[];
-  /** The first employment's history, so the screen can show what a timeline looks like. */
-  readonly history?: EmploymentHistoryView;
   /** True when the API could not be reached or refused the caller — the ordinary state today. */
   readonly unavailable: boolean;
 }
@@ -47,23 +45,20 @@ interface Page<TItem> {
   readonly items: readonly TItem[];
 }
 
+/**
+ * The workforce listing, and nothing about any single employment.
+ *
+ * This loader used to make a second request — the *first row's* history — so the directory could
+ * demonstrate a timeline. That history rendered under a heading that named nobody, which made the
+ * screen a display of one arbitrary person's employment history. A history belongs to the
+ * employment whose record is being read, so it is loaded by the employee record, keyed on the
+ * requested employment, and never by position in a page.
+ */
 export const loadWorkforce = async (asOf?: string): Promise<WorkforceForDisplay> => {
   const query = asOf === undefined ? '' : `?asOf=${encodeURIComponent(asOf)}`;
   const page = await read<Page<EmploymentView>>(query);
 
   if (page === undefined) return { employments: [], unavailable: true };
 
-  const first = page.items[0];
-  // Fetched only when there is something to fetch it for. A second round trip on an empty
-  // workforce is latency spent to render nothing.
-  const history =
-    first === undefined
-      ? undefined
-      : await read<EmploymentHistoryView>(`/${first.employmentId}/history`);
-
-  return {
-    employments: page.items,
-    ...(history === undefined ? {} : { history }),
-    unavailable: false,
-  };
+  return { employments: page.items, unavailable: false };
 };

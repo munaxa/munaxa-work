@@ -6,6 +6,7 @@ import type { DocumentView } from '@work/documents/contracts';
 import type {
   AssignmentView,
   ContractView,
+  EmploymentHistoryView,
   EmploymentView,
   ReportingLineView,
 } from '@work/employment/contracts';
@@ -113,6 +114,15 @@ export interface EmployeeRecord {
    */
   readonly leaveTypes: readonly LeaveTypeView[] | undefined;
   readonly attendanceDays: readonly AttendanceDayView[] | undefined;
+  /**
+   * The employment's own history — **keyed on the requested employment, never on a row's position.**
+   *
+   * The workforce directory used to fetch the *first page row's* history to demonstrate a timeline,
+   * which put an arbitrary person's employment history on a screen that named nobody. The read
+   * belongs here: `GET /employments/:id/history` is bounded to one employment, and the identifier
+   * it is asked with is the one this record was opened by.
+   */
+  readonly history: EmploymentHistoryView | undefined;
   readonly career: CareerSummaryView | undefined;
   readonly learning: LearningHistoryView | undefined;
   readonly violations: readonly ViolationView[] | undefined;
@@ -165,6 +175,7 @@ export const loadRecord = async (
     balances,
     leaveTypes,
     attendanceDays,
+    history,
     career,
     learning,
     violations,
@@ -180,6 +191,7 @@ export const loadRecord = async (
     items<LeaveBalanceView>(`/leave/balances?employmentId=${id}&limit=${RECENT}`),
     items<LeaveTypeView>('/leave/types'),
     items<AttendanceDayView>(`/attendance/days?employmentId=${id}&size=${RECENT}`),
+    read<EmploymentHistoryView>(`/employments/${id}/history`),
     read<CareerSummaryView>(`/career/summary/${id}`),
     read<LearningHistoryView>(`/learning/history/${id}`),
     items<ViolationView>(`/relations/violations?employmentId=${id}&pageSize=${RECENT}`),
@@ -202,6 +214,7 @@ export const loadRecord = async (
     balances,
     leaveTypes,
     attendanceDays,
+    history,
     career,
     learning,
     violations,
