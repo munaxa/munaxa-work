@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "db:bootstrap": "node scripts/bootstrap-tenant.mjs",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @work/api exec prisma migrate deploy --schema ../../prisma/schema.prisma",
     "db:reset": "pnpm --filter @work/api exec prisma migrate reset --schema ../../prisma/schema.prisma",
