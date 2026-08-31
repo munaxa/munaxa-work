@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  readPlatformAuthentication,
+  type PlatformAuthenticationConfiguration,
+} from './platform-authentication.js';
+
 /**
  * Environment variables are strings, and `z.coerce.boolean()` is the wrong tool for them: it
  * applies JavaScript truthiness, so the string "false" becomes `true` and a variable set to
@@ -80,6 +85,24 @@ export const environmentSchema = z.object({
   PII_MATCH_SECRET: z.string().min(32).default('development-only-people-match-secret-change-me'),
 
   OPENAPI_ENABLED: booleanFromEnvironment(true),
+
+  /**
+   * What this deployment needs in order to verify a token Platform issued (ADR-0001).
+   *
+   * Held as raw strings here because no single one of them is valid or invalid on its own —
+   * an issuer without keys is not a worse issuer, it is an unusable configuration — and a
+   * rule that spans variables belongs in `refineEnvironment`, which is where it is. The
+   * structured contract they describe is `readPlatformAuthentication`.
+   *
+   * Supplying none of the four is a supported deployment: the API then runs with
+   * `UnauthenticatedPort` and answers 401 to every business route, exactly as today.
+   */
+  PLATFORM_AUTH_ISSUER: z.string().optional(),
+  PLATFORM_AUTH_AUDIENCE: z.string().optional(),
+  PLATFORM_AUTH_ALGORITHM: z.string().optional(),
+  PLATFORM_AUTH_PUBLIC_KEYS: z.string().optional(),
+  /** Tolerance for drift between Platform's clock and this one. Platform's own default. */
+  PLATFORM_AUTH_CLOCK_SKEW_MS: z.coerce.number().int().min(0).max(300_000).default(30_000),
 });
 
 const DEVELOPMENT_MATCH_SECRET = 'development-only-people-match-secret-change-me';
@@ -121,12 +144,45 @@ export const loadEnvironment = (source: Record<string, string | undefined>): Env
  * Checked here rather than at the point of use, so a deployment that would be insecure fails at
  * startup instead of behaving correctly until the day somebody looks.
  */
-const refineEnvironment = (environment: Environment): readonly string[] =>
+const refineEnvironment = (environment: Environment): readonly string[] => [
+  ...matchSecretIssues(environment),
+  ...platformAuthenticationIssues(environment),
+];
+
+const matchSecretIssues = (environment: Environment): readonly string[] =>
   environment.NODE_ENV === 'production' && environment.PII_MATCH_SECRET === DEVELOPMENT_MATCH_SECRET
     ? [
         'PII_MATCH_SECRET: the development default must not be used in production. It is the key People derives duplicate-match digests with, and a shipped default is the same key in every deployment.',
       ]
     : [];
+
+/**
+ * Refuses a half-configured or unusable Platform authentication contract.
+ *
+ * Startup is the only honest place for this. The alternative — discovering at the first request
+ * that the keys were malformed — means the deployment looks healthy, passes its readiness probe
+ * and answers 401 to everybody, which reads exactly like "Platform is down" and is not.
+ */
+const platformAuthenticationIssues = (environment: Environment): readonly string[] => {
+  const platform = readPlatformAuthentication(environment);
+
+  return platform.kind === 'invalid' ? platform.issues : [];
+};
+
+/**
+ * The Platform authentication contract, or `undefined` when this deployment configured none.
+ *
+ * `undefined` is not a failure and not a fallback: it is the deployment that has not been given
+ * Platform's issuer yet, and it selects the port that authenticates nobody. An *invalid*
+ * contract never reaches here, because `loadEnvironment` already refused to start.
+ */
+export const platformAuthenticationFrom = (
+  environment: Environment,
+): PlatformAuthenticationConfiguration | undefined => {
+  const platform = readPlatformAuthentication(environment);
+
+  return platform.kind === 'configured' ? platform.configuration : undefined;
+};
 
 /**
  * Reads and validates the real process environment. This is the only expression in Munaxa Work
