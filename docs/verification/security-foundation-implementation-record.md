@@ -471,3 +471,136 @@ empty queue with an empty queue rather than a refusal.
 
 What is not yet true: no deployment is configured, because no issuer, key, credential or grant seed
 exists to configure it with. Those five values are Operations', and none of them was invented here.
+
+---
+
+# Finalization attempt — operational verification
+
+*Appended after a second pass whose purpose was to consume the Operations configuration and run the
+real local stack. The configuration does not exist, so the operational proof was not performed and
+nothing was changed to make it appear to have been. This section records what was looked for, where,
+and what was found.*
+
+## T. Operations configuration
+
+Nine inputs were required. **None was supplied, and none was invented.**
+
+| # | Required input | Present | Where it was looked for |
+| --- | --- | --- | --- |
+| 1 | Production issuer identifier | **No** | `AUTH_ISSUER` appears in eight files; all eight are the schema, the adapter, their tests and two records. No value anywhere |
+| 2 | Production audience | **No** | Same |
+| 3 | Production public verification keys | **No** | `AUTH_PUBLIC_KEYS` has no value in any file, environment or CI secret |
+| 4 | `kid` / key rotation procedure | **No** | The code accepts a list of keys and selects by `kid`; the procedure is Operations' and is not written down anywhere in this repository |
+| 5 | Production secret/key management procedure | **No** | No document, no runbook, no infrastructure directory |
+| 6 | Local issuer or approved local authentication environment | **No** | `docker-compose.yml` runs PostgreSQL, Redis and Mailpit. **There is no identity provider service** |
+| 7 | Local public verification keys | **No** | Same as 3 |
+| 8 | Development credentials or tokens | **No** | No `.env` exists; `.env.example` documents the four variables and gives values for none |
+| 9 | Development grant seed | **No** | `prisma/` holds `migrations/`, `schema.prisma` and `sql/row-level-security.sql`. There is **no seed script, no `prisma.seed` entry and no seeding mechanism of any kind** in the repository |
+
+`.github/workflows/ci.yml` carries no `AUTH_*` variable and no issuer. Its only secret is
+`NODE_AUTH_TOKEN`, the registry read token, which predates this work and is unrelated to
+authentication.
+
+## U. Local issuer
+
+**Not supplied, and none was created.** Standing up an identity provider — adding a service to
+`docker-compose.yml`, generating a key pair, choosing an `iss` and an `aud` — would be inventing the
+security infrastructure this work exists to consume, and would produce a local path that does not
+correspond to any real deployment. It was not done.
+
+## V. Development grant seed
+
+**Not supplied, and none was created.**
+
+The repository has no supported development-seeding mechanism, so §4 of the brief would have had
+this pass invent one. It did not, for a reason worth stating precisely: a seed is not merely a
+script. It has to name a **tenant**, a **membership** and a **role**, and all three are the very
+values §4 forbids putting in application code and that Operations has not supplied. A seed written
+without them would either hardcode a fixed tenant and membership — prohibited — or take them as
+parameters nobody can currently provide.
+
+What the implementation already offers instead, and what a seed would use once those values exist:
+`WorkAuthorization.defineRole` and `.assign`, which write through the same ports, the same policies
+and the same invalidation as production.
+
+## W. End-to-end security proof, Cases A–H
+
+**Not performed against a real local stack**, because there is no issuer to obtain a token from and
+no seed to grant anything with. No result is reported for any case here, and none is inferred from
+the suite.
+
+What exists instead is unchanged and is stated at its real strength: Cases A–G are proved in
+`approvals-security.spec.ts` and Case H in `authorization-store.spec.ts`, through the same
+production code path — real signatures, real middleware, real guard, real checker, real PostgreSQL,
+unprivileged role — with a key pair the fixture generates because Work holds none by design. Those
+suites were re-run against the committed implementation during this pass: **76 tests, 76 passed**
+(21 Approvals, 14 store, 16 authentication, 12 vocabulary, 13 pre-existing identity).
+
+That is a proof of the code path. It is **not** a demonstration that a configured deployment works,
+and this record does not claim to be one.
+
+## X. Revocation proof
+
+Unchanged from §J and re-run in this pass. `invalidateUser` is wired on `assign` and `revoke`,
+`invalidateTenant` on `defineRole` and `removeRole`; the resolver is constructed with no
+`CachePort`, so resolution reads the assignment rows on every call and a withdrawn grant stops
+working on the next request. Both revocation cases pass. No observation against a live local stack
+was possible or is claimed.
+
+## Y. 401 / 403 / 200
+
+Proved at the API layer and re-run in this pass:
+
+| Condition | Result |
+| --- | --- |
+| No credential | **401** |
+| Valid principal, no `workflow.approval.read-own` | **403** |
+| Valid principal with the grant | **200** |
+| Valid principal with the grant, empty queue | **200** with the empty state, not a refusal |
+
+The Admin API helper still collapses non-OK responses; it was **not** changed, because no security
+requirement needed it and the mandatory distinction lives at the API boundary, where it holds. It
+remains a product finding for whoever owns the Approvals screen.
+
+## Z. Final gate
+
+**No new gate run is reported for this pass, because no code changed.** The uncached gate recorded
+in §P stands as the gate for `6e55b9d`: 51 test tasks, 475 files, 5470 passed, 0 failed, 0 skipped,
+0 cached; 29 build tasks; 32 migrations; exit 0.
+
+Re-verified during this pass, read-only: the working tree is clean at `6e55b9d`; `@munaxa/auth`,
+`crypto`, `rbac`, `interfaces` and `types` all resolve at **2.4.1** on disk and in the manifest; the
+adapter accepts only `Bearer`, verifies through `TokenService`, refuses an empty subject and carries
+`tid` as an assertion; `enforceTenantAssertion` runs only on a resolved membership; the checker
+denies at all four gates and defers to `hasPermission`; `app_protect_table` is called on both tables
+by the migration that creates them; the membership reference is composite; the vocabulary seam is
+the only dot-to-colon translation in the repository; and **no `DEV_AUTH`, `SKIP_AUTH`,
+`BYPASS_AUTH`, trusted identity header or other bypass exists in any production file.**
+
+## AA. Remaining limitations
+
+Identical to §Q, and none has been reduced. The nine inputs in §T are all outstanding. Until they
+exist:
+
+- no deployment can be configured, and configuration deliberately refuses a production deployment
+  that has no issuer;
+- no developer can obtain a real token locally;
+- no authenticated local request can be authorized, because both authorization tables ship empty and
+  there is no seed;
+- the end-to-end evidence for Cases A–H remains a proof of the code path under test, not a
+  demonstration of a running configured system.
+
+Nothing in this repository is production-ready infrastructure, and this record does not claim
+otherwise. What is ready is the code that will consume it.
+
+## Production readiness
+
+**BLOCKED.** Nine of nine required Operations inputs are missing. The classification is not close:
+it fails on the first item and on every one after it.
+
+Ready when: a production issuer and audience exist and are configured; production public keys exist
+with a rotation and key-management procedure; a local issuer exists; development credentials exist;
+a development grant seed exists; the real end-to-end proof passes against them; and the full gate
+passes. Six of those seven are Operations'. The seventh, the seed, is a few lines this repository
+can write in an afternoon — the day somebody supplies the tenant, the membership and the role it is
+meant to name.
