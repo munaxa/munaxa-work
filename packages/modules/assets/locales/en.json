@@ -1,47 +1,74 @@
 {
   "assets": {
+    "active": {
+      "no": "Not in use",
+      "yes": "In use"
+    },
+    "conflict": {
+      "category_code_taken": "An asset type already uses that code.",
+      "category_inactive": "This asset type is no longer in use.",
+      "asset_tag_taken": "An asset already uses that tag.",
+      "serial_number_taken": "An asset already has that serial number.",
+      "asset_already_in_custody": "This asset is already held by somebody.",
+      "asset_not_available": "This asset is not available to be issued.",
+      "asset_in_custody": "This asset is still held by somebody and cannot be retired."
+    },
+    "custodyState": {
+      "open": "Out",
+      "returned": "Returned"
+    },
+    "empty": {
+      "catalogue": "No asset types have been configured yet.",
+      "custody": "This asset has never been issued.",
+      "inventory": "No assets are registered.",
+      "noHolder": "Nobody is holding this asset.",
+      "nothingOut": "Nothing is out. Every asset that has been issued has come back."
+    },
     "label": {
-      "inventory": "Assets",
-      "catalogue": "Asset catalogue",
-      "category": "Asset type",
-      "categories": "Asset types",
-      "code": "Code",
-      "name": "Name",
-      "sequence": "Order",
       "active": "In use",
+      "amendAsset": "Amend asset",
+      "amendCategory": "Amend asset type",
+      "asAt": "Measured as at",
       "asset": "Asset",
       "assetTag": "Asset tag",
-      "serialNumber": "Serial number",
-      "description": "Description",
-      "locationNote": "Where it is",
-      "purchaseReference": "Purchase reference",
-      "status": "Status",
-      "version": "Version",
-      "define": "Add an asset type",
-      "amendCategory": "Amend asset type",
-      "register": "Register an asset",
-      "amendAsset": "Amend asset",
+      "backToAssets": "Back to assets",
+      "boundaries": "What this screen does not do",
+      "catalogue": "Asset catalogue",
+      "categories": "Asset types",
+      "category": "Asset type",
       "changeStatus": "Change status",
+      "code": "Code",
+      "currentHolder": "Currently held by",
       "custody": "Custody",
       "custodyHistory": "Custody history",
-      "currentHolder": "Currently held by",
-      "employment": "Employment",
-      "issuedOn": "Issued",
-      "returnedOn": "Returned",
-      "issueNote": "Note on issue",
-      "returnNote": "Note on return",
       "custodyState": "Custody status",
-      "issue": "Issue to an employment",
-      "return": "Record a return",
-      "openOnly": "Still out",
+      "daysHeld": "Days held",
       "daysOutstanding": "Days outstanding",
-      "outstanding": "Outstanding"
-    },
-    "status": {
-      "registered": "Registered",
-      "available": "Available",
-      "under_repair": "Under repair",
-      "retired": "Retired"
+      "define": "Add an asset type",
+      "description": "Description",
+      "employment": "Employment",
+      "inventory": "Assets",
+      "issue": "Issue to an employment",
+      "issueNote": "Note on issue",
+      "issuedOn": "Issued",
+      "locationNote": "Where it is",
+      "longestDaysOutstanding": "Longest days outstanding",
+      "name": "Name",
+      "nothingReadable": "Nothing here could be read",
+      "oldestIssuedOn": "Longest-standing issue",
+      "openCount": "Assets out",
+      "openOnly": "Still out",
+      "outstanding": "Outstanding",
+      "purchaseReference": "Purchase reference",
+      "register": "Register an asset",
+      "registered": "Registered assets",
+      "return": "Record a return",
+      "returnNote": "Note on return",
+      "returnedOn": "Returned",
+      "sequence": "Order",
+      "serialNumber": "Serial number",
+      "status": "Status",
+      "version": "Version"
     },
     "note": {
       "catalogueIsTenant": "Asset types are your organization's own. Nothing is supplied with the product.",
@@ -89,18 +116,17 @@
       "custody_not_open": "This custody has already been returned.",
       "as_at_malformed": "Give the as-at date as YYYY-MM-DD."
     },
-    "conflict": {
-      "category_code_taken": "An asset type already uses that code.",
-      "category_inactive": "This asset type is no longer in use.",
-      "asset_tag_taken": "An asset already uses that tag.",
-      "serial_number_taken": "An asset already has that serial number.",
-      "asset_already_in_custody": "This asset is already held by somebody.",
-      "asset_not_available": "This asset is not available to be issued.",
-      "asset_in_custody": "This asset is still held by somebody and cannot be retired."
+    "status": {
+      "registered": "Registered",
+      "available": "Available",
+      "under_repair": "Under repair",
+      "retired": "Retired"
     },
-    "custodyState": {
-      "open": "Out",
-      "returned": "Returned"
+    "withheld": {
+      "assetNotFound": "This inventory holds no asset with that identifier.",
+      "assetRead": "Reading the inventory needs a permission this caller does not hold.",
+      "categoryRead": "Reading the asset catalogue needs a permission this caller does not hold.",
+      "custodyRead": "Reading who holds what needs a permission this caller does not hold."
     }
   }
 }

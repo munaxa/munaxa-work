@@ -1,47 +1,74 @@
 {
   "assets": {
+    "active": {
+      "no": "غير مستخدم",
+      "yes": "قيد الاستخدام"
+    },
+    "conflict": {
+      "category_code_taken": "هذا الرمز مستخدم بالفعل لنوع أصل آخر.",
+      "category_inactive": "نوع الأصل هذا لم يعد قيد الاستخدام.",
+      "asset_tag_taken": "هذا الرقم مستخدم بالفعل لأصل آخر.",
+      "serial_number_taken": "هذا الرقم التسلسلي مسجَّل بالفعل لأصل آخر.",
+      "asset_already_in_custody": "هذا الأصل في عهدة شخص آخر بالفعل.",
+      "asset_not_available": "هذا الأصل غير متاح للتسليم.",
+      "asset_in_custody": "هذا الأصل ما زال في عهدة أحدهم ولا يمكن إخراجه من الخدمة."
+    },
+    "custodyState": {
+      "open": "خارج المخزن",
+      "returned": "أُعيد"
+    },
+    "empty": {
+      "catalogue": "لم تُعرَّف أنواع أصول بعد.",
+      "custody": "لم يُسلَّم هذا الأصل لأحد من قبل.",
+      "inventory": "لا توجد أصول مسجّلة.",
+      "noHolder": "لا أحد يحوز هذا الأصل حاليًا.",
+      "nothingOut": "لا شيء خارج العهدة. عاد كل أصل سُلِّم."
+    },
     "label": {
-      "inventory": "الأصول",
-      "catalogue": "دليل الأصول",
-      "category": "نوع الأصل",
-      "categories": "أنواع الأصول",
-      "code": "الرمز",
-      "name": "الاسم",
-      "sequence": "الترتيب",
       "active": "قيد الاستخدام",
+      "amendAsset": "تعديل الأصل",
+      "amendCategory": "تعديل نوع الأصل",
+      "asAt": "محسوب حتى",
       "asset": "أصل",
       "assetTag": "رقم الأصل",
-      "serialNumber": "الرقم التسلسلي",
-      "description": "الوصف",
-      "locationNote": "مكان وجوده",
-      "purchaseReference": "مرجع الشراء",
-      "status": "الحالة",
-      "version": "الإصدار",
-      "define": "إضافة نوع أصل",
-      "amendCategory": "تعديل نوع الأصل",
-      "register": "تسجيل أصل",
-      "amendAsset": "تعديل الأصل",
+      "backToAssets": "العودة إلى الأصول",
+      "boundaries": "ما لا تفعله هذه الشاشة",
+      "catalogue": "دليل الأصول",
+      "categories": "أنواع الأصول",
+      "category": "نوع الأصل",
       "changeStatus": "تغيير الحالة",
+      "code": "الرمز",
+      "currentHolder": "في عهدة",
       "custody": "العهدة",
       "custodyHistory": "سجل العهدة",
-      "currentHolder": "في عهدة",
-      "employment": "علاقة التوظيف",
-      "issuedOn": "تاريخ التسليم",
-      "returnedOn": "تاريخ الإرجاع",
-      "issueNote": "ملاحظة عند التسليم",
-      "returnNote": "ملاحظة عند الإرجاع",
       "custodyState": "حالة العهدة",
-      "issue": "تسليم إلى موظف",
-      "return": "تسجيل إرجاع",
-      "openOnly": "ما زال خارج المخزن",
+      "daysHeld": "أيام الحيازة",
       "daysOutstanding": "أيام العُهدة المفتوحة",
-      "outstanding": "غير مُعاد"
-    },
-    "status": {
-      "registered": "مسجَّل",
-      "available": "متاح",
-      "under_repair": "قيد الإصلاح",
-      "retired": "خارج الخدمة نهائيًا"
+      "define": "إضافة نوع أصل",
+      "description": "الوصف",
+      "employment": "علاقة التوظيف",
+      "inventory": "الأصول",
+      "issue": "تسليم إلى موظف",
+      "issueNote": "ملاحظة عند التسليم",
+      "issuedOn": "تاريخ التسليم",
+      "locationNote": "مكان وجوده",
+      "longestDaysOutstanding": "أطول مدة قائمة بالأيام",
+      "name": "الاسم",
+      "nothingReadable": "تعذّرت قراءة أي شيء هنا",
+      "oldestIssuedOn": "أقدم تسليم قائم",
+      "openCount": "أصول خارج العهدة",
+      "openOnly": "ما زال خارج المخزن",
+      "outstanding": "غير مُعاد",
+      "purchaseReference": "مرجع الشراء",
+      "register": "تسجيل أصل",
+      "registered": "الأصول المسجّلة",
+      "return": "تسجيل إرجاع",
+      "returnNote": "ملاحظة عند الإرجاع",
+      "returnedOn": "تاريخ الإرجاع",
+      "sequence": "الترتيب",
+      "serialNumber": "الرقم التسلسلي",
+      "status": "الحالة",
+      "version": "الإصدار"
     },
     "note": {
       "catalogueIsTenant": "أنواع الأصول تخص مؤسستك وحدها. لا يأتي أي نوع جاهزًا مع النظام.",
@@ -89,18 +116,17 @@
       "custody_not_open": "تم تسجيل إرجاع هذه العهدة بالفعل.",
       "as_at_malformed": "أدخل تاريخ الاحتساب بالصيغة YYYY-MM-DD."
     },
-    "conflict": {
-      "category_code_taken": "هذا الرمز مستخدم بالفعل لنوع أصل آخر.",
-      "category_inactive": "نوع الأصل هذا لم يعد قيد الاستخدام.",
-      "asset_tag_taken": "هذا الرقم مستخدم بالفعل لأصل آخر.",
-      "serial_number_taken": "هذا الرقم التسلسلي مسجَّل بالفعل لأصل آخر.",
-      "asset_already_in_custody": "هذا الأصل في عهدة شخص آخر بالفعل.",
-      "asset_not_available": "هذا الأصل غير متاح للتسليم.",
-      "asset_in_custody": "هذا الأصل ما زال في عهدة أحدهم ولا يمكن إخراجه من الخدمة."
+    "status": {
+      "registered": "مسجَّل",
+      "available": "متاح",
+      "under_repair": "قيد الإصلاح",
+      "retired": "خارج الخدمة نهائيًا"
     },
-    "custodyState": {
-      "open": "خارج المخزن",
-      "returned": "أُعيد"
+    "withheld": {
+      "assetNotFound": "لا يحتوي سجل الأصول على أصل بهذا المعرّف.",
+      "assetRead": "قراءة سجل الأصول تتطلّب صلاحية لا يملكها هذا المستخدم.",
+      "categoryRead": "قراءة دليل الأصول تتطلّب صلاحية لا يملكها هذا المستخدم.",
+      "custodyRead": "قراءة من يحوز ماذا تتطلّب صلاحية لا يملكها هذا المستخدم."
     }
   }
 }

@@ -20,3 +20,24 @@ export type { AssetCategoryView, AssetPageView, AssetView, LocalizedTextView } f
  * employment, carrying no employment status, no person and no tenant.
  */
 export type { AssetClearanceView, CustodyBlockerView } from './views.js';
+
+/**
+ * The custody contracts, published because the Admin portal now reads them.
+ *
+ * These four were written for `contracts/views.ts` — they carry no handler, no store and no
+ * aggregate, and they are what `GET /assets/:assetId/custody`, `GET /assets/custody` and
+ * `GET /assets/custody/summary` have always returned. Only the re-export was missing, so a consumer
+ * could receive them and had no name for what it received.
+ *
+ * Publishing them changes nothing about what any route answers or what any permission covers. The
+ * three reads sit behind `assets.custody.read`, exactly as before.
+ *
+ * **`CustodySummaryView` names no identifier at all** — a count and two dates — which is what keeps
+ * it distinct from the tenant-wide custody *listing* this module deliberately does not publish.
+ */
+export type {
+  AssetCustodyView,
+  CustodyPageView,
+  CustodySummaryView,
+  CustodyView,
+} from './views.js';
