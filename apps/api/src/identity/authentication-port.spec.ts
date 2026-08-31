@@ -102,6 +102,31 @@ describe('a deployment with a complete Platform authentication configuration', (
   });
 });
 
+describe('a grant that conferred nothing', () => {
+  it('is reported through the observer the composition root wires to the logger', async () => {
+    const dropped: unknown[] = [];
+    const port = authenticationPortFor(
+      environmentOf(configured),
+      () => ({
+        verifyAccessToken: () => ({
+          sub: 'u',
+          iss: 'https://identity.example.com',
+          iat: 1,
+          perms: ['work:*', 'users:read', 'work:leave:read'],
+        }),
+      }),
+      (entry) => dropped.push(entry),
+    );
+    const principal = await port.authenticate({ scheme: 'Bearer', value: 'a-token' });
+
+    expect(principal?.permissions).toEqual(['leave.read']);
+    expect(dropped).toEqual([
+      { grant: 'work:*', reason: 'wildcard' },
+      { grant: 'users:read', reason: 'not-a-work-grant' },
+    ]);
+  });
+});
+
 describe('a deployment with a partial configuration', () => {
   it('never gets as far as choosing a port, because startup already refused', () => {
     expect(() =>

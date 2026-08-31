@@ -6,6 +6,7 @@ import {
   PlatformTokenAuthenticationPort,
   type AccessTokenVerifier,
 } from './platform-token-authentication.js';
+import type { DroppedGrant } from './platform-grants.js';
 
 /**
  * Which authentication port this deployment runs with, decided from its configuration alone.
@@ -55,14 +56,19 @@ export const platformAccessTokenVerifier: AccessTokenVerifierFactory = () => {
  * `createVerifier` is a parameter so the selection can be proved without the Platform package
  * present — the branch that matters is *which port is chosen*, and a test that could not reach
  * the configured branch would leave the more important of the two unproved.
+ *
+ * `onDroppedGrant` is where a grant that conferred nothing is reported (ADR-0076). An operator who
+ * granted `work:*` and saw no effect has one question, and it deserves an answer in the log rather
+ * than an afternoon.
  */
 export const authenticationPortFor = (
   environment: Environment,
   createVerifier: AccessTokenVerifierFactory = platformAccessTokenVerifier,
+  onDroppedGrant?: (dropped: DroppedGrant) => void,
 ): PlatformAuthenticationPort => {
   const configuration = platformAuthenticationFrom(environment);
 
   return configuration === undefined
     ? new UnauthenticatedPort()
-    : new PlatformTokenAuthenticationPort(createVerifier(configuration));
+    : new PlatformTokenAuthenticationPort(createVerifier(configuration), onDroppedGrant);
 };

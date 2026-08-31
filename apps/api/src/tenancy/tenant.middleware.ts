@@ -5,6 +5,7 @@ import type { IdentityRequestContext, TenantMembershipDirectory } from '@work/id
 
 import type { CorrelatedRequest } from '../observability/correlation.middleware.js';
 import { AUTHENTICATION_PORT, MEMBERSHIP_DIRECTORY } from '../identity/identity.tokens.js';
+import { runWithGrants } from '../identity/request-grants.js';
 
 import { actorFor, resolveForPrincipal } from './tenant-resolution.js';
 
@@ -88,8 +89,14 @@ export class TenantMiddleware implements NestMiddleware {
       membershipId: resolution.membership.membershipId,
     };
 
+    // The grant scope is entered *inside* the tenant context and around everything downstream, so
+    // the two are established together and end together. It carries the permissions the adapter
+    // already reduced to exact Work names; a principal Platform granted nothing gets an empty set,
+    // which refuses every operation while the request still runs as a properly resolved member.
     runInContext(context, () => {
-      next();
+      runWithGrants(new Set(principal.permissions ?? []), () => {
+        next();
+      });
     });
   }
 }

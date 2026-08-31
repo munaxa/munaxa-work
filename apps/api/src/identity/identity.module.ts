@@ -113,9 +113,12 @@ import { authenticationPortFor } from './authentication-port.js';
       // own. The decision itself is `authenticationPortFor`, so it can be proved in a test
       // rather than asserted here.
       provide: AUTHENTICATION_PORT,
-      inject: [ENVIRONMENT],
-      useFactory: (environment: Environment): PlatformAuthenticationPort =>
-        authenticationPortFor(environment),
+      inject: [ENVIRONMENT, PinoLogger],
+      useFactory: (environment: Environment, logger: PinoLogger): PlatformAuthenticationPort =>
+        authenticationPortFor(environment, undefined, (dropped) => {
+          // The grant name and the reason, and nothing else — never the token it arrived in.
+          logger.logger.warn({ dropped }, 'a Platform grant conferred no Work permission');
+        }),
     },
     {
       provide: MEMBERSHIP_DIRECTORY,

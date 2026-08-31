@@ -48,6 +48,8 @@ describe('a token Platform vouched for', () => {
       platformUserId: 'platform-user-7',
       issuer: 'https://identity.example.com',
       authenticatedAt: new Date(1_780_000_000_000),
+      // No `perms` claim, so Platform granted nothing: an authenticated caller who may do nothing.
+      permissions: [],
     });
   });
 
@@ -87,6 +89,7 @@ describe('the tenant claim', () => {
       platformUserId: 'platform-user-7',
       issuer: 'https://identity.example.com',
       authenticatedAt: new Date(1_780_000_000_000),
+      permissions: [],
     });
     expect(Object.keys(principal ?? {})).not.toContain('tid');
     expect(Object.keys(principal ?? {})).not.toContain('tenantId');
