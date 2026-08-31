@@ -62,10 +62,24 @@ export class TenantMiddleware implements NestMiddleware {
       headerValue(request, TENANT_HEADER),
     );
 
+    if (resolution.kind === 'tenant-mismatch') {
+      // The one outcome here that is an incident rather than a state. A token minted for one
+      // tenant arrived holding a membership in another: either the issuer and this product
+      // disagree about who somebody is, or a valid token is being replayed against the wrong
+      // tenant. Neither is ordinary, and neither is served — the request continues with no
+      // context, so every tenant-scoped operation downstream refuses.
+      this.logger.warn(
+        `Tenant claim refused for principal ${principal.platformUserId}: ` +
+          `token asserts ${resolution.asserted}, membership resolves ${resolution.resolved}.`,
+      );
+      next();
+      return;
+    }
+
     if (resolution.kind !== 'resolved') {
       // Logged at debug because these are ordinary outcomes — a new starter with no membership,
       // a client that forgot to name a tenant — not incidents. A refused tenant *claim* is
-      // different, and says so.
+      // different, and says so above.
       this.logger.debug(
         `Tenant unresolved (${resolution.kind}) for principal ${principal.platformUserId}.`,
       );

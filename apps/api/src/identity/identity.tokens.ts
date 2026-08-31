@@ -9,6 +9,15 @@
 /** Platform's implementation. This repository ships only the one that authenticates nobody. */
 export const AUTHENTICATION_PORT = Symbol('AUTHENTICATION_PORT');
 
+/**
+ * The tenant's authorization: its stored role assignments, and Platform's resolver over them.
+ *
+ * A token of its own rather than an expression inside the checker's factory, because the resolver
+ * memoises each tenant's role graph and administration has to invalidate *that* instance. Two
+ * would mean a role edited through one and still conferring its old grants through the other.
+ */
+export const AUTHORIZATION = Symbol('AUTHORIZATION');
+
 /** Which tenants an authenticated person may act in. Supplied by Workforce Identity. */
 export const MEMBERSHIP_DIRECTORY = Symbol('MEMBERSHIP_DIRECTORY');
 

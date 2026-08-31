@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { PinoLogger } from 'nestjs-pino';
 import {
   IdentityDispatcher,
@@ -18,12 +18,9 @@ import {
 import { StoredTenantSettings } from '@work/organization';
 import {
   Dispatcher,
-  GrantAwarePermissionChecker,
   ModuleRegistry,
-  UnauthenticatedPort,
   type EventDispatcher,
   type PermissionChecker,
-  type PlatformAuthenticationPort,
   type UnitOfWork,
   type WorkModule,
 } from '@work/kernel';
@@ -76,6 +73,7 @@ import { workflowModuleFor } from '../workflow/workflow.composition.js';
 
 import {
   AUTHENTICATION_PORT,
+  AUTHORIZATION,
   DEFERRED_SENDERS,
   DISPATCHER,
   MEMBERSHIP_DIRECTORY,
@@ -84,7 +82,11 @@ import {
   PERMISSION_AWARE_MODULES,
   PERMISSION_CHECKER,
 } from './identity.tokens.js';
-import { PlatformPermissionChecker } from './permission-checker.js';
+import {
+  authenticationProvider,
+  authorizationProvider,
+  permissionCheckerProvider,
+} from './security.providers.js';
 
 /**
  * The composition root for Workforce Identity, and for module registration generally.
@@ -106,13 +108,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
   ],
   providers: [
     environmentProvider,
-    {
-      // Platform's adapter replaces this in a deployment that has one. Until then it
-      // authenticates nobody, which is the only safe default for a port this product does not
-      // own — see `UnauthenticatedPort`.
-      provide: AUTHENTICATION_PORT,
-      useFactory: (): PlatformAuthenticationPort => new UnauthenticatedPort(),
-    },
+    authenticationProvider,
     {
       provide: MEMBERSHIP_DIRECTORY,
       inject: [DATABASE_POOL],
@@ -134,22 +130,8 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         payroll: new DeferredPayrollDispatcher(),
       }),
     },
-    {
-      // One checker, given to the pipeline *and* to People's reads. Two would eventually differ,
-      // and the difference would be a caller redacted by one and not the other.
-      //
-      // It is wrapped, not replaced. `GrantAwarePermissionChecker` consults Platform first and adds
-      // only the narrow, named authority a module holds while acting inside another under a bounded
-      // service grant (ADR-0043) — and adds nothing at all when no grant is open. Every elevation is
-      // logged with the operation that caused it and the human it was for, so "what did Recruitment
-      // do inside People, and for whom" is a question the logs answer.
-      provide: PERMISSION_CHECKER,
-      inject: [PinoLogger],
-      useFactory: (logger: PinoLogger): PermissionChecker =>
-        new GrantAwarePermissionChecker(new PlatformPermissionChecker(), (elevation) => {
-          logger.logger.info({ elevation }, 'service grant elevated a cross-module permission');
-        }),
-    },
+    authorizationProvider,
+    permissionCheckerProvider,
     {
       provide: PEOPLE_MODULE,
       inject: [UNIT_OF_WORK, PERMISSION_CHECKER, ENVIRONMENT, PinoLogger, DEFERRED_SENDERS],
@@ -317,7 +299,7 @@ import { PlatformPermissionChecker } from './permission-checker.js';
         new IdentityDispatcher(dispatcher),
     },
   ],
-  exports: [AUTHENTICATION_PORT, MEMBERSHIP_DIRECTORY, DISPATCHER, MODULE_REGISTRY],
+  exports: [AUTHENTICATION_PORT, AUTHORIZATION, MEMBERSHIP_DIRECTORY, DISPATCHER, MODULE_REGISTRY],
 })
 export class IdentityModule {}
 

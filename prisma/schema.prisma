@@ -51,6 +51,9 @@ model TenantMembership {
   version           Int
 
   @@unique([tenant_id, workforce_user_id], map: "tenant_membership_tenant_user_key")
+  /// The pair `tenant_role_assignment` references, so a grant's subject is a member of the tenant
+  /// that granted it. `id` is already unique; this adds the index a composite reference needs.
+  @@unique([tenant_id, id], map: "tenant_membership_tenant_id_idx")
   @@index([workforce_user_id, status], map: "tenant_membership_user_status_idx")
   @@index([tenant_id, status], map: "tenant_membership_tenant_status_idx")
   @@map("tenant_membership")
@@ -5824,4 +5827,58 @@ model AssetCustody {
   @@index([tenant_id, asset_id, issued_on], map: "asset_custody_asset_idx")
   @@index([tenant_id, employment_id, issued_on], map: "asset_custody_employment_idx")
   @@map("asset_custody")
+}
+
+/// The tenant's authorization assignments — storage for the platform's resolver, never an engine.
+///
+/// Munaxa Work persists which roles a tenant defined and who holds them; `@munaxa/rbac` walks the
+/// graph and decides every permission check. Nothing here evaluates anything.
+model TenantRole {
+  id          String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  /// The tenant's own identifier for the role, and the value an assignment names.
+  role_id     String    @db.VarChar(64)
+  name        String    @db.VarChar(200)
+  description String?   @db.VarChar(500)
+  /// Platform grant strings, `resource:action`. Wildcards are permitted in a grant, never a check.
+  permissions String[]
+  /// Parent roles. An unknown parent resolves to fewer permissions, never to a broken check.
+  inherits    String[]
+  system      Boolean
+  created_at  DateTime  @db.Timestamptz(6)
+  created_by  String    @db.VarChar(255)
+  updated_at  DateTime  @db.Timestamptz(6)
+  updated_by  String    @db.VarChar(255)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  deleted_by  String?   @db.VarChar(255)
+  version     Int
+
+  @@map("tenant_role")
+}
+
+/// One membership holding one role, optionally within one scope.
+///
+/// The subject is a membership rather than a workforce user, which is what makes "a grant from one
+/// membership never becomes a grant for another" a property of the row shape instead of a rule.
+model TenantRoleAssignment {
+  id            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id     String    @db.Uuid
+  membership_id String    @db.Uuid
+  role_id       String    @db.VarChar(64)
+  /// Narrows the role's grants to one scope. Null means wherever the tenant reaches.
+  scope         String?   @db.VarChar(120)
+  /// A grant that stops on its own. Null is ordinary.
+  expires_at    DateTime? @db.Timestamptz(6)
+  /// `created_at` and `created_by` are this assignment's `assignedAt` and `assignedBy`.
+  created_at    DateTime  @db.Timestamptz(6)
+  created_by    String    @db.VarChar(255)
+  updated_at    DateTime  @db.Timestamptz(6)
+  updated_by    String    @db.VarChar(255)
+  deleted_at    DateTime? @db.Timestamptz(6)
+  deleted_by    String?   @db.VarChar(255)
+  version       Int
+
+  @@index([tenant_id, membership_id], map: "tenant_role_assignment_membership_idx")
+  @@index([tenant_id, role_id], map: "tenant_role_assignment_role_idx")
+  @@map("tenant_role_assignment")
 }

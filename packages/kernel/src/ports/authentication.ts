@@ -31,6 +31,16 @@ export interface PlatformPrincipal {
    * claim from the request, and it is optional because not every identity provider asserts one.
    */
   readonly email?: string;
+  /**
+   * The tenant the issuer asserted, when it asserts one.
+   *
+   * It is a **constraint, never an authority**. Munaxa Work chooses the tenant from a stored
+   * membership and from nothing else (ADR-0032); this value is compared against that choice and
+   * a disagreement refuses the request. Nothing reads it to *select* a tenant, because a token
+   * claim that could select one would be a tenant identifier supplied by the caller wearing a
+   * signature.
+   */
+  readonly tenantAssertion?: string;
   readonly authenticatedAt: Date;
 }
 
@@ -54,13 +64,18 @@ export interface PlatformAuthenticationPort {
 }
 
 /**
- * The default, and the only implementation this repository will ever contain: it authenticates
- * nobody.
+ * The default: it authenticates nobody.
  *
  * A product that must not implement authentication has exactly one safe default, and it is this
- * one. Every deployment supplies Platform's adapter; a deployment that forgets serves 401 to
- * every request, which is noticed immediately. The alternative default — accepting a header and
- * believing it — is the failure this port exists to make impossible.
+ * one. The application's relying-party adapter takes its place wherever an issuer is configured;
+ * a deployment that configures none serves 401 to every request, which is noticed immediately.
+ * The alternative default — accepting a header and believing it — is the failure this port exists
+ * to make impossible.
+ *
+ * It remains the only implementation *in the kernel*, and that is deliberate. Verifying a
+ * credential needs the platform's key handling and token contract, which are the application's
+ * dependencies rather than the kernel's; a kernel that could verify a token would be a kernel with
+ * an opinion about how people prove who they are.
  */
 export class UnauthenticatedPort implements PlatformAuthenticationPort {
   /** The parameter is named and ignored, so the signature reads as the contract it implements. */

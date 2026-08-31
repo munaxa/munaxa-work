@@ -29,7 +29,16 @@ export type TenantResolution =
   /** They asked for a tenant they are not an active member of. Refused, never substituted. */
   | { readonly kind: 'not-a-member'; readonly requested: string }
   /** Several tenants and no choice made. Refused rather than guessed. */
-  | { readonly kind: 'ambiguous'; readonly candidates: readonly string[] };
+  | { readonly kind: 'ambiguous'; readonly candidates: readonly string[] }
+  /**
+   * The issuer asserted one tenant and the membership says another. Refused, never reconciled.
+   *
+   * Neither side wins, because picking either is the bug. Preferring the token would let a
+   * signed claim choose the tenant, which is the authority inversion this whole file exists to
+   * prevent; preferring the membership would silently serve tenant B's data to a token minted
+   * for tenant A, which is a tenant switch nobody asked for and nobody would see.
+   */
+  | { readonly kind: 'tenant-mismatch'; readonly asserted: string; readonly resolved: string };
 
 export const resolveTenant = (
   memberships: readonly ResolvedMembership[],
@@ -67,8 +76,39 @@ export const resolveForPrincipal = async (
   directory: TenantMembershipDirectory,
   principal: PlatformPrincipal,
   requestedTenantId: string | undefined,
-): Promise<TenantResolution> =>
-  resolveTenant(await directory.activeMembershipsOf(principal.platformUserId), requestedTenantId);
+): Promise<TenantResolution> => {
+  const resolution = resolveTenant(
+    await directory.activeMembershipsOf(principal.platformUserId),
+    requestedTenantId,
+  );
+
+  return resolution.kind === 'resolved'
+    ? enforceTenantAssertion(principal, resolution)
+    : resolution;
+};
+
+/**
+ * Checks the issuer's `tid` against the tenant the membership chose.
+ *
+ * It runs *after* resolution and never during it, which is the ordering that makes the claim a
+ * constraint rather than an input: the tenant is already decided from stored facts by the time
+ * this function sees the token's opinion of it, so the only thing left for the claim to do is
+ * disagree, and disagreement refuses.
+ *
+ * A token that asserts nothing constrains nothing. That is not a hole: such a token names no
+ * tenant, so there is no second opinion to reconcile, and the membership was the sole authority
+ * either way.
+ */
+const enforceTenantAssertion = (
+  principal: PlatformPrincipal,
+  resolution: Extract<TenantResolution, { kind: 'resolved' }>,
+): TenantResolution => {
+  const asserted = principal.tenantAssertion;
+
+  if (asserted === undefined || asserted === resolution.membership.tenantId) return resolution;
+
+  return { kind: 'tenant-mismatch', asserted, resolved: resolution.membership.tenantId };
+};
 
 /**
  * The audit actor.

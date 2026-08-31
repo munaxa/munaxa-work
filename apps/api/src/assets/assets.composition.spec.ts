@@ -182,6 +182,11 @@ describe('the assets composition', () => {
    *
    * The consumer the specification names — Offboarding, reading custody through public contracts
    * (AD-006) — does not exist yet, and when it does it will read the contract rather than the table.
+   *
+   * **Suites are not consumers.** A test that asserts a property *of* Assets' declarations — that
+   * every permission in the product translates at the platform seam, say — imports the package to
+   * make a claim about it, not to depend on it. Counting one would make this guard fire on the
+   * suite that proves Assets is correct, which is the opposite of what it is for.
    */
   it('is read by no other module in this application', () => {
     const root = join(process.cwd(), 'src');
@@ -189,7 +194,7 @@ describe('the assets composition', () => {
       .filter((entry) => entry.isDirectory() && entry.name !== 'assets')
       .filter((entry) =>
         readdirSync(join(root, entry.name))
-          .filter((file) => file.endsWith('.ts'))
+          .filter((file) => file.endsWith('.ts') && !/\.(spec|test)\.ts$/.test(file))
           .some((file) =>
             readFileSync(join(root, entry.name, file), 'utf8').includes('@work/assets'),
           ),
