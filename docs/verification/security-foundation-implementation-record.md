@@ -604,3 +604,107 @@ a development grant seed exists; the real end-to-end proof passes against them; 
 passes. Six of those seven are Operations'. The seventh, the seed, is a few lines this repository
 can write in an afternoon — the day somebody supplies the tenant, the membership and the role it is
 meant to name.
+
+---
+
+# Operations provisioning handoff
+
+*Nothing in this section is a request for a decision — every architectural decision is taken and
+implemented. It is a request for nine values and two environments. Written for whoever provisions
+them; no secret appears here, and none should ever appear in this repository.*
+
+Re-checked at `a26e6cb` before writing: no `.env`, no key material, no identity-provider service in
+`docker-compose.yml`, no `AUTH_*` in CI, no seed mechanism under `prisma/`. The gap is unchanged.
+
+## 1. What is missing, and 2. why each is required
+
+| # | Missing input | Why Work cannot proceed without it |
+| --- | --- | --- |
+| 1 | Production issuer identifier and exact `iss` | The adapter compares `claims.iss` against a configured value. There is no default and there must not be one: a verifier that accepts any issuer accepts anybody's token |
+| 2 | Exact `aud` Work expects | Distinguishes a token minted **for Munaxa Work** from one minted for another Munaxa product against the same issuer. Without it, any sibling product's token would be accepted |
+| 3 | Production public verification keys, with format and `kid` | The signature check has nothing to verify against. Public keys are not secrets and travel as ordinary configuration; **private keys must never reach this repository** |
+| 4 | Which `kid` is active, and which are retained | The adapter accepts a list and selects by the token's `kid`. Retaining the previous key is what makes rotation zero-downtime rather than a mass 401 |
+| 5 | Rotation and key-management procedure, including emergency rotation and ownership | Operational, not code — the code already supports overlap. What is missing is who rotates, on what cadence, how a new `kid` is distributed, and when a retired one is removed |
+| 6 | Transport and proxy trust: how the bearer reaches Work, whether any proxy rewrites `Authorization`, which component terminates TLS | Work reads the original `Authorization` header and nothing else. If a proxy strips or rewrites it, every request is unauthenticated; if one *adds* identity, that is a trusted custom header and needs its own approval, which has not been given |
+| 7 | Local issuer: `iss`, `aud`, public key, `kid`, and the token-generation procedure | A developer cannot obtain a token, so no local request can authenticate. The private half stays outside the repository |
+| 8 | One development identity: a real Platform principal, its Work membership, its tenant — and how Operations creates or resets it | The adapter resolves `sub` to a membership through `app_memberships_of`. An identity with no membership authenticates and then resolves no tenant, which is a 401 |
+| 9 | Development grant: the tenant, membership, role and assignment that confer `workflow.approval.read-own` | Both authorization tables ship empty by design. Without this, every authenticated local request is a correct 403, and Cases C, D and E cannot be demonstrated live |
+
+**Why no seed was written.** A seed must name a tenant, a membership and a role. All three are the
+values §4 of the brief forbids hardcoding and item 9 above has not supplied. Writing one now would
+mean inventing them, which is the one thing this handoff exists to avoid.
+
+## 3. Where Operations provides each
+
+| Input | Delivered as |
+| --- | --- |
+| 1, 2 | `AUTH_ISSUER`, `AUTH_AUDIENCE` — deployment environment variables |
+| 3, 4 | `AUTH_PUBLIC_KEYS` — a JSON array of `{ kid, publicKey }`; more than one entry **is** the rotation overlap. `AUTH_SIGNING_ALGORITHM` is `RS256` or `ES256` |
+| 5, 6 | An operational runbook. No repository change; item 6 may confirm that no change is needed, which is itself the answer |
+| 7 | The same four variables pointing at the local issuer, plus the service and the token-generation procedure — outside this repository |
+| 8 | A `workforce_user` and a `tenant_membership` row, created by Identity's own mechanism, plus the `sub` the local issuer will mint for that principal |
+| 9 | Four values — tenant id, membership id, role id, permission — for the seed to consume |
+
+Configuration is already fail-closed: all three of `AUTH_ISSUER`, `AUTH_AUDIENCE` and
+`AUTH_PUBLIC_KEYS` or none, refused at startup either way; and a production deployment with none is
+refused outright. A deployment that forgets authenticates nobody rather than everybody.
+
+## 4. What happens once they exist
+
+1. Verify each supplied value against the approved architecture; reinterpret nothing, and stop and
+   report any contradiction rather than reconcile it.
+2. Wire configuration only where required. The schema already carries all five variables, so the
+   expected repository change here is **none**.
+3. Implement the development seed using only the supplied tenant, membership and role, through
+   `WorkAuthorization.defineRole` → `.assign` → `PermissionResolver` → invalidation — the same
+   application path as production, never a direct insert. Kept out of the production migrations,
+   invoked explicitly, and documented.
+4. Start the approved local issuer, mint a real development token through it, and drive the running
+   stack over the same adapter, middleware, guard and checker production uses.
+
+## 5. What will then be tested
+
+Cases A–H against the running stack: no token → 401; valid token without the grant → 403; with it →
+200; authorized empty queue → 200 and the empty state, never a refusal; grant revoked → access stops
+on the next request under the approved invalidation guarantee; `tid` mismatch → refused with no
+tenant switch; cross-membership → refused with no union; cross-tenant → refused by application
+authorization **and** by row-level security, asserted through an unprivileged database role.
+
+Then `pnpm verify --force` in full, uncached, with PostgreSQL live and every migration applied, and
+the actual numbers reported — never the previous gate replayed.
+
+## 6. What must never be committed
+
+Private signing keys · bearer tokens · refresh tokens · session secrets · passwords · PATs ·
+registry credentials · `.env` files · any real `sub`, tenant or membership identifier written into
+application code · any development-only authentication or authorization path.
+
+Public verification keys are **not** secrets and belong in deployment configuration, not in Git.
+
+## Configuration checklist
+
+| Configuration | Production | Local | Supplied |
+| --- | --- | --- | --- |
+| Issuer | required | required | **No** |
+| `iss` | required | required | **No** |
+| `aud` | required | required | **No** |
+| Public key | required | required | **No** |
+| `kid` | required | required | **No** |
+| Rotation procedure | required | required | **No** |
+| Token lifetime | required | required | **No** |
+| Proxy / header trust | required | required | **No** |
+| Development identity | n/a | required | **No** |
+| Development grant | n/a | required | **No** |
+
+## Status
+
+```text
+Security implementation                    COMPLETE
+Production authentication infrastructure   NOT PROVISIONED
+Local authentication infrastructure        NOT PROVISIONED
+Development grant seed                     NOT PROVISIONED
+```
+
+**CODE-COMPLETE / DEPLOYMENT-BLOCKED.** The application and database layers are finished and
+proved; the infrastructure they consume does not exist yet. This is not production readiness and is
+not described as such anywhere in this record.
