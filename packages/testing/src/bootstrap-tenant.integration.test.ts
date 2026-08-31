@@ -102,7 +102,9 @@ describeWithDatabase('pnpm db:bootstrap', () => {
     await admin.query(
       `grant select, insert, update, delete on workforce_user, tenant_membership to ${ROLE}`,
     );
-    await admin.query(`grant execute on function app_memberships_of(varchar) to ${ROLE}`);
+    // No grant for `app_memberships_of`: EXECUTE is PUBLIC by default and stays that way, and
+    // since ADR-0077 the function is owned by `work_membership_resolver`, so a migration role
+    // could not grant on it anyway.
     await admin.query(`grant execute on function app_current_tenant() to ${ROLE}`);
 
     const url = new URL(CONNECTION ?? '');

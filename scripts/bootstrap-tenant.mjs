@@ -123,12 +123,13 @@ const create = async (client, { tenantId, platformUserId }) => {
  * Proves the records resolve through the path every request uses, and diagnoses the one failure
  * that otherwise looks like nothing at all.
  *
- * `app_memberships_of` is `security definer`, and the tables it reads carry `force row level
- * security` — which applies to their owner too. So if the role that ran the migrations can neither
- * bypass row-level security nor is a superuser, the function returns no rows, tenant resolution
- * finds no membership, and every authenticated request answers 401 with nothing in the log to say
- * why. Catching it here, at provisioning time, is the difference between a message and an
- * afternoon.
+ * `app_memberships_of` must be owned by `work_membership_resolver` for tenant resolution to work:
+ * the tables it reads carry `force row level security`, which applies to their owner too, so a
+ * function owned by anything else runs subject to `tenant_isolation` with no tenant in context,
+ * matches nothing, and returns no rows. Tenant resolution then finds no membership and every
+ * authenticated request answers 401 with nothing in the log to say why. The migration establishes
+ * that ownership (ADR-0077); this checks it held, because catching it at provisioning time is the
+ * difference between a message and an afternoon.
  */
 const verify = async (client, platformUserId, expectedTenantId) => {
   const membership = await existingMembership(client, platformUserId);
@@ -136,11 +137,13 @@ const verify = async (client, platformUserId, expectedTenantId) => {
   if (membership?.tenant_id === expectedTenantId) return;
 
   throw new Error(
-    'The records were written, but app_memberships_of() does not resolve them. That function is ' +
-      'security definer over tables with force row level security, so the role that owns them — ' +
-      'the role the migrations ran as — must be able to bypass row-level security for tenant ' +
-      'resolution to work at all. Grant it BYPASSRLS and re-run this command to confirm. The ' +
-      'application role is unaffected and must stay unprivileged (ADR-0030).',
+    'The records were written, but app_memberships_of() does not resolve them, so tenant ' +
+      'resolution would find no membership and every authenticated request would answer 401. ' +
+      'Check that the function is owned by work_membership_resolver and that the ' +
+      'membership_resolution policies exist on tenant_membership and workforce_user — the ' +
+      '20260901090000_membership_resolution_role migration establishes both (ADR-0077). Do not ' +
+      'grant BYPASSRLS to work around this: no role in the deployment needs it, and the ' +
+      'application role must stay unprivileged (ADR-0030).',
   );
 };
 

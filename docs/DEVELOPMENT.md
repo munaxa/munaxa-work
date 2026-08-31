@@ -265,7 +265,19 @@ psql "$DATABASE_URL" -c "
   grant execute on all functions in schema public to work_app;"
 ```
 
-then point `DATABASE_URL` at `work_app`. Starting as the migration user produces:
+then point `DATABASE_URL` at `work_app`.
+
+The **migration** role needs `CREATEROLE`, because one migration creates `work_membership_resolver`
+— the role that owns `app_memberships_of` so that tenant resolution works under
+`force row level security` (ADR-0077). It needs nothing else, and specifically not `BYPASSRLS`:
+
+```text
+migration role   login, CREATEROLE          owns the tables, runs the migrations
+work_app         login, no attributes       the application; cannot bypass isolation
+work_membership_resolver   NOLOGIN, none    owns one function, reads two tables
+```
+
+Starting as the migration user produces:
 
 ```
 Failed to start: IsolationNotEnforcedError: Refusing to start: the database role "work" can
@@ -336,13 +348,17 @@ already has: `insert` on `workforce_user` and `tenant_membership`, and `execute`
 isolation. `workforce_user`'s policy carries `with check (true)` precisely so the user can be written
 a moment before the membership that makes it readable, so no elevation is needed for this.
 
-**One privilege it does depend on, on the *migration* role.** `app_memberships_of` is
-`security definer` over tables with `force row level security`, which applies to their owner too. If
-the role that ran the migrations can neither bypass row-level security nor is a superuser, that
-function returns no rows — tenant resolution then finds no membership and **every authenticated
-request answers 401 with nothing in the log to say why**. Bootstrap verifies its own work through
-that function and fails with this diagnosis rather than leaving it to be discovered later. Grant the
-migration role `BYPASSRLS`; the application role stays unprivileged (ADR-0030).
+**The one privilege the *migration* role needs is `CREATEROLE`.** `app_memberships_of` is
+`security definer` over tables with `force row level security`, which applies to their owner too —
+so a function owned by the migration role runs subject to `tenant_isolation` with no tenant in
+context, returns no rows, and **every authenticated request answers 401 with nothing in the log to
+say why**. The `20260901090000_membership_resolution_role` migration fixes that by giving the
+function to `work_membership_resolver`, a role that cannot log in and can read exactly two tables
+(ADR-0077); creating it is why the migration role needs `CREATEROLE`.
+
+**No role in the deployment needs `BYPASSRLS`, and none should be given it.** Bootstrap verifies
+its own work through `app_memberships_of` and fails naming this ADR rather than leaving the
+condition to be discovered later.
 
 **What it does not do.**
 
