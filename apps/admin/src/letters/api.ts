@@ -1,4 +1,4 @@
-import { loadPortalProcessEnvironment } from '@work/config';
+import { apiRead } from '../shell/api-request.js';
 import type {
   ApprovalDecisionView,
   IssuedLetterDetailView,
@@ -44,18 +44,8 @@ export interface LettersForDisplay {
   readonly valuesWithheld: boolean;
 }
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/letters${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/letters${path}`);
 
 interface Page<TItem> {
   readonly items: readonly TItem[];

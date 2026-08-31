@@ -1,5 +1,5 @@
-import { loadPortalProcessEnvironment } from '@work/config';
 import type { DuplicateCandidateView, PersonView } from '@work/people/contracts';
+import { apiRead } from '../shell/api-request.js';
 
 /**
  * Reading the register from the API.
@@ -24,8 +24,6 @@ export interface RegisterForDisplay {
   readonly unavailable: boolean;
 }
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 /**
  * One fetch, failing closed.
  *
@@ -34,16 +32,8 @@ const BASE = loadPortalProcessEnvironment().WORK_API_URL;
  * with it. It matters more here than for an org chart: a cached page of personal data is a page of
  * personal data sitting somewhere nobody chose.
  */
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/people${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/people${path}`);
 
 interface Page<TItem> {
   readonly items: readonly TItem[];

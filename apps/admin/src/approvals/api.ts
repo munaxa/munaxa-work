@@ -1,4 +1,4 @@
-import { loadPortalProcessEnvironment } from '@work/config';
+import { apiRead } from '../shell/api-request.js';
 import type {
   ApprovalStatusView,
   PendingApprovalView,
@@ -31,8 +31,6 @@ import type {
  * those is published by the application against a reading instant this screen never sees.
  */
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 /** What one screen shows at once. The server clamps its own bound; this is the request. */
 const PAGE = 'page=1&size=25';
 
@@ -47,16 +45,8 @@ interface Page<TItem> {
  * `cache: 'no-store'` because a queue is a list of decisions somebody is personally being asked to
  * make, and a cached copy of it is one person's work sitting somewhere nobody chose.
  */
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/workflow${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/workflow${path}`);
 
 /**
  * A page, or the fact that there was not one.

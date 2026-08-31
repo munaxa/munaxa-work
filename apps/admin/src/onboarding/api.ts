@@ -1,5 +1,5 @@
-import { loadPortalProcessEnvironment } from '@work/config';
 import type { OnboardingView, PlanView, TaskView } from '@work/onboarding/contracts';
+import { apiRead } from '../shell/api-request.js';
 
 /**
  * Reading the onboarding register from the API.
@@ -30,18 +30,8 @@ export interface AwaitingEmployment {
   readonly startDate: string;
 }
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/onboarding${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/onboarding${path}`);
 
 interface Page<TItem> {
   readonly items: readonly TItem[];

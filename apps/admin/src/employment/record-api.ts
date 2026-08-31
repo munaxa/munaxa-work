@@ -1,4 +1,3 @@
-import { loadPortalProcessEnvironment } from '@work/config';
 import type { AssetClearanceView } from '@work/assets/contracts';
 import type { AttendanceDayView } from '@work/attendance/contracts';
 import type { CareerSummaryView } from '@work/career/contracts';
@@ -14,6 +13,7 @@ import type { LeaveBalanceView, LeaveTypeView } from '@work/leave/contracts';
 import type { IssuedLetterView } from '@work/letters/contracts';
 import type { PersonProfileView } from '@work/people/contracts';
 import type { ViolationView } from '@work/relations/contracts';
+import { apiRead } from '../shell/api-request.js';
 
 /**
  * One employee, read from eleven modules.
@@ -53,8 +53,6 @@ import type { ViolationView } from '@work/relations/contracts';
  * is the expected condition today rather than a fault.
  */
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 /** How many rows of a per-employee list the record shows. A record is a summary, not an archive. */
 const RECENT = 10;
 
@@ -73,16 +71,8 @@ interface Page<TItem> {
  * *withheld* from *empty*, which is the distinction that matters to a reader, and it has never
  * needed to distinguish a 403 from a 404 to do that.
  */
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`${path}`);
 
 const items = async <TItem>(path: string): Promise<readonly TItem[] | undefined> =>
   (await read<Page<TItem>>(path))?.items;

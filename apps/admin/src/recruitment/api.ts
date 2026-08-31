@@ -1,5 +1,5 @@
-import { loadPortalProcessEnvironment } from '@work/config';
 import type { EmploymentView } from '@work/employment/contracts';
+import { apiRead } from '../shell/api-request.js';
 import type {
   ApplicationSnapshot,
   ApplicationView,
@@ -43,8 +43,6 @@ import type {
  * own handler comments warn about. The name appears on the application record, from one read.
  */
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 /** What one screen shows at once. The server clamps its own bound; this is the request. */
 const PAGE = 'page=1&size=25';
 
@@ -71,16 +69,8 @@ export interface Listing<TItem> {
  * `cache: 'no-store'` because a hiring pipeline holds a named candidate's progress, and a cached
  * copy of it is one person's application sitting somewhere nobody chose.
  */
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`${path}`);
 
 const listing = <TItem>(page: Paged<TItem> | undefined): Listing<TItem> | undefined =>
   page === undefined ? undefined : { items: page.items, total: page.total };

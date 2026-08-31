@@ -1,4 +1,4 @@
-import { loadPortalProcessEnvironment } from '@work/config';
+import { apiRead } from '../shell/api-request.js';
 import type {
   AccountingLineView,
   DeductionDefinitionView,
@@ -43,8 +43,6 @@ import type {
  * duration. Every figure is published or it is not shown.
  */
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 /** What one screen shows at once. The server clamps its own bound; this is the request. */
 const PAGE = 'page=1&size=50';
 
@@ -65,16 +63,8 @@ export interface Listing<TItem> {
  * `cache: 'no-store'` because a payroll page holds what named people were paid, and a cached copy of
  * it is a company's salary bill sitting somewhere nobody chose.
  */
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/payroll${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/payroll${path}`);
 
 const listing = <TItem>(page: Paged<TItem> | undefined): Listing<TItem> | undefined =>
   page === undefined ? undefined : { items: page.items, total: page.total };

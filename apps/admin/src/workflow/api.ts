@@ -1,4 +1,4 @@
-import { loadPortalProcessEnvironment } from '@work/config';
+import { apiRead } from '../shell/api-request.js';
 import type {
   ApprovalGroupDetailView,
   ApprovalGroupView,
@@ -53,8 +53,6 @@ import type {
 /** One page, the size every listing on this screen uses. Nothing asks for more. */
 const PAGE = 'page=1&size=50';
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 interface Page<TItem> {
   readonly items: readonly TItem[];
   readonly total: number;
@@ -88,16 +86,8 @@ export interface WorkflowForDisplay {
   readonly unavailable: boolean;
 }
 
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/workflow${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/workflow${path}`);
 
 /**
  * A page's rows and the server's own total, with the absent case answered once.
