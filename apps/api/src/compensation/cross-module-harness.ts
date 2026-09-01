@@ -21,10 +21,10 @@ import {
 } from '@work/employment/testing';
 import {
   ALL_COMPENSATION_PERMISSIONS,
-  FixedClock,
   compensationModule,
   inMemoryCompensationStores,
 } from '@work/compensation';
+import { FixedClock } from '@work/compensation/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 
 import {

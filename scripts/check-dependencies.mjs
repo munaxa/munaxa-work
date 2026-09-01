@@ -44,6 +44,12 @@ const ENTRY_POINTS = [
    */
   /\/app\/(.*\/)?(route|manifest|sitemap|robots|opengraph-image|twitter-image|icon|apple-icon)\.ts$/,
   /next-env\.d\.ts$/,
+  /*
+   * A package's declared subpath entry points. `src/testing.ts` backs `@work/<module>/testing`, so
+   * it is imported across the package boundary by name and never by path — which is exactly what
+   * this check cannot see, and exactly what makes it an entry point rather than dead code.
+   */
+  /\/src\/testing\.ts$/,
 ];
 
 const tracked = execFileSync('git', ['ls-files'], { encoding: 'utf8' }).split('\n');

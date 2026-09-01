@@ -56,8 +56,3 @@ export { HireController } from './api/hire.controller.js';
  * duplicated in two packages is a fake that will drift from the real thing in one of them.
  */
 export { inMemoryRecruitmentStores } from './application/in-memory-stores.js';
-export {
-  FakeEmployment,
-  FakeOrganization,
-  FakePeople,
-} from './application/recruitment-test-harness.js';

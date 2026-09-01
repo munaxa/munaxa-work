@@ -2,7 +2,7 @@
   "name": "@work/recruitment",
   "version": "0.1.0",
   "private": true,
-  "description": "Recruitment \u2014 the hiring process, and the candidates who are not yet people: requisitions and their approval, vacancies, candidates, applications and their pipeline, interviews and feedback, offers, and the transition that turns an accepted offer into a Person and an Employment. Owns no identity, no structure and no employment.",
+  "description": "Recruitment — the hiring process, and the candidates who are not yet people: requisitions and their approval, vacancies, candidates, applications and their pipeline, interviews and feedback, offers, and the transition that turns an accepted offer into a Person and an Employment. Owns no identity, no structure and no employment.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,12 +12,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
     },
     "./locales/en.json": "./locales/en.json",
     "./locales/ar.json": "./locales/ar.json"
+  },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing.d.ts"
+      ],
+      "contracts": [
+        "./dist/contracts/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",
