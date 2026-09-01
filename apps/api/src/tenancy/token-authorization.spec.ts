@@ -7,7 +7,6 @@ import { PlatformPermissionChecker } from '../identity/permission-checker.js';
 import {
   PlatformTokenAuthenticationPort,
   type AccessTokenVerifier,
-  type VerifiedAccessToken,
 } from '../identity/platform-token-authentication.js';
 
 import { TENANT_HEADER, TenantMiddleware } from './tenant.middleware.js';
@@ -39,13 +38,12 @@ const directoryWith = (...memberships: ResolvedMembership[]): TenantMembershipDi
 });
 
 const vouchingFor = (claims: Record<string, unknown>): AccessTokenVerifier => ({
-  verifyAccessToken: () =>
-    ({
-      sub: PLATFORM_USER,
-      iss: 'https://identity.example.com',
-      iat: 1_780_000_000,
-      ...claims,
-    }) as unknown as VerifiedAccessToken,
+  verifyAccessToken: () => ({
+    sub: PLATFORM_USER,
+    iss: 'https://identity.example.com',
+    iat: 1_780_000_000,
+    ...claims,
+  }),
 });
 
 const middlewareFor = (

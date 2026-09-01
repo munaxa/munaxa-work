@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { platformGrantFor } from './platform-grants.js';
@@ -16,7 +17,30 @@ import { WORK_PERMISSION_CATALOGUE, workPermissionCatalogue } from './work-permi
  * is a 403 with no explanation.
  */
 
-const ROOT = resolve(import.meta.dirname, '../../../..');
+/**
+ * The repository root, found by walking up from the working directory.
+ *
+ * Not `import.meta.dirname`: this package compiles as CommonJS, where `tsc` rejects the
+ * meta-property outright even though vitest would run it. Not a fixed number of `..` either — that
+ * silently resolves to the wrong directory the day the file moves. Walking up for the script that
+ * is about to be executed fails loudly instead, naming what it could not find.
+ */
+const repositoryRoot = (): string => {
+  let directory = process.cwd();
+
+  while (!existsSync(resolve(directory, 'scripts/emit-permission-catalogue.mjs'))) {
+    const parent = dirname(directory);
+    if (parent === directory) {
+      throw new Error(
+        'Could not find scripts/emit-permission-catalogue.mjs above the working directory.',
+      );
+    }
+    directory = parent;
+  }
+  return directory;
+};
+
+const ROOT = repositoryRoot();
 
 const emitted = (...args: readonly string[]): readonly string[] =>
   JSON.parse(

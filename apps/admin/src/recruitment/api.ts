@@ -1,5 +1,5 @@
 import type { EmploymentView } from '@work/employment/contracts';
-import { apiRead } from '../shell/api-request.js';
+import { apiRead } from '../shell/api-request';
 import type {
   ApplicationSnapshot,
   ApplicationView,

@@ -1,4 +1,4 @@
-import { apiOutcome } from '../shell/api-request.js';
+import { apiOutcome } from '../shell/api-request';
 import type {
   AssetCategoryView,
   AssetCustodyView,

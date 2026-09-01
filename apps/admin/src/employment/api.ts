@@ -1,5 +1,5 @@
 import type { EmploymentHistoryView, EmploymentView } from '@work/employment/contracts';
-import { apiRead } from '../shell/api-request.js';
+import { apiRead } from '../shell/api-request';
 
 /**
  * Reading the workforce from the API.

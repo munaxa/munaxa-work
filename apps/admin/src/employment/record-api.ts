@@ -13,7 +13,7 @@ import type { LeaveBalanceView, LeaveTypeView } from '@work/leave/contracts';
 import type { IssuedLetterView } from '@work/letters/contracts';
 import type { PersonProfileView } from '@work/people/contracts';
 import type { ViolationView } from '@work/relations/contracts';
-import { apiRead } from '../shell/api-request.js';
+import { apiRead } from '../shell/api-request';
 
 /**
  * One employee, read from eleven modules.

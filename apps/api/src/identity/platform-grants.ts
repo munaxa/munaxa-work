@@ -37,10 +37,7 @@ const PLATFORM_SEGMENTS = /^[a-z0-9][a-z0-9_-]*(?::[a-z0-9][a-z0-9_-]*)*$/;
 
 /** Why a grant conferred nothing. Reported, never guessed at. */
 export type DroppedGrantReason =
-  | 'not-a-work-grant'
-  | 'wildcard'
-  | 'malformed'
-  | 'not-a-declared-permission';
+  'not-a-work-grant' | 'wildcard' | 'malformed' | 'not-a-declared-permission';
 
 export interface DroppedGrant {
   readonly grant: string;

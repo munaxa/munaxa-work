@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { loadPortalProcessEnvironment } from '@work/config';
 
-import type { ApiState } from './api-request.js';
-import { translator, type Language } from './locale.js';
+import type { ApiState } from './api-request';
+import { translator, type Language } from './locale';
 
 /**
  * What a screen says when it has no data, and why.

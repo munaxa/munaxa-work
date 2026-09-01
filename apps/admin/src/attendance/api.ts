@@ -1,5 +1,5 @@
 import type { EmploymentView } from '@work/employment/contracts';
-import { apiOutcome } from '../shell/api-request.js';
+import { apiOutcome } from '../shell/api-request';
 import type {
   AttendanceDashboardView,
   AttendanceDaySnapshot,

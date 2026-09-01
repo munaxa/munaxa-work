@@ -1,5 +1,5 @@
 import type { DuplicateCandidateView, PersonView } from '@work/people/contracts';
-import { apiRead } from '../shell/api-request.js';
+import { apiRead } from '../shell/api-request';
 
 /**
  * Reading the register from the API.

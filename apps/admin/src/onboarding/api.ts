@@ -1,5 +1,5 @@
 import type { OnboardingView, PlanView, TaskView } from '@work/onboarding/contracts';
-import { apiRead } from '../shell/api-request.js';
+import { apiRead } from '../shell/api-request';
 
 /**
  * Reading the onboarding register from the API.

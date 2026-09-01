@@ -36,7 +36,7 @@
 
 import { loadPortalProcessEnvironment } from '@work/config';
 
-import { authorization, selectedTenant, TENANT_HEADER } from './platform-session.js';
+import { authorization, selectedTenant, TENANT_HEADER } from './platform-session';
 
 const BASE = loadPortalProcessEnvironment().WORK_API_URL;
 

@@ -1,4 +1,4 @@
-import { apiRead } from '../shell/api-request.js';
+import { apiRead } from '../shell/api-request';
 import type {
   ApprovalDecisionView,
   IssuedLetterDetailView,

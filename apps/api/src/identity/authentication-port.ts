@@ -1,4 +1,6 @@
-import { ConfigurationError, platformAuthenticationFrom } from '@work/config';
+import { AsymmetricSigner } from '@munaxa/crypto';
+import { TokenService } from '@munaxa/auth';
+import { platformAuthenticationFrom } from '@work/config';
 import type { Environment, PlatformAuthenticationConfiguration } from '@work/config';
 import { UnauthenticatedPort, type PlatformAuthenticationPort } from '@work/kernel';
 
@@ -30,25 +32,31 @@ export type AccessTokenVerifierFactory = (
 /**
  * Builds Platform's verifier from the configured issuer, audience, algorithm and keys.
  *
- * **This is the only expression in Munaxa Work that would construct `@munaxa/auth`'s
- * `TokenService`, and it is deliberately the only one.** Everything above it is written against
- * `AccessTokenVerifier`, which `TokenService` satisfies structurally, so wiring the real
- * implementation is a change to this function and to nothing else.
+ * **This is the only expression in Munaxa Work that constructs `@munaxa/auth`'s `TokenService`,
+ * and it is deliberately the only one.** Everything above it is written against
+ * `AccessTokenVerifier`, which `TokenService` satisfies structurally, so the whole of Work's
+ * dependency on Platform's token implementation is this function.
  *
- * It refuses today because `@munaxa/auth` is published to GitHub Packages and cannot be
- * installed by this repository yet (Phase 1, section C). The refusal is the correct behaviour
- * rather than a placeholder for one: a deployment that supplied Platform's issuer and keys has
- * asked for verified authentication, and the two alternatives to stopping are both worse.
- * Falling back to `UnauthenticatedPort` would answer 401 to everybody while the operator
- * believed authentication was live. Verifying with a JWT library chosen here would put token
- * verification — and therefore authentication — inside this product, which ADR-0001 forbids and
- * which no amount of care would make correct.
+ * Two properties are worth stating because they are the reason this is Platform's code and not
+ * ours. The algorithm used to verify comes from the *signer*, never from the token header, so the
+ * `alg: none` and algorithm-confusion families of attack fail here rather than being defended
+ * against. And `AsymmetricSigner` is constructed with public keys only — Work holds no private
+ * half of anything and could not mint a token it would accept, which is what makes ADR-0001's
+ * "Platform owns authentication" a structural fact rather than an intention.
+ *
+ * The key ring is the whole configured set, keyed by `kid`, so a rotation is a deployment that
+ * carries two public keys and no coordination window at all.
  */
-export const platformAccessTokenVerifier: AccessTokenVerifierFactory = () => {
-  throw new ConfigurationError([
-    'Platform authentication is configured, but no verifier is wired. Munaxa Work verifies tokens with Platform\'s own implementation and must not implement its own (ADR-0001): add "@munaxa/auth" to apps/api and construct its TokenService in platformAccessTokenVerifier. Until then, leave PLATFORM_AUTH_* unset to run with UnauthenticatedPort.',
-  ]);
-};
+export const platformAccessTokenVerifier: AccessTokenVerifierFactory = (configuration) =>
+  new TokenService({
+    signer: new AsymmetricSigner(
+      configuration.algorithm,
+      configuration.keys.map((key) => ({ kid: key.kid, publicKey: key.publicKey })),
+    ),
+    issuer: configuration.issuer,
+    audience: configuration.audience,
+    clockSkew: configuration.clockSkewMs,
+  });
 
 /**
  * Chooses the port. Deterministic, total, and dependent on nothing but the environment.
