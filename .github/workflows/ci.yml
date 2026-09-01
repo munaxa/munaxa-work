@@ -119,6 +119,13 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # After the build, because it inspects the emitted artefact rather than the source: it walks
+      # the module graph from apps/api/dist/main.js and fails if a test double, a harness or
+      # @work/testing is reachable from it. Phase 10 shipped an image that died at startup on
+      # exactly that, and no source-level gate noticed.
+      - name: Check the production output carries no test-only code
+        run: pnpm check:production-output
+
       # `prisma validate` resolves env() at parse time, so the variable must exist. Its value
       # is irrelevant here — nothing connects.
       - name: Validate the Prisma schema
