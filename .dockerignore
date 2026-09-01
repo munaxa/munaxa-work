@@ -1,0 +1,29 @@
+# Everything the build produces itself, or must never enter an image.
+#
+# `node_modules` in particular: the build installs its own from the lockfile, and copying a host
+# tree over it would replace a verified install with whatever happened to be on a laptop.
+node_modules
+**/node_modules
+.git
+.next
+**/.next
+dist
+**/dist
+**/*.tsbuildinfo
+.turbo
+**/.turbo
+coverage
+**/coverage
+
+# CI configuration describes how the project is built, not how it runs. It has no business inside a
+# distributed artifact, and a scan of the last image found it there.
+.github
+
+# Secrets, in every shape this repository has ever held one.
+.env
+.env.*
+!.env.example
+!.env.staging.example
+*.pem
+*.key
+secrets/

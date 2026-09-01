@@ -51,7 +51,6 @@ export type {
 
 export { postgresDocumentsStores } from './infrastructure/documents-stores.js';
 export { inMemoryDocumentsStores } from './application/in-memory-stores.js';
-export { FixedClock } from './application/documents-test-harness.js';
 
 /**
  * The HTTP edge. Registered by the API app's Documents Nest module; nothing else imports it.

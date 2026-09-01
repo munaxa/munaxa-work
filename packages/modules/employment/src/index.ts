@@ -63,4 +63,3 @@ export { TransferController } from './api/transfer.controller.js';
  * fake duplicated in two packages is a fake that will drift from the real thing in one of them.
  */
 export { inMemoryEmploymentStores } from './application/in-memory-stores.js';
-export { FakeOrganization, FakePeople } from './application/employment-test-harness.js';

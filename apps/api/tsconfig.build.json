@@ -8,5 +8,19 @@
     "composite": false,
     "incremental": false
   },
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+  // Harnesses and fixtures are excluded alongside the tests they exist for. They were being
+  // compiled into dist and shipped, which is how the API image came to require `@work/testing` at
+  // runtime: a fake port implementation reached the running service's dependency graph. Test code
+  // is reachable from tests and from nowhere else.
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/*.fixture.ts",
+    "**/*harness*.ts",
+    "**/*scenario*.ts",
+    "**/*cross-module*.ts",
+    "**/phase-*-configuration.ts"
+  ]
 }

@@ -66,7 +66,6 @@ export type { MoneyAmount } from './domain/money-amount.js';
 
 export { postgresPayrollStores } from './infrastructure/payroll-stores.js';
 export { inMemoryPayrollStores } from './application/in-memory-stores.js';
-export { FixedClock } from './application/payroll-test-harness.js';
 
 /**
  * The two pure stages, published so a benchmark measures **this code** rather than a copy of it.

@@ -2,7 +2,7 @@
   "name": "@work/letters",
   "version": "0.1.0",
   "private": true,
-  "description": "Employee letters \u2014 tenant-authored templates, immutable template versions, generation from published contracts, a frozen source snapshot and immutable issuance. Renders nothing: no PDF service exists.",
+  "description": "Employee letters — tenant-authored templates, immutable template versions, generation from published contracts, a frozen source snapshot and immutable issuance. Renders nothing: no PDF service exists.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,12 +12,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
     },
     "./locales/en.json": "./locales/en.json",
     "./locales/ar.json": "./locales/ar.json"
+  },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing.d.ts"
+      ],
+      "contracts": [
+        "./dist/contracts/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",

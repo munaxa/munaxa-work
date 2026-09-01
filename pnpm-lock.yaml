@@ -13,6 +13,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      '@prisma/client':
+        specifier: ^6.2.0
+        version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
     devDependencies:
       '@munaxa/config-eslint':
         specifier: ^1.0.0
@@ -26,6 +30,9 @@ importers:
       prettier:
         specifier: ^3.4.2
         version: 3.9.6
+      prisma:
+        specifier: ^6.2.0
+        version: 6.19.3(typescript@5.9.3)
       turbo:
         specifier: ^2.3.3
         version: 2.10.8

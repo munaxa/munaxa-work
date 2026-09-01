@@ -2,7 +2,7 @@
   "name": "@work/attendance",
   "version": "0.1.0",
   "private": true,
-  "description": "Attendance \u2014 the record of when people actually worked: raw time events, schedules, shifts, rosters, attendance policies, the calculated working day, exceptions and corrections. Owns no employment, no leave, no payroll and no location.",
+  "description": "Attendance — the record of when people actually worked: raw time events, schedules, shifts, rosters, attendance policies, the calculated working day, exceptions and corrections. Owns no employment, no leave, no payroll and no location.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,12 +12,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
     },
     "./locales/en.json": "./locales/en.json",
     "./locales/ar.json": "./locales/ar.json"
+  },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing.d.ts"
+      ],
+      "contracts": [
+        "./dist/contracts/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",

@@ -71,4 +71,3 @@ export {
  * duplicated in two packages is a fake that will drift from the real thing in one of them.
  */
 export { inMemoryOnboardingStores } from './application/in-memory-stores.js';
-export { FakeEmployment, FakePeople } from './application/onboarding-test-harness.js';

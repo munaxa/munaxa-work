@@ -12,12 +12,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
     },
     "./locales/en.json": "./locales/en.json",
     "./locales/ar.json": "./locales/ar.json"
+  },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing.d.ts"
+      ],
+      "contracts": [
+        "./dist/contracts/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",

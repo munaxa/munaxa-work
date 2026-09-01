@@ -87,4 +87,3 @@ export { LeaveRunController } from './api/run.controller.js';
  * fake duplicated in two packages is a fake that will drift from the real thing in one of them.
  */
 export { inMemoryLeaveStores } from './application/in-memory-definitions.js';
-export { FakeAttendance, FakeEmployment, FixedClock } from './application/leave-test-harness.js';

@@ -13,11 +13,13 @@ import {
 } from '@work/kernel';
 import {
   ALL_EMPLOYMENT_PERMISSIONS,
-  FakeOrganization as FakeEmploymentOrganization,
-  FakePeople,
   employmentModule,
   inMemoryEmploymentStores,
 } from '@work/employment';
+import {
+  FakeOrganization as FakeEmploymentOrganization,
+  FakePeople,
+} from '@work/employment/testing';
 import {
   ALL_COMPENSATION_PERMISSIONS,
   FixedClock,

@@ -18,12 +18,11 @@ import {
   AttendanceScheduleController,
   AttendanceShiftController,
   AttendanceTransferController,
-  FakeEmployment,
-  FakeLeave,
   attendanceModule,
   inMemoryAttendanceStores,
   leaveUnavailable,
 } from '@work/attendance';
+import { FakeEmployment, FakeLeave } from '@work/attendance/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 

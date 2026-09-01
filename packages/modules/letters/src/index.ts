@@ -41,7 +41,6 @@ export type {
 } from './application/letters-ports.js';
 
 export { inMemoryLettersStores } from './application/in-memory-stores.js';
-export { FixedClock } from './application/letters-test-harness.js';
 
 /**
  * The only `VerificationTokenPort` that exists, and the only code here that reaches a random source.

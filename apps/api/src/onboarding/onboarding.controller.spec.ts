@@ -9,8 +9,6 @@ import request from 'supertest';
 import { loadEnvironment } from '@work/config';
 import { Dispatcher, runInContext, uuidV7, type PermissionChecker } from '@work/kernel';
 import {
-  FakeEmployment,
-  FakePeople,
   OnboardingDispatcher,
   OnboardingExportController,
   OnboardingLifecycleController,
@@ -23,6 +21,7 @@ import {
   inMemoryOnboardingStores,
   onboardingModule,
 } from '@work/onboarding';
+import { FakeEmployment, FakePeople } from '@work/onboarding/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 
