@@ -71,19 +71,28 @@ RUN pnpm turbo run build --filter @work/admin
 #
 # CI=true is required, not cosmetic: the install rebuilds the modules directory and without a TTY to
 # confirm that it refuses with ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY.
+#
+# `rm -rf node_modules` before the install, and that is the part that matters. `pnpm install --prod`
+# re-links each project's node_modules but does not garbage-collect the virtual store underneath, so
+# vitest, eslint, turbo and the Nest CLI all survived into the shipped image — the manifest said
+# production and the filesystem said otherwise. Removing the tree first makes the prod install
+# materialise only what production actually resolves. Packages come from the build stage's
+# content-addressable store, so this costs seconds, not a re-download.
 RUN --mount=type=secret,id=npm_token --mount=type=secret,id=ca_bundle \
     NODE_EXTRA_CA_CERTS="$([ -f /etc/ssl/certs/build-proxy.pem ] && echo /etc/ssl/certs/build-proxy.pem || true)" \
     CI=true \
     sh -c 'set -e; \
       T="$(cat /run/secrets/npm_token)"; \
       printf "//npm.pkg.github.com/:_authToken=%s\n//npm.pkg.github.com/:always-auth=true\n" "$T" > /root/.npmrc; \
+      rm -rf node_modules apps/*/node_modules packages/*/node_modules packages/modules/*/node_modules; \
       pnpm install --prod --frozen-lockfile; \
       rm -f /root/.npmrc'
 
 # TypeScript sources are dropped once they have been compiled. They are not secret, but an image is
 # distributed more widely than a repository is, and nothing in a running service reads them.
 RUN find /app/packages -type d \( -name src -o -name test -o -name __tests__ \) -prune -exec rm -rf {} + && \
-    find /app -name '*.tsbuildinfo' -delete
+    find /app -name '*.tsbuildinfo' -delete && \
+    rm -f /app/.npmrc
 
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production

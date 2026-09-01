@@ -70,30 +70,47 @@ RUN pnpm --filter @work/api exec prisma generate --schema ../../prisma/schema.pr
 # CI=true is required, not cosmetic: the install rebuilds the modules directory and without a TTY to
 # confirm that it refuses with ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY.
 #
+# `rm -rf node_modules` before the install, and that is the part that matters. `pnpm install --prod`
+# re-links each project's node_modules but does not garbage-collect the virtual store underneath, so
+# vitest, eslint, turbo and the Nest CLI all survived into the shipped image — the manifest said
+# production and the filesystem said otherwise. Removing the tree first makes the prod install
+# materialise only what production actually resolves. Packages come from the build stage's
+# content-addressable store, so this costs seconds, not a re-download.
+#
 # The generated Prisma client is set aside across it. Work generates it *into* the @prisma/client
 # package inside pnpm's virtual store rather than into node_modules/.prisma, and the install
 # re-materialises that store from the content-addressable cache — which would restore the pristine
 # package and silently discard the generated client. That failure would not appear until the service
 # tried its first query.
+#
+# Both halves are preserved, not just the package: `prisma generate` writes the emitted client to a
+# `.prisma` directory *beside* `@prisma/client` inside the same store entry, and `@prisma/client`'s
+# own entry point is a one-line re-export of `.prisma/client/default`. Carrying the package without
+# its sibling produces `Cannot find module '.prisma/client/default'` — a package that is plainly
+# installed, failing to load.
 RUN --mount=type=secret,id=npm_token --mount=type=secret,id=ca_bundle \
     NODE_EXTRA_CA_CERTS="$([ -f /etc/ssl/certs/build-proxy.pem ] && echo /etc/ssl/certs/build-proxy.pem || true)" \
     CI=true \
     sh -c 'set -e; \
       T="$(cat /run/secrets/npm_token)"; \
       printf "//npm.pkg.github.com/:_authToken=%s\n//npm.pkg.github.com/:always-auth=true\n" "$T" > /root/.npmrc; \
-      SRC=$(ls -d /app/node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client); \
-      cp -r "$SRC" /tmp/prisma-client; \
+      SRC=$(ls -d /app/node_modules/.pnpm/@prisma+client@*/node_modules); \
+      cp -r "$SRC/@prisma/client" /tmp/prisma-client; \
+      cp -r "$SRC/.prisma" /tmp/prisma-generated; \
+      rm -rf node_modules apps/*/node_modules packages/*/node_modules packages/modules/*/node_modules; \
       pnpm install --prod --frozen-lockfile; \
-      DST=$(ls -d /app/node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client); \
-      rm -rf "$DST"; \
-      cp -r /tmp/prisma-client "$DST"; \
-      rm -rf /tmp/prisma-client; \
+      DST=$(ls -d /app/node_modules/.pnpm/@prisma+client@*/node_modules); \
+      rm -rf "$DST/@prisma/client" "$DST/.prisma"; \
+      cp -r /tmp/prisma-client "$DST/@prisma/client"; \
+      cp -r /tmp/prisma-generated "$DST/.prisma"; \
+      rm -rf /tmp/prisma-client /tmp/prisma-generated; \
       rm -f /root/.npmrc'
 
 # TypeScript sources are dropped once they have been compiled. They are not secret, but an image is
 # distributed more widely than a repository is, and nothing in a running service reads them.
 RUN find /app/apps /app/packages -type d \( -name src -o -name test -o -name __tests__ \) -prune -exec rm -rf {} + && \
-    find /app -name '*.tsbuildinfo' -delete
+    find /app -name '*.tsbuildinfo' -delete && \
+    rm -f /app/.npmrc
 
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
