@@ -14,7 +14,12 @@ import {
   type WorkflowCrossModuleHarness,
   UNADOPTED,
 } from './workflow-cross-module-harness.js';
-import { seedDelegation, startApproval } from './workflow-cross-module-seed.js';
+import {
+  noLongerInForce,
+  notYetInForce,
+  seedDelegation,
+  startApproval,
+} from './workflow-cross-module-seed.js';
 
 /**
  * The mandatory production scenario: an approval decided by a deputy, end to end.
@@ -199,8 +204,7 @@ suite('workflow delegation, across modules', () => {
       const { instanceId } = await approvalIn(TENANT_A);
 
       await seedDelegation(harness, TENANT_A, {
-        from: new Date('2026-12-01T00:00:00.000Z'),
-        to: new Date('2027-01-01T00:00:00.000Z'),
+        ...notYetInForce(),
         status: 'scheduled',
       });
 
@@ -221,8 +225,7 @@ suite('workflow delegation, across modules', () => {
       const { instanceId } = await approvalIn(TENANT_A);
 
       await seedDelegation(harness, TENANT_A, {
-        from: new Date('2026-01-01T00:00:00.000Z'),
-        to: new Date('2026-02-01T00:00:00.000Z'),
+        ...noLongerInForce(),
         status: 'active',
       });
 
