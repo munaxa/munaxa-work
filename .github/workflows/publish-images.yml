@@ -28,7 +28,7 @@ on:
 
 concurrency:
   group: publish-${{ github.ref }}
-  cancel-in-progress: false     # never cancel a half-finished push to a registry
+  cancel-in-progress: false # never cancel a half-finished push to a registry
 
 permissions:
   contents: read
@@ -39,7 +39,7 @@ jobs:
     name: ${{ matrix.image }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false          # one image failing should not hide the other's result
+      fail-fast: false # one image failing should not hide the other's result
       matrix:
         include:
           - image: munaxa-work-api
