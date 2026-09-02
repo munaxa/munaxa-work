@@ -77,8 +77,3 @@ export { CompensationComponentController } from './api/component.controller.js';
  * fake duplicated in two packages is a fake that will drift from the real thing in one of them.
  */
 export { inMemoryCompensationStores } from './application/in-memory-definitions.js';
-export {
-  FakeEmployment,
-  FakeOrganization,
-  FixedClock,
-} from './application/compensation-test-harness.js';

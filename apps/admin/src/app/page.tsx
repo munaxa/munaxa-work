@@ -3,6 +3,8 @@ import { Card } from '@munaxa/ui';
 
 import { NAVIGATION } from '../shell/navigation';
 import { isLanguage, translator, type Language } from '../shell/locale';
+import { AccessState } from '../shell/access-state';
+import { isSignedIn } from '../shell/platform-session';
 
 /**
  * The portal's home.
@@ -18,6 +20,10 @@ import { isLanguage, translator, type Language } from '../shell/locale';
  *
  * The lockup is in the sidebar now, so the heading is text again: repeating the mark beside the
  * mark is the product's name said twice.
+ *
+ * **A signed-out reader gets the sign-in state instead of the index.** Listing eighteen screens to
+ * somebody who will be refused by every one of them is a menu of dead ends; saying that Platform
+ * authenticates them, and where, is the one useful thing this page can do in that condition.
  */
 
 interface PageProps {
@@ -32,6 +38,8 @@ const HomePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
   const requested = single(parameters['lang']);
   const language: Language = isLanguage(requested) ? requested : 'en';
   const t = translator(language);
+
+  if (!(await isSignedIn())) return <AccessState state="unauthenticated" language={language} />;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 p-8">
@@ -59,7 +67,6 @@ const HomePage = async ({ searchParams }: PageProps): Promise<ReactNode> => {
       ))}
 
       <p className="text-xs opacity-70">{t('admin.notice.readOnly')}</p>
-      <p className="text-xs opacity-70">{t('admin.notice.notSignedIn')}</p>
     </div>
   );
 };

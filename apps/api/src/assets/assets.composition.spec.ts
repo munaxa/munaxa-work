@@ -178,20 +178,30 @@ describe('the assets composition', () => {
   });
 
   /**
-   * Nothing outside Assets reads its tables or imports its package.
+   * Nothing outside Assets reads its tables or imports its domain.
    *
    * The consumer the specification names — Offboarding, reading custody through public contracts
    * (AD-006) — does not exist yet, and when it does it will read the contract rather than the table.
+   *
+   * The permission catalogue is the one exemption, and it is narrow by construction rather than by
+   * exception: it imports `ALL_ASSETS_PERMISSIONS` and nothing else, which is a frozen list of the
+   * names Assets declares. Enumerating every module's vocabulary is what a catalogue *is*
+   * (ADR-0076), so the alternative to this import is not less coupling — it is a second, hand-kept
+   * copy of the same names, which is the coupling plus a way for it to drift. The assertion below
+   * still fails on any import of an Assets type, service or repository.
    */
   it('is read by no other module in this application', () => {
     const root = join(process.cwd(), 'src');
+    const PERMISSION_CATALOGUE_IMPORT = "import { ALL_ASSETS_PERMISSIONS } from '@work/assets';";
     const consumers = readdirSync(root, { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && entry.name !== 'assets')
       .filter((entry) =>
         readdirSync(join(root, entry.name))
           .filter((file) => file.endsWith('.ts'))
           .some((file) =>
-            readFileSync(join(root, entry.name, file), 'utf8').includes('@work/assets'),
+            readFileSync(join(root, entry.name, file), 'utf8')
+              .replace(PERMISSION_CATALOGUE_IMPORT, '')
+              .includes('@work/assets'),
           ),
       )
       .map((entry) => entry.name);

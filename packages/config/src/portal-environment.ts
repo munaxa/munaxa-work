@@ -17,6 +17,19 @@ import { ConfigurationError } from './environment.js';
 export const portalEnvironmentSchema = z.object({
   /** Where the product's API lives. A URL, validated, so a typo fails at startup. */
   WORK_API_URL: z.string().url().default('http://127.0.0.1:3000'),
+
+  /**
+   * Where Platform's sign-in lives.
+   *
+   * A portal does not authenticate anybody (ADR-0001); it sends them somewhere that does, and
+   * Platform's service sets the session cookie this portal then reads. So the whole of Work's
+   * sign-in configuration is one URL, and it is deliberately not a client identifier, a secret or
+   * a redirect contract — none of which Work is entitled to hold.
+   *
+   * Optional, because no such service is deployed yet. Unset, the portal says so plainly instead
+   * of offering a button that goes nowhere.
+   */
+  PLATFORM_SIGN_IN_URL: z.string().url().optional(),
 });
 
 export type PortalEnvironment = z.infer<typeof portalEnvironmentSchema>;

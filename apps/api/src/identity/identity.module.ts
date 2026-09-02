@@ -20,7 +20,6 @@ import {
   Dispatcher,
   GrantAwarePermissionChecker,
   ModuleRegistry,
-  UnauthenticatedPort,
   type EventDispatcher,
   type PermissionChecker,
   type PlatformAuthenticationPort,
@@ -85,6 +84,7 @@ import {
   PERMISSION_CHECKER,
 } from './identity.tokens.js';
 import { PlatformPermissionChecker } from './permission-checker.js';
+import { authenticationPortFor } from './authentication-port.js';
 
 /**
  * The composition root for Workforce Identity, and for module registration generally.
@@ -107,11 +107,18 @@ import { PlatformPermissionChecker } from './permission-checker.js';
   providers: [
     environmentProvider,
     {
-      // Platform's adapter replaces this in a deployment that has one. Until then it
-      // authenticates nobody, which is the only safe default for a port this product does not
-      // own — see `UnauthenticatedPort`.
+      // Chosen from the environment, not hardcoded: a deployment given Platform's issuer, keys,
+      // audience and algorithm verifies tokens with them, and one given none of that
+      // authenticates nobody — which is the only safe default for a port this product does not
+      // own. The decision itself is `authenticationPortFor`, so it can be proved in a test
+      // rather than asserted here.
       provide: AUTHENTICATION_PORT,
-      useFactory: (): PlatformAuthenticationPort => new UnauthenticatedPort(),
+      inject: [ENVIRONMENT, PinoLogger],
+      useFactory: (environment: Environment, logger: PinoLogger): PlatformAuthenticationPort =>
+        authenticationPortFor(environment, undefined, (dropped) => {
+          // The grant name and the reason, and nothing else — never the token it arrived in.
+          logger.logger.warn({ dropped }, 'a Platform grant conferred no Work permission');
+        }),
     },
     {
       provide: MEMBERSHIP_DIRECTORY,

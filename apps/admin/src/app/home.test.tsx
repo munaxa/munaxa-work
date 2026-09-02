@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
+import { browserCookies, signedIn } from '../test/setup';
 import { translator } from '../shell/locale';
 import { DESTINATIONS } from '../shell/navigation';
 
@@ -62,11 +63,31 @@ describe('the home screen', () => {
     expect(markup).toContain('href="/people?lang=en"');
   });
 
-  it('says the product writes nothing and that nobody is signed in', async () => {
+  it('says the product writes nothing', async () => {
     const markup = await render();
 
     expect(markup).toContain(escaped(en('admin.notice.readOnly')));
-    expect(markup).toContain(escaped(en('admin.notice.notSignedIn')));
+  });
+
+  it('shows a reader with no session the way in, not the workspace', async () => {
+    // The one test here that is about who is looking rather than what is on the screen. It was
+    // written when nobody could be signed in at all; now that somebody can be, the notice it
+    // asserts belongs to the signed-out reader specifically.
+    browserCookies();
+    try {
+      const markup = await render();
+
+      expect(markup).toContain(escaped(en('admin.access.signedOut.title')));
+      expect(markup).toContain(escaped(en('admin.access.signedOut.detail')));
+      for (const destination of DESTINATIONS) {
+        expect([destination.href, markup.includes(`href="${destination.href}`)]).toEqual([
+          destination.href,
+          false,
+        ]);
+      }
+    } finally {
+      signedIn();
+    }
   });
 
   it('has no button, form or input: nothing here does nothing', async () => {

@@ -12,17 +12,19 @@ import {
 } from '@work/kernel';
 import {
   ALL_EMPLOYMENT_PERMISSIONS,
-  FakeOrganization as FakeEmploymentOrganization,
-  FakePeople,
   employmentModule,
   inMemoryEmploymentStores,
 } from '@work/employment';
 import {
+  FakeOrganization as FakeEmploymentOrganization,
+  FakePeople,
+} from '@work/employment/testing';
+import {
   ALL_COMPENSATION_PERMISSIONS,
-  FixedClock,
   compensationModule,
   inMemoryCompensationStores,
 } from '@work/compensation';
+import { FixedClock } from '@work/compensation/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 
 import {

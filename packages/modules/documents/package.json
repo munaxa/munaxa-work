@@ -2,7 +2,7 @@
   "name": "@work/documents",
   "version": "0.1.0",
   "private": true,
-  "description": "Employee documents \u2014 document types, stable document identity, immutable versions, verification, expiry, archive, retention metadata and a queryable access trail. Holds no bytes: storage is a port with no adapter.",
+  "description": "Employee documents — document types, stable document identity, immutable versions, verification, expiry, archive, retention metadata and a queryable access trail. Holds no bytes: storage is a port with no adapter.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,12 +12,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
     },
     "./locales/en.json": "./locales/en.json",
     "./locales/ar.json": "./locales/ar.json"
+  },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing.d.ts"
+      ],
+      "contracts": [
+        "./dist/contracts/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",

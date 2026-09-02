@@ -2,7 +2,7 @@
   "name": "@work/api",
   "version": "0.1.0",
   "private": true,
-  "description": "Munaxa Work API. Transport only \u2014 no business logic.",
+  "description": "Munaxa Work API. Transport only — no business logic.",
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
@@ -14,6 +14,8 @@
     "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma"
   },
   "dependencies": {
+    "@munaxa/auth": "^2.4.1",
+    "@munaxa/crypto": "^2.4.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",

@@ -1,4 +1,4 @@
-import { loadPortalProcessEnvironment } from '@work/config';
+import { apiRead } from '../shell/api-request';
 import type {
   LegalEntityView,
   OrganizationTree,
@@ -31,28 +31,14 @@ export interface OrganizationSnapshotForDisplay {
 }
 
 /**
- * Read through the configuration package, which validates it — so a typo in `WORK_API_URL` is a
- * startup failure rather than every request quietly 404-ing against a hostname nobody checked.
- */
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
-/**
  * One fetch, failing closed.
  *
  * `cache: 'no-store'` because an org chart shown as at a date must not be a cached answer for a
  * different date — and because the whole point of the `asOf` parameter is that the answer
  * changes with it.
  */
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/organization/${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/organization/${path}`);
 
 export const loadOrganization = async (asOf?: string): Promise<OrganizationSnapshotForDisplay> => {
   const query = asOf === undefined ? '' : `?asOf=${encodeURIComponent(asOf)}`;

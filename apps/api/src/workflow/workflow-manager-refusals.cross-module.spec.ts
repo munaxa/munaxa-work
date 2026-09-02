@@ -24,6 +24,7 @@ import {
   send,
   type WorkflowCrossModuleHarness,
 } from './workflow-cross-module-harness.js';
+import { inForceNow, noLongerInForce, notYetInForce } from './workflow-cross-module-seed.js';
 
 /**
  * The manager chain when it does **not** resolve: every way the three modules can fail to produce
@@ -260,8 +261,9 @@ suite('an approval whose manager cannot be resolved', () => {
     /**
      * A line that had not started yet on the day the approval was raised is not a manager.
      *
-     * The clock is fixed at 2026-08-15, and this line begins in September. Employment's own timeline
-     * answers the question; the adapter passes the date and reads what it is told.
+     * Dated against the same clock the decision uses — `workflowModuleFor` wires `systemClock`, so
+     * the adapter asks Employment about *now*. This line opens a month after that. Employment's own
+     * timeline answers the question; the adapter passes the date and reads what it is told.
      */
     it('finds no manager when the line begins after the approval', async () => {
       await seedReportingLine(harness.owner, {
@@ -271,7 +273,7 @@ suite('an approval whose manager cannot be resolved', () => {
         line: {
           managerEmploymentId: MANAGER_EMPLOYMENT,
           managerMembershipIds: [MANAGER],
-          effectiveFrom: '2026-09-01T00:00:00Z',
+          effectiveFrom: notYetInForce().from.toISOString(),
         },
       });
 
@@ -290,8 +292,8 @@ suite('an approval whose manager cannot be resolved', () => {
         line: {
           managerEmploymentId: MANAGER_EMPLOYMENT,
           managerMembershipIds: [MANAGER],
-          effectiveFrom: '2026-01-01T00:00:00Z',
-          effectiveTo: '2026-07-01T00:00:00Z',
+          effectiveFrom: noLongerInForce().from.toISOString(),
+          effectiveTo: noLongerInForce().to.toISOString(),
         },
       });
 
@@ -310,8 +312,8 @@ suite('an approval whose manager cannot be resolved', () => {
         line: {
           managerEmploymentId: MANAGER_EMPLOYMENT,
           managerMembershipIds: [MANAGER],
-          effectiveFrom: '2026-08-01T00:00:00Z',
-          effectiveTo: '2026-09-01T00:00:00Z',
+          effectiveFrom: inForceNow().from.toISOString(),
+          effectiveTo: inForceNow().to.toISOString(),
         },
       });
 

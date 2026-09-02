@@ -2,7 +2,7 @@
   "name": "@work/onboarding",
   "version": "0.1.0",
   "private": true,
-  "description": "Onboarding \u2014 the process that carries a new employment from hire to a first working day: configurable plans and their immutable versions, onboarding instances, tasks with owners and due dates, completion and cancellation. Owns no identity, no employment, no documents and no messaging.",
+  "description": "Onboarding — the process that carries a new employment from hire to a first working day: configurable plans and their immutable versions, onboarding instances, tasks with owners and due dates, completion and cancellation. Owns no identity, no employment, no documents and no messaging.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,12 +12,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "default": "./dist/contracts/index.js"
     },
     "./locales/en.json": "./locales/en.json",
     "./locales/ar.json": "./locales/ar.json"
+  },
+  "typesVersions": {
+    "*": {
+      "testing": [
+        "./dist/testing.d.ts"
+      ],
+      "contracts": [
+        "./dist/contracts/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",

@@ -1,4 +1,4 @@
-import { loadPortalProcessEnvironment } from '@work/config';
+import { apiRead } from '../shell/api-request';
 import type {
   AssessmentResultView,
   AssessmentView,
@@ -59,8 +59,6 @@ const PAGE = 'page=1&size=50';
  */
 const NOTICE_DAYS = 30;
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 interface Page<TItem> {
   readonly items: readonly TItem[];
   readonly total: number;
@@ -108,16 +106,8 @@ export interface LearningForDisplay {
   readonly recordsWithheld: boolean;
 }
 
-const read = async <TValue>(path: string): Promise<TValue | undefined> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1/learning${path}`, { cache: 'no-store' });
-
-    if (!response.ok) return undefined;
-    return (await response.json()) as TValue;
-  } catch {
-    return undefined;
-  }
-};
+const read = async <TValue>(path: string): Promise<TValue | undefined> =>
+  apiRead<TValue>(`/learning${path}`);
 
 /**
  * A page's rows and the server's own total, with the absent case answered once.

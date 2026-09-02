@@ -240,6 +240,13 @@ describe('what the leave screens do with the answers', () => {
   });
 
   it('never caches a page holding a requester’s own words', () => {
-    expect(CODE).toContain("cache: 'no-store'");
+    // The property moved when every read was routed through one seam, and it is asserted where it
+    // now lives rather than restated here: a copy of the string in each module would pass long
+    // after the seam stopped setting it. What this file owes is proof that these reads go through
+    // that seam at all.
+    const shell = readFileSync(new URL('../shell/api-request.ts', import.meta.url), 'utf8');
+
+    expect(shell).toContain("cache: 'no-store'");
+    expect(CODE).toMatch(/from '\.\.\/shell\/api-request'/);
   });
 });

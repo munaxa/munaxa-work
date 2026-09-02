@@ -9,11 +9,10 @@ import {
 } from '@work/attendance';
 import {
   ALL_EMPLOYMENT_PERMISSIONS,
-  FakeOrganization,
-  FakePeople,
   employmentModule,
   inMemoryEmploymentStores,
 } from '@work/employment';
+import { FakeOrganization, FakePeople } from '@work/employment/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 import { describe, expect, it } from 'vitest';
 

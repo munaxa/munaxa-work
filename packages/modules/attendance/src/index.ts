@@ -92,4 +92,3 @@ export { AttendanceTransferController } from './api/transfer.controller.js';
  * fake duplicated in two packages is a fake that will drift from the real thing in one of them.
  */
 export { inMemoryAttendanceStores } from './application/in-memory-definitions.js';
-export { FakeEmployment, FakeLeave } from './application/attendance-test-harness.js';

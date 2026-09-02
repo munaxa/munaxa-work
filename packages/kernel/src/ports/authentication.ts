@@ -32,6 +32,20 @@ export interface PlatformPrincipal {
    */
   readonly email?: string;
   readonly authenticatedAt: Date;
+  /**
+   * The Work permissions Platform granted this principal, in Work's own vocabulary (ADR-0076).
+   *
+   * Optional because a port that authenticates nobody grants nobody anything, and because
+   * authentication and authorization fail independently: a principal with no permissions is an
+   * ordinary authenticated caller who may do nothing, not an error.
+   *
+   * It carries **exact Work permission names only** — already reduced from Platform's `work:`
+   * namespace, already checked against Work's declared catalogue, never a pattern. A wildcard
+   * cannot appear here, because the adapter that fills it drops one rather than translating it.
+   * Authorization is still refused by default: this says what Platform vouched for, and holds no
+   * tenant, so it can never imply a membership.
+   */
+  readonly permissions?: readonly string[];
 }
 
 /** Whatever the caller presented, verbatim. Work does not parse it; Platform does. */

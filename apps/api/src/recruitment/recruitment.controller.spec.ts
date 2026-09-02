@@ -12,9 +12,6 @@ import {
   ApplicationsController,
   CandidateRecordsController,
   CandidatesController,
-  FakeEmployment,
-  FakeOrganization,
-  FakePeople,
   HireController,
   InterviewsController,
   OffersController,
@@ -26,6 +23,7 @@ import {
   inMemoryRecruitmentStores,
   recruitmentModule,
 } from '@work/recruitment';
+import { FakeEmployment, FakeOrganization, FakePeople } from '@work/recruitment/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 

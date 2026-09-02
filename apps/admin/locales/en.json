@@ -105,6 +105,34 @@
       "nothingExpires": "Nothing expires, escalates or is reminded on its own. Every figure here was counted by the server; none is computed on this screen.",
       "portVocabulary": "The same approval as a requesting module sees it, in the approval port’s own five-state vocabulary.",
       "decisions": "Decisions"
+    },
+    "access": {
+      "signIn": "Sign in with Munaxa Platform",
+      "signInUnconfigured": "This deployment has no Munaxa Platform sign-in configured yet, so there is nowhere to sign in. An administrator sets PLATFORM_SIGN_IN_URL once Platform's authentication service is available.",
+      "ok": {
+        "title": "Nothing to show",
+        "detail": "This view has no records yet."
+      },
+      "signedOut": {
+        "title": "You are not signed in",
+        "detail": "Munaxa Platform authenticates you, and Munaxa Work reads what it vouches for. Sign in to continue."
+      },
+      "noMembership": {
+        "title": "No workspace for this account",
+        "detail": "You are signed in, but this account is not an active member of a Munaxa Work tenant. Signing in again will not change that — an administrator has to admit the account."
+      },
+      "withheld": {
+        "title": "Withheld",
+        "detail": "You are a member of this workspace, but you do not hold the permission this view requires. Permissions are granted in Munaxa Platform."
+      },
+      "notFound": {
+        "title": "Not found",
+        "detail": "There is no such record, or it belongs to another workspace."
+      },
+      "unavailable": {
+        "title": "Munaxa Work is unavailable",
+        "detail": "The service did not answer. This is not a problem with your account or your permissions."
+      }
     }
   }
 }

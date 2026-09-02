@@ -18,12 +18,12 @@ import {
 } from '@work/attendance';
 import {
   ALL_EMPLOYMENT_PERMISSIONS,
-  FakeOrganization,
-  FakePeople,
   employmentModule,
   inMemoryEmploymentStores,
 } from '@work/employment';
-import { ALL_LEAVE_PERMISSIONS, FixedClock, inMemoryLeaveStores, leaveModule } from '@work/leave';
+import { FakeOrganization, FakePeople } from '@work/employment/testing';
+import { ALL_LEAVE_PERMISSIONS, inMemoryLeaveStores, leaveModule } from '@work/leave';
+import { FixedClock } from '@work/leave/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 
 import {

@@ -265,7 +265,19 @@ psql "$DATABASE_URL" -c "
   grant execute on all functions in schema public to work_app;"
 ```
 
-then point `DATABASE_URL` at `work_app`. Starting as the migration user produces:
+then point `DATABASE_URL` at `work_app`.
+
+The **migration** role needs `CREATEROLE`, because one migration creates `work_membership_resolver`
+— the role that owns `app_memberships_of` so that tenant resolution works under
+`force row level security` (ADR-0077). It needs nothing else, and specifically not `BYPASSRLS`:
+
+```text
+migration role   login, CREATEROLE          owns the tables, runs the migrations
+work_app         login, no attributes       the application; cannot bypass isolation
+work_membership_resolver   NOLOGIN, none    owns one function, reads two tables
+```
+
+Starting as the migration user produces:
 
 ```
 Failed to start: IsolationNotEnforcedError: Refusing to start: the database role "work" can
@@ -273,6 +285,119 @@ bypass row-level security because it is a superuser.
 ```
 
 which is the guard working, not a fault.
+
+## Bootstrapping the first tenant
+
+A migrated database has no tenant in it, and cannot get one through the API: every business route
+needs an authenticated principal with a membership, and the first membership is what does not exist
+yet. `pnpm db:bootstrap` writes it, so a staging database becomes operable without hand-written SQL.
+
+```bash
+DATABASE_URL=postgresql://work_app:...@host:5432/work \
+  pnpm db:bootstrap --platform-user-id <the Platform account's subject>
+```
+
+**Prerequisites.** A database with every migration applied (`pnpm db:migrate`), the unprivileged
+`work_app` role above, and — this is the part that is easy to miss — **a Platform account that
+already exists**. Munaxa Work creates no identity (ADR-0001): `--platform-user-id` is the stable
+subject Platform will put in the `sub` claim of that account's tokens. Ask Platform for it; do not
+invent one, and do not use a value that has to be a secret, because it is written to the database in
+plaintext and printed to the console.
+
+**Inputs.**
+
+| Flag | Required | What it is |
+| ---- | -------- | ---------- |
+| `--platform-user-id` | Yes | The Platform account being admitted. Fails clearly if absent. |
+| `--tenant-id` | No | A UUID v7. Generated when omitted; a v4 is refused, because `runInContext` refuses one on the first request. |
+| `--allow-production` | Only when `NODE_ENV=production` | Admitting an identity is a real grant of reach, so in production it must be deliberate. |
+
+**Environment.** `DATABASE_URL` only, pointing at the application role. Nothing else is read, and no
+secret is involved.
+
+**What it writes**, in one transaction, under the same row-level security every request runs under:
+
+```text
+workforce_user     the Platform account, status 'active'
+tenant_membership  that user, in the tenant, status 'active'
+```
+
+and prints what it created:
+
+```text
+Bootstrapped tenant 01920000-0000-7000-8000-00000000b007.
+  workforce user  01920000-…  (platform user hr-lead@example)
+  membership      01920000-…  status active
+No permission was granted: Platform must assign this account the work:* grants it needs.
+```
+
+**Idempotency.** Run it twice and the second run reports what it found and writes nothing:
+
+```text
+Already bootstrapped. <id> is an active member of tenant <id> (membership …, workforce user …).
+Nothing was written.
+```
+
+It will not move somebody to a different tenant, reassert a status, or touch `updated_at`. If a
+workforce user exists for that Platform account but resolves to no active membership, it refuses and
+says so rather than guessing what should happen.
+
+**Database privileges.** The command runs as `work_app` and needs nothing more than the application
+already has: `insert` on `workforce_user` and `tenant_membership`, and `execute` on
+`app_memberships_of`. It grants no privilege, changes no policy, and leaves the role unable to bypass
+isolation. `workforce_user`'s policy carries `with check (true)` precisely so the user can be written
+a moment before the membership that makes it readable, so no elevation is needed for this.
+
+**The one privilege the *migration* role needs is `CREATEROLE`.** `app_memberships_of` is
+`security definer` over tables with `force row level security`, which applies to their owner too —
+so a function owned by the migration role runs subject to `tenant_isolation` with no tenant in
+context, returns no rows, and **every authenticated request answers 401 with nothing in the log to
+say why**. The `20260901090000_membership_resolution_role` migration fixes that by giving the
+function to `work_membership_resolver`, a role that cannot log in and can read exactly two tables
+(ADR-0077); creating it is why the migration role needs `CREATEROLE`.
+
+**No role in the deployment needs `BYPASSRLS`, and none should be given it.** Bootstrap verifies
+its own work through `app_memberships_of` and fails naming this ADR rather than leaving the
+condition to be discovered later.
+
+**What it does not do.**
+
+- It creates no Platform identity, credential, token or password.
+- It grants **no permission**. Authorization arrives in the verified token (ADR-0076), so a
+  bootstrapped member can sign in and still do nothing until Platform grants them Work permissions.
+- It writes no `tenant_settings` row. A tenant without one uses the deployment's defaults
+  (ADR-0036); writing one would freeze this deployment's defaults into the tenant as though somebody
+  had chosen them.
+- It creates no employee, organization or business data.
+
+**Assigning permissions.** On the Platform side, the account needs Work grants in the `work:`
+namespace. The exact list is generated from Work's own declarations:
+
+```bash
+node scripts/emit-permission-catalogue.mjs        # every grant, in Platform's form
+node scripts/emit-permission-catalogue.mjs --work # the same, in Work's names
+```
+
+**Verifying a tenant.** Ask the database the same question the request pipeline asks:
+
+```bash
+psql "$DATABASE_URL" -c "select * from app_memberships_of('<platform user id>')"
+```
+
+One row, status `active`, is a member who will resolve. No rows means either the bootstrap did not
+run or the migration role cannot bypass row-level security — check that first.
+
+**Removing staging data.** There is no undo command, deliberately: a command that deletes
+memberships is a command somebody eventually points at production. Remove a bootstrapped member by
+hand, as the migration role, naming exactly what you mean:
+
+```sql
+delete from tenant_membership m using workforce_user u
+ where u.id = m.workforce_user_id and u.platform_user_id = '<platform user id>';
+delete from workforce_user where platform_user_id = '<platform user id>';
+```
+
+To start over entirely, `pnpm db:reset` re-runs every migration on an empty database.
 
 ## Running a portal locally
 

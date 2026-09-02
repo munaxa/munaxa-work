@@ -209,9 +209,12 @@ describe('what the approvals reads are allowed to do', () => {
 
   /** Every path it asks for is one the workflow module's controllers actually serve. */
   it('asks only for paths a controller serves', () => {
-    const asked = [...SOURCE.matchAll(/`\/([a-z-]+(?:\/[a-z-]+)*)/g)].map(
-      (match) => match[1] ?? '',
-    );
+    // Every read goes through one helper that prefixes `/workflow`, so that template is the
+    // module's base rather than a path it asks for — collecting it would make the base fail the
+    // rule the rule exists to enforce about the paths underneath it.
+    const asked = [...SOURCE.matchAll(/`\/([a-z-]+(?:\/[a-z-]+)*)/g)]
+      .map((match) => match[1] ?? '')
+      .filter((path) => path !== 'workflow');
     const controllers = readFileSync(
       new URL(
         '../../../../packages/modules/workflow/src/api/approval.controller.ts',
@@ -227,6 +230,8 @@ describe('what the approvals reads are allowed to do', () => {
       'utf8',
     );
 
+    // The base the helper prepends, so the two halves of each URL are both pinned.
+    expect(SOURCE).toContain('`/workflow${path}`');
     expect(controllers).toContain("path: 'workflow/approvals'");
     expect(instances).toContain("path: 'workflow/instances'");
     expect(asked.length).toBeGreaterThan(0);

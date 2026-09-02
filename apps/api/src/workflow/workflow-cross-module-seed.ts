@@ -28,6 +28,43 @@ import {
  * governs it has to accept the write — and the query that reads it back is Identity's own.
  */
 
+/**
+ * Effective-dating windows, expressed against the clock the code under test actually consults.
+ *
+ * These suites compose Workflow through `workflowModuleFor`, which wires `systemClock` — the real
+ * wall clock — so a delegation's window and a reporting line's period are compared against *now*,
+ * at the instant the decision is taken. Every window here was a fixed calendar date until Phase 16:
+ * `2026-08-01` to `2026-09-01` for the ordinary case, with the suites' prose describing "a clock
+ * fixed at 2026-08-15" that nothing ever fixed. That agreed with the wall clock only for as long as
+ * the wall clock stayed inside it, and on 2026-09-02 it stopped: nine suites began failing together,
+ * every one of them on the delegated path, because the arrangement under test had expired the day
+ * before rather than because anything about the product had changed.
+ *
+ * A fixed clock would be the other repair, and is not available honestly: `workflowModuleFor` takes
+ * no clock, and giving it one so a test can move time would be adding a test-only seam to production
+ * composition. Relative windows need nothing from production and say what each test means — in force
+ * now, not yet, no longer — which is what the assertions were always about.
+ */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A window that contains the moment the decision is taken. */
+export const inForceNow = (): { readonly from: Date; readonly to: Date } => ({
+  from: new Date(Date.now() - 30 * DAY_MS),
+  to: new Date(Date.now() + 30 * DAY_MS),
+});
+
+/** A window that has not opened yet — the arrangement exists but is not in force. */
+export const notYetInForce = (): { readonly from: Date; readonly to: Date } => ({
+  from: new Date(Date.now() + 30 * DAY_MS),
+  to: new Date(Date.now() + 60 * DAY_MS),
+});
+
+/** A window that has already closed — the arrangement was in force and no longer is. */
+export const noLongerInForce = (): { readonly from: Date; readonly to: Date } => ({
+  from: new Date(Date.now() - 60 * DAY_MS),
+  to: new Date(Date.now() - 30 * DAY_MS),
+});
+
 export interface DelegationSeed {
   readonly delegator?: string;
   readonly delegate?: string;
@@ -65,8 +102,8 @@ export const seedDelegation = async (
         seed.delegator ?? APPROVER,
         seed.delegate ?? DEPUTY,
         seed.scope ?? DECIDE_SCOPE,
-        seed.from ?? new Date('2026-08-01T00:00:00.000Z'),
-        seed.to ?? new Date('2026-09-01T00:00:00.000Z'),
+        seed.from ?? inForceNow().from,
+        seed.to ?? inForceNow().to,
         seed.status ?? 'active',
       ],
     );

@@ -11,6 +11,8 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "check:production-output": "node scripts/check-production-output.mjs",
+    "db:bootstrap": "node scripts/bootstrap-tenant.mjs",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @work/api exec prisma migrate deploy --schema ../../prisma/schema.prisma",
     "db:reset": "pnpm --filter @work/api exec prisma migrate reset --schema ../../prisma/schema.prisma",
@@ -34,13 +36,14 @@
     "standards": "node scripts/check-standards.mjs && node scripts/check-architecture.mjs && node scripts/check-localization.mjs && node scripts/check-dependencies.mjs && node scripts/check-platform-parity.mjs",
     "test": "turbo run test --concurrency=1",
     "typecheck": "turbo run typecheck",
-    "verify": "pnpm standards && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm standards && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:production-output"
   },
   "devDependencies": {
     "@munaxa/config-eslint": "^1.0.0",
     "@munaxa/config-typescript": "^1.0.0",
     "pg": "^8.13.1",
     "prettier": "^3.4.2",
+    "prisma": "^6.2.0",
     "turbo": "^2.3.3",
     "typescript": "^5.7.3"
   },
@@ -60,5 +63,8 @@
       "js-yaml": "^5.2.3",
       "deepmerge-ts": "^8.0.2"
     }
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.0"
   }
 }

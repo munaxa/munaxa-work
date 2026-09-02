@@ -16,13 +16,12 @@ import {
   EmploymentLifecycleController,
   EmploymentPermissions,
   EmploymentsController,
-  FakeOrganization,
-  FakePeople,
   ReportingLineController,
   TransferController,
   employmentModule,
   inMemoryEmploymentStores,
 } from '@work/employment';
+import { FakeOrganization, FakePeople } from '@work/employment/testing';
 import { InMemoryUnitOfWork } from '@work/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 

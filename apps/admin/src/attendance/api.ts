@@ -1,5 +1,5 @@
-import { loadPortalProcessEnvironment } from '@work/config';
 import type { EmploymentView } from '@work/employment/contracts';
+import { apiOutcome } from '../shell/api-request';
 import type {
   AttendanceDashboardView,
   AttendanceDaySnapshot,
@@ -42,8 +42,6 @@ import type {
  * monthly total. Every figure is published or it is not shown.
  */
 
-const BASE = loadPortalProcessEnvironment().WORK_API_URL;
-
 /** What one screen shows at once. The server clamps its own bound; this is the request. */
 const PAGE = 'page=1&size=50';
 
@@ -71,15 +69,10 @@ export type Outcome<TValue> =
   | { readonly kind: 'refused' };
 
 const outcome = async <TValue>(path: string): Promise<Outcome<TValue>> => {
-  try {
-    const response = await fetch(`${BASE}/api/v1${path}`, { cache: 'no-store' });
+  const answer = await apiOutcome<TValue>(`${path}`);
 
-    if (response.status === 404) return { kind: 'missing' };
-    if (!response.ok) return { kind: 'refused' };
-    return { kind: 'ok', value: (await response.json()) as TValue };
-  } catch {
-    return { kind: 'refused' };
-  }
+  if (answer.kind === 'ok') return { kind: 'ok', value: answer.value };
+  return answer.kind === 'missing' ? { kind: 'missing' } : { kind: 'refused' };
 };
 
 /**

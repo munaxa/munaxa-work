@@ -82,10 +82,18 @@ jobs:
           scope: '@munaxa'
 
       # The shared design system is published from munaxa-platform to GitHub Packages.
+      # `GITHUB_TOKEN` is scoped to *this* repository, and `@munaxa/*` is published from
+      # munaxa-platform, so it can only read those packages if that package has separately been
+      # granted to this repository. It sufficed until this workspace actually took a dependency on
+      # `@munaxa/auth`, at which point install began failing with ERR_PNPM_FETCH_403 — the token was
+      # valid and simply not entitled to the package. `PLATFORM_PACKAGES_TOKEN` is the credential
+      # the configuration contract names for exactly this, and it is used when present; the
+      # fallback keeps the workflow working for whichever remedy an operator chooses, rather than
+      # hard-failing on the one they did not.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PLATFORM_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
       # Records the exact @munaxa/* versions the rest of this job compiles, lints and tests
       # against. That record is what a local run of the same gate has to match before anyone
@@ -118,6 +126,13 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # After the build, because it inspects the emitted artefact rather than the source: it walks
+      # the module graph from apps/api/dist/main.js and fails if a test double, a harness or
+      # @work/testing is reachable from it. Phase 10 shipped an image that died at startup on
+      # exactly that, and no source-level gate noticed.
+      - name: Check the production output carries no test-only code
+        run: pnpm check:production-output
 
       # `prisma validate` resolves env() at parse time, so the variable must exist. Its value
       # is irrelevant here — nothing connects.
