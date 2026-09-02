@@ -1,0 +1,169 @@
+# Publishing the runtime images to GHCR, so Render can deploy an artifact that was built rather
+# than build one itself.
+#
+# Render's builder does not implement BuildKit secrets, and these Dockerfiles take the GitHub
+# Packages credential as one. The alternative — passing it as a build ARG — writes the token into
+# image history, where anyone who can pull the image can read it. That was removed in Phase 11 and
+# is not worth reintroducing for the convenience of building in one fewer place. So the images are
+# built here, where BuildKit secrets work, and Render pulls them by digest.
+#
+# **Tag-triggered, not push-triggered.** Publishing is a decision about a specific validated commit,
+# not something every push should do. `workflow_dispatch` would be the obvious alternative and is
+# offered too, but GitHub only exposes it for workflows present on the default branch — and the
+# validated commit currently sits on an unmerged branch. A tag works from any commit that carries
+# this file.
+
+name: Publish images
+
+on:
+  push:
+    tags:
+      - 'image/**'
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Commit SHA to build. Defaults to the ref this runs on.'
+        required: false
+        type: string
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false     # never cancel a half-finished push to a registry
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # one image failing should not hide the other's result
+      matrix:
+        include:
+          - image: munaxa-work-api
+            dockerfile: apps/api/Dockerfile
+          - image: munaxa-work-admin
+            dockerfile: apps/admin/Dockerfile
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The commit to build, which is deliberately not tied to where this workflow file lives:
+          # `.github/` is in .dockerignore, so a commit that only adds this workflow produces a
+          # byte-identical image to the commit it was added on top of.
+          ref: ${{ inputs.commit || github.sha }}
+
+      - name: Record what is being built
+        id: source
+        run: |
+          echo "sha=$(git rev-parse HEAD)"       >> "$GITHUB_OUTPUT"
+          echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # The per-run token, scoped by `packages: write` above. Nothing longer-lived is needed to
+          # push, and nothing longer-lived should be used.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          # Two immutable references and no `latest`. A moving tag means two hosts can run "the same
+          # version" and disagree about what that is, which costs more to diagnose than it saves.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.source.outputs.short }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ steps.source.outputs.sha }}
+          # The credential reaches the build as a BuildKit secret — mounted at /run/secrets/npm_token
+          # for the layers that need it and absent from every layer's filesystem and from history.
+          secrets: |
+            npm_token=${{ secrets.PLATFORM_PACKAGES_TOKEN }}
+          # A single-platform manifest, so the digest below names the image itself rather than an
+          # index over it. Predictable pinning matters more here than multi-arch, which nothing in
+          # this deployment asks for.
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+            org.opencontainers.image.version=${{ steps.source.outputs.short }}
+
+      - name: Fail if no digest was produced
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          # A push that reports success without a digest has published nothing pinnable, and the
+          # deployment that follows would silently be pinned to whatever the tag resolves to later.
+          if [ -z "$DIGEST" ]; then
+            echo "::error::build-push-action produced no digest; nothing pinnable was published"
+            exit 1
+          fi
+          echo "Published ${{ matrix.image }}@$DIGEST"
+
+      - name: Verify the published image
+        env:
+          REF: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "$REF"
+
+          # Runs unprivileged. A root runtime is one container escape away from being root on the host.
+          user=$(docker run --rm --entrypoint sh "$REF" -c 'id -un')
+          [ "$user" != "root" ] || { echo "::error::image runs as root"; exit 1; }
+          echo "runs as: $user"
+
+          # No development toolchain. `pnpm install --prod` relinks but does not garbage-collect
+          # pnpm's store, so this is a real check rather than a formality — it caught vitest, eslint,
+          # turbo and the Nest CLI shipping in a "production" image once already.
+          for pkg in vitest eslint turbo '@nestjs+cli'; do
+            if docker run --rm --entrypoint sh "$REF" -c "ls -d /app/node_modules/.pnpm/${pkg}@* 2>/dev/null" | grep -q .; then
+              echo "::error::development dependency $pkg present in the runtime image"; exit 1
+            fi
+          done
+          echo "no development toolchain"
+
+          # No credential anywhere it could be read back out.
+          if docker history --no-trunc --format '{{.CreatedBy}}' "$REF" \
+               | grep -qE 'ghp_|github_pat_|_authToken=[A-Za-z0-9]'; then
+            echo "::error::a credential appears in image history"; exit 1
+          fi
+          if docker run --rm --entrypoint sh "$REF" -c \
+               'find / -name ".npmrc" 2>/dev/null | xargs grep -l "_authToken=[A-Za-z0-9]" 2>/dev/null' | grep -q .; then
+            echo "::error::an npmrc carrying a token is present in the image"; exit 1
+          fi
+          echo "no credentials in history or filesystem"
+
+      - name: Verify the Prisma client survived the production install
+        if: matrix.image == 'munaxa-work-api'
+        env:
+          REF: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          # The generated client lives beside @prisma/client inside pnpm's store and is easy to lose
+          # to a production reinstall. It fails at the first query rather than at startup, so it is
+          # checked here where the failure is cheap.
+          docker run --rm --entrypoint sh "$REF" -c \
+            'node -e "require(\"@prisma/client\"); console.log(\"prisma client loads\")"'
+
+      - name: Summary
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### ${{ matrix.image }}"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| commit | \`${{ steps.source.outputs.sha }}\` |"
+            echo "| image | \`ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}\` |"
+            echo "| digest | \`$DIGEST\` |"
+            echo "| run | ${{ github.run_id }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
