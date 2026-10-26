@@ -4,6 +4,7 @@ import {
   systemClock,
   type CommandSender,
   type EmployablePerson,
+  type HeadcountLicence,
   type OrganizationDirectoryPort,
   type PersonDirectoryPort,
 } from '@work/employment';
@@ -149,6 +150,7 @@ export class OrganizationDirectory implements OrganizationDirectoryPort {
 export const employmentModuleFor = (
   unitOfWork: UnitOfWork,
   sender: DeferredEmploymentSender,
+  headcount?: HeadcountLicence,
 ): WorkModule =>
   employmentModule(
     {
@@ -157,6 +159,7 @@ export const employmentModuleFor = (
       people: new PeopleDirectory(sender),
       organization: new OrganizationDirectory(sender),
       clock: systemClock,
+      ...(headcount === undefined ? {} : { headcount }),
     },
     sender,
   );

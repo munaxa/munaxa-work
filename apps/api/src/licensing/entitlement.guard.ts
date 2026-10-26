@@ -28,6 +28,10 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * sign-in — never reach a licensing decision. Under `LICENSING_MODE=NONE` it permits everything,
  * which is the deployment as it was before licensing existed.
  *
+ * Which *modules* a plan includes is the operation gate's question (`LicensingGate`), asked inside
+ * the dispatcher where the operation's module is known; this guard answers only whether the term
+ * allows a read or a write at all, before the request reaches any controller.
+ *
  * `402`, not `403`: the question is what the organisation bought, not what this person may do.
  */
 @Injectable()
@@ -44,18 +48,25 @@ export class EntitlementGuard implements CanActivate {
     ]);
     if (isPublic === true) return true;
 
-    const state = await this.licence.current();
-    if (!state.configured) return true;
+    if (!this.licence.configured) return true;
 
     const established = currentContext();
     // `AuthenticatedTenantGuard` has already refused these; nothing to ask about.
     if (established === undefined || isSystemContext(established)) return true;
 
+    const state = await this.licence.current(established.tenantId);
+    if (!state.configured) return true;
+
     const method = context.switchToHttp().getRequest<Request>().method.toUpperCase();
     const decision = checkOperation(
       state.snapshot,
       READ_METHODS.has(method) ? OperationKind.READ : OperationKind.WRITE,
-      { now: state.evaluatedAt, tenantId: established.tenantId, product: WORK_PRODUCT_KEY },
+      {
+        now: state.evaluatedAt,
+        tenantId: established.tenantId,
+        product: WORK_PRODUCT_KEY,
+        cap: state.cap,
+      },
     );
     if (decision.allowed) return true;
 
@@ -63,7 +74,7 @@ export class EntitlementGuard implements CanActivate {
       {
         message:
           decision.reason === 'NO_SUBSCRIPTION'
-            ? 'This installation has no valid Munaxa Work licence.'
+            ? 'Your organisation has no valid Munaxa Work subscription.'
             : "Your organisation's licence does not allow this right now.",
         reason: decision.reason,
         status: decision.status,

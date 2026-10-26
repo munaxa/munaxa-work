@@ -32,12 +32,12 @@ same answer in every product.
 ## Consequences
 
 - Blocked on publishing `@munaxa/licensing@0.1.0`; until then `pnpm install --frozen-lockfile` fails.
-- Not yet built, because each needs a product decision on what Work sells: per-module feature gates
-  (a decorator in `@work/kernel` that module controllers can carry) and a headcount limit enforced
-  in Employment. The contract already evaluates both; Work has to name its features and limits.
+- Per-module feature gates and the headcount limit were left for a product decision; ADR-0079 makes
+  it (in the dispatcher rather than a controller decorator).
 - The latest observed instant is kept per process only, so clock rollback is detected while the API
   runs and, across a restart, only against the licence's issue time.
-- Hosted Work does not consult the central subscription service yet; it does not exist.
+- Hosted Work consults the central subscription service through `LICENSING_MODE=CONTROL_PLANE`
+  (ADR-0079).
 
 ## Alternatives considered
 

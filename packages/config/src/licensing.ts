@@ -6,12 +6,21 @@ import type { Environment } from './environment.js';
  * `NONE` (the default) is the deployment as it has always been: nothing is licensed and nothing is
  * gated. `LICENSE_FILE` is the on-premises mode: a signed Munaxa licence on disk, verified offline
  * against public keys, which then caps every request through the shared `@munaxa/licensing`
- * contract. No failure selects `NONE`; a licence that is missing or untrustworthy grants nothing.
+ * contract. `CONTROL_PLANE` is the hosted mode: the central subscription service, asked per tenant
+ * with this deployment's service credential. No failure selects `NONE`; a licence that is missing
+ * or untrustworthy, or a tenant the service has no subscription for, grants nothing.
  */
 export type Licensing =
   | { readonly kind: 'none' }
   | { readonly kind: 'licence-file'; readonly configuration: LicenceFileConfiguration }
+  | { readonly kind: 'control-plane'; readonly configuration: ControlPlaneConfiguration }
   | { readonly kind: 'invalid'; readonly issues: readonly string[] };
+
+export interface ControlPlaneConfiguration {
+  /** Without a trailing slash. */
+  readonly url: string;
+  readonly token: string;
+}
 
 export interface LicenceFileConfiguration {
   readonly path: string;
@@ -22,7 +31,11 @@ export interface LicenceFileConfiguration {
 
 export const readLicensing = (environment: Environment): Licensing => {
   if (environment.LICENSING_MODE === 'NONE') return { kind: 'none' };
+  if (environment.LICENSING_MODE === 'CONTROL_PLANE') return readControlPlane(environment);
+  return readLicenceFile(environment);
+};
 
+const readLicenceFile = (environment: Environment): Licensing => {
   const issues: string[] = [];
   for (const key of [
     'LICENSE_FILE_PATH',
@@ -64,6 +77,29 @@ export const readLicensing = (environment: Environment): Licensing => {
       algorithm: environment.LICENSE_ALGORITHM,
       publicKeys,
       installationId: environment.LICENSE_INSTALLATION_ID as string,
+    },
+  };
+};
+
+const readControlPlane = (environment: Environment): Licensing => {
+  const issues: string[] = [];
+  for (const key of ['CONTROL_PLANE_URL', 'CONTROL_PLANE_TOKEN'] as const) {
+    if (environment[key] === undefined)
+      issues.push(`${key}: required when LICENSING_MODE=CONTROL_PLANE.`);
+  }
+  // The credential travels in a header: never over plain HTTP outside a developer's machine.
+  if (
+    environment.NODE_ENV === 'production' &&
+    environment.CONTROL_PLANE_URL?.startsWith('http://') === true
+  ) {
+    issues.push('CONTROL_PLANE_URL: must be https in production.');
+  }
+  if (issues.length > 0) return { kind: 'invalid', issues };
+  return {
+    kind: 'control-plane',
+    configuration: {
+      url: (environment.CONTROL_PLANE_URL as string).replace(/\/+$/, ''),
+      token: environment.CONTROL_PLANE_TOKEN as string,
     },
   };
 };

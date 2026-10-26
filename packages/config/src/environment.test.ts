@@ -132,6 +132,41 @@ describe('licensing', () => {
     },
   );
 
+  const controlPlane = {
+    ...base,
+    LICENSING_MODE: 'CONTROL_PLANE',
+    CONTROL_PLANE_URL: 'https://control.munaxa.test/',
+    CONTROL_PLANE_TOKEN: 'mxc_00000000-0000-4000-8000-000000000000_secret',
+  };
+
+  it('reads a hosted deployment, without the trailing slash', () => {
+    expect(readLicensing(loadEnvironment(controlPlane))).toEqual({
+      kind: 'control-plane',
+      configuration: {
+        url: 'https://control.munaxa.test',
+        token: 'mxc_00000000-0000-4000-8000-000000000000_secret',
+      },
+    });
+  });
+
+  it.each(['CONTROL_PLANE_URL', 'CONTROL_PLANE_TOKEN'])('refuses to start without %s', (key) => {
+    const source: Record<string, string> = { ...controlPlane };
+    delete source[key];
+    expect(() => loadEnvironment(source)).toThrow(ConfigurationError);
+  });
+
+  it('refuses to send the credential over plain HTTP in production', () => {
+    const environment = {
+      ...loadEnvironment(controlPlane),
+      NODE_ENV: 'production' as const,
+      CONTROL_PLANE_URL: 'http://control.munaxa.test',
+    };
+    expect(readLicensing(environment)).toEqual({
+      kind: 'invalid',
+      issues: ['CONTROL_PLANE_URL: must be https in production.'],
+    });
+  });
+
   it('refuses a private key where public keys belong', () => {
     expect(() =>
       loadEnvironment({

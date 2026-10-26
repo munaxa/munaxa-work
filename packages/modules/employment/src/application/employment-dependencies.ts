@@ -3,6 +3,7 @@ import type { UnitOfWork } from '@work/kernel';
 import type {
   Clock,
   EmploymentStores,
+  HeadcountLicence,
   OrganizationDirectoryPort,
   PersonDirectoryPort,
 } from './employment-ports.js';
@@ -32,4 +33,6 @@ export interface EmploymentDependencies {
   readonly people: PersonDirectoryPort;
   readonly organization: OrganizationDirectoryPort;
   readonly clock: Clock;
+  /** The licensed headcount, when the deployment is licensed. Absent: no ceiling. */
+  readonly headcount?: HeadcountLicence;
 }

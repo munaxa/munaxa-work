@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { TenantIsolationException } from '../errors/domain-exception.js';
 import { currentContext, isSystemContext } from '../tenancy/tenant-context.js';
 import { err, ok, type Result } from '../result/result.js';
@@ -51,6 +53,30 @@ export interface PermissionChecker {
   holds(permission: string): Promise<boolean>;
 }
 
+/**
+ * A ceiling on what permissions allow — what the organisation is entitled to, say. Supplied by the
+ * platform; the kernel never learns what it means.
+ *
+ * Asked only for the **outermost** operation: the one a person or a job started. An operation one
+ * module dispatches while handling another — Leave asking Compensation, Payroll asking Employment —
+ * is collaboration between modules on behalf of an operation already admitted, and refusing it
+ * would let one module's entitlement break another module's work.
+ *
+ * Never a grant: it runs after the permission check, so a caller without the permission learns
+ * nothing about entitlements, and passing it still leaves validation and the handler to decide.
+ */
+export interface OperationGate {
+  /** Resolves to admit; throws `NotEntitledException` to refuse. */
+  admit(operation: {
+    readonly kind: 'command' | 'query';
+    readonly name: string;
+    readonly permission: string;
+  }): Promise<void>;
+}
+
+/** Set while an operation runs, so the gate can tell an outermost operation from a nested one. */
+const operating = new AsyncLocalStorage<true>();
+
 interface Registry {
   readonly commands: Map<string, CommandHandler<Command, unknown>>;
   readonly queries: Map<string, QueryHandler<Query, unknown>>;
@@ -59,7 +85,10 @@ interface Registry {
 export class Dispatcher {
   private readonly registry: Registry = { commands: new Map(), queries: new Map() };
 
-  public constructor(private readonly permissions: PermissionChecker) {}
+  public constructor(
+    private readonly permissions: PermissionChecker,
+    private readonly gate?: OperationGate,
+  ) {}
 
   public registerCommand<TCommand extends Command, TResult>(
     handler: CommandHandler<TCommand, TResult>,
@@ -80,8 +109,8 @@ export class Dispatcher {
   }
 
   /**
-   * Runs a command through the pipeline: tenancy, then authorization, then validation, then the
-   * handler. In that order deliberately — an unauthorized caller learns nothing about whether
+   * Runs a command through the pipeline: tenancy, then authorization, then the operation gate (when
+   * there is one, and this is the outermost operation), then validation, then the handler. In that order deliberately — an unauthorized caller learns nothing about whether
    * their payload was well formed.
    *
    * Generic over the command type as well as the result. With a bare `Command` parameter,
@@ -102,11 +131,15 @@ export class Dispatcher {
     if (!(await this.permissions.holds(handler.permission))) {
       return err({ kind: 'forbidden', permission: handler.permission });
     }
+    await this.admit('command', command.commandName, handler.permission);
     const failures = handler.validate?.(command) ?? [];
 
     if (failures.length > 0) return err({ kind: 'validation', failures });
 
-    return (await handler.handle(command)) as Result<TResult, HandlerFailure>;
+    return (await operating.run(true, () => handler.handle(command))) as Result<
+      TResult,
+      HandlerFailure
+    >;
   }
 
   public async ask<TResult, TQuery extends Query = Query>(
@@ -122,7 +155,17 @@ export class Dispatcher {
     if (!(await this.permissions.holds(handler.permission))) {
       return err({ kind: 'forbidden', permission: handler.permission });
     }
-    return (await handler.handle(query)) as Result<TResult, HandlerFailure>;
+    await this.admit('query', query.queryName, handler.permission);
+
+    return (await operating.run(true, () => handler.handle(query))) as Result<
+      TResult,
+      HandlerFailure
+    >;
+  }
+
+  private async admit(kind: 'command' | 'query', name: string, permission: string): Promise<void> {
+    if (this.gate === undefined || operating.getStore() === true) return;
+    await this.gate.admit({ kind, name, permission });
   }
 
   /** Every registered permission, for the module registry and the administration UI. */

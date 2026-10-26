@@ -97,6 +97,22 @@ export class EmploymentRepository
     return row === undefined ? undefined : toState(row);
   }
 
+  public async lockAndCountOpen(transaction: Transaction): Promise<number> {
+    // Two-key form, in its own namespace: it can contend with nothing but another headcount check
+    // for the same tenant, and it is released when the transaction ends.
+    await transaction.execute(
+      `select pg_advisory_xact_lock(hashtext('work:headcount'), hashtext($1))`,
+      [transaction.tenantId],
+    );
+    const rows = await transaction.execute<{ readonly open: string }>(
+      `select count(*) as open from employment e
+        where e.tenant_id = $1 and e.status <> 'ended' and e.deleted_at is null`,
+      [transaction.tenantId],
+    );
+
+    return Number(rows[0]?.open ?? 0);
+  }
+
   public async search(
     transaction: Transaction,
     query: EmploymentQuery,

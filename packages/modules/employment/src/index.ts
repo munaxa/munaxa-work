@@ -25,6 +25,7 @@ export type {
   Clock,
   EmployablePerson,
   EmploymentStores,
+  HeadcountLicence,
   OrganizationDirectoryPort,
   PersonDirectoryPort,
 } from './application/employment-ports.js';

@@ -226,6 +226,55 @@ describe.skipIf(CONNECTION === undefined)('Employment tenant isolation', () => {
     expect(allocated).toBe(1);
   });
 
+  it('counts the licensed headcount for its own tenant only, and ended employments not at all', async () => {
+    const { employmentId } = await seedWorkforce(TENANT_A);
+    await seedWorkforce(TENANT_B);
+    await fixture.admin.query(
+      `update employment set status = 'ended', end_date = '2026-06-30', end_reason_code = 'resignation' where id = $1`,
+      [employmentId],
+    );
+
+    const count = (tenantId: string) =>
+      fixture.asTenant(tenantId, (transaction) =>
+        fixture.stores.employments.lockAndCountOpen(transaction),
+      );
+
+    expect(await count(TENANT_A)).toBe(1);
+    expect(await count(TENANT_B)).toBe(2);
+  });
+
+  it('serialises two headcount checks for one tenant until the first transaction ends', async () => {
+    await seedWorkforce(TENANT_A);
+    const order: string[] = [];
+    const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const first = fixture.asTenant(TENANT_A, async (transaction) => {
+      await fixture.stores.employments.lockAndCountOpen(transaction);
+      order.push('first counted');
+      await held;
+      order.push('first committing');
+    });
+    while (!order.includes('first counted')) await pause(10);
+    const second = fixture.asTenant(TENANT_A, async (transaction) => {
+      await fixture.stores.employments.lockAndCountOpen(transaction);
+      order.push('second counted');
+    });
+    // Another tenant's check is not held up by it.
+    await fixture.asTenant(TENANT_B, (transaction) =>
+      fixture.stores.employments.lockAndCountOpen(transaction),
+    );
+    await pause(200);
+    order.push('released');
+    release();
+    await Promise.all([first, second]);
+
+    expect(order).toEqual(['first counted', 'released', 'first committing', 'second counted']);
+  });
+
   it('runs as a role that cannot bypass isolation, which is what makes the rest meaningful', async () => {
     const diagnostics = await fixture.application.query<{ can_bypass_rls: boolean }>(
       'select * from app_isolation_diagnostics()',

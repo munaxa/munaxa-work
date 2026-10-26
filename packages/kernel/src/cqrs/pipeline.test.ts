@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { TenantIsolationException } from '../errors/domain-exception.js';
+import { NotEntitledException, TenantIsolationException } from '../errors/domain-exception.js';
 import { runInContext } from '../tenancy/tenant-context.js';
 import { uuidV7 } from '../identity/uuid-v7.js';
 
@@ -113,5 +113,71 @@ describe('Dispatcher', () => {
     await runInContext(context, () => dispatcher.ask({ queryName: 'leave.balance' }));
 
     expect(dispatcher.declaredPermissions()).toEqual(['leave.approve', 'leave.read']);
+  });
+});
+
+describe('Dispatcher with an operation gate', () => {
+  const refusing = (refuse: (name: string) => boolean) => {
+    const seen: string[] = [];
+    const gate = {
+      admit: (operation: { name: string }) => {
+        seen.push(operation.name);
+        return refuse(operation.name)
+          ? Promise.reject(new NotEntitledException('FEATURE_NOT_INCLUDED', 'not included'))
+          : Promise.resolve();
+      },
+    };
+    return { gate, seen };
+  };
+
+  it('asks the gate after the permission check, so an unauthorized caller learns nothing', async () => {
+    const { gate, seen } = refusing(() => true);
+    const dispatcher = new Dispatcher(denying, gate);
+    dispatcher.registerCommand(approveHandler());
+
+    const result = await runInContext(context, () => dispatcher.send(command));
+
+    expect(!result.ok && result.error.kind).toBe('forbidden');
+    expect(seen).toEqual([]);
+  });
+
+  it('refuses before validating or handling when the gate refuses', async () => {
+    const { gate } = refusing(() => true);
+    const handle = vi.fn(() => Promise.resolve(success('approved')));
+    const dispatcher = new Dispatcher(allowing, gate);
+    dispatcher.registerCommand(approveHandler(handle));
+
+    await expect(runInContext(context, () => dispatcher.send(invalidCommand))).rejects.toThrow(
+      NotEntitledException,
+    );
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it('asks only about the outermost operation, never about one module asking another', async () => {
+    const { gate, seen } = refusing((name) => name === 'compensation.rate');
+    const dispatcher = new Dispatcher(allowing, gate);
+    dispatcher.registerQuery({
+      queryName: 'compensation.rate',
+      permission: 'compensation.read',
+      handle: () => Promise.resolve(success(42)),
+    });
+    dispatcher.registerCommand(
+      approveHandler(
+        vi.fn(async () => {
+          // Leave asks Compensation while handling its own command.
+          const rate = await dispatcher.ask<number>({ queryName: 'compensation.rate' });
+          return success(rate.ok ? `approved at ${String(rate.value)}` : 'failed');
+        }),
+      ),
+    );
+
+    const result = await runInContext(context, () => dispatcher.send<string>(command));
+
+    expect(result.ok && result.value).toBe('approved at 42');
+    expect(seen).toEqual(['leave.approve']);
+    // Asked directly, the same query is the outermost operation, and is refused.
+    await expect(
+      runInContext(context, () => dispatcher.ask({ queryName: 'compensation.rate' })),
+    ).rejects.toThrow(NotEntitledException);
   });
 });

@@ -81,6 +81,11 @@ export const createEmploymentHandler = (
       // already employed" rather than a constraint violation they cannot act on.
       if (open !== undefined) return conflicted('person_already_employed');
 
+      // The licensed headcount, counted under the tenant's headcount lock in this transaction.
+      await dependencies.headcount?.admitHeadcount(1, () =>
+        dependencies.stores.employments.lockAndCountOpen(transaction),
+      );
+
       const seriesKey = seriesKeyFor(command.startDate);
       const next = await dependencies.stores.numbers.allocate(transaction, seriesKey);
       const employment = Employment.create(

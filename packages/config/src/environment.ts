@@ -106,11 +106,16 @@ export const environmentSchema = z.object({
   PLATFORM_AUTH_CLOCK_SKEW_MS: z.coerce.number().int().min(0).max(300_000).default(30_000),
 
   /**
-   * Where entitlements come from — `NONE` (default, nothing gated, as before) or `LICENSE_FILE`
-   * (a signed Munaxa licence verified offline; on premises). The rules that span these are in
+   * Where entitlements come from — `NONE` (default, nothing gated, as before), `LICENSE_FILE` (a
+   * signed Munaxa licence verified offline; on premises) or `CONTROL_PLANE` (the central Munaxa
+   * subscription service, asked per tenant; Munaxa-hosted). The rules that span these are in
    * `readLicensing`, for the same reason the Platform authentication ones are in their reader.
    */
-  LICENSING_MODE: z.enum(['NONE', 'LICENSE_FILE']).default('NONE'),
+  LICENSING_MODE: z.enum(['NONE', 'LICENSE_FILE', 'CONTROL_PLANE']).default('NONE'),
+  /** The central service's origin, e.g. `https://control.munaxa.com`. */
+  CONTROL_PLANE_URL: z.string().url().optional(),
+  /** This deployment's service credential (`mxc_…`), issued in the Super Admin portal. A secret. */
+  CONTROL_PLANE_TOKEN: z.string().min(20).optional(),
   LICENSE_FILE_PATH: z.string().min(1).optional(),
   /** JSON `[{"kid":"…","publicKey":"-----BEGIN PUBLIC KEY-----…"}]`. Public keys only. */
   LICENSE_PUBLIC_KEYS: z.string().min(1).optional(),

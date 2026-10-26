@@ -62,6 +62,7 @@ line; the decision that replaced it is a new record.
 | [0076](0076-cross-product-authorization-contract.md) | How a Platform grant becomes a Work permission | Accepted |
 | [0077](0077-membership-resolution-role.md)       | Membership resolution runs as a role that cannot log in | Accepted |
 | [0078](0078-licence-gate-through-the-shared-licensing-contract.md) | Licences cap requests through the shared licensing contract | Accepted |
+| [0079](0079-what-work-sells-modules-headcount-and-the-hosted-licence.md) | What Work sells: modules, headcount, and the hosted licence | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

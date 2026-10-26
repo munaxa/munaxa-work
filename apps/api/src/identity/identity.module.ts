@@ -79,12 +79,14 @@ import {
   DISPATCHER,
   MEMBERSHIP_DIRECTORY,
   MODULE_REGISTRY,
+  EMPLOYMENT_MODULE,
   PEOPLE_MODULE,
   PERMISSION_AWARE_MODULES,
   PERMISSION_CHECKER,
 } from './identity.tokens.js';
 import { PlatformPermissionChecker } from './permission-checker.js';
 import { authenticationPortFor } from './authentication-port.js';
+import { LicensingGate } from '../licensing/licensing.gate.js';
 
 /**
  * The composition root for Workforce Identity, and for module registration generally.
@@ -170,15 +172,33 @@ import { authenticationPortFor } from './authentication-port.js';
         peopleModuleFor(unitOfWork, permissions, environment, logger.logger, senders.people),
     },
     {
+      provide: EMPLOYMENT_MODULE,
+      inject: [UNIT_OF_WORK, DEFERRED_SENDERS, LicensingGate],
+      // With the licensed headcount it enforces (ADR-0079); admits everyone under LICENSING_MODE=NONE.
+      useFactory: (
+        unitOfWork: UnitOfWork,
+        senders: DeferredSenders,
+        licensing: LicensingGate,
+      ): WorkModule => employmentModuleFor(unitOfWork, senders.employment, licensing),
+    },
+    {
       provide: PERMISSION_AWARE_MODULES,
-      inject: [UNIT_OF_WORK, PERMISSION_CHECKER, DEFERRED_SENDERS, PEOPLE_MODULE],
+      inject: [
+        UNIT_OF_WORK,
+        PERMISSION_CHECKER,
+        DEFERRED_SENDERS,
+        PEOPLE_MODULE,
+        EMPLOYMENT_MODULE,
+      ],
       useFactory: (
         unitOfWork: UnitOfWork,
         permissions: PermissionChecker,
         senders: DeferredSenders,
         people: WorkModule,
+        employment: WorkModule,
       ): PermissionAwareModules => ({
         people,
+        employment,
         documents: documentsModuleFor(unitOfWork, senders.payroll, permissions),
         letters: lettersModuleFor(unitOfWork, senders.payroll, permissions),
         performance: performanceModuleFor(unitOfWork, senders.payroll, permissions),
@@ -220,7 +240,7 @@ import { authenticationPortFor } from './authentication-port.js';
           ),
         );
         registry.register(permissionAware.people);
-        registry.register(employmentModuleFor(unitOfWork, senders.employment));
+        registry.register(permissionAware.employment);
         registry.register(recruitmentModuleFor(unitOfWork, senders.recruitment));
         registry.register(onboardingModuleFor(unitOfWork, senders.onboarding));
         registry.register(attendanceModuleFor(unitOfWork, senders.attendance));
@@ -287,14 +307,23 @@ import { authenticationPortFor } from './authentication-port.js';
     },
     {
       provide: DISPATCHER,
-      inject: [MODULE_REGISTRY, EVENT_DISPATCHER, DEFERRED_SENDERS, PERMISSION_CHECKER],
+      inject: [
+        MODULE_REGISTRY,
+        EVENT_DISPATCHER,
+        DEFERRED_SENDERS,
+        PERMISSION_CHECKER,
+        LicensingGate,
+      ],
       useFactory: (
         registry: ModuleRegistry,
         events: EventDispatcher,
         senders: DeferredSenders,
         permissions: PermissionChecker,
+        licensing: LicensingGate,
       ): Dispatcher => {
-        const dispatcher = new Dispatcher(permissions);
+        // The licence is a ceiling on every operation a person or job starts (ADR-0079): which
+        // modules the plan includes, and whether the term allows reads or writes at all.
+        const dispatcher = new Dispatcher(permissions, licensing);
 
         for (const module of registry.registered) {
           for (const handler of module.commands ?? []) {
@@ -336,6 +365,7 @@ export class IdentityModule {}
  */
 interface PermissionAwareModules {
   readonly people: WorkModule;
+  readonly employment: WorkModule;
   readonly documents: WorkModule;
   readonly letters: WorkModule;
   readonly performance: WorkModule;

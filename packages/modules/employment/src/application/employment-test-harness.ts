@@ -17,10 +17,12 @@ import type {
   Clock,
   EmployablePerson,
   EmploymentStores,
+  HeadcountLicence,
   OrganizationDirectoryPort,
   PersonDirectoryPort,
 } from './employment-ports.js';
 import type { CommandSender } from './transfer.use-case.js';
+import type { EmploymentDependencies } from './employment-dependencies.js';
 
 /**
  * The harness the module's application-service tests share.
@@ -113,12 +115,20 @@ export interface Harness {
 export const harnessFor = (tenantId: string, granted: readonly string[] = ALL): Harness =>
   harnessWithStores(tenantId, inMemoryEmploymentStores(), granted);
 
+/** Binds a licensed headcount only when a test asks for one: absent, nothing is limited. */
+const withHeadcount = (
+  dependencies: EmploymentDependencies,
+  headcount: HeadcountLicence | undefined,
+): EmploymentDependencies =>
+  headcount === undefined ? dependencies : { ...dependencies, headcount };
+
 /** A harness sharing existing stores, for the cross-tenant tests. */
 export const harnessWithStores = (
   tenantId: string,
   stores: EmploymentStores,
   granted: readonly string[] = ALL,
   shared?: { readonly people?: FakePeople; readonly organization?: FakeOrganization },
+  headcount?: HeadcountLicence,
 ): Harness => {
   const work = new InMemoryUnitOfWork(tenantId);
   const permissions: PermissionChecker = permitting(...granted);
@@ -129,7 +139,7 @@ export const harnessWithStores = (
   // dispatcher rather than through a shortcut only the tests have.
   const sender: CommandSender = { send: (command) => dispatcher.send(command) };
   const module = employmentModule(
-    { unitOfWork: work, stores, people, organization, clock },
+    withHeadcount({ unitOfWork: work, stores, people, organization, clock }, headcount),
     sender,
   );
 
