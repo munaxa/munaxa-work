@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { readLicensing } from './licensing.js';
 import {
   readPlatformAuthentication,
   type PlatformAuthenticationConfiguration,
@@ -103,6 +104,18 @@ export const environmentSchema = z.object({
   PLATFORM_AUTH_PUBLIC_KEYS: z.string().optional(),
   /** Tolerance for drift between Platform's clock and this one. Platform's own default. */
   PLATFORM_AUTH_CLOCK_SKEW_MS: z.coerce.number().int().min(0).max(300_000).default(30_000),
+
+  /**
+   * Where entitlements come from — `NONE` (default, nothing gated, as before) or `LICENSE_FILE`
+   * (a signed Munaxa licence verified offline; on premises). The rules that span these are in
+   * `readLicensing`, for the same reason the Platform authentication ones are in their reader.
+   */
+  LICENSING_MODE: z.enum(['NONE', 'LICENSE_FILE']).default('NONE'),
+  LICENSE_FILE_PATH: z.string().min(1).optional(),
+  /** JSON `[{"kid":"…","publicKey":"-----BEGIN PUBLIC KEY-----…"}]`. Public keys only. */
+  LICENSE_PUBLIC_KEYS: z.string().min(1).optional(),
+  LICENSE_ALGORITHM: z.enum(['ES256', 'RS256']).default('ES256'),
+  LICENSE_INSTALLATION_ID: z.string().min(1).max(128).optional(),
 });
 
 const DEVELOPMENT_MATCH_SECRET = 'development-only-people-match-secret-change-me';
@@ -147,7 +160,14 @@ export const loadEnvironment = (source: Record<string, string | undefined>): Env
 const refineEnvironment = (environment: Environment): readonly string[] => [
   ...matchSecretIssues(environment),
   ...platformAuthenticationIssues(environment),
+  ...licensingIssues(environment),
 ];
+
+const licensingIssues = (environment: Environment): readonly string[] => {
+  const licensing = readLicensing(environment);
+
+  return licensing.kind === 'invalid' ? licensing.issues : [];
+};
 
 const matchSecretIssues = (environment: Environment): readonly string[] =>
   environment.NODE_ENV === 'production' && environment.PII_MATCH_SECRET === DEVELOPMENT_MATCH_SECRET

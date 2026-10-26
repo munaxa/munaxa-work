@@ -26,6 +26,8 @@ import { LearningModule } from './learning/learning.module.js';
 import { WorkflowModule } from './workflow/workflow.module.js';
 import { CorrelationMiddleware } from './observability/correlation.middleware.js';
 import { AuthenticatedTenantGuard } from './tenancy/authenticated-tenant.guard.js';
+import { EntitlementGuard } from './licensing/entitlement.guard.js';
+import { LicenceSource } from './licensing/licence.source.js';
 import { TenantMiddleware } from './tenancy/tenant.middleware.js';
 import { loggingOptions } from './observability/logging.js';
 
@@ -70,6 +72,11 @@ import { loggingOptions } from './observability/logging.js';
       provide: APP_GUARD,
       useClass: AuthenticatedTenantGuard,
     },
+    LicenceSource,
+    // After the tenant guard, so the tenant it asks about is the resolved one. A ceiling only:
+    // every request it passes still faces the permission check. Permits everything under
+    // LICENSING_MODE=NONE, the default.
+    { provide: APP_GUARD, useClass: EntitlementGuard },
   ],
   exports: [environmentProvider],
 })

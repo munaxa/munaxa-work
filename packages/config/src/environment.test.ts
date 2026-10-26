@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ConfigurationError, loadEnvironment } from './environment.js';
+import { readLicensing } from './licensing.js';
 
 const valid = { DATABASE_URL: 'postgresql://user:pass@localhost:5432/work' };
 
@@ -92,5 +93,53 @@ describe('loadProcessEnvironment', () => {
     const { loadProcessEnvironment } = await import('./environment.js');
 
     expect(loadProcessEnvironment().DATABASE_URL).toContain('postgresql://');
+  });
+});
+
+describe('licensing', () => {
+  const base = { DATABASE_URL: 'postgresql://work@localhost:5432/work' };
+  const publicKey = '-----BEGIN PUBLIC KEY-----\nMFkw\n-----END PUBLIC KEY-----';
+  const licenceFile = {
+    ...base,
+    LICENSING_MODE: 'LICENSE_FILE',
+    LICENSE_FILE_PATH: '/etc/munaxa/work.license',
+    LICENSE_PUBLIC_KEYS: JSON.stringify([{ kid: 'lic-1', publicKey }]),
+    LICENSE_INSTALLATION_ID: 'inst-1',
+  };
+
+  it('defaults to no licensing, the deployment as it has always been', () => {
+    expect(readLicensing(loadEnvironment(base))).toEqual({ kind: 'none' });
+  });
+
+  it('reads a licence-file deployment', () => {
+    expect(readLicensing(loadEnvironment(licenceFile))).toEqual({
+      kind: 'licence-file',
+      configuration: {
+        path: '/etc/munaxa/work.license',
+        algorithm: 'ES256',
+        publicKeys: [{ kid: 'lic-1', publicKey }],
+        installationId: 'inst-1',
+      },
+    });
+  });
+
+  it.each(['LICENSE_FILE_PATH', 'LICENSE_PUBLIC_KEYS', 'LICENSE_INSTALLATION_ID'])(
+    'refuses to start without %s',
+    (key) => {
+      const source: Record<string, string> = { ...licenceFile };
+      delete source[key];
+      expect(() => loadEnvironment(source)).toThrow(ConfigurationError);
+    },
+  );
+
+  it('refuses a private key where public keys belong', () => {
+    expect(() =>
+      loadEnvironment({
+        ...licenceFile,
+        LICENSE_PUBLIC_KEYS: JSON.stringify([
+          { kid: 'k', publicKey: '-----BEGIN PRIVATE KEY-----\nMIG\n-----END PRIVATE KEY-----' },
+        ]),
+      }),
+    ).toThrow(/private key/);
   });
 });
