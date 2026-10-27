@@ -13,6 +13,7 @@ import type { HeadcountLicence } from '@work/employment';
 
 import { WorkLimit, featureFor } from './catalogue.js';
 import { LicenceSource, WORK_PRODUCT_KEY, type LicenceState } from './licence.source.js';
+import { USAGE_REPORTER, type UsageReporter } from './usage.reporter.js';
 
 type Configured = Extract<LicenceState, { readonly configured: true }>;
 
@@ -33,7 +34,10 @@ type Configured = Extract<LicenceState, { readonly configured: true }>;
 @Injectable()
 export class LicensingGate implements OperationGate, HeadcountLicence {
   // Injected by token: the test runner transpiles without decorator metadata.
-  public constructor(@Inject(LicenceSource) private readonly licence: LicenceSource) {}
+  public constructor(
+    @Inject(LicenceSource) private readonly licence: LicenceSource,
+    @Inject(USAGE_REPORTER) private readonly usage: UsageReporter,
+  ) {}
 
   public async admit(operation: {
     readonly kind: 'command' | 'query';
@@ -42,7 +46,7 @@ export class LicensingGate implements OperationGate, HeadcountLicence {
   }): Promise<void> {
     const state = await this.state();
     if (state === null) return;
-    const kind = operation.kind === 'command' ? OperationKind.WRITE : OperationKind.READ;
+    const kind = operationKindOf(operation);
     const context = contextOf(state);
     const feature = featureFor(operation.permission);
     const decision =
@@ -50,6 +54,7 @@ export class LicensingGate implements OperationGate, HeadcountLicence {
         ? checkOperation(state.snapshot, kind, context)
         : checkFeature(state.snapshot, feature, kind, context);
     if (!decision.allowed) throw refusal(decision);
+    this.usage.noteActivity(state.tenantId);
   }
 
   /**
@@ -77,6 +82,22 @@ export class LicensingGate implements OperationGate, HeadcountLicence {
     return state.configured ? { ...state, tenantId } : null;
   }
 }
+
+/**
+ * A query is a read and a command a write — except a module's own export (`people.export`,
+ * `employment.export`, …), which is an export: the one thing a cancelled organisation keeps, so it
+ * can take its records with it (ADR-0079). The permission decides, not the route, so an export is
+ * recognised wherever it is dispatched from and a route merely named `export` gains nothing.
+ */
+export const operationKindOf = (operation: {
+  readonly kind: 'command' | 'query';
+  readonly permission: string;
+}): OperationKind => {
+  if (operation.kind === 'query' && operation.permission.split('.')[1] === 'export') {
+    return OperationKind.EXPORT;
+  }
+  return operation.kind === 'command' ? OperationKind.WRITE : OperationKind.READ;
+};
 
 const contextOf = (state: Configured & { readonly tenantId: string }) => ({
   now: state.evaluatedAt,

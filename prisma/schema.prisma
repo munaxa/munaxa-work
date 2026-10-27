@@ -5825,3 +5825,22 @@ model AssetCustody {
   @@index([tenant_id, employment_id, issued_on], map: "asset_custody_employment_idx")
   @@map("asset_custody")
 }
+
+/// What this deployment last verified about a tenant's entitlements (ADR-0079). Written by the API's
+/// licensing source only; `last_observed_at` only moves forward.
+model LicensingState {
+  id               String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id        String    @unique(map: "licensing_state_tenant_key") @db.Uuid
+  snapshot         Json?
+  source           String    @db.VarChar(32)
+  last_observed_at DateTime  @db.Timestamptz(6)
+  created_at       DateTime  @db.Timestamptz(6)
+  created_by       String    @db.VarChar(255)
+  updated_at       DateTime  @db.Timestamptz(6)
+  updated_by       String    @db.VarChar(255)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  deleted_by       String?   @db.VarChar(255)
+  version          Int
+
+  @@map("licensing_state")
+}

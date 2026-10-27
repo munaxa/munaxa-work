@@ -14,6 +14,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { PUBLIC_ROUTE } from '../tenancy/public-route.decorator.js';
 import { EntitlementGuard } from './entitlement.guard.js';
 import { LicenceSource } from './licence.source.js';
+import { MemoryLicensingStateStore } from './licensing-state.store.js';
 
 const TENANT = uuidV7();
 const directory = mkdtempSync(join(tmpdir(), 'work-licence-'));
@@ -94,6 +95,7 @@ describe('EntitlementGuard', () => {
   it('permits everything when this deployment is not licensed, as before', async () => {
     const source = new LicenceSource(
       loadEnvironment({ DATABASE_URL: 'postgresql://work@localhost/w' }),
+      new MemoryLicensingStateStore(),
     );
     const guard = new EntitlementGuard(reflector(), source);
     await expect(asTenant(() => guard.canActivate(http('DELETE')))).resolves.toBe(true);
@@ -101,14 +103,20 @@ describe('EntitlementGuard', () => {
 
   it('a valid licence permits reads and writes', async () => {
     writeFileSync(path, licence());
-    const guard = new EntitlementGuard(reflector(), new LicenceSource(licensedEnvironment));
+    const guard = new EntitlementGuard(
+      reflector(),
+      new LicenceSource(licensedEnvironment, new MemoryLicensingStateStore()),
+    );
     await expect(asTenant(() => guard.canActivate(http('GET')))).resolves.toBe(true);
     await expect(asTenant(() => guard.canActivate(http('POST')))).resolves.toBe(true);
   });
 
   it('an ended licence is read-only, with 402 rather than 403', async () => {
     writeFileSync(path, licence({ expiresAt: '2026-02-01T00:00:00.000Z' }));
-    const guard = new EntitlementGuard(reflector(), new LicenceSource(licensedEnvironment));
+    const guard = new EntitlementGuard(
+      reflector(),
+      new LicenceSource(licensedEnvironment, new MemoryLicensingStateStore()),
+    );
     await expect(asTenant(() => guard.canActivate(http('GET')))).resolves.toBe(true);
     const refused = await refusal(guard, 'PATCH');
     expect(refused.getStatus()).toBe(402);
@@ -122,7 +130,10 @@ describe('EntitlementGuard', () => {
       () => writeFileSync(path, licence({ product: 'docs' })),
     ]) {
       write();
-      const guard = new EntitlementGuard(reflector(), new LicenceSource(licensedEnvironment));
+      const guard = new EntitlementGuard(
+        reflector(),
+        new LicenceSource(licensedEnvironment, new MemoryLicensingStateStore()),
+      );
       expect((await refusal(guard, 'GET')).getStatus()).toBe(402);
     }
   });
@@ -131,7 +142,7 @@ describe('EntitlementGuard', () => {
     rmSync(path, { force: true });
     const guard = new EntitlementGuard(
       reflector({ [PUBLIC_ROUTE]: true }),
-      new LicenceSource(licensedEnvironment),
+      new LicenceSource(licensedEnvironment, new MemoryLicensingStateStore()),
     );
     await expect(guard.canActivate(http('POST'))).resolves.toBe(true);
   });

@@ -163,3 +163,15 @@ export const employmentModuleFor = (
     },
     sender,
   );
+
+/**
+ * Employment's own count of the current tenant's open employments, as a level to report to the
+ * central subscription service (ADR-0079): the rows the licensed headcount counts, read through
+ * this module's store under the tenant's row-level security, without the headcount lock.
+ */
+export const openEmploymentCounter =
+  (unitOfWork: UnitOfWork): (() => Promise<number>) =>
+  () =>
+    unitOfWork.execute((transaction) =>
+      postgresEmploymentStores().employments.countOpen(transaction),
+    );

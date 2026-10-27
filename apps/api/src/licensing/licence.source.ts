@@ -21,6 +21,11 @@ import {
 } from '@munaxa/licensing';
 
 import { ENVIRONMENT } from '../configuration/environment.provider.js';
+import {
+  LICENSING_STATE_STORE,
+  type LicensingStateStore,
+  type StoredLicensingState,
+} from './licensing-state.store.js';
 
 /** This product's key in every Munaxa licence. */
 export const WORK_PRODUCT_KEY = 'work';
@@ -57,10 +62,14 @@ const CONTROL_PLANE_TIMEOUT_MS = 3_000;
  *   no growth for a day, read-only for a week, then nothing). A `404` is an answer — no
  *   subscription — and drops that snapshot, so it cannot bridge a later outage.
  *
- * The latest instant observed is kept for the life of the process and decisions are made at the
- * later of it and the clock, so a clock wound back cannot un-expire a term while the API runs. A
- * hosted process starts with no remembered snapshot: if the service is down at that moment, its
- * tenants are refused until it answers (ADR-0079).
+ * What was verified is kept in `licensing_state` (ADR-0079), per tenant: the last snapshot the
+ * service gave and the latest instant observed. So a process that starts while the service is down
+ * bridges the outage with the last answer, degraded by its age, exactly as a running one would; and
+ * decisions are made at the later of the clock and the latest instant observed by any process that
+ * ever served the tenant, so a clock wound back cannot un-expire a term, across restarts too.
+ *
+ * The store is read once per tenant per process and written on every answer. If it cannot be read
+ * the source carries on with what the process itself knows — never with more.
  */
 @Injectable()
 export class LicenceSource {
@@ -78,8 +87,11 @@ export class LicenceSource {
   private lastObservedAt: Date | null = null;
 
   // Injected by token: the test runner transpiles without decorator metadata.
+  private readonly loaded = new Set<string>();
+
   public constructor(
     @Inject(ENVIRONMENT) environment: Environment,
+    @Inject(LICENSING_STATE_STORE) private readonly store: LicensingStateStore,
     @Optional() @Inject(LICENSING_FETCH) fetchImpl?: typeof fetch,
   ) {
     this.fetch = fetchImpl ?? globalThis.fetch;
@@ -109,7 +121,8 @@ export class LicenceSource {
       if (this.fileCache !== null && this.fileCache.until > now.getTime()) {
         return this.fileCache.state;
       }
-      const state = await this.readFile(this.file, now);
+      await this.recall(tenantId);
+      const state = await this.readFile(this.file, tenantId, now);
       this.fileCache = { state, until: now.getTime() + LicenceSource.TTL_MS };
       return state;
     }
@@ -121,6 +134,45 @@ export class LicenceSource {
       return state;
     }
     return { configured: false };
+  }
+
+  /**
+   * Folds what an earlier process verified for this tenant into this one, once: its latest observed
+   * instant, and the snapshot that bridges an outage. Never fails a decision; a store that cannot be
+   * read leaves the process with what it alone has seen.
+   */
+  private async recall(tenantId: string): Promise<void> {
+    if (this.loaded.has(tenantId)) return;
+    let stored: StoredLicensingState | null = null;
+    try {
+      stored = await this.store.read(tenantId);
+    } catch (error) {
+      this.logger.warn(
+        `Licensing state for ${tenantId} could not be read: ${(error as Error).name}`,
+      );
+      return;
+    }
+    this.loaded.add(tenantId);
+    if (stored === null) return;
+    if (this.lastObservedAt === null || stored.lastObservedAt > this.lastObservedAt) {
+      this.lastObservedAt = stored.lastObservedAt;
+    }
+    if (stored.snapshot !== null && !this.lastGood.has(tenantId)) {
+      this.lastGood.set(tenantId, stored.snapshot);
+    }
+  }
+
+  private async remember(
+    tenantId: string,
+    state: Parameters<LicensingStateStore['write']>[1],
+  ): Promise<void> {
+    try {
+      await this.store.write(tenantId, state);
+    } catch (error) {
+      this.logger.warn(
+        `Licensing state for ${tenantId} could not be kept: ${(error as Error).name}`,
+      );
+    }
   }
 
   private observe(now: Date): Date {
@@ -135,10 +187,16 @@ export class LicenceSource {
     tenantId: string,
     now: Date,
   ): Promise<Configured> {
+    await this.recall(tenantId);
     const evaluatedAt = this.observe(now);
     const answer = await this.fetchEntitlements(settings, tenantId);
     if (answer.kind === 'SNAPSHOT') {
       this.lastGood.set(tenantId, answer.snapshot);
+      await this.remember(tenantId, {
+        snapshot: answer.snapshot,
+        source: 'CONTROL_PLANE',
+        observedAt: evaluatedAt,
+      });
       return {
         configured: true,
         snapshot: answer.snapshot,
@@ -150,6 +208,11 @@ export class LicenceSource {
     this.logger.warn(`Entitlements for ${tenantId} could not be confirmed: ${answer.reason}`);
     if (answer.kind === 'NONE') {
       this.lastGood.delete(tenantId);
+      await this.remember(tenantId, {
+        snapshot: null,
+        source: 'CONTROL_PLANE',
+        observedAt: evaluatedAt,
+      });
       return {
         configured: true,
         snapshot: null,
@@ -199,6 +262,7 @@ export class LicenceSource {
 
   private async readFile(
     settings: NonNullable<LicenceSource['file']>,
+    tenantId: string,
     now: Date,
   ): Promise<Configured> {
     const evaluatedAt =
@@ -218,6 +282,14 @@ export class LicenceSource {
     });
     if (!result.ok) return this.refused(`LICENSE_${result.reason}`, evaluatedAt);
     this.lastObservedAt = evaluatedAt;
+    // Only the licence's own tenant is remembered: another tenant asking learns nothing it may keep.
+    if (result.snapshot.tenantId === tenantId) {
+      await this.remember(tenantId, {
+        snapshot: result.snapshot,
+        source: 'LICENSE_FILE',
+        observedAt: evaluatedAt,
+      });
+    }
     return {
       configured: true,
       snapshot: result.snapshot,

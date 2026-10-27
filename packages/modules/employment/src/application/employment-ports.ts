@@ -76,6 +76,8 @@ export interface EmploymentStore {
    * serialised between this count and their commit.
    */
   lockAndCountOpen(transaction: Transaction): Promise<number>;
+  /** The same count without the lock: a level to report, not a ceiling to enforce. */
+  countOpen(transaction: Transaction): Promise<number>;
   search(transaction: Transaction, query: EmploymentQuery): Promise<Page<EmploymentState>>;
   all(transaction: Transaction): Promise<readonly EmploymentState[]>;
   insert(transaction: Transaction, state: EmploymentState): Promise<void>;

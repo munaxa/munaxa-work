@@ -50,18 +50,32 @@ suspended or limited at all.
    the last answer is degraded by age through the shared policy: full for an hour, no growth (no
    hiring) for a day, read-only for a week, then nothing. The URL must be `https` in production.
 
+9. **What was verified is kept** in `licensing_state`, one row per tenant under
+   `app_protect_table`: the last snapshot and the latest instant observed, which only moves
+   forward (`greatest` in SQL). Read once per tenant per process, written on every answer. A process
+   started during an outage bridges it like a running one; a kept "no subscription" bridges nothing;
+   a clock wound back across a restart cannot make an ended term current.
+10. **A cancelled organisation exports its records.** Its access mode is `EXPORT_ONLY`. An operation
+    whose permission is `<module>.export` is an `EXPORT`, which that mode admits; every other read
+    and every write is refused. The request guard lets `GET …/export` through to the gate, and the
+    gate decides by the dispatched query's *permission*, so a route merely named `export` that reads
+    anything else is still refused. The exports are the modules' own: people, employment,
+    organization structure, attendance, and recruitment where the plan included it. Nothing is
+    deleted; reactivation in the central service restores everything else.
+11. **The licensed headcount is reported** to the central service under `CONTROL_PLANE`: at most once
+    per tenant per hour per process, on the tenant's first admitted operation in that hour, measured
+    by Employment's own count (the rows the limit counts) and stamped with the hour, so several
+    processes report one point. Best effort; informational at the other end.
+
 ## Consequences
 
-- A hosted process remembers its last good answers in memory only. If the service is down when the
-  process starts, its tenants are refused until it answers. Persisting the snapshot (as Docs does)
-  is the follow-up if that proves to matter.
-- Clock rollback is detected per process: decisions are made at the later of the clock and the
-  latest instant this process observed. Docs persists that instant; School and Work do not.
-- A cancelled tenant's mode is `EXPORT_ONLY`, and Work has no export-only routes, so a cancelled
-  tenant reaches nothing. Its records are not deleted; restoring access is a reactivation in the
-  central service. An export surface is the follow-up.
-- Usage is not yet reported to the central service from Work; it enforces its own headcount, and
-  the report is informational there.
+- Clock rollback is now detected across restarts too, as in Docs and School; a clock that was
+  wrong from the first boot and never moved backwards still cannot be detected.
+- A tenant that does nothing in an hour is not reported for it; its headcount cannot have changed
+  through Work.
+- `licensing_state` is a new table: the deployment's standing grant to `work_app` must cover it
+  (`grant select, insert, update, delete on all tables in schema public to work_app`, or the
+  equivalent default privileges), as for every migration.
 
 ## Alternatives considered
 

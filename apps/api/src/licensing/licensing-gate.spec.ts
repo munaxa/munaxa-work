@@ -18,7 +18,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { ProblemDetailsFilter } from '../errors/problem-details.filter.js';
 import { CORE_MODULES, WorkFeature, featureFor } from './catalogue.js';
 import { LicenceSource } from './licence.source.js';
+import { MemoryLicensingStateStore } from './licensing-state.store.js';
 import { LicensingGate } from './licensing.gate.js';
+import { NO_USAGE_REPORTS } from './usage.reporter.js';
 
 const TENANT = uuidV7();
 const directory = mkdtempSync(join(tmpdir(), 'work-gate-'));
@@ -79,7 +81,10 @@ const asTenant = <T>(work: () => Promise<T>): Promise<T> =>
 
 const gateFor = (file: string): LicensingGate => {
   writeFileSync(path, file);
-  return new LicensingGate(new LicenceSource(fileEnvironment));
+  return new LicensingGate(
+    new LicenceSource(fileEnvironment, new MemoryLicensingStateStore()),
+    NO_USAGE_REPORTS,
+  );
 };
 
 const command = (permission: string) => ({ kind: 'command' as const, name: 'x', permission });
@@ -129,7 +134,11 @@ describe('LicensingGate', () => {
 
   it('admits everything, and counts nothing, when the deployment is not licensed', async () => {
     const gate = new LicensingGate(
-      new LicenceSource(loadEnvironment({ DATABASE_URL: 'postgresql://work@localhost/w' })),
+      new LicenceSource(
+        loadEnvironment({ DATABASE_URL: 'postgresql://work@localhost/w' }),
+        new MemoryLicensingStateStore(),
+      ),
+      NO_USAGE_REPORTS,
     );
     const countOpen = vi.fn(() => Promise.resolve(10_000));
     expect(await reasonOf(() => gate.admit(command('recruitment.manage')))).toBe('ADMITTED');
@@ -206,7 +215,10 @@ describe('Munaxa Work against the central subscription service', () => {
   };
 
   it('asks for this tenant only, with the credential, never following a redirect', async () => {
-    const gate = new LicensingGate(new LicenceSource(hosted, fetchImpl));
+    const gate = new LicensingGate(
+      new LicenceSource(hosted, new MemoryLicensingStateStore(), fetchImpl),
+      NO_USAGE_REPORTS,
+    );
     replies.push({ status: 200, body: snapshot() });
     expect(await reasonOf(() => gate.admit(command('payroll.calculate')))).toBe('ADMITTED');
     expect(await reasonOf(() => gate.admit(query('recruitment.read')))).toBe(
@@ -223,7 +235,10 @@ describe('Munaxa Work against the central subscription service', () => {
   });
 
   it('an outage degrades the last answer by age, and no subscription outlives no snapshot', async () => {
-    const gate = new LicensingGate(new LicenceSource(hosted, fetchImpl));
+    const gate = new LicensingGate(
+      new LicenceSource(hosted, new MemoryLicensingStateStore(), fetchImpl),
+      NO_USAGE_REPORTS,
+    );
     replies.push({ status: 200, body: snapshot() });
     expect(await reasonOf(() => gate.admit(command('people.manage')))).toBe('ADMITTED');
 
@@ -246,11 +261,110 @@ describe('Munaxa Work against the central subscription service', () => {
   });
 
   it('a refused credential is an outage, not a cancellation', async () => {
-    const gate = new LicensingGate(new LicenceSource(hosted, fetchImpl));
+    const gate = new LicensingGate(
+      new LicenceSource(hosted, new MemoryLicensingStateStore(), fetchImpl),
+      NO_USAGE_REPORTS,
+    );
     replies.push({ status: 200, body: snapshot() });
     expect(await reasonOf(() => gate.admit(command('people.manage')))).toBe('ADMITTED');
     at(0.5, { status: 401 });
     expect(await reasonOf(() => gate.admit(command('people.manage')))).toBe('ADMITTED');
+  });
+
+  it('a restarted process bridges an outage with the answer an earlier one kept', async () => {
+    const store = new MemoryLicensingStateStore();
+    const first = new LicensingGate(new LicenceSource(hosted, store, fetchImpl), NO_USAGE_REPORTS);
+    replies.push({ status: 200, body: snapshot() });
+    expect(await reasonOf(() => first.admit(command('people.manage')))).toBe('ADMITTED');
+
+    // A new process, started while the service is down.
+    at(0.5, { status: 503 });
+    const restarted = new LicensingGate(
+      new LicenceSource(hosted, store, fetchImpl),
+      NO_USAGE_REPORTS,
+    );
+    expect(await reasonOf(() => restarted.admit(command('people.manage')))).toBe('ADMITTED');
+    at(48, { status: 503 });
+    const later = new LicensingGate(new LicenceSource(hosted, store, fetchImpl), NO_USAGE_REPORTS);
+    expect(await reasonOf(() => later.admit(command('people.manage')))).toBe(
+      'SUBSCRIPTION_RESTRICTED',
+    );
+    expect(await reasonOf(() => later.admit(query('people.read')))).toBe('ADMITTED');
+  });
+
+  it('a kept "no subscription" is not bridged by anything after a restart', async () => {
+    const store = new MemoryLicensingStateStore();
+    replies.push({ status: 200, body: snapshot() });
+    await reasonOf(() =>
+      new LicensingGate(new LicenceSource(hosted, store, fetchImpl), NO_USAGE_REPORTS).admit(
+        query('people.read'),
+      ),
+    );
+    at(0.1, { status: 404 });
+    await reasonOf(() =>
+      new LicensingGate(new LicenceSource(hosted, store, fetchImpl), NO_USAGE_REPORTS).admit(
+        query('people.read'),
+      ),
+    );
+    at(0.2, { status: 503 });
+    const restarted = new LicensingGate(
+      new LicenceSource(hosted, store, fetchImpl),
+      NO_USAGE_REPORTS,
+    );
+    expect(await reasonOf(() => restarted.admit(query('people.read')))).toBe('NO_SUBSCRIPTION');
+  });
+
+  it('a clock wound back across a restart cannot make an ended term current', async () => {
+    const store = new MemoryLicensingStateStore();
+    const ended = snapshot({ expiresAt: '2026-11-01T00:00:00.000Z' });
+    vi.setSystemTime(new Date('2026-11-10T00:00:00.000Z'));
+    replies.push({ status: 200, body: ended });
+    await reasonOf(() =>
+      new LicensingGate(new LicenceSource(hosted, store, fetchImpl), NO_USAGE_REPORTS).admit(
+        query('people.read'),
+      ),
+    );
+    vi.setSystemTime(new Date('2026-10-20T00:00:00.000Z'));
+    replies.push({ status: 200, body: ended });
+    const restarted = new LicensingGate(
+      new LicenceSource(hosted, store, fetchImpl),
+      NO_USAGE_REPORTS,
+    );
+    expect(await reasonOf(() => restarted.admit(command('people.manage')))).toBe(
+      'SUBSCRIPTION_RESTRICTED',
+    );
+  });
+
+  it('a cancelled organisation exports its records and reaches nothing else', async () => {
+    const gate = new LicensingGate(
+      new LicenceSource(hosted, new MemoryLicensingStateStore(), fetchImpl),
+      NO_USAGE_REPORTS,
+    );
+    replies.push({ status: 200, body: snapshot({ status: 'CANCELLED' }) });
+    expect(await reasonOf(() => gate.admit(query('people.export')))).toBe('ADMITTED');
+    expect(await reasonOf(() => gate.admit(query('employment.export')))).toBe('ADMITTED');
+    expect(await reasonOf(() => gate.admit(query('payroll.export')))).toBe('ADMITTED');
+    expect(await reasonOf(() => gate.admit(query('people.read')))).toBe('SUBSCRIPTION_RESTRICTED');
+    expect(await reasonOf(() => gate.admit(command('people.export')))).toBe(
+      'SUBSCRIPTION_RESTRICTED',
+    );
+    // An export of a module the plan never included is still refused.
+    expect(await reasonOf(() => gate.admit(query('recruitment.export')))).toBe(
+      'FEATURE_NOT_INCLUDED',
+    );
+  });
+
+  it('notes each admitted operation for the hourly headcount report', async () => {
+    const noteActivity = vi.fn();
+    const gate = new LicensingGate(
+      new LicenceSource(hosted, new MemoryLicensingStateStore(), fetchImpl),
+      { noteActivity },
+    );
+    replies.push({ status: 200, body: snapshot() });
+    await reasonOf(() => gate.admit(query('people.read')));
+    await reasonOf(() => gate.admit(query('recruitment.read')));
+    expect(noteActivity).toHaveBeenCalledTimes(1);
+    expect(noteActivity).toHaveBeenCalledWith(TENANT);
   });
 });
 
