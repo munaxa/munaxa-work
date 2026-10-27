@@ -26,5 +26,6 @@ export { readLicensing } from './licensing.js';
 export type {
   ControlPlaneConfiguration,
   Licensing,
+  LicensingSource,
   LicenceFileConfiguration,
 } from './licensing.js';

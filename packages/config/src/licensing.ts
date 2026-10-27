@@ -1,4 +1,18 @@
-import type { Environment } from './environment.js';
+/**
+ * What `readLicensing` reads: the licensing variables, and the deployment's `NODE_ENV`. Declared
+ * here rather than taken from `Environment`, so this module and the environment schema that calls it
+ * do not import each other — the shape `PlatformAuthenticationSource` has, for the same reason.
+ */
+export interface LicensingSource {
+  readonly NODE_ENV: 'development' | 'test' | 'production';
+  readonly LICENSING_MODE: 'NONE' | 'LICENSE_FILE' | 'CONTROL_PLANE';
+  readonly LICENSE_FILE_PATH?: string | undefined;
+  readonly LICENSE_PUBLIC_KEYS?: string | undefined;
+  readonly LICENSE_ALGORITHM: 'ES256' | 'RS256';
+  readonly LICENSE_INSTALLATION_ID?: string | undefined;
+  readonly CONTROL_PLANE_URL?: string | undefined;
+  readonly CONTROL_PLANE_TOKEN?: string | undefined;
+}
 
 /**
  * Where Munaxa Work's entitlements come from.
@@ -29,13 +43,13 @@ export interface LicenceFileConfiguration {
   readonly installationId: string;
 }
 
-export const readLicensing = (environment: Environment): Licensing => {
+export const readLicensing = (environment: LicensingSource): Licensing => {
   if (environment.LICENSING_MODE === 'NONE') return { kind: 'none' };
   if (environment.LICENSING_MODE === 'CONTROL_PLANE') return readControlPlane(environment);
   return readLicenceFile(environment);
 };
 
-const readLicenceFile = (environment: Environment): Licensing => {
+const readLicenceFile = (environment: LicensingSource): Licensing => {
   const issues: string[] = [];
   for (const key of [
     'LICENSE_FILE_PATH',
@@ -81,7 +95,7 @@ const readLicenceFile = (environment: Environment): Licensing => {
   };
 };
 
-const readControlPlane = (environment: Environment): Licensing => {
+const readControlPlane = (environment: LicensingSource): Licensing => {
   const issues: string[] = [];
   for (const key of ['CONTROL_PLANE_URL', 'CONTROL_PLANE_TOKEN'] as const) {
     if (environment[key] === undefined)

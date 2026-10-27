@@ -1,3 +1,8 @@
+import type { Provider } from '@nestjs/common';
+
+import { LicensingGate } from '../licensing/licensing.gate.js';
+import { DEFERRED_SENDERS, EMPLOYMENT_MODULE } from '../identity/identity.tokens.js';
+import { UNIT_OF_WORK } from '../persistence/database.module.js';
 import {
   employmentModule,
   postgresEmploymentStores,
@@ -175,3 +180,17 @@ export const openEmploymentCounter =
     unitOfWork.execute((transaction) =>
       postgresEmploymentStores().employments.countOpen(transaction),
     );
+
+/**
+ * Employment as a provider of its own, built with the licensed headcount it enforces (ADR-0079) —
+ * the gate admits everyone under `LICENSING_MODE=NONE`. Registered by the identity module.
+ */
+export const employmentModuleProvider: Provider = {
+  provide: EMPLOYMENT_MODULE,
+  inject: [UNIT_OF_WORK, DEFERRED_SENDERS, LicensingGate],
+  useFactory: (
+    unitOfWork: UnitOfWork,
+    senders: { readonly employment: DeferredEmploymentSender },
+    licensing: LicensingGate,
+  ): WorkModule => employmentModuleFor(unitOfWork, senders.employment, licensing),
+};

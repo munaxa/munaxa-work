@@ -43,7 +43,7 @@ import {
 import { DeferredPeopleSender, peopleModuleFor } from '../people/people.composition.js';
 import {
   DeferredEmploymentSender,
-  employmentModuleFor,
+  employmentModuleProvider,
 } from '../employment/employment.composition.js';
 import { assignmentFilledHeadcount, postgresEmploymentStores } from '@work/employment';
 import {
@@ -171,16 +171,7 @@ import { LicensingGate } from '../licensing/licensing.gate.js';
       ): WorkModule =>
         peopleModuleFor(unitOfWork, permissions, environment, logger.logger, senders.people),
     },
-    {
-      provide: EMPLOYMENT_MODULE,
-      inject: [UNIT_OF_WORK, DEFERRED_SENDERS, LicensingGate],
-      // With the licensed headcount it enforces (ADR-0079); admits everyone under LICENSING_MODE=NONE.
-      useFactory: (
-        unitOfWork: UnitOfWork,
-        senders: DeferredSenders,
-        licensing: LicensingGate,
-      ): WorkModule => employmentModuleFor(unitOfWork, senders.employment, licensing),
-    },
+    employmentModuleProvider,
     {
       provide: PERMISSION_AWARE_MODULES,
       inject: [
@@ -321,8 +312,7 @@ import { LicensingGate } from '../licensing/licensing.gate.js';
         permissions: PermissionChecker,
         licensing: LicensingGate,
       ): Dispatcher => {
-        // The licence is a ceiling on every operation a person or job starts (ADR-0079): which
-        // modules the plan includes, and whether the term allows reads or writes at all.
+        // The licence caps every operation a person or job starts (ADR-0079).
         const dispatcher = new Dispatcher(permissions, licensing);
 
         for (const module of registry.registered) {
@@ -334,15 +324,7 @@ import { LicensingGate } from '../licensing/licensing.gate.js';
           }
           for (const handler of module.eventHandlers ?? []) events.register(handler);
         }
-        senders.organization.attach(dispatcher);
-        senders.people.attach(dispatcher);
-        senders.employment.attach(dispatcher);
-        senders.recruitment.attach(dispatcher);
-        senders.onboarding.attach(dispatcher);
-        senders.attendance.attach(dispatcher);
-        senders.leave.attach(dispatcher);
-        senders.compensation.attach(dispatcher);
-        senders.payroll.attach(dispatcher);
+        for (const sender of Object.values(senders)) sender.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -375,7 +357,7 @@ interface PermissionAwareModules {
   readonly relations: WorkModule;
 }
 
-interface DeferredSenders {
+type DeferredSenders = {
   readonly organization: DeferredCommandSender;
   readonly people: DeferredPeopleSender;
   readonly employment: DeferredEmploymentSender;
@@ -385,7 +367,7 @@ interface DeferredSenders {
   readonly leave: DeferredLeaveDispatcher;
   readonly compensation: DeferredCompensationDispatcher;
   readonly payroll: DeferredPayrollDispatcher;
-}
+};
 
 /**
  * The tenant's identity defaults now come from *that tenant*, falling back to the deployment's
