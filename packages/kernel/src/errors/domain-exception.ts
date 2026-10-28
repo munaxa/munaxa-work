@@ -33,3 +33,25 @@ export class TenantIsolationException extends DomainException {
     this.name = 'TenantIsolationException';
   }
 }
+
+/**
+ * Refused by what the organisation is entitled to, not by what the person may do: a module its
+ * licence does not include, a term that has ended, a licensed headcount reached.
+ *
+ * Not a `DomainException` — nothing impossible happened — and not a `Result` failure, for the same
+ * reason a lost concurrency race is not one: the refusal is decided outside the module (by the
+ * platform's operation gate, or a port the module was handed), and every module's own failure
+ * mapping would otherwise need a case for a concept the kernel does not own. It travels to the
+ * edge, which answers `402`. The `reason` is the shared licensing contract's, and safe to return.
+ */
+export class NotEntitledException extends Error {
+  public readonly reason: string;
+  public readonly status: string | null;
+
+  public constructor(reason: string, message: string, status: string | null = null) {
+    super(message);
+    this.name = 'NotEntitledException';
+    this.reason = reason;
+    this.status = status;
+  }
+}

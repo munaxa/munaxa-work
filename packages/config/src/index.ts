@@ -22,3 +22,10 @@ export {
   loadPortalProcessEnvironment,
 } from './portal-environment.js';
 export type { PortalEnvironment } from './portal-environment.js';
+export { readLicensing } from './licensing.js';
+export type {
+  ControlPlaneConfiguration,
+  Licensing,
+  LicensingSource,
+  LicenceFileConfiguration,
+} from './licensing.js';

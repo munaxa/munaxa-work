@@ -52,6 +52,9 @@ export const PERMISSION_CHECKER = Symbol('PERMISSION_CHECKER');
  */
 export const PEOPLE_MODULE = Symbol('PEOPLE_MODULE');
 
+/** Employment, built with the licensed headcount it enforces (ADR-0079). */
+export const EMPLOYMENT_MODULE = Symbol('EMPLOYMENT_MODULE');
+
 /**
  * Every module that needs the permission checker, assembled together.
  *

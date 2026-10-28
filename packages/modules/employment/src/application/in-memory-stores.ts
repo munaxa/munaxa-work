@@ -71,6 +71,16 @@ class InMemoryEmploymentStore implements EmploymentStore {
     );
   }
 
+  public lockAndCountOpen(transaction: Transaction): Promise<number> {
+    return this.countOpen(transaction);
+  }
+
+  public countOpen(transaction: Transaction): Promise<number> {
+    return Promise.resolve(
+      scoped(this.rows, transaction).filter((row) => row.status !== 'ended').length,
+    );
+  }
+
   public openForPerson(
     transaction: Transaction,
     personId: string,

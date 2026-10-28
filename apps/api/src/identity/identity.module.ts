@@ -43,7 +43,7 @@ import {
 import { DeferredPeopleSender, peopleModuleFor } from '../people/people.composition.js';
 import {
   DeferredEmploymentSender,
-  employmentModuleFor,
+  employmentModuleProvider,
 } from '../employment/employment.composition.js';
 import { assignmentFilledHeadcount, postgresEmploymentStores } from '@work/employment';
 import {
@@ -79,12 +79,14 @@ import {
   DISPATCHER,
   MEMBERSHIP_DIRECTORY,
   MODULE_REGISTRY,
+  EMPLOYMENT_MODULE,
   PEOPLE_MODULE,
   PERMISSION_AWARE_MODULES,
   PERMISSION_CHECKER,
 } from './identity.tokens.js';
 import { PlatformPermissionChecker } from './permission-checker.js';
 import { authenticationPortFor } from './authentication-port.js';
+import { LicensingGate } from '../licensing/licensing.gate.js';
 
 /**
  * The composition root for Workforce Identity, and for module registration generally.
@@ -169,16 +171,25 @@ import { authenticationPortFor } from './authentication-port.js';
       ): WorkModule =>
         peopleModuleFor(unitOfWork, permissions, environment, logger.logger, senders.people),
     },
+    employmentModuleProvider,
     {
       provide: PERMISSION_AWARE_MODULES,
-      inject: [UNIT_OF_WORK, PERMISSION_CHECKER, DEFERRED_SENDERS, PEOPLE_MODULE],
+      inject: [
+        UNIT_OF_WORK,
+        PERMISSION_CHECKER,
+        DEFERRED_SENDERS,
+        PEOPLE_MODULE,
+        EMPLOYMENT_MODULE,
+      ],
       useFactory: (
         unitOfWork: UnitOfWork,
         permissions: PermissionChecker,
         senders: DeferredSenders,
         people: WorkModule,
+        employment: WorkModule,
       ): PermissionAwareModules => ({
         people,
+        employment,
         documents: documentsModuleFor(unitOfWork, senders.payroll, permissions),
         letters: lettersModuleFor(unitOfWork, senders.payroll, permissions),
         performance: performanceModuleFor(unitOfWork, senders.payroll, permissions),
@@ -220,7 +231,7 @@ import { authenticationPortFor } from './authentication-port.js';
           ),
         );
         registry.register(permissionAware.people);
-        registry.register(employmentModuleFor(unitOfWork, senders.employment));
+        registry.register(permissionAware.employment);
         registry.register(recruitmentModuleFor(unitOfWork, senders.recruitment));
         registry.register(onboardingModuleFor(unitOfWork, senders.onboarding));
         registry.register(attendanceModuleFor(unitOfWork, senders.attendance));
@@ -287,14 +298,22 @@ import { authenticationPortFor } from './authentication-port.js';
     },
     {
       provide: DISPATCHER,
-      inject: [MODULE_REGISTRY, EVENT_DISPATCHER, DEFERRED_SENDERS, PERMISSION_CHECKER],
+      inject: [
+        MODULE_REGISTRY,
+        EVENT_DISPATCHER,
+        DEFERRED_SENDERS,
+        PERMISSION_CHECKER,
+        LicensingGate,
+      ],
       useFactory: (
         registry: ModuleRegistry,
         events: EventDispatcher,
         senders: DeferredSenders,
         permissions: PermissionChecker,
+        licensing: LicensingGate,
       ): Dispatcher => {
-        const dispatcher = new Dispatcher(permissions);
+        // The licence caps every operation a person or job starts (ADR-0079).
+        const dispatcher = new Dispatcher(permissions, licensing);
 
         for (const module of registry.registered) {
           for (const handler of module.commands ?? []) {
@@ -305,15 +324,7 @@ import { authenticationPortFor } from './authentication-port.js';
           }
           for (const handler of module.eventHandlers ?? []) events.register(handler);
         }
-        senders.organization.attach(dispatcher);
-        senders.people.attach(dispatcher);
-        senders.employment.attach(dispatcher);
-        senders.recruitment.attach(dispatcher);
-        senders.onboarding.attach(dispatcher);
-        senders.attendance.attach(dispatcher);
-        senders.leave.attach(dispatcher);
-        senders.compensation.attach(dispatcher);
-        senders.payroll.attach(dispatcher);
+        for (const sender of Object.values(senders)) sender.attach(dispatcher);
         return dispatcher;
       },
     },
@@ -336,6 +347,7 @@ export class IdentityModule {}
  */
 interface PermissionAwareModules {
   readonly people: WorkModule;
+  readonly employment: WorkModule;
   readonly documents: WorkModule;
   readonly letters: WorkModule;
   readonly performance: WorkModule;
@@ -345,7 +357,7 @@ interface PermissionAwareModules {
   readonly relations: WorkModule;
 }
 
-interface DeferredSenders {
+type DeferredSenders = {
   readonly organization: DeferredCommandSender;
   readonly people: DeferredPeopleSender;
   readonly employment: DeferredEmploymentSender;
@@ -355,7 +367,7 @@ interface DeferredSenders {
   readonly leave: DeferredLeaveDispatcher;
   readonly compensation: DeferredCompensationDispatcher;
   readonly payroll: DeferredPayrollDispatcher;
-}
+};
 
 /**
  * The tenant's identity defaults now come from *that tenant*, falling back to the deployment's

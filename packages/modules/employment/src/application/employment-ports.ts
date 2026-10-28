@@ -70,6 +70,14 @@ export interface EmploymentStore {
    * what makes a duplicated create fail deterministically rather than merely usually.
    */
   openForPerson(transaction: Transaction, personId: string): Promise<EmploymentState | undefined>;
+  /**
+   * How many of the tenant's employments are not ended — its headcount — after taking the
+   * tenant's headcount lock for the rest of the transaction, so two concurrent creates are
+   * serialised between this count and their commit.
+   */
+  lockAndCountOpen(transaction: Transaction): Promise<number>;
+  /** The same count without the lock: a level to report, not a ceiling to enforce. */
+  countOpen(transaction: Transaction): Promise<number>;
   search(transaction: Transaction, query: EmploymentQuery): Promise<Page<EmploymentState>>;
   all(transaction: Transaction): Promise<readonly EmploymentState[]>;
   insert(transaction: Transaction, state: EmploymentState): Promise<void>;
@@ -186,3 +194,17 @@ export interface Clock {
 }
 
 export const systemClock: Clock = { now: () => new Date() };
+
+/**
+ * What the organisation is licensed to employ (Work ADR-0079). Bound by the platform when a
+ * licensing mode is configured; absent, nothing is limited.
+ */
+export interface HeadcountLicence {
+  /**
+   * Resolves to admit `requested` more open employments; throws the kernel's
+   * `NotEntitledException` to refuse. `countOpen` is the store's {@link
+   * EmploymentStore.lockAndCountOpen}, run inside the transaction that would commit the growth —
+   * and not run at all when the plan is unlimited.
+   */
+  admitHeadcount(requested: number, countOpen: () => Promise<number>): Promise<void>;
+}

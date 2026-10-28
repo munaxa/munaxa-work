@@ -12,6 +12,7 @@ export type { Result } from './result/result.js';
 export {
   ConcurrencyException,
   DomainException,
+  NotEntitledException,
   TenantIsolationException,
 } from './errors/domain-exception.js';
 
@@ -104,6 +105,7 @@ export type {
   Command,
   CommandHandler,
   HandlerFailure,
+  OperationGate,
   PermissionChecker,
   Query,
   QueryHandler,

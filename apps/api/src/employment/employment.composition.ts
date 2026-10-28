@@ -1,9 +1,15 @@
+import type { Provider } from '@nestjs/common';
+
+import { LicensingGate } from '../licensing/licensing.gate.js';
+import { DEFERRED_SENDERS, EMPLOYMENT_MODULE } from '../identity/identity.tokens.js';
+import { UNIT_OF_WORK } from '../persistence/database.module.js';
 import {
   employmentModule,
   postgresEmploymentStores,
   systemClock,
   type CommandSender,
   type EmployablePerson,
+  type HeadcountLicence,
   type OrganizationDirectoryPort,
   type PersonDirectoryPort,
 } from '@work/employment';
@@ -149,6 +155,7 @@ export class OrganizationDirectory implements OrganizationDirectoryPort {
 export const employmentModuleFor = (
   unitOfWork: UnitOfWork,
   sender: DeferredEmploymentSender,
+  headcount?: HeadcountLicence,
 ): WorkModule =>
   employmentModule(
     {
@@ -157,6 +164,33 @@ export const employmentModuleFor = (
       people: new PeopleDirectory(sender),
       organization: new OrganizationDirectory(sender),
       clock: systemClock,
+      ...(headcount === undefined ? {} : { headcount }),
     },
     sender,
   );
+
+/**
+ * Employment's own count of the current tenant's open employments, as a level to report to the
+ * central subscription service (ADR-0079): the rows the licensed headcount counts, read through
+ * this module's store under the tenant's row-level security, without the headcount lock.
+ */
+export const openEmploymentCounter =
+  (unitOfWork: UnitOfWork): (() => Promise<number>) =>
+  () =>
+    unitOfWork.execute((transaction) =>
+      postgresEmploymentStores().employments.countOpen(transaction),
+    );
+
+/**
+ * Employment as a provider of its own, built with the licensed headcount it enforces (ADR-0079) —
+ * the gate admits everyone under `LICENSING_MODE=NONE`. Registered by the identity module.
+ */
+export const employmentModuleProvider: Provider = {
+  provide: EMPLOYMENT_MODULE,
+  inject: [UNIT_OF_WORK, DEFERRED_SENDERS, LicensingGate],
+  useFactory: (
+    unitOfWork: UnitOfWork,
+    senders: { readonly employment: DeferredEmploymentSender },
+    licensing: LicensingGate,
+  ): WorkModule => employmentModuleFor(unitOfWork, senders.employment, licensing),
+};
