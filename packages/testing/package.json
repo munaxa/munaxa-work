@@ -29,7 +29,7 @@
     "@types/pg": "^8.11.10",
     "eslint": "^9.17.0",
     "typescript": "^5.7.3",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "pg": "^8.13.1",

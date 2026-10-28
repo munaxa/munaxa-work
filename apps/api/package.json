@@ -65,7 +65,7 @@
     "prisma": "^6.2.0",
     "supertest": "^7.0.0",
     "typescript": "^5.7.3",
-    "vitest": "^3.0.0",
+    "vitest": "^4.1.12",
     "@types/pg": "^8.11.10",
     "@work/testing": "workspace:*"
   }
