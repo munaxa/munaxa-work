@@ -106,7 +106,8 @@ export const environmentSchema = z.object({
   PLATFORM_AUTH_CLOCK_SKEW_MS: z.coerce.number().int().min(0).max(300_000).default(30_000),
 
   /**
-   * Where entitlements come from — `NONE` (default, nothing gated, as before), `LICENSE_FILE` (a
+   * Where entitlements come from — `NONE` (default, nothing gated, as before; refused in
+   * production, including when unset), `LICENSE_FILE` (a
    * signed Munaxa licence verified offline; on premises) or `CONTROL_PLANE` (the central Munaxa
    * subscription service, asked per tenant; Munaxa-hosted). The rules that span these are in
    * `readLicensing`, for the same reason the Platform authentication ones are in their reader.

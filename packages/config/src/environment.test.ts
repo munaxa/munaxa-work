@@ -75,6 +75,9 @@ describe('the People duplicate-match key', () => {
       ...valid,
       NODE_ENV: 'production',
       PII_MATCH_SECRET: 'a'.repeat(48),
+      LICENSING_MODE: 'CONTROL_PLANE',
+      CONTROL_PLANE_URL: 'https://control.munaxa.test',
+      CONTROL_PLANE_TOKEN: 'mxc_00000000-0000-4000-8000-000000000000_secret',
     });
 
     expect(environment.PII_MATCH_SECRET).toHaveLength(48);
@@ -176,6 +179,57 @@ describe('licensing', () => {
       kind: 'invalid',
       issues: ['CONTROL_PLANE_URL: must be https in production.'],
     });
+  });
+
+  describe('in production', () => {
+    const production = { NODE_ENV: 'production', PII_MATCH_SECRET: 'a'.repeat(48) };
+
+    it('refuses LICENSING_MODE=NONE, which would license nothing and gate nothing', () => {
+      const act = (): unknown =>
+        loadEnvironment({ ...base, ...production, LICENSING_MODE: 'NONE' });
+
+      expect(act).toThrow(ConfigurationError);
+      expect(act).toThrow(/LICENSING_MODE: production needs LICENSE_FILE or CONTROL_PLANE/);
+    });
+
+    it('refuses an unset LICENSING_MODE rather than taking the NONE default', () => {
+      const act = (): unknown => loadEnvironment({ ...base, ...production });
+
+      expect(act).toThrow(ConfigurationError);
+      expect(act).toThrow(/LICENSING_MODE: production needs LICENSE_FILE or CONTROL_PLANE/);
+    });
+
+    it('accepts a complete licence-file deployment', () => {
+      expect(readLicensing(loadEnvironment({ ...licenceFile, ...production }))).toMatchObject({
+        kind: 'licence-file',
+      });
+    });
+
+    it('still refuses an incomplete licence-file deployment', () => {
+      const source: Record<string, string> = { ...licenceFile, ...production };
+      delete source['LICENSE_PUBLIC_KEYS'];
+      expect(() => loadEnvironment(source)).toThrow(/LICENSE_PUBLIC_KEYS: required/);
+    });
+
+    it('accepts a hosted deployment over https', () => {
+      expect(readLicensing(loadEnvironment({ ...controlPlane, ...production }))).toMatchObject({
+        kind: 'control-plane',
+      });
+    });
+
+    it('refuses a hosted deployment over plain HTTP at startup', () => {
+      expect(() =>
+        loadEnvironment({
+          ...controlPlane,
+          ...production,
+          CONTROL_PLANE_URL: 'http://control.munaxa.test',
+        }),
+      ).toThrow(/CONTROL_PLANE_URL: must be https in production/);
+    });
+  });
+
+  it.each(['development', 'test'])('keeps the NONE default in %s', (NODE_ENV) => {
+    expect(readLicensing(loadEnvironment({ ...base, NODE_ENV }))).toEqual({ kind: 'none' });
   });
 
   it('refuses a private key where public keys belong', () => {
