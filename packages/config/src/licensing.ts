@@ -10,6 +10,7 @@ export interface LicensingSource {
   readonly LICENSE_PUBLIC_KEYS?: string | undefined;
   readonly LICENSE_ALGORITHM: 'ES256' | 'RS256';
   readonly LICENSE_INSTALLATION_ID?: string | undefined;
+  readonly LICENSE_REVOCATION_PATH?: string | undefined;
   readonly CONTROL_PLANE_URL?: string | undefined;
   readonly CONTROL_PLANE_TOKEN?: string | undefined;
 }
@@ -41,6 +42,11 @@ export interface LicenceFileConfiguration {
   readonly algorithm: 'ES256' | 'RS256';
   readonly publicKeys: readonly { readonly kid: string; readonly publicKey: string }[];
   readonly installationId: string;
+  /**
+   * Where Munaxa delivers the signed revocation list, next to the licence. Optional: without it the
+   * list persisted earlier still applies, and nothing is revoked that was not before.
+   */
+  readonly revocationPath: string | null;
 }
 
 export const readLicensing = (environment: LicensingSource): Licensing => {
@@ -91,6 +97,7 @@ const readLicenceFile = (environment: LicensingSource): Licensing => {
       algorithm: environment.LICENSE_ALGORITHM,
       publicKeys,
       installationId: environment.LICENSE_INSTALLATION_ID as string,
+      revocationPath: environment.LICENSE_REVOCATION_PATH ?? null,
     },
   };
 };

@@ -119,7 +119,18 @@ describe('licensing', () => {
         algorithm: 'ES256',
         publicKeys: [{ kid: 'lic-1', publicKey }],
         installationId: 'inst-1',
+        revocationPath: null,
       },
+    });
+  });
+
+  it('reads the optional revocation list path next to the licence', () => {
+    const configured = readLicensing(
+      loadEnvironment({ ...licenceFile, LICENSE_REVOCATION_PATH: '/etc/munaxa/work.revocations' }),
+    );
+    expect(configured).toMatchObject({
+      kind: 'licence-file',
+      configuration: { revocationPath: '/etc/munaxa/work.revocations' },
     });
   });
 

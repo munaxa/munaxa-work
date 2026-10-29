@@ -121,6 +121,8 @@ export const environmentSchema = z.object({
   LICENSE_PUBLIC_KEYS: z.string().min(1).optional(),
   LICENSE_ALGORITHM: z.enum(['ES256', 'RS256']).default('ES256'),
   LICENSE_INSTALLATION_ID: z.string().min(1).max(128).optional(),
+  /** The signed revocation list Munaxa delivers with the licence (`mxr1`). Optional. */
+  LICENSE_REVOCATION_PATH: z.string().min(1).optional(),
 });
 
 const DEVELOPMENT_MATCH_SECRET = 'development-only-people-match-secret-change-me';
