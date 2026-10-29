@@ -54,6 +54,22 @@ RUN --mount=type=secret,id=npm_token --mount=type=secret,id=ca_bundle \
 RUN pnpm --filter @work/api exec prisma generate --schema ../../prisma/schema.prisma && \
     pnpm turbo run build --filter @work/api
 
+# --- migrate -----------------------------------------------------------------------------------
+# The release job for the shared AWS stack (munaxa-platform infra/aws): `prisma migrate deploy` as
+# the owner role, once per release, before the new API starts. Built from the stage above, which
+# still holds the Prisma CLI and prisma/migrations; the runtime image below holds neither. The task
+# receives DATABASE_MIGRATION_URL (the owner role) and never the runtime role's credentials.
+FROM build AS migrate
+ENV NODE_ENV=production
+RUN addgroup -S work && adduser -S -G work work
+WORKDIR /app/apps/api
+USER work
+# Then the runtime role's standing grant (deploy/aws/runtime-grants.sql), as the same owner.
+CMD ["sh", "-c", "export DATABASE_URL=\"$DATABASE_MIGRATION_URL\" && ./node_modules/.bin/prisma migrate deploy --schema ../../prisma/schema.prisma && exec ./node_modules/.bin/prisma db execute --schema ../../prisma/schema.prisma --file ../../deploy/aws/runtime-grants.sql"]
+
+# --- prune: production dependencies only, for the runtime image ---------------------------------
+FROM build AS prune
+
 # Dev dependencies are removed with a production install rather than with `pnpm prune --prod` or
 # `pnpm deploy`, both of which were tried first and both of which are wrong here.
 #
@@ -122,7 +138,7 @@ RUN addgroup -S work && adduser -S -G work work
 # relative symlinks into node_modules/.pnpm; move a package and every link inside it dangles. With
 # twenty workspace packages an explicit per-package copy list is a maintenance trap that fails at
 # runtime rather than at build time, so the shape is preserved instead.
-COPY --from=build --chown=work:work /app /app
+COPY --from=prune --chown=work:work /app /app
 
 WORKDIR /app/apps/api
 USER work
