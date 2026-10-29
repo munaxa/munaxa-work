@@ -228,8 +228,10 @@ describe('licensing', () => {
     });
   });
 
-  it.each(['development', 'test'])('keeps the NONE default in %s', (NODE_ENV) => {
-    expect(readLicensing(loadEnvironment({ ...base, NODE_ENV }))).toEqual({ kind: 'none' });
+  it.each(['development', 'test'])('keeps the NONE default in %s', (nodeEnv) => {
+    expect(readLicensing(loadEnvironment({ ...base, NODE_ENV: nodeEnv }))).toEqual({
+      kind: 'none',
+    });
   });
 
   it('refuses a private key where public keys belong', () => {
