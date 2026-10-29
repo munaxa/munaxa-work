@@ -28,6 +28,12 @@ same answer in every product.
    permission check and tenant isolation.
 4. **`402`**, not `403`. A missing, forged, foreign-installation or other-tenant licence grants
    nothing — not even reads — because there is no subscription to degrade from.
+5. **`LICENSE_REVOCATION_PATH`** (optional, `LICENSE_FILE` mode only) names a signed revocation list
+   exported from Control. A verified list that names the licence suspends it (read-only); it never
+   grants anything. The newest verified list is stored per tenant in `licensing_state`, and a list
+   is replaced only by one with a higher sequence, so deleting the file or offering an older list
+   does not lift a revocation. A list that fails verification is ignored when offered and, if the
+   stored copy fails verification, the licence fails closed (read-only) rather than open.
 
 ## Consequences
 
@@ -36,6 +42,8 @@ same answer in every product.
   it (in the dispatcher rather than a controller decorator).
 - The latest observed instant is kept per process only, so clock rollback is detected while the API
   runs and, across a restart, only against the licence's issue time.
+- A fully offline installation learns of a revocation only when an operator places the new list at
+  `LICENSE_REVOCATION_PATH`; until then the licence it holds keeps its normal behaviour.
 - Hosted Work consults the central subscription service through `LICENSING_MODE=CONTROL_PLANE`
   (ADR-0079).
 

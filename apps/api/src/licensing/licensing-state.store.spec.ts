@@ -117,4 +117,29 @@ describe.skipIf(CONNECTION === undefined)('licensing_state', () => {
     expect(own?.snapshot?.tenantId).toBe(TENANT_B);
     expect(own?.lastObservedAt.toISOString()).toBe('2026-10-27T10:00:00.000Z');
   });
+
+  it('keeps a revocation list only when its sequence is higher, and only for its own tenant', async () => {
+    const write = (sequence: number, list: string) =>
+      as(TENANT_A, () => store.writeRevocationList(TENANT_A, list, sequence));
+    await write(3, 'mxr1.three');
+    await write(2, 'mxr1.two'); // older: refused by the database, not just the caller
+    await write(3, 'mxr1.three-again'); // the same number: not newer
+    expect((await as(TENANT_A, () => store.read(TENANT_A)))?.revocationList).toBe('mxr1.three');
+    await write(4, 'mxr1.four');
+    expect((await as(TENANT_A, () => store.read(TENANT_A)))?.revocationList).toBe('mxr1.four');
+
+    // Another tenant's context can neither write nor read it.
+    await as(TENANT_B, () => store.writeRevocationList(TENANT_A, 'mxr1.forged', 99));
+    expect((await as(TENANT_A, () => store.read(TENANT_A)))?.revocationList).toBe('mxr1.four');
+    expect(await as(TENANT_B, () => store.read(TENANT_A))).toBeNull();
+  });
+
+  it('the database refuses a list without its sequence', async () => {
+    await expect(
+      admin.query(
+        `update licensing_state set revocation_list = 'x', revocation_sequence = null where tenant_id = $1`,
+        [TENANT_A],
+      ),
+    ).rejects.toThrow(/licensing_state_revocation_pair_check/);
+  });
 });

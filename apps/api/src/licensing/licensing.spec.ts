@@ -6,7 +6,13 @@ import { join } from 'node:path';
 import { HttpException, type ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
 import { AsymmetricSigner } from '@munaxa/crypto';
-import { armorLicense, issueLicense, type LicensePayload } from '@munaxa/licensing';
+import {
+  REVOCATION_LIST_FORMAT,
+  armorLicense,
+  issueLicense,
+  issueRevocationList,
+  type LicensePayload,
+} from '@munaxa/licensing';
 import { loadEnvironment } from '@work/config';
 import { runInContext, uuidV7 } from '@work/kernel';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -28,6 +34,25 @@ const pair = {
 };
 const issuer = new AsymmetricSigner('ES256', [pair]);
 const path = join(directory, 'work.license');
+const revocations = join(directory, 'work.revocations');
+
+/** A signed revocation list naming `licenseIds`, numbered `sequence`. */
+function revocationList(sequence: number, licenseIds: readonly string[], signer = issuer): string {
+  return issueRevocationList(
+    {
+      format: REVOCATION_LIST_FORMAT,
+      product: 'work',
+      sequence,
+      issuedAt: '2026-06-01T00:00:00.000Z',
+      revoked: licenseIds.map((licenseId) => ({
+        licenseId,
+        revokedAt: '2026-06-01T00:00:00.000Z',
+        reason: 'CONTRACT_ENDED' as const,
+      })),
+    },
+    signer,
+  );
+}
 
 function licence(overrides: Partial<LicensePayload> = {}): string {
   return armorLicense(
@@ -64,6 +89,14 @@ const licensedEnvironment = loadEnvironment({
   LICENSE_FILE_PATH: path,
   LICENSE_PUBLIC_KEYS: JSON.stringify([{ kid: pair.kid, publicKey: pair.publicKey }]),
   LICENSE_INSTALLATION_ID: 'inst-1',
+});
+const revocableEnvironment = loadEnvironment({
+  DATABASE_URL: 'postgresql://work@localhost:5432/work',
+  LICENSING_MODE: 'LICENSE_FILE',
+  LICENSE_FILE_PATH: path,
+  LICENSE_PUBLIC_KEYS: JSON.stringify([{ kid: pair.kid, publicKey: pair.publicKey }]),
+  LICENSE_INSTALLATION_ID: 'inst-1',
+  LICENSE_REVOCATION_PATH: revocations,
 });
 
 function reflector(metadata: Record<string, unknown> = {}): Reflector {
@@ -145,5 +178,90 @@ describe('EntitlementGuard', () => {
       new LicenceSource(licensedEnvironment, new MemoryLicensingStateStore()),
     );
     await expect(guard.canActivate(http('POST'))).resolves.toBe(true);
+  });
+});
+
+describe('offline revocation (platform ADR-0022)', () => {
+  const guardWith = (store: MemoryLicensingStateStore) =>
+    new EntitlementGuard(reflector(), new LicenceSource(revocableEnvironment, store));
+  const seeded = () => {
+    const store = new MemoryLicensingStateStore();
+    // A licensing_state row exists once a check has written it.
+    store.rows.set(TENANT, { snapshot: null, lastObservedAt: new Date(0), revocationList: null });
+    return store;
+  };
+
+  it('a licence the delivered list names is suspended: reads stay, writes stop', async () => {
+    writeFileSync(path, licence());
+    writeFileSync(revocations, revocationList(2, ['lic_1']));
+    const guard = guardWith(seeded());
+    await expect(asTenant(() => guard.canActivate(http('GET')))).resolves.toBe(true);
+    expect((await refusal(guard, 'POST')).getStatus()).toBe(402);
+  });
+
+  it('a list that does not name this licence changes nothing', async () => {
+    writeFileSync(path, licence());
+    writeFileSync(revocations, revocationList(2, ['lic_someone_else']));
+    const guard = guardWith(seeded());
+    await expect(asTenant(() => guard.canActivate(http('POST')))).resolves.toBe(true);
+  });
+
+  it('a revocation sticks: deleting the file or offering an older list does not undo it', async () => {
+    writeFileSync(path, licence());
+    writeFileSync(revocations, revocationList(3, ['lic_1']));
+    const store = seeded();
+    await refusal(guardWith(store), 'POST');
+    expect(store.sequences.get(TENANT)).toBe(3);
+
+    // A new process (restart), the file now gone: the persisted list still applies.
+    rmSync(revocations);
+    expect((await refusal(guardWith(store), 'POST')).getStatus()).toBe(402);
+
+    // An older list, which did not yet name the licence, is not taken.
+    writeFileSync(revocations, revocationList(2, []));
+    expect((await refusal(guardWith(store), 'POST')).getStatus()).toBe(402);
+    expect(store.sequences.get(TENANT)).toBe(3);
+  });
+
+  it('a forged list is not taken, and grants nothing it did not already have', async () => {
+    writeFileSync(path, licence());
+    const forger = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    // The same key id, a different key: what a forger would try.
+    const stranger = new AsymmetricSigner('ES256', [
+      {
+        kid: pair.kid,
+        privateKey: forger.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
+        publicKey: forger.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+      },
+    ]);
+    // Persist a real revocation first, then offer a forged, newer list that would lift it.
+    writeFileSync(revocations, revocationList(2, ['lic_1']));
+    const store = seeded();
+    await refusal(guardWith(store), 'POST');
+    writeFileSync(revocations, revocationList(9, [], stranger));
+    expect((await refusal(guardWith(store), 'POST')).getStatus()).toBe(402);
+    expect(store.sequences.get(TENANT)).toBe(2);
+  });
+
+  it('a kept list that no longer verifies fails closed: the licence is suspended', async () => {
+    writeFileSync(path, licence());
+    rmSync(revocations, { force: true });
+    const store = seeded();
+    const tampered = revocationList(2, []).replace(/\.[^.]+$/, '.AAAA');
+    store.rows.set(TENANT, {
+      snapshot: null,
+      lastObservedAt: new Date(0),
+      revocationList: tampered,
+    });
+    expect((await refusal(guardWith(store), 'POST')).getStatus()).toBe(402);
+  });
+
+  it('without a revocation path, a valid licence works as before', async () => {
+    writeFileSync(path, licence());
+    const guard = new EntitlementGuard(
+      reflector(),
+      new LicenceSource(licensedEnvironment, new MemoryLicensingStateStore()),
+    );
+    await expect(asTenant(() => guard.canActivate(http('POST')))).resolves.toBe(true);
   });
 });

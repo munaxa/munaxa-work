@@ -8,6 +8,8 @@ export interface StoredLicensingState {
   /** The last snapshot verified for the tenant; `null` when the source said "no subscription". */
   readonly snapshot: EntitlementSnapshot | null;
   readonly lastObservedAt: Date;
+  /** The newest revocation list verified for this installation, as delivered; `null` when none. */
+  readonly revocationList: string | null;
 }
 
 /**
@@ -27,6 +29,12 @@ export interface LicensingStateStore {
       readonly observedAt: Date;
     },
   ): Promise<void>;
+  /**
+   * Keeps a newly verified revocation list. Only a higher `sequence` replaces the stored one, so
+   * two processes racing can never put an older list back. A tenant with no state row yet keeps
+   * nothing; the next check, after its state is written, keeps it.
+   */
+  writeRevocationList(tenantId: string, list: string, sequence: number): Promise<void>;
 }
 
 const WRITER = 'system:licensing';
@@ -38,8 +46,12 @@ export class PostgresLicensingStateStore implements LicensingStateStore {
     const rows = await this.unitOfWork.execute((transaction) => {
       // The unit of work is the current context's tenant; asked about any other, it knows nothing.
       if (transaction.tenantId !== tenantId) return Promise.resolve([]);
-      return transaction.execute<{ snapshot: unknown; last_observed_at: Date }>(
-        `select snapshot, last_observed_at from licensing_state
+      return transaction.execute<{
+        snapshot: unknown;
+        last_observed_at: Date;
+        revocation_list: string | null;
+      }>(
+        `select snapshot, last_observed_at, revocation_list from licensing_state
           where tenant_id = $1 and deleted_at is null`,
         [tenantId],
       );
@@ -51,6 +63,7 @@ export class PostgresLicensingStateStore implements LicensingStateStore {
     return {
       snapshot: parsed !== null && parsed.ok ? parsed.snapshot : null,
       lastObservedAt: row.last_observed_at,
+      revocationList: row.revocation_list,
     };
   }
 
@@ -82,6 +95,24 @@ export class PostgresLicensingStateStore implements LicensingStateStore {
       );
     });
   }
+
+  public async writeRevocationList(
+    tenantId: string,
+    list: string,
+    sequence: number,
+  ): Promise<void> {
+    await this.unitOfWork.execute(async (transaction) => {
+      if (transaction.tenantId !== tenantId) return;
+      await transaction.execute(
+        `update licensing_state
+            set revocation_list = $2, revocation_sequence = $3,
+                updated_at = now(), updated_by = $4, version = version + 1
+          where tenant_id = $1 and deleted_at is null
+            and (revocation_sequence is null or revocation_sequence < $3)`,
+        [tenantId, list, sequence, WRITER],
+      );
+    });
+  }
 }
 
 /** The same forward-only rule, in memory: for tests, and for nothing else. */
@@ -99,7 +130,20 @@ export class MemoryLicensingStateStore implements LicensingStateStore {
     const previous = this.rows.get(tenantId)?.lastObservedAt;
     const lastObservedAt =
       previous !== undefined && previous > state.observedAt ? previous : state.observedAt;
-    this.rows.set(tenantId, { snapshot: state.snapshot, lastObservedAt });
+    const revocationList = this.rows.get(tenantId)?.revocationList ?? null;
+    this.rows.set(tenantId, { snapshot: state.snapshot, lastObservedAt, revocationList });
+    return Promise.resolve();
+  }
+
+  public readonly sequences = new Map<string, number>();
+
+  public writeRevocationList(tenantId: string, list: string, sequence: number): Promise<void> {
+    const row = this.rows.get(tenantId);
+    const previous = this.sequences.get(tenantId);
+    if (row !== undefined && (previous === undefined || previous < sequence)) {
+      this.rows.set(tenantId, { ...row, revocationList: list });
+      this.sequences.set(tenantId, sequence);
+    }
     return Promise.resolve();
   }
 }

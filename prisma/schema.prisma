@@ -5834,6 +5834,9 @@ model LicensingState {
   snapshot         Json?
   source           String    @db.VarChar(32)
   last_observed_at DateTime  @db.Timestamptz(6)
+  /// The newest verified revocation list (`mxr1`) and its sequence, which only grows.
+  revocation_list     String?
+  revocation_sequence Int?
   created_at       DateTime  @db.Timestamptz(6)
   created_by       String    @db.VarChar(255)
   updated_at       DateTime  @db.Timestamptz(6)
