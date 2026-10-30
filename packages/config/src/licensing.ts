@@ -19,7 +19,7 @@ export interface LicensingSource {
  * Where Munaxa Work's entitlements come from.
  *
  * `NONE` (the default) is the deployment as it has always been: nothing is licensed and nothing is
- * gated. `LICENSE_FILE` is the on-premises mode: a signed Munaxa licence on disk, verified offline
+ * gated. Development and test only: production refuses it, set or defaulted. `LICENSE_FILE` is the on-premises mode: a signed Munaxa licence on disk, verified offline
  * against public keys, which then caps every request through the shared `@munaxa/licensing`
  * contract. `CONTROL_PLANE` is the hosted mode: the central subscription service, asked per tenant
  * with this deployment's service credential. No failure selects `NONE`; a licence that is missing
@@ -50,7 +50,18 @@ export interface LicenceFileConfiguration {
 }
 
 export const readLicensing = (environment: LicensingSource): Licensing => {
-  if (environment.LICENSING_MODE === 'NONE') return { kind: 'none' };
+  if (environment.LICENSING_MODE === 'NONE') {
+    // `NONE` is also what an unset variable means, so a production deployment that forgot to say
+    // how it is licensed would otherwise run unlicensed for every tenant. It must name a source.
+    return environment.NODE_ENV === 'production'
+      ? {
+          kind: 'invalid',
+          issues: [
+            'LICENSING_MODE: production needs LICENSE_FILE or CONTROL_PLANE. NONE, which is also the default when the variable is unset, licenses nothing and gates nothing.',
+          ],
+        }
+      : { kind: 'none' };
+  }
   if (environment.LICENSING_MODE === 'CONTROL_PLANE') return readControlPlane(environment);
   return readLicenceFile(environment);
 };

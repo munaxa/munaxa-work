@@ -18,7 +18,8 @@ same answer in every product.
 ## Decision
 
 1. **`LICENSING_MODE`**, read through `@work/config` like every other variable. `NONE` (default) is
-   the deployment as it has always been: nothing gated. `LICENSE_FILE` reads a signed licence from
+   the deployment as it has always been: nothing gated. `NONE` is for development and test only:
+   with `NODE_ENV=production` startup refuses it, whether it is set or taken as the default. `LICENSE_FILE` reads a signed licence from
    disk and verifies it offline with public keys only; a private key in `LICENSE_PUBLIC_KEYS`, or a
    missing input, refuses startup.
 2. **One global `EntitlementGuard`, after `AuthenticatedTenantGuard`.** Reads need `READ`, everything
@@ -46,6 +47,9 @@ same answer in every product.
   `LICENSE_REVOCATION_PATH`; until then the licence it holds keeps its normal behaviour.
 - Hosted Work consults the central subscription service through `LICENSING_MODE=CONTROL_PLANE`
   (ADR-0079).
+- A production deployment must name its licence source (`LICENSE_FILE` or `CONTROL_PLANE`). One that
+  forgot the variable would otherwise license nothing and gate nothing for every tenant, so it fails
+  to start instead (2026-10-29).
 
 ## Alternatives considered
 
