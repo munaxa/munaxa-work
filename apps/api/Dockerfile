@@ -61,6 +61,9 @@ RUN pnpm --filter @work/api exec prisma generate --schema ../../prisma/schema.pr
 # receives DATABASE_MIGRATION_URL (the owner role) and never the runtime role's credentials.
 FROM build AS migrate
 ENV NODE_ENV=production
+# The RDS roots, for scripts/bootstrap-tenant.mjs (node-postgres); see the runtime stage.
+COPY deploy/aws/rds-ca-eu-central-1.crt /usr/local/share/ca-certificates/rds-ca-eu-central-1.crt
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/rds-ca-eu-central-1.crt
 RUN addgroup -S work && adduser -S -G work work
 WORKDIR /app/apps/api
 USER work
@@ -130,6 +133,14 @@ RUN find /app/apps /app/packages -type d \( -name src -o -name test -o -name __t
 
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
+
+# Amazon RDS's eu-central-1 root CAs (deploy/aws/rds-ca-eu-central-1.crt, AWS's regional trust
+# bundle). node-postgres treats `sslmode=require` as `verify-full`, so on RDS, whose certificates
+# chain to these private roots and not to anything in Node's store, every connection fails with
+# SELF_SIGNED_CERT_IN_CHAIN. Appending them keeps full verification (chain and host name) rather
+# than turning it off. Public certificates, not a secret.
+COPY deploy/aws/rds-ca-eu-central-1.crt /usr/local/share/ca-certificates/rds-ca-eu-central-1.crt
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/rds-ca-eu-central-1.crt
 
 # Never root. A container that is compromised should not also be privileged inside itself.
 RUN addgroup -S work && adduser -S -G work work
