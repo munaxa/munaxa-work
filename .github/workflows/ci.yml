@@ -1,11 +1,10 @@
 name: CI
 
 on:
+  # No paths-ignore: these jobs are required checks on main, and a required check that a path
+  # filter never starts stays pending forever, so a Markdown-only pull request could never merge.
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
 
 concurrency:
   group: ci-${{ github.ref }}
