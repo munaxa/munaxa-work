@@ -7,18 +7,17 @@
 # is not worth reintroducing for the convenience of building in one fewer place. So the images are
 # built here, where BuildKit secrets work, and Render pulls them by digest.
 #
-# **Tag-triggered, not push-triggered.** Publishing is a decision about a specific validated commit,
-# not something every push should do. `workflow_dispatch` would be the obvious alternative and is
-# offered too, but GitHub only exposes it for workflows present on the default branch — and the
-# validated commit currently sits on an unmerged branch. A tag works from any commit that carries
-# this file.
+# **Dispatch only, not push- or tag-triggered.** Publishing is a decision about a specific validated
+# commit, not something every push should do. `image/**` tags are the ECR release tags
+# (publish-images-ecr.yml), so this workflow no longer listens to them; dispatch it from main and
+# name the commit to build.
 
 name: Publish images
 
+# Not on `image/**` tags any more: those are the ECR release tags (publish-images-ecr.yml), which
+# run behind the image-release environment. This GHCR job has no environment and holds
+# PLATFORM_PACKAGES_TOKEN, so it runs only when dispatched by hand, until Render is retired.
 on:
-  push:
-    tags:
-      - 'image/**'
   workflow_dispatch:
     inputs:
       commit:
