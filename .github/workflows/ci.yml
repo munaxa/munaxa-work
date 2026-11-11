@@ -5,10 +5,16 @@ on:
   # filter never starts stays pending forever, so a Markdown-only pull request could never merge.
   pull_request:
     branches: [main]
+  # And on main itself, so the commit an `image/<sha>` tag names has a CI run of its own. With only
+  # the pull_request trigger, main's history showed no CI at all (a merge result is never re-checked
+  # after it lands), and the only runs recorded against main were the image publishes.
+  push:
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A superseded pull request run is noise; a main run is the record for its commit, so keep it.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   NODE_VERSION: '22'

@@ -3,7 +3,7 @@
 **Munaxa Work** is the HCM product. This is its independent repository — it owns its own API,
 apps, database, migrations, infrastructure and CI, and depends on no other product.
 
-> **Where this is.** Eighteen business modules, 186 tables, 32 migrations and 513 routes are
+> **Where this is.** Eighteen business modules, 187 tables, 34 migrations and 513 routes are
 > built and tested; the ledger is [`docs/PHASES.md`](docs/PHASES.md). The product surface over
 > them is thinner than the domain beneath it, and
 > [`docs/verification/product-readiness-audit.md`](docs/verification/product-readiness-audit.md)

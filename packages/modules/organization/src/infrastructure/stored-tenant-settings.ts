@@ -29,6 +29,14 @@ import type { PortalKey, TenantIdentitySettings, TenantSettingsPort } from '@wor
  * — a language, a calendar, a time zone — that is not personal data and discloses nothing about
  * anybody. See ADR-0036.
  *
+ * **The named tenant is set for the read, because row-level security needs it.** `tenant_settings`
+ * carries the forced `tenant_isolation` policy, so a query on a pooled connection with no
+ * `app.tenant_id` reads zero rows for the runtime role (`work_app`, `NOBYPASSRLS`). Without the
+ * transaction-local `set_config` below every tenant silently resolved to the deployment defaults
+ * in a real deployment, while a test running as a superuser saw the stored row. The tenant set
+ * is the one being asked about and nothing wider, so the read still returns that tenant's row
+ * alone.
+ *
  * **A missing row falls back rather than failing.** A tenant created five minutes ago has no
  * settings, and refusing to invite anybody into it until an administrator has visited a settings
  * screen would be a worse product. The fallback is the deployment's *validated configuration*,
@@ -42,15 +50,32 @@ export class StoredTenantSettings implements TenantSettingsPort {
   ) {}
 
   public async settingsFor(tenantId: string): Promise<TenantIdentitySettings> {
-    const result = await this.pool.query<SettingsRow>(
-      `select language, calendar, time_zone, numerals, invitation_validity_days, default_portals
-         from tenant_settings
-        where tenant_id = $1 and deleted_at is null`,
-      [tenantId],
-    );
-    const row = result.rows[0];
+    const row = await this.storedRow(tenantId);
 
     return row === undefined ? this.deploymentDefaults : merged(row, this.deploymentDefaults);
+  }
+
+  private async storedRow(tenantId: string): Promise<SettingsRow | undefined> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('begin read only');
+      // Transaction-local, so the pooled connection carries no tenant into its next checkout.
+      await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantId]);
+      const result = await client.query<SettingsRow>(
+        `select language, calendar, time_zone, numerals, invitation_validity_days, default_portals
+           from tenant_settings
+          where tenant_id = $1 and deleted_at is null`,
+        [tenantId],
+      );
+      await client.query('commit');
+      return result.rows[0];
+    } catch (error) {
+      await client.query('rollback').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 

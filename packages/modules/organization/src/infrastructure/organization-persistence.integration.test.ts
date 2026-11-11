@@ -324,6 +324,19 @@ describeWithDatabase('Organization persistence', () => {
       });
     });
 
+    it('reads the stored settings as the application role, which row-level security binds', async () => {
+      await fixture.seedSettings(TENANT_A, RIYADH);
+      await fixture.seedSettings(TENANT_B, AMMAN);
+
+      // The runtime role cannot bypass the forced policy on `tenant_settings`, so a read with no
+      // tenant in context sees nothing and every tenant would fall back to the deployment
+      // defaults. The superuser pool above cannot show that; this one can.
+      const settings = new StoredTenantSettings(fixture.application, DEPLOYMENT_DEFAULTS);
+
+      expect((await settings.settingsFor(TENANT_A)).timeZone).toBe('Asia/Riyadh');
+      expect((await settings.settingsFor(TENANT_B)).timeZone).toBe('Asia/Amman');
+    });
+
     it("falls back to the deployment's configuration for a tenant configured with nothing", async () => {
       const settings = new StoredTenantSettings(fixture.admin, DEPLOYMENT_DEFAULTS);
 
