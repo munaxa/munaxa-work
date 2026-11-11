@@ -94,8 +94,12 @@ contract states "no wildcard authorization; the checker matches exactly".
 - **Staleness is bounded by the token lifecycle, and must be operated as such.** Permissions travel
   in the access token, so a revoked permission remains effective until that token expires —
   Platform's default access-token lifetime is 15 minutes. Immediate revocation is Platform's
-  `tokenVersion` bump, which `verifyAccessToken` enforces. This is a property of the contract, not a
-  defect, and it belongs in the runbook rather than in a reader's memory.
+  `tokenVersion` bump — but `verifyAccessToken` enforces it only when the caller passes the current
+  version, and Work does not: `platform-token-authentication.ts` calls `verifyAccessToken(token)`
+  with no `tokenVersion`, and reads no `sid`, `ver`, `amr` or `mfa`. So a signed-out, revoked or
+  version-bumped token is still accepted by Work until it expires (*correction, 11 Nov 2026*). This
+  is a property of the contract, not a defect, and it belongs in the runbook rather than in a
+  reader's memory.
 
 - **A Work administrator role in Platform enumerates its grants.** Because no wildcard confers a
   Work permission, a role granting broad Work access lists the φ-form names explicitly. That list is

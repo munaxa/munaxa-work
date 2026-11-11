@@ -140,7 +140,7 @@ munaxa-work/
 
 ## Status
 
-**Eighteen business modules, 186 tables, 32 migrations, 513 HTTP routes and 285 declared
+**Eighteen business modules, 187 tables, 34 migrations, 513 HTTP routes and 285 declared
 permissions are built and tested.** The API, the Admin portal, the two self-service portal shells
 and the Flutter host all exist; [`docs/PHASES.md`](docs/PHASES.md) is the ledger of what each phase
 delivered and [`docs/verification/`](docs/verification/) holds every phase's report.
