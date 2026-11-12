@@ -197,18 +197,40 @@ describeWithDatabase('Workforce Identity persistence', () => {
   });
 
   describe('the membership directory — the query the tenant guard depends on', () => {
-    it('returns the tenants an authenticated person is an active member of', async () => {
+    const ORG_A = { issuer: 'https://id.test.example', tenantId: 'org-a' };
+    const ORG_B = { issuer: 'https://id.test.example', tenantId: 'org-b' };
+
+    beforeEach(async () => {
+      await fixture.seedBinding(TENANT_A, ORG_A);
+      await fixture.seedBinding(TENANT_B, ORG_B);
+    });
+
+    it('returns only the membership in the tenant bound to the token’s organisation', async () => {
       const directory = new PostgresMembershipDirectory(fixture.application);
       const user = await fixture.seedUser('platform-1');
 
       await fixture.seedMembership(TENANT_A, user);
       await fixture.seedMembership(TENANT_B, user);
 
-      const found = await directory.activeMembershipsOf('platform-1');
+      const inA = await directory.activeMembershipsOf('platform-1', ORG_A);
+      const inB = await directory.activeMembershipsOf('platform-1', ORG_B);
 
-      expect(found.map((membership) => membership.tenantId).sort()).toEqual(
-        [TENANT_A, TENANT_B].sort(),
-      );
+      expect(inA.map((membership) => membership.tenantId)).toEqual([TENANT_A]);
+      expect(inB.map((membership) => membership.tenantId)).toEqual([TENANT_B]);
+    });
+
+    it('returns nothing for an organisation bound to no tenant, or from another issuer', async () => {
+      const directory = new PostgresMembershipDirectory(fixture.application);
+      const user = await fixture.seedUser('platform-1');
+
+      await fixture.seedMembership(TENANT_A, user);
+
+      expect(
+        await directory.activeMembershipsOf('platform-1', { ...ORG_A, tenantId: 'org-z' }),
+      ).toEqual([]);
+      expect(
+        await directory.activeMembershipsOf('platform-1', { ...ORG_A, issuer: 'https://evil' }),
+      ).toEqual([]);
     });
 
     it('returns nothing for a platform user nobody has admitted', async () => {
@@ -216,13 +238,13 @@ describeWithDatabase('Workforce Identity persistence', () => {
 
       await fixture.seedUser('platform-stranger');
 
-      expect(await directory.activeMembershipsOf('platform-stranger')).toEqual([]);
+      expect(await directory.activeMembershipsOf('platform-stranger', ORG_A)).toEqual([]);
     });
 
     it('returns nothing for a platform user that does not exist', async () => {
       const directory = new PostgresMembershipDirectory(fixture.application);
 
-      expect(await directory.activeMembershipsOf('platform-nobody')).toEqual([]);
+      expect(await directory.activeMembershipsOf('platform-nobody', ORG_A)).toEqual([]);
     });
 
     it('excludes a suspended membership, so a suspended person resolves no tenant', async () => {
@@ -236,7 +258,7 @@ describeWithDatabase('Workforce Identity persistence', () => {
         membership,
       ]);
 
-      expect(await directory.activeMembershipsOf('platform-1')).toEqual([]);
+      expect(await directory.activeMembershipsOf('platform-1', ORG_A)).toEqual([]);
     });
 
     it('excludes every membership of a suspended account', async () => {
@@ -249,7 +271,7 @@ describeWithDatabase('Workforce Identity persistence', () => {
         user,
       ]);
 
-      expect(await directory.activeMembershipsOf('platform-1')).toEqual([]);
+      expect(await directory.activeMembershipsOf('platform-1', ORG_A)).toEqual([]);
     });
 
     it('returns identifiers only — nothing that would be a disclosure if it were wrong', async () => {
@@ -258,7 +280,7 @@ describeWithDatabase('Workforce Identity persistence', () => {
 
       await fixture.seedMembership(TENANT_A, user);
 
-      const [membership] = await directory.activeMembershipsOf('platform-1');
+      const [membership] = await directory.activeMembershipsOf('platform-1', ORG_A);
 
       expect(Object.keys(membership ?? {}).sort()).toEqual([
         'membershipId',

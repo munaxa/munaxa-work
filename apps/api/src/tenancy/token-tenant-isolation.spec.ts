@@ -11,24 +11,35 @@ import {
 import { TENANT_HEADER, TenantMiddleware } from './tenant.middleware.js';
 
 /**
- * The regression suite for the risk Phase 2 introduces, and the reason the adapter reads the
- * claims it does.
+ * The regression suite for the two ways a genuine token could reach the wrong tenant.
  *
  * `tenant.middleware.spec.ts` already proves that a *header* cannot select a tenant somebody is
- * not a member of. That suite authenticates through a double, so it cannot see the new hazard:
- * a genuine Platform access token carries `tid`, the tenant Platform minted it for. If that
- * claim ever reached tenant resolution, a caller would once again be choosing their own tenant
- * — the exact defect ADR-0032 removed, reintroduced through a different door and harder to see,
- * because this time the value arrives inside a cryptographically valid token.
+ * not a member of. These tests wire the **real** `PlatformTokenAuthenticationPort` to the **real**
+ * `TenantMiddleware` and vary what the token says, against a directory that holds to the same rule
+ * `app_bound_memberships_of` does in the database: only memberships of the Work tenant bound to the
+ * token's organisation are returned (ADR-0080).
  *
- * So these tests wire the **real** `PlatformTokenAuthenticationPort` to the **real**
- * `TenantMiddleware` and vary only what the token says. The property under test is that the
- * token's tenant claim changes nothing, and that membership decides everything.
+ * The two properties:
+ *
+ * - **The token's `tid` never selects a Work tenant.** It names a Platform organisation, which is a
+ *   different identifier space; the tenant still comes from a stored membership (ADR-0032).
+ * - **The token's grants never leave the organisation they were issued for** (WK-01). A person who
+ *   is a member of two Work tenants can act, with a given token, only in the one bound to that
+ *   token's organisation — whatever the header says.
  */
 
 const TENANT_A = uuidV7();
 const TENANT_B = uuidV7();
+const ORG_A = 'org-a';
+const ORG_B = 'org-b';
+const ISSUER = 'https://identity.example.com';
 const PLATFORM_USER = 'platform-user-9';
+
+/** Which organisation each Work tenant is bound to, as `tenant_platform_binding` records it. */
+const BINDINGS = new Map<string, string>([
+  [TENANT_A, ORG_A],
+  [TENANT_B, ORG_B],
+]);
 
 const membershipOf = (tenantId: string): ResolvedMembership => ({
   tenantId,
@@ -39,19 +50,25 @@ const membershipOf = (tenantId: string): ResolvedMembership => ({
 });
 
 const directoryWith = (...memberships: ResolvedMembership[]): TenantMembershipDirectory => ({
-  activeMembershipsOf: () => Promise.resolve(memberships),
+  activeMembershipsOf: (_user, organisation) =>
+    Promise.resolve(
+      memberships.filter(
+        (membership) =>
+          organisation.issuer === ISSUER &&
+          BINDINGS.get(membership.tenantId) === organisation.tenantId,
+      ),
+    ),
 });
 
-/**
- * A verifier that accepts the token and reports the claims it was built with, including a
- * tenant claim. It stands for a Platform token that is entirely genuine — the point being that
- * a genuine token still may not choose the tenant.
- */
+/** A verifier that accepts the token and reports the claims it was built with. */
 const vouchingFor = (claims: Record<string, unknown>): AccessTokenVerifier => ({
   verifyAccessToken: () => ({
     sub: PLATFORM_USER,
-    iss: 'https://identity.example.com',
+    iss: ISSUER,
     iat: 1_780_000_000,
+    exp: 1_780_000_900,
+    sid: 'sess-1',
+    tid: ORG_A,
     ...claims,
   }),
 });
@@ -82,71 +99,86 @@ const tenantEstablishedBy = async (
 
 const AUTHORIZED = { authorization: 'Bearer a-genuine-platform-token' };
 
-describe('the tenant claim inside a verified Platform token', () => {
-  it('does not select the tenant — the stored membership does', async () => {
-    // The token was minted for tenant A. The only membership is in tenant B. Membership wins,
-    // because membership is the only thing that ever decided.
-    const middleware = middlewareFor({ tid: TENANT_A }, directoryWith(membershipOf(TENANT_B)));
+describe('the organisation claim inside a verified Platform token', () => {
+  it('is never a Work tenant: a tid equal to a Work tenant id resolves nothing', async () => {
+    // A caller who learned a Work tenant id and got a token whose tid happens to equal it gains
+    // nothing: no Work tenant is bound to an organisation with that id.
+    const middleware = middlewareFor({ tid: TENANT_B }, directoryWith(membershipOf(TENANT_B)));
 
-    expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBe(TENANT_B);
+    expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBeUndefined();
+  });
+
+  it('resolves the member’s tenant when it is the one bound to the token’s organisation', async () => {
+    const middleware = middlewareFor({ tid: ORG_A }, directoryWith(membershipOf(TENANT_A)));
+
+    expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBe(TENANT_A);
+  });
+
+  it('WK-01: a member of two tenants acts with an organisation-A token in tenant A only', async () => {
+    const both = directoryWith(membershipOf(TENANT_A), membershipOf(TENANT_B));
+    const orgAToken = middlewareFor({ tid: ORG_A }, both);
+
+    // No header: no longer ambiguous, because only one tenant is eligible for this token.
+    expect(await tenantEstablishedBy(orgAToken, AUTHORIZED)).toBe(TENANT_A);
+    // Naming tenant B is refused, not honoured: the grants were computed in organisation A.
+    expect(
+      await tenantEstablishedBy(orgAToken, { ...AUTHORIZED, [TENANT_HEADER]: TENANT_B }),
+    ).toBeUndefined();
+    expect(await tenantEstablishedBy(orgAToken, { ...AUTHORIZED, [TENANT_HEADER]: TENANT_A })).toBe(
+      TENANT_A,
+    );
+  });
+
+  it('grants nothing when the token’s organisation is bound to no tenant the person belongs to', async () => {
+    const middleware = middlewareFor({ tid: ORG_B }, directoryWith(membershipOf(TENANT_A)));
+
+    expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBeUndefined();
+  });
+
+  it('grants nothing for an organisation no Work tenant is bound to', async () => {
+    const middleware = middlewareFor({ tid: 'org-unbound' }, directoryWith(membershipOf(TENANT_A)));
+
+    expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBeUndefined();
+  });
+
+  it('a token without an organisation, a session or an expiry is not a principal at all', async () => {
+    for (const missing of [
+      { tid: undefined },
+      { tid: '' },
+      { sid: undefined },
+      { exp: undefined },
+    ]) {
+      const middleware = middlewareFor(missing, directoryWith(membershipOf(TENANT_A)));
+      expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBeUndefined();
+    }
   });
 
   it('grants nothing when the person is a member of no tenant at all', async () => {
-    const middleware = middlewareFor({ tid: TENANT_A }, directoryWith());
+    const middleware = middlewareFor({ tid: ORG_A }, directoryWith());
 
     expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBeUndefined();
-  });
-
-  it('cannot break a tie the membership directory left ambiguous', async () => {
-    // Two memberships and no header is refused rather than guessed. A token claim resolving it
-    // would be the caller choosing, which is what may never happen.
-    const middleware = middlewareFor(
-      { tid: TENANT_A },
-      directoryWith(membershipOf(TENANT_A), membershipOf(TENANT_B)),
-    );
-
-    expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBeUndefined();
-  });
-
-  it('changes nothing when it names a tenant the person is a member of', async () => {
-    // The claim agreeing with the membership must be a coincidence, not a cause: the same
-    // membership alone already resolves to the same tenant.
-    const withClaim = middlewareFor({ tid: TENANT_A }, directoryWith(membershipOf(TENANT_A)));
-    const withoutClaim = middlewareFor({}, directoryWith(membershipOf(TENANT_A)));
-
-    expect(await tenantEstablishedBy(withClaim, AUTHORIZED)).toBe(TENANT_A);
-    expect(await tenantEstablishedBy(withoutClaim, AUTHORIZED)).toBe(TENANT_A);
   });
 });
 
 describe('the tenant header, against a genuinely authenticated caller', () => {
   it('cannot grant a membership the person does not hold', async () => {
-    const middleware = middlewareFor({ tid: TENANT_A }, directoryWith(membershipOf(TENANT_B)));
+    const middleware = middlewareFor({ tid: ORG_A }, directoryWith());
 
     expect(
       await tenantEstablishedBy(middleware, { ...AUTHORIZED, [TENANT_HEADER]: TENANT_A }),
     ).toBeUndefined();
   });
 
-  it('is refused even when the token was minted for the very tenant it names', async () => {
-    // Token and header agree, and both are wrong: the person is a member of neither. Two
-    // claims saying the same thing is still nobody vouching for it.
-    const middleware = middlewareFor({ tid: TENANT_A }, directoryWith());
-
-    expect(
-      await tenantEstablishedBy(middleware, { ...AUTHORIZED, [TENANT_HEADER]: TENANT_A }),
-    ).toBeUndefined();
-  });
-
-  it('narrows a genuine set of memberships, which is all it has ever been allowed to do', async () => {
+  it('cannot move an organisation-B token into tenant A, where the person is also a member', async () => {
     const middleware = middlewareFor(
-      { tid: TENANT_A },
+      { tid: ORG_B },
       directoryWith(membershipOf(TENANT_A), membershipOf(TENANT_B)),
     );
 
     expect(
-      await tenantEstablishedBy(middleware, { ...AUTHORIZED, [TENANT_HEADER]: TENANT_B }),
-    ).toBe(TENANT_B);
+      await tenantEstablishedBy(middleware, { ...AUTHORIZED, [TENANT_HEADER]: TENANT_A }),
+    ).toBeUndefined();
+    expect(await tenantEstablishedBy(middleware, AUTHORIZED)).toBe(TENANT_B);
   });
 });
 
@@ -172,7 +204,7 @@ describe('a request the Platform verifier refuses', () => {
   });
 
   it('establishes no tenant when no credential was presented at all', async () => {
-    const middleware = middlewareFor({ tid: TENANT_A }, directoryWith(membershipOf(TENANT_A)));
+    const middleware = middlewareFor({ tid: ORG_A }, directoryWith(membershipOf(TENANT_A)));
 
     expect(await tenantEstablishedBy(middleware, {})).toBeUndefined();
   });

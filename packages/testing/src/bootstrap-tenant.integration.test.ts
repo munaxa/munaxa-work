@@ -6,17 +6,10 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * Proves `pnpm db:bootstrap` makes a migrated database operable, and does so without becoming a
- * way in.
- *
- * It runs the real command as a child process against a real PostgreSQL, as the unprivileged
- * application role, because every property under test belongs to the database rather than to our
- * code: whether the row-level security policies permit the writes at all, whether the records
- * resolve through the product's own membership lookup, and whether the tenant they create is
- * isolated from every other. A double would only prove the double agrees with itself.
- *
- * Skipped when no database is reachable, so a developer without one is not blocked — but never
- * skipped in CI, for the reason `tenant-isolation.integration.test.ts` gives.
+ * Proves `pnpm db:bootstrap` makes a migrated database operable without becoming a way in. It runs
+ * the real command against a real PostgreSQL as the unprivileged application role, because every
+ * property under test (policies permit the writes, records resolve through the product's own
+ * lookup, the tenant is isolated) belongs to the database. Never skipped in CI.
  */
 
 const CONNECTION = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -28,6 +21,9 @@ const stamp = `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toSt
 const platformUser = (suffix: string): string => `bootstrap-test-${stamp}-${suffix}`;
 
 const run = promisify(execFile);
+
+const ISSUER = 'https://identity.bootstrap-test.invalid';
+const organisationOf = (platformUserId: string): string => `org-${platformUserId}`;
 
 const SCRIPT = fileURLToPath(new URL('../../../scripts/bootstrap-tenant.mjs', import.meta.url));
 
@@ -54,9 +50,22 @@ describeWithDatabase('pnpm db:bootstrap', () => {
   const bootstrap = async (
     ...args: readonly string[]
   ): Promise<{ readonly stdout: string; readonly stderr: string; readonly code: number }> => {
+    // Every run names an organisation, one per person (ADR-0080), unless told not to.
+    const userIndex = args.indexOf('--platform-user-id');
+    const withOrganisation =
+      userIndex === -1 ||
+      args.includes('--platform-tenant-id') ||
+      args.includes('--no-organisation')
+        ? args.filter((arg) => arg !== '--no-organisation')
+        : [...args, '--platform-tenant-id', organisationOf(args[userIndex + 1] ?? '')];
     try {
-      const { stdout, stderr } = await run('node', [SCRIPT, ...args], {
-        env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: applicationUrl },
+      const { stdout, stderr } = await run('node', [SCRIPT, ...withOrganisation], {
+        env: {
+          ...process.env,
+          NODE_ENV: 'test',
+          DATABASE_URL: applicationUrl,
+          PLATFORM_AUTH_ISSUER: ISSUER,
+        },
       });
       return { stdout, stderr, code: 0 };
     } catch (error) {
@@ -100,7 +109,7 @@ describeWithDatabase('pnpm db:bootstrap', () => {
       end $$`);
     await admin.query(`grant usage on schema public to ${ROLE}`);
     await admin.query(
-      `grant select, insert, update, delete on workforce_user, tenant_membership to ${ROLE}`,
+      `grant select, insert, update, delete on workforce_user, tenant_membership, tenant_platform_binding to ${ROLE}`,
     );
     // No grant for `app_memberships_of`: EXECUTE is PUBLIC by default and stays that way, and
     // since ADR-0077 the function is owned by `work_membership_resolver`, so a migration role
@@ -119,6 +128,9 @@ describeWithDatabase('pnpm db:bootstrap', () => {
     await application?.end();
     // Only this run's rows, named by the stamp: a suite that truncated the tables would take a
     // developer's own database with it.
+    await admin?.query('delete from tenant_platform_binding where platform_tenant_id like $1', [
+      `org-bootstrap-test-${stamp}-%`,
+    ]);
     await admin?.query(
       `delete from tenant_membership m
          using workforce_user u

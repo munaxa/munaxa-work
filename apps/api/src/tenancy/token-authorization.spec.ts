@@ -42,6 +42,9 @@ const vouchingFor = (claims: Record<string, unknown>): AccessTokenVerifier => ({
     sub: PLATFORM_USER,
     iss: 'https://identity.example.com',
     iat: 1_780_000_000,
+    exp: 1_780_000_900,
+    tid: 'org-a',
+    sid: 'sess-1',
     ...claims,
   }),
 });

@@ -42,10 +42,16 @@ const configured = {
   PLATFORM_AUTH_AUDIENCE: 'munaxa-work',
   PLATFORM_AUTH_ALGORITHM: 'ES256',
   PLATFORM_AUTH_PUBLIC_KEYS: JSON.stringify([{ kid: 'k1', publicKey }]),
+  // The revocation check is proved against a real HTTP Identity in session-revocation.*.spec.ts;
+  // this suite is about which port a deployment gets, so it runs the check off.
+  PLATFORM_AUTH_REVOCATION_CHECK: 'disabled',
 };
 
+/** The claims Identity always issues besides the subject (ADR-0080). */
+const SESSION = { tid: 'org-1', sid: 'sess-1', exp: 4_000_000_000 };
+
 const verifier: AccessTokenVerifier = {
-  verifyAccessToken: () => ({ sub: 'u', iss: 'https://identity.example.com', iat: 1 }),
+  verifyAccessToken: () => ({ sub: 'u', iss: 'https://identity.example.com', iat: 1, ...SESSION }),
 };
 
 const environmentOf = (source: Record<string, string>): Environment => loadEnvironment(source);
@@ -114,6 +120,7 @@ describe('a grant that conferred nothing', () => {
           sub: 'u',
           iss: 'https://identity.example.com',
           iat: 1,
+          ...SESSION,
           perms: ['work:*', 'users:read', 'work:leave:read'],
         }),
       }),
@@ -144,6 +151,7 @@ describe('the Platform verifier this repository ships', () => {
     algorithm: 'ES256',
     keys: [{ kid: 'k1', publicKey }],
     clockSkewMs: 30_000,
+    revocation: { kind: 'disabled' },
   } as const;
 
   /** A token minted the way Munaxa Identity mints one: ES256, `kid` in the header, real claims. */

@@ -9,6 +9,12 @@ import {
   type AccessTokenVerifier,
 } from './platform-token-authentication.js';
 import type { DroppedGrant } from './platform-grants.js';
+import {
+  IdentitySessionStatus,
+  SESSION_STATUS_UNCHECKED,
+  type SessionStatus,
+  type UnavailableReason,
+} from './session-revocation.js';
 
 /**
  * Which authentication port this deployment runs with, decided from its configuration alone.
@@ -58,6 +64,33 @@ export const platformAccessTokenVerifier: AccessTokenVerifierFactory = (configur
     clockSkew: configuration.clockSkewMs,
   });
 
+export interface SessionStatusHooks {
+  /** The `fetch` introspection sends with. Bound only by tests. */
+  readonly fetch?: typeof fetch;
+  /** Told why Identity could not answer a revocation check. Never told the token. */
+  readonly onUnavailable?: (reason: UnavailableReason) => void;
+}
+
+/**
+ * The revocation check a configuration asks for (WK-02, ADR-0080).
+ *
+ * `disabled` is reachable only outside production; `readPlatformAuthentication` refuses it there,
+ * so this branch never runs in a production process.
+ */
+export const sessionStatusFor = (
+  configuration: PlatformAuthenticationConfiguration,
+  hooks: SessionStatusHooks = {},
+): SessionStatus =>
+  configuration.revocation.kind === 'disabled'
+    ? SESSION_STATUS_UNCHECKED
+    : new IdentitySessionStatus({
+        url: configuration.revocation.url,
+        cacheMs: configuration.revocation.cacheMs,
+        timeoutMs: configuration.revocation.timeoutMs,
+        ...(hooks.fetch === undefined ? {} : { fetch: hooks.fetch }),
+        ...(hooks.onUnavailable === undefined ? {} : { onUnavailable: hooks.onUnavailable }),
+      });
+
 /**
  * Chooses the port. Deterministic, total, and dependent on nothing but the environment.
  *
@@ -73,10 +106,38 @@ export const authenticationPortFor = (
   environment: Environment,
   createVerifier: AccessTokenVerifierFactory = platformAccessTokenVerifier,
   onDroppedGrant?: (dropped: DroppedGrant) => void,
+  hooks: SessionStatusHooks = {},
 ): PlatformAuthenticationPort => {
   const configuration = platformAuthenticationFrom(environment);
 
   return configuration === undefined
     ? new UnauthenticatedPort()
-    : new PlatformTokenAuthenticationPort(createVerifier(configuration), onDroppedGrant);
+    : new PlatformTokenAuthenticationPort(
+        createVerifier(configuration),
+        onDroppedGrant,
+        sessionStatusFor(configuration, hooks),
+      );
 };
+
+/**
+ * The composition root's port: `authenticationPortFor` with its two reports sent to a logger.
+ *
+ * Each report carries a grant name and reason, or a failure kind, and never the token it arrived
+ * in (ADR-0076, ADR-0080). A revocation check that could not answer has already refused.
+ */
+export const loggedAuthenticationPortFor = (
+  environment: Environment,
+  warn: (fields: Record<string, unknown>, message: string) => void,
+): PlatformAuthenticationPort =>
+  authenticationPortFor(
+    environment,
+    platformAccessTokenVerifier,
+    (dropped) => {
+      warn({ dropped }, 'a Platform grant conferred no Work permission');
+    },
+    {
+      onUnavailable: (reason) => {
+        warn({ reason }, 'session revocation check unavailable; refused');
+      },
+    },
+  );

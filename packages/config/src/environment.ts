@@ -104,6 +104,26 @@ export const environmentSchema = z.object({
   PLATFORM_AUTH_PUBLIC_KEYS: z.string().optional(),
   /** Tolerance for drift between Platform's clock and this one. Platform's own default. */
   PLATFORM_AUTH_CLOCK_SKEW_MS: z.coerce.number().int().min(0).max(300_000).default(30_000),
+  /**
+   * Whether every access token is also checked against Identity's live session state (WK-02,
+   * ADR-0080). `introspect` is the default and the only value production accepts; `disabled` is
+   * for a local machine with no Identity running, and is refused when `NODE_ENV=production`.
+   */
+  PLATFORM_AUTH_REVOCATION_CHECK: z.enum(['introspect', 'disabled']).default('introspect'),
+  /** Identity's introspection route. Derived from `PLATFORM_AUTH_ISSUER` when unset. */
+  PLATFORM_AUTH_INTROSPECTION_URL: z.string().optional(),
+  /**
+   * How long one "still active" answer is reused, at most. This is the whole of the revocation
+   * window, and it is bounded at 30 s so that nobody can configure the check away.
+   */
+  PLATFORM_AUTH_REVOCATION_CACHE_MS: z.coerce.number().int().min(0).max(30_000).default(5_000),
+  /** How long to wait for Identity before refusing the request. */
+  PLATFORM_AUTH_INTROSPECTION_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(10_000)
+    .default(2_000),
 
   /**
    * Where entitlements come from — `NONE` (default, nothing gated, as before; refused in

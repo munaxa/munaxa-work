@@ -25,13 +25,31 @@ export interface ResolvedMembership {
   readonly status: MembershipStatus;
 }
 
+/**
+ * The Platform organisation a token was issued for, as the token states it.
+ *
+ * A Work tenant is bound to exactly one of these (`tenant_platform_binding`, ADR-0080), and the
+ * token's grants were computed in it. That is why it is part of the question below.
+ */
+export interface PlatformOrganisation {
+  readonly issuer: string;
+  readonly tenantId: string;
+}
+
 export interface TenantMembershipDirectory {
   /**
-   * The memberships this Platform user holds that permit acting now. Suspended, invited and
-   * ended memberships are not returned: a suspended member is a member, but not one who may
-   * open a request.
+   * The memberships this Platform user holds that permit acting now **with a token issued for
+   * `organisation`**: only memberships of the Work tenant bound to that organisation are
+   * returned. Suspended, invited and ended memberships are not returned either: a suspended
+   * member is a member, but not one who may open a request.
+   *
+   * Without the organisation, the grants of one organisation would be exercised in every Work
+   * tenant the person belongs to (WK-01). An unbound tenant resolves nobody.
    */
-  activeMembershipsOf(platformUserId: string): Promise<readonly ResolvedMembership[]>;
+  activeMembershipsOf(
+    platformUserId: string,
+    organisation: PlatformOrganisation,
+  ): Promise<readonly ResolvedMembership[]>;
 }
 
 /**

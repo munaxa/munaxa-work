@@ -23,12 +23,26 @@
  * policy, with the tenant set transaction-locally exactly as `PostgresUnitOfWork` sets it. Nothing
  * here is granted, disabled or bypassed.
  *
+ * **The binding (ADR-0080).** A Work tenant also records the one Platform organisation it belongs
+ * to — the `tid` of the tokens its people present, and the organisation whose roles produced their
+ * `perms`. Requests resolve only memberships of the tenant bound to the token's organisation, so an
+ * unbound tenant admits nobody, and one organisation's grants can never be exercised in a second
+ * Work tenant. The binding is written here, once, and is never changed by this script: a run that
+ * names a different organisation for an already-bound tenant is refused. The runtime role cannot
+ * write bindings at all (deploy/aws/runtime-grants.sql), so run this as the owner role, as
+ * deploy/aws/README.md does.
+ *
  * Usage:
- *   DATABASE_URL=... node scripts/bootstrap-tenant.mjs --platform-user-id <id> [--tenant-id <uuid>]
+ *   DATABASE_URL=... node scripts/bootstrap-tenant.mjs --platform-user-id <id> \
+ *     --platform-tenant-id <organisation id> [--platform-issuer <url>] [--tenant-id <uuid>]
  *
  * Options:
  *   --platform-user-id  Required. The Platform account's stable subject — the `sub` of the tokens
  *                       it will present. Never invented here; it must already exist on Platform.
+ *   --platform-tenant-id
+ *                       Required. The Platform organisation this tenant belongs to — the `tid` of
+ *                       that account's tokens (Identity's organisation id, not its slug).
+ *   --platform-issuer   The issuer, exactly as PLATFORM_AUTH_ISSUER. Defaults to that variable.
  *   --tenant-id         A UUID v7. Generated when omitted, because the identifier is arbitrary and
  *                       asking somebody to compose one by hand invites a v4 that fails at runtime.
  *   --allow-production  Required when NODE_ENV=production. Admitting an identity to a tenant is a
@@ -87,7 +101,74 @@ const existingMembership = async (client, platformUserId) => {
   return found.rows[0];
 };
 
-const create = async (client, { tenantId, platformUserId }) => {
+/** The binding a tenant already has, read under its own tenant context. */
+const bindingOf = async (client, tenantId) => {
+  await client.query('begin');
+  try {
+    await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantId]);
+    const found = await client.query(
+      `select platform_issuer, platform_tenant_id from tenant_platform_binding
+        where tenant_id = $1 and deleted_at is null`,
+      [tenantId],
+    );
+    await client.query('commit');
+    return found.rows[0];
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined);
+    throw error;
+  }
+};
+
+/**
+ * Writes the binding inside an open, tenant-scoped transaction, unless the tenant already has one.
+ * Refuses a different one: re-binding a tenant moves whose grants apply in it, which is not a
+ * thing a bootstrap does by accident.
+ */
+const bind = async (client, { tenantId, organisation }) => {
+  const existing = await client.query(
+    `select platform_issuer, platform_tenant_id from tenant_platform_binding
+      where tenant_id = $1 and deleted_at is null`,
+    [tenantId],
+  );
+  const row = existing.rows[0];
+  if (row !== undefined) {
+    if (
+      row.platform_issuer === organisation.issuer &&
+      row.platform_tenant_id === organisation.tenantId
+    ) {
+      return false;
+    }
+    throw new BindingConflict(
+      `Tenant ${tenantId} is already bound to organisation ${row.platform_tenant_id} of ` +
+        `${row.platform_issuer}. Bootstrap will not re-bind it.`,
+    );
+  }
+  await client.query(
+    `insert into tenant_platform_binding
+       (id, tenant_id, platform_issuer, platform_tenant_id,
+        created_at, created_by, updated_at, updated_by, version)
+     values ($1, $2, $3, $4, now(), $5, now(), $5, 1)`,
+    [uuidV7(), tenantId, organisation.issuer, organisation.tenantId, ACTOR],
+  );
+  return true;
+};
+
+class BindingConflict extends Error {}
+
+const ensureBinding = async (client, { tenantId, organisation }) => {
+  await client.query('begin');
+  try {
+    await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantId]);
+    const written = await bind(client, { tenantId, organisation });
+    await client.query('commit');
+    return written;
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined);
+    throw error;
+  }
+};
+
+const create = async (client, { tenantId, platformUserId, organisation }) => {
   const workforceUserId = uuidV7();
   const membershipId = uuidV7();
 
@@ -96,6 +177,7 @@ const create = async (client, { tenantId, platformUserId }) => {
     // Transaction-local, exactly as `PostgresUnitOfWork` sets it: a session-level setting would
     // outlive the checkout and apply this tenant to whatever used the connection next.
     await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantId]);
+    await bind(client, { tenantId, organisation });
     // No `returning`: reading the row back is a select, and the reachability policy refuses it
     // until the membership below exists. The identifier is generated here instead.
     await client.query(
@@ -131,17 +213,21 @@ const create = async (client, { tenantId, platformUserId }) => {
  * that ownership (ADR-0077); this checks it held, because catching it at provisioning time is the
  * difference between a message and an afternoon.
  */
-const verify = async (client, platformUserId, expectedTenantId) => {
-  const membership = await existingMembership(client, platformUserId);
+const verify = async (client, platformUserId, expectedTenantId, organisation) => {
+  const found = await client.query(
+    'select tenant_id from app_bound_memberships_of($1, $2, $3)',
+    [platformUserId, organisation.issuer, organisation.tenantId],
+  );
 
-  if (membership?.tenant_id === expectedTenantId) return;
+  if (found.rows[0]?.tenant_id === expectedTenantId) return;
 
   throw new Error(
-    'The records were written, but app_memberships_of() does not resolve them, so tenant ' +
+    'The records were written, but app_bound_memberships_of() does not resolve them, so tenant ' +
       'resolution would find no membership and every authenticated request would answer 401. ' +
       'Check that the function is owned by work_membership_resolver and that the ' +
-      'membership_resolution policies exist on tenant_membership and workforce_user — the ' +
-      '20260901090000_membership_resolution_role migration establishes both (ADR-0077). Do not ' +
+      'membership_resolution policies exist on tenant_membership, workforce_user and ' +
+      'tenant_platform_binding — the 20260901090000_membership_resolution_role and ' +
+      '20261112090000_tenant_platform_binding migrations establish them (ADR-0077, ADR-0080). Do not ' +
       'grant BYPASSRLS to work around this: no role in the deployment needs it, and the ' +
       'application role must stay unprivileged (ADR-0030).',
   );
@@ -150,6 +236,8 @@ const verify = async (client, platformUserId, expectedTenantId) => {
 const run = async () => {
   const platformUserId = argument('platform-user-id');
   const tenantId = argument('tenant-id') ?? uuidV7();
+  const platformTenantId = argument('platform-tenant-id')?.trim();
+  const platformIssuer = (argument('platform-issuer') ?? process.env.PLATFORM_AUTH_ISSUER)?.trim();
 
   if (CONNECTION === undefined) {
     return fail('Set DATABASE_URL to a migrated database, as the application role.');
@@ -158,6 +246,18 @@ const run = async () => {
     return fail(
       'Give --platform-user-id: the Platform account this tenant admits. Munaxa Work does not ' +
         'create Platform identities (ADR-0001); the account must already exist on Platform.',
+    );
+  }
+  if (platformTenantId === undefined || platformTenantId === '' || platformTenantId.startsWith('--')) {
+    return fail(
+      'Give --platform-tenant-id: the Platform organisation id this tenant belongs to (the tid of ' +
+        "the account's tokens). A Work tenant with no organisation admits nobody (ADR-0080).",
+    );
+  }
+  if (platformIssuer === undefined || platformIssuer === '' || platformIssuer.startsWith('--')) {
+    return fail(
+      'Give --platform-issuer or set PLATFORM_AUTH_ISSUER: the issuer the binding holds for, ' +
+        'exactly as the deployment verifies it.',
     );
   }
   if (!UUID_V7.test(tenantId)) {
@@ -173,24 +273,46 @@ const run = async () => {
   const client = await pool.connect();
 
   try {
+    const organisation = { issuer: platformIssuer, tenantId: platformTenantId };
     const already = await existingMembership(client, platformUserId.trim());
 
     if (already !== undefined) {
-      // Idempotent, and deliberately without touching anything: a second run reports the state it
-      // found rather than reasserting it. Re-writing the row would move `updated_at` and could
-      // overwrite a status somebody changed on purpose.
+      // Idempotent, and deliberately without touching the membership: a second run reports the
+      // state it found rather than reasserting it. Re-writing the row would move `updated_at` and
+      // could overwrite a status somebody changed on purpose. A tenant bootstrapped before the
+      // binding existed gets its binding now; one bound to another organisation is refused.
+      const bound = await ensureBinding(client, { tenantId: already.tenant_id, organisation });
+      await verify(client, platformUserId.trim(), already.tenant_id, organisation);
       process.stdout.write(
         `Already bootstrapped. ${platformUserId} is an active member of tenant ${already.tenant_id}` +
           ` (membership ${already.membership_id}, workforce user ${already.workforce_user_id}).` +
-          ' Nothing was written.\n',
+          (bound
+            ? ` Bound the tenant to organisation ${platformTenantId}; nothing else was written.\n`
+            : ' Nothing was written.\n'),
       );
       return;
     }
-    const created = await create(client, { tenantId, platformUserId: platformUserId.trim() });
-    await verify(client, platformUserId.trim(), tenantId);
+    const existingBinding = await bindingOf(client, tenantId);
+    if (
+      existingBinding !== undefined &&
+      (existingBinding.platform_issuer !== organisation.issuer ||
+        existingBinding.platform_tenant_id !== organisation.tenantId)
+    ) {
+      throw new BindingConflict(
+        `Tenant ${tenantId} is already bound to organisation ${existingBinding.platform_tenant_id}.` +
+          ' Bootstrap will not re-bind it.',
+      );
+    }
+    const created = await create(client, {
+      tenantId,
+      platformUserId: platformUserId.trim(),
+      organisation,
+    });
+    await verify(client, platformUserId.trim(), tenantId, organisation);
 
     process.stdout.write(
       `Bootstrapped tenant ${created.tenantId}.\n` +
+        `  bound to        organisation ${platformTenantId} of ${platformIssuer}\n` +
         `  workforce user  ${created.workforceUserId}  (platform user ${platformUserId})\n` +
         `  membership      ${created.membershipId}  status active\n` +
         'No permission was granted: Platform must assign this account the work:* grants it needs' +
@@ -203,6 +325,17 @@ const run = async () => {
 };
 
 await run().catch((error) => {
+  if (error instanceof BindingConflict) return fail(error.message);
+  if (
+    error instanceof Error &&
+    error.code === '23505' &&
+    error.constraint === 'tenant_platform_binding_organisation_key'
+  ) {
+    return fail(
+      `Organisation ${argument('platform-tenant-id')} is already bound to another Work tenant. One ` +
+        "organisation's grants may apply in one Work tenant only (ADR-0080); nothing was written.",
+    );
+  }
   fail(
     error instanceof Error && error.code === '23505'
       ? `A workforce user already exists for ${argument('platform-user-id')}, but it resolves to no` +

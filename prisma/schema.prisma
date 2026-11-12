@@ -56,6 +56,26 @@ model TenantMembership {
   @@map("tenant_membership")
 }
 
+/// The one Platform organisation (issuer + organisation id) a Work tenant belongs to, and so the
+/// only organisation whose token grants may be exercised in it (WK-01, ADR-0080). Unique in both
+/// directions. Written by the owner (bootstrap), never by the runtime role.
+model TenantPlatformBinding {
+  id                 String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
+  tenant_id          String    @unique(map: "tenant_platform_binding_tenant_key") @db.Uuid
+  platform_issuer    String    @db.VarChar(2048)
+  platform_tenant_id String    @db.VarChar(255)
+  created_at         DateTime  @db.Timestamptz(6)
+  created_by         String    @db.VarChar(255)
+  updated_at         DateTime  @db.Timestamptz(6)
+  updated_by         String    @db.VarChar(255)
+  deleted_at         DateTime? @db.Timestamptz(6)
+  deleted_by         String?   @db.VarChar(255)
+  version            Int
+
+  @@unique([platform_issuer, platform_tenant_id], map: "tenant_platform_binding_organisation_key")
+  @@map("tenant_platform_binding")
+}
+
 model Invitation {
   id                            String    @id @default(dbgenerated("app_uuid_v7()")) @db.Uuid
   tenant_id                     String    @db.Uuid

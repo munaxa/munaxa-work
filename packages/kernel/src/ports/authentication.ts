@@ -24,6 +24,25 @@ export interface PlatformPrincipal {
   /** Which Platform deployment vouched for this principal. Recorded, never trusted blindly. */
   readonly issuer: string;
   /**
+   * The Platform organisation the token was issued for — the organisation whose roles produced
+   * `permissions` (WK-01, ADR-0080).
+   *
+   * It never *chooses* a tenant. A Work tenant still comes from a stored membership, and the
+   * membership directory returns only memberships in the one Work tenant bound to this
+   * organisation, so the grants can only ever be exercised where they were granted. Optional
+   * because a port that authenticates nobody has no organisation to report; the Platform adapter
+   * refuses a token without one.
+   */
+  readonly platformTenantId?: string;
+  /** Platform's session behind the token. What revocation is decided against. */
+  readonly sessionId?: string;
+  /**
+   * How the person authenticated, as Platform recorded it at sign-in (`amr`, `mfa`). Carried so a
+   * sensitive operation can require a second factor; nothing in Work requires one yet.
+   */
+  readonly authenticationMethods?: readonly string[];
+  readonly mfaSatisfied?: boolean;
+  /**
    * The address on the Platform account, when Platform supplies one.
    *
    * Present because an invitation is addressed to a person, and acceptance has to check that

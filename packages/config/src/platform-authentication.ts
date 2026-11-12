@@ -38,6 +38,25 @@ export interface PlatformVerificationKey {
   readonly publicKey: string;
 }
 
+/**
+ * How a verified token is held to Identity's live session state (WK-02, ADR-0080).
+ *
+ * A signature proves a token was issued; it cannot prove the session behind it has not been signed
+ * out since. `introspect` asks Identity, which holds that state, and reuses a "still active" answer
+ * for at most `cacheMs`. `disabled` asks nobody and accepts a signed-out token until it expires; it
+ * exists for a laptop with no Identity running and is refused in production.
+ */
+export type PlatformRevocationCheck =
+  | {
+      readonly kind: 'introspect';
+      /** Identity's `GET /api/auth/introspect`. */
+      readonly url: string;
+      /** The longest one positive answer is reused. The bound on the revocation window. */
+      readonly cacheMs: number;
+      readonly timeoutMs: number;
+    }
+  | { readonly kind: 'disabled' };
+
 export interface PlatformAuthenticationConfiguration {
   readonly issuer: string;
   readonly audience: readonly string[];
@@ -45,16 +64,28 @@ export interface PlatformAuthenticationConfiguration {
   /** At least one, each with a distinct `kid`. Rotation is publishing a second one. */
   readonly keys: readonly PlatformVerificationKey[];
   readonly clockSkewMs: number;
+  readonly revocation: PlatformRevocationCheck;
 }
 
 /** What this reads from the validated environment. */
 export interface PlatformAuthenticationSource {
+  readonly NODE_ENV?: string | undefined;
   readonly PLATFORM_AUTH_ISSUER?: string | undefined;
   readonly PLATFORM_AUTH_AUDIENCE?: string | undefined;
   readonly PLATFORM_AUTH_ALGORITHM?: string | undefined;
   readonly PLATFORM_AUTH_PUBLIC_KEYS?: string | undefined;
   readonly PLATFORM_AUTH_CLOCK_SKEW_MS: number;
+  readonly PLATFORM_AUTH_REVOCATION_CHECK?: string | undefined;
+  readonly PLATFORM_AUTH_INTROSPECTION_URL?: string | undefined;
+  readonly PLATFORM_AUTH_REVOCATION_CACHE_MS?: number | undefined;
+  readonly PLATFORM_AUTH_INTROSPECTION_TIMEOUT_MS?: number | undefined;
 }
+
+/** Identity serves every route under `/api/auth` (its global prefix and controller path). */
+const INTROSPECTION_PATH = '/api/auth/introspect';
+const DEFAULT_REVOCATION_CACHE_MS = 5_000;
+const MAX_REVOCATION_CACHE_MS = 30_000;
+const DEFAULT_INTROSPECTION_TIMEOUT_MS = 2_000;
 
 /**
  * The three answers, kept apart because they are acted on differently.
@@ -242,7 +273,10 @@ export const readPlatformAuthentication = (
     ...keyMaterial.issues,
   ];
 
-  if (issues.length > 0) return { kind: 'invalid', issues };
+  const revocation = issues.length > 0 ? NOT_READ : readRevocationCheck(source, issuer);
+  if (revocation.check === undefined) {
+    return { kind: 'invalid', issues: [...issues, ...revocation.issues] };
+  }
 
   return {
     kind: 'configured',
@@ -253,6 +287,101 @@ export const readPlatformAuthentication = (
       algorithm: algorithm as PlatformAuthenticationAlgorithm,
       keys: keyMaterial.keys,
       clockSkewMs: source.PLATFORM_AUTH_CLOCK_SKEW_MS,
+      revocation: revocation.check,
     }),
   };
+};
+
+/**
+ * Reads the revocation check, refusing every spelling that would quietly weaken it.
+ *
+ * - Production must introspect. `disabled` there would be the 15-minute signed-out window WK-02
+ *   closed, reopened by one variable, so it fails startup instead.
+ * - Production must reach Identity over `https`. The bearer token travels in the request.
+ * - The URL defaults to the issuer's own origin, because the issuer *is* Identity's base URL
+ *   (it must equal `IDENTITY_BASE_URL` character for character), so a deployment that configured
+ *   verification has already said where Identity is.
+ */
+type RevocationReading = {
+  readonly check?: PlatformRevocationCheck;
+  readonly issues: readonly string[];
+};
+
+/** Stands in for the revocation reading when verification itself is already invalid. */
+const NOT_READ: RevocationReading = { issues: [] };
+
+const refused = (issue: string): RevocationReading => ({ issues: [issue] });
+
+const readRevocationCheck = (
+  source: PlatformAuthenticationSource,
+  issuer: string,
+): RevocationReading => {
+  const production = source.NODE_ENV === 'production';
+  const mode = (source.PLATFORM_AUTH_REVOCATION_CHECK ?? 'introspect').trim();
+
+  if (mode === 'disabled') return disabledCheck(production);
+  if (mode !== 'introspect') {
+    return refused(
+      `PLATFORM_AUTH_REVOCATION_CHECK: "${mode}" is not accepted. Use "introspect" (or "disabled" outside production).`,
+    );
+  }
+
+  const url = introspectionUrl(source.PLATFORM_AUTH_INTROSPECTION_URL, issuer, production);
+  if (typeof url !== 'string') return url;
+
+  const cacheMs = source.PLATFORM_AUTH_REVOCATION_CACHE_MS ?? DEFAULT_REVOCATION_CACHE_MS;
+  if (!Number.isInteger(cacheMs) || cacheMs < 0 || cacheMs > MAX_REVOCATION_CACHE_MS) {
+    return refused(
+      `PLATFORM_AUTH_REVOCATION_CACHE_MS: must be a whole number from 0 to ${String(MAX_REVOCATION_CACHE_MS)}.`,
+    );
+  }
+
+  return {
+    check: {
+      kind: 'introspect',
+      url,
+      cacheMs,
+      timeoutMs: source.PLATFORM_AUTH_INTROSPECTION_TIMEOUT_MS ?? DEFAULT_INTROSPECTION_TIMEOUT_MS,
+    },
+    issues: [],
+  };
+};
+
+const disabledCheck = (production: boolean): RevocationReading =>
+  production
+    ? refused(
+        'PLATFORM_AUTH_REVOCATION_CHECK: "disabled" is refused in production. Without it a signed-out, revoked or password-reset session keeps working until its access token expires.',
+      )
+    : { check: { kind: 'disabled' }, issues: [] };
+
+/** The introspection URL as a string, or the reading that refuses it. */
+const introspectionUrl = (
+  configured: string | undefined,
+  issuer: string,
+  production: boolean,
+): string | RevocationReading => {
+  const trimmed = configured?.trim() ?? '';
+  const raw = trimmed === '' ? `${issuer.replace(/\/+$/, '')}${INTROSPECTION_PATH}` : trimmed;
+
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return refused(`PLATFORM_AUTH_INTROSPECTION_URL: "${raw}" is not a URL.`);
+  }
+  return urlIssue(url, production) ?? url.toString();
+};
+
+/** Why the introspection URL is refused, if it is. The bearer token travels in the request. */
+const urlIssue = (url: URL, production: boolean): RevocationReading | undefined => {
+  const secure = url.protocol === 'https:' || (url.protocol === 'http:' && !production);
+  if (!secure) {
+    return refused(
+      `PLATFORM_AUTH_INTROSPECTION_URL: must use https${production ? ' in production' : ' or http'}; the access token is sent to it.`,
+    );
+  }
+  if (url.username !== '' || url.password !== '' || url.hash !== '') {
+    return refused('PLATFORM_AUTH_INTROSPECTION_URL: must carry no credentials and no fragment.');
+  }
+  return undefined;
 };

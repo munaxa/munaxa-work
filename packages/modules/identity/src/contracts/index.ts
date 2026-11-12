@@ -23,7 +23,11 @@ export type {
  */
 export { PORTAL_KEYS } from '../domain/identity-vocabulary.js';
 
-export type { TenantMembershipDirectory, ResolvedMembership } from './membership-directory.js';
+export type {
+  PlatformOrganisation,
+  TenantMembershipDirectory,
+  ResolvedMembership,
+} from './membership-directory.js';
 export { DenyAllMembershipDirectory } from './membership-directory.js';
 
 export type {

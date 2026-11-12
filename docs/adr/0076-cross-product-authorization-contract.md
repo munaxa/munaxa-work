@@ -99,7 +99,10 @@ contract states "no wildcard authorization; the checker matches exactly".
   with no `tokenVersion`, and reads no `sid`, `ver`, `amr` or `mfa`. So a signed-out, revoked or
   version-bumped token is still accepted by Work until it expires (*correction, 11 Nov 2026*). This
   is a property of the contract, not a defect, and it belongs in the runbook rather than in a
-  reader's memory.
+  reader's memory. *Superseded 12 Nov 2026 by [ADR-0080](0080-grants-are-bound-to-their-organisation-and-sessions-are-checked.md):
+  Work now checks every token's session with Identity, so revocation takes effect within the
+  configured cache window (5 s by default), and grants apply only in the tenant bound to the
+  token's organisation.*
 
 - **A Work administrator role in Platform enumerates its grants.** Because no wildcard confers a
   Work permission, a role granting broad Work access lists the φ-form names explicitly. That list is

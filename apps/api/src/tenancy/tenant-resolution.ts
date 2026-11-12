@@ -67,8 +67,20 @@ export const resolveForPrincipal = async (
   directory: TenantMembershipDirectory,
   principal: PlatformPrincipal,
   requestedTenantId: string | undefined,
-): Promise<TenantResolution> =>
-  resolveTenant(await directory.activeMembershipsOf(principal.platformUserId), requestedTenantId);
+): Promise<TenantResolution> => {
+  // No organisation, no tenant. A principal whose grants cannot be tied to the organisation they
+  // were computed in has nowhere they can safely be exercised (WK-01, ADR-0080).
+  const organisation = principal.platformTenantId;
+  if (organisation === undefined || organisation.trim() === '') return { kind: 'no-membership' };
+
+  return resolveTenant(
+    await directory.activeMembershipsOf(principal.platformUserId, {
+      issuer: principal.issuer,
+      tenantId: organisation,
+    }),
+    requestedTenantId,
+  );
+};
 
 /**
  * The audit actor.

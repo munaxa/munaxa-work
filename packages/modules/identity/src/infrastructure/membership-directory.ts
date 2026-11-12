@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 
 import type {
+  PlatformOrganisation,
   ResolvedMembership,
   TenantMembershipDirectory,
 } from '../contracts/membership-directory.js';
@@ -37,14 +38,28 @@ import type { MembershipStatus } from '../domain/identity-vocabulary.js';
 export class PostgresMembershipDirectory implements TenantMembershipDirectory {
   public constructor(private readonly pool: Pool) {}
 
-  public async activeMembershipsOf(platformUserId: string): Promise<readonly ResolvedMembership[]> {
+  /**
+   * Asks `app_bound_memberships_of` rather than `app_memberships_of` (ADR-0080). The difference is
+   * one join and it is the whole of WK-01: only the Work tenant bound to the organisation the
+   * token was issued for can come back, so the token's grants — computed in that organisation —
+   * can never be exercised in another tenant this person happens to belong to. The predicate is in
+   * the function, where it cannot be forgotten by a second caller.
+   */
+  public async activeMembershipsOf(
+    platformUserId: string,
+    organisation: PlatformOrganisation,
+  ): Promise<readonly ResolvedMembership[]> {
     const result = await this.pool.query<{
       tenant_id: string;
       membership_id: string;
       workforce_user_id: string;
       platform_user_id: string;
       status: string;
-    }>('select * from app_memberships_of($1::varchar)', [platformUserId]);
+    }>('select * from app_bound_memberships_of($1::varchar, $2::varchar, $3::varchar)', [
+      platformUserId,
+      organisation.issuer,
+      organisation.tenantId,
+    ]);
 
     return result.rows.map((row) => ({
       tenantId: row.tenant_id,

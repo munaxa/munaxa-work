@@ -14,6 +14,7 @@ export type {
   PlatformAuthentication,
   PlatformAuthenticationAlgorithm,
   PlatformAuthenticationConfiguration,
+  PlatformRevocationCheck,
   PlatformVerificationKey,
 } from './platform-authentication.js';
 export {

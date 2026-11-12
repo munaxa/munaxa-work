@@ -11,7 +11,7 @@ replacing the Render blueprint in `munaxa-identity/deploy/render.yaml`.
 | Host                   | `work.munaxa.com`: `/api/auth/*` to Identity, `/api/v1/*` to the API, the rest to the admin (one origin, Identity ADR-0004) |
 | Admin → API            | `WORK_API_URL=http://work-api.<env>.munaxa.internal:3000` (private)                                   |
 | Licensing              | `LICENSING_MODE=CONTROL_PLANE`, `CONTROL_PLANE_URL=https://control-api.munaxa.com`, `CONTROL_PLANE_TOKEN` from the bundle |
-| Identity               | `PLATFORM_AUTH_ISSUER=https://id.munaxa.com` (character for character), `PLATFORM_AUTH_AUDIENCE=munaxa-work`, `PLATFORM_AUTH_PUBLIC_KEYS` |
+| Identity               | `PLATFORM_AUTH_ISSUER=https://id.munaxa.com` (character for character), `PLATFORM_AUTH_AUDIENCE=munaxa-work`, `PLATFORM_AUTH_PUBLIC_KEYS`; every request's session is checked at `${PLATFORM_AUTH_ISSUER}/api/auth/introspect` over the existing 443 egress (ADR-0080), so Identity must be deployed with that route first |
 | Secrets (bundle)       | `DATABASE_URL`, `PII_MATCH_SECRET`, `CONTROL_PLANE_TOKEN`; the owner URL is in a separate migrate bundle |
 
 Verified locally on PostgreSQL 16 (29 Oct 2026): the migrate image applies all 34 migrations to an
@@ -30,8 +30,14 @@ override, after the migrate job and before anyone signs in:
 
 ```sh
 sh -c 'DATABASE_URL="$DATABASE_MIGRATION_URL" exec node ../../scripts/bootstrap-tenant.mjs \
-  --platform-user-id <Identity user id, the token sub> --allow-production'
+  --platform-user-id <Identity user id, the token sub> \
+  --platform-tenant-id <Identity organisation id, the token tid> \
+  --platform-issuer <PLATFORM_AUTH_ISSUER, exactly> --allow-production'
 ```
+
+The organisation id binds the new Work tenant to that Identity organisation (ADR-0080): only tokens
+issued for it can act in the tenant, and its grants can act in no other tenant. One organisation
+binds to one Work tenant, and a binding is never changed by the script.
 
 It connects as `work_owner`, which is `NOBYPASSRLS`, and every Work table has `FORCE ROW LEVEL
 SECURITY`, so the owner is held to the same policies as `work_app`. It is idempotent: a second

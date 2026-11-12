@@ -151,14 +151,18 @@ describeWithDatabase('membership resolution under force row level security', () 
       expect(diagnostics.rows[0]).toEqual({ is_superuser: false, can_bypass_rls: false });
     });
 
-    it('owns the resolution function with a role that cannot log in', async () => {
-      const owner = await admin.query<{ rolname: string; rolcanlogin: boolean }>(
-        `select r.rolname, r.rolcanlogin
+    it('owns both resolution functions with a role that cannot log in', async () => {
+      const owner = await admin.query<{ proname: string; rolname: string; rolcanlogin: boolean }>(
+        `select p.proname, r.rolname, r.rolcanlogin
            from pg_proc p join pg_roles r on r.oid = p.proowner
-          where p.proname = 'app_memberships_of'`,
+          where p.proname in ('app_memberships_of', 'app_bound_memberships_of')
+          order by p.proname`,
       );
 
-      expect(owner.rows[0]).toEqual({ rolname: RESOLVER, rolcanlogin: false });
+      expect(owner.rows).toEqual([
+        { proname: 'app_bound_memberships_of', rolname: RESOLVER, rolcanlogin: false },
+        { proname: 'app_memberships_of', rolname: RESOLVER, rolcanlogin: false },
+      ]);
     });
 
     it('gives that role no privilege attribute of any kind', async () => {
@@ -178,15 +182,17 @@ describeWithDatabase('membership resolution under force row level security', () 
       ]);
     });
 
-    it('limits its reach to reading exactly two tables', async () => {
+    it('limits its reach to reading exactly three tables', async () => {
       const privileges = await admin.query<{ table_name: string; privilege_type: string }>(
         `select table_name, privilege_type from information_schema.table_privileges
           where grantee = $1 order by table_name, privilege_type`,
         [RESOLVER],
       );
 
+      // The third is the tenant-to-organisation binding (ADR-0080), read for the same reason.
       expect(privileges.rows).toEqual([
         { table_name: 'tenant_membership', privilege_type: 'SELECT' },
+        { table_name: 'tenant_platform_binding', privilege_type: 'SELECT' },
         { table_name: 'workforce_user', privilege_type: 'SELECT' },
       ]);
     });
@@ -199,6 +205,7 @@ describeWithDatabase('membership resolution under force row level security', () 
 
       expect(policies.rows).toEqual([
         { tablename: 'tenant_membership', cmd: 'SELECT', roles: `{${RESOLVER}}` },
+        { tablename: 'tenant_platform_binding', cmd: 'SELECT', roles: `{${RESOLVER}}` },
         { tablename: 'workforce_user', cmd: 'SELECT', roles: `{${RESOLVER}}` },
       ]);
     });
