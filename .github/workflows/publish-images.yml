@@ -15,8 +15,9 @@
 name: Publish images
 
 # Not on `image/**` tags any more: those are the ECR release tags (publish-images-ecr.yml), which
-# run behind the image-release environment. This GHCR job has no environment and holds
-# PLATFORM_PACKAGES_TOKEN, so it runs only when dispatched by hand, until Render is retired.
+# run behind the image-release environment. This GHCR job has no environment and holds a
+# packages: write token, so it runs only when dispatched by hand, until Render is retired. It reads
+# @munaxa/* with the same per-run GITHUB_TOKEN; no long-lived package token is used.
 on:
   workflow_dispatch:
     inputs:
@@ -31,10 +32,12 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   publish:
+    permissions:
+      contents: read
+      packages: write # push to GHCR; also reads @munaxa/* during the build
     name: ${{ matrix.image }}
     runs-on: ubuntu-latest
     strategy:
@@ -46,8 +49,9 @@ jobs:
           - image: munaxa-work-admin
             dockerfile: apps/admin/Dockerfile
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
+          persist-credentials: false
           # The commit to build, which is deliberately not tied to where this workflow file lives:
           # `.github/` is in .dockerignore, so a commit that only adds this workflow produces a
           # byte-identical image to the commit it was added on top of.
@@ -59,20 +63,20 @@ jobs:
           echo "sha=$(git rev-parse HEAD)"       >> "$GITHUB_OUTPUT"
           echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Authenticate to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          # The per-run token, scoped by `packages: write` above. Nothing longer-lived is needed to
+          # The per-run token, scoped by this job's `packages: write`. Nothing longer-lived is needed to
           # push, and nothing longer-lived should be used.
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -85,7 +89,7 @@ jobs:
           # The credential reaches the build as a BuildKit secret — mounted at /run/secrets/npm_token
           # for the layers that need it and absent from every layer's filesystem and from history.
           secrets: |
-            npm_token=${{ secrets.PLATFORM_PACKAGES_TOKEN }}
+            npm_token=${{ secrets.GITHUB_TOKEN }}
           # A single-platform manifest, so the digest below names the image itself rather than an
           # index over it. Predictable pinning matters more here than multi-arch, which nothing in
           # this deployment asks for.

@@ -81,6 +81,7 @@ jobs:
     environment: image-release # required reviewer; the publisher role trusts only this subject
     permissions:
       contents: read
+      packages: read # @munaxa/* from GitHub Packages, during the build only
       id-token: write # GitHub OIDC, for the image publisher role
     strategy:
       fail-fast: false
@@ -149,7 +150,7 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           # The registry credential for @munaxa/* as a BuildKit secret, never a build argument.
           secrets: |
-            npm_token=${{ secrets.PLATFORM_PACKAGES_TOKEN }}
+            npm_token=${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify the image runs as non-root and carries no credential
         env:
