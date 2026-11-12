@@ -1,14 +1,9 @@
-import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { dirname, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:http';
 
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { TokenService } from '@munaxa/auth';
-import { AsymmetricSigner } from '@munaxa/crypto';
 import { loadProcessEnvironment } from '@work/config';
 import { ALL_DOCUMENTS_PERMISSIONS } from '@work/documents';
 import { ALL_PEOPLE_PERMISSIONS } from '@work/people';
@@ -17,7 +12,22 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { platformGrantFor } from '../identity/platform-grants.js';
-import { CONNECTION, requireDatabaseInCi, stageEnvironment } from './cross-tenant.fixture.js';
+import {
+  CONNECTION,
+  ISSUER,
+  KID,
+  PASSWORD,
+  RUNTIME,
+  admitTo,
+  applyRuntimeGrants,
+  bindTo,
+  inTenant,
+  keys,
+  mintToken,
+  requireDatabaseInCi,
+  stageEnvironment,
+  startIdentityStandIn,
+} from './cross-tenant.fixture.js';
 import { TENANT_HEADER } from './tenant.middleware.js';
 
 /**
@@ -41,36 +51,9 @@ import { TENANT_HEADER } from './tenant.middleware.js';
 requireDatabaseInCi('The cross-tenant suite');
 const describeWithDatabase = CONNECTION === undefined ? describe.skip : describe;
 
-const RUNTIME = 'work_app';
-const PASSWORD = 'probe';
-const ISSUER = 'https://identity.cross-tenant.invalid';
-const KID = 'cross-tenant-test';
-/** The repository's runtime grants, found by walking up (this package compiles as CommonJS). */
-const GRANTS = ((): string => {
-  for (let directory = process.cwd(); ; directory = dirname(directory)) {
-    const candidate = resolve(directory, 'deploy/aws/runtime-grants.sql');
-    if (existsSync(candidate)) return candidate;
-    if (dirname(directory) === directory)
-      throw new Error('deploy/aws/runtime-grants.sql not found');
-  }
-})();
-
 const stamp = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
 const ORG_A = `org-a-${stamp}`;
 const ORG_B = `org-b-${stamp}`;
-const keys = generateKeyPairSync('ec', {
-  namedCurve: 'prime256v1',
-  publicKeyEncoding: { type: 'spki', format: 'pem' },
-  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-});
-const signer = new TokenService({
-  signer: new AsymmetricSigner('ES256', [
-    { kid: KID, privateKey: keys.privateKey, publicKey: keys.publicKey },
-  ]),
-  issuer: ISSUER,
-  audience: ['munaxa-work'],
-});
-
 /** Every Platform grant an administrator of People and Documents would hold. */
 const ADMIN_GRANTS = [...ALL_PEOPLE_PERMISSIONS, ...ALL_DOCUMENTS_PERMISSIONS].map(
   platformGrantFor,
@@ -79,16 +62,9 @@ const ADMIN_GRANTS = [...ALL_PEOPLE_PERMISSIONS, ...ALL_DOCUMENTS_PERMISSIONS].m
 /** Revoked sessions, as the stand-in Identity knows them. */
 const revoked = new Set<string>();
 let identity: Server;
-let identityUrl = '';
 
 const tokenFor = (sub: string, organisation: string, grants: readonly string[] = ADMIN_GRANTS) =>
-  signer.issueAccessToken({
-    subject: sub,
-    tenantId: organisation as never,
-    tokenVersion: 1,
-    sessionId: `sess_${randomUUID()}` as never,
-    permissions: grants,
-  });
+  mintToken(sub, organisation, grants);
 
 describeWithDatabase('cross-tenant access through the production composition (WK-01)', () => {
   let admin: Client;
@@ -128,75 +104,17 @@ describeWithDatabase('cross-tenant access through the production composition (WK
       )
     ).rows[0];
 
-  const inTenant = async (tenant: string, sql: string, values: unknown[]) => {
-    await admin.query('begin');
-    await admin.query('select set_config($1, $2, true)', ['app.tenant_id', tenant]);
-    await admin.query(sql, values);
-    await admin.query('commit');
-  };
-  const admit = async (sub: string, tenant: string) => {
-    const known = await admin.query<{ id: string }>(
-      'select id from workforce_user where platform_user_id = $1',
-      [sub],
-    );
-    const userId = known.rows[0]?.id ?? randomUUID();
-    if (known.rows[0] === undefined) {
-      await inTenant(
-        tenant,
-        `insert into workforce_user (id, platform_user_id, status, created_at, created_by, updated_at, updated_by, version)
-         values ($1, $2, 'active', now(), 'test', now(), 'test', 1)`,
-        [userId, sub],
-      );
-    }
-    await inTenant(
-      tenant,
-      `insert into tenant_membership (id, tenant_id, workforce_user_id, status, joined_at, created_at, created_by, updated_at, updated_by, version)
-       values (app_uuid_v7(), $1, $2, 'active', now(), now(), 'test', now(), 'test', 1)`,
-      [tenant, userId],
-    );
-  };
-  const bind = (tenant: string, organisation: string) =>
-    inTenant(
-      tenant,
-      `insert into tenant_platform_binding (tenant_id, platform_issuer, platform_tenant_id, created_at, created_by, updated_at, updated_by, version)
-       values ($1, $2, $3, now(), 'test', now(), 'test', 1)`,
-      [tenant, ISSUER, organisation],
-    );
+  const admit = (sub: string, tenant: string) => admitTo(admin, sub, tenant);
+  const bind = (tenant: string, organisation: string) => bindTo(admin, tenant, organisation);
 
   beforeAll(async () => {
-    identity = createServer((incoming, response) => {
-      const token = /^Bearer (\S+)$/.exec(incoming.headers.authorization ?? '')?.[1] ?? '';
-      let body: unknown = { active: false };
-      try {
-        const claims = signer.verifyAccessToken(token);
-        if (claims.sid !== undefined && !revoked.has(claims.sid)) {
-          body = {
-            active: true,
-            sub: claims.sub,
-            tid: claims.tid,
-            sid: claims.sid,
-            exp: claims.exp,
-          };
-        }
-      } catch {
-        // inactive
-      }
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify(body));
-    });
-    await new Promise<void>((resolve) => identity.listen(0, '127.0.0.1', resolve));
-    identityUrl = `http://127.0.0.1:${String((identity.address() as AddressInfo).port)}/api/auth/introspect`;
+    const started = await startIdentityStandIn(revoked);
+    identity = started.server;
+    const identityUrl = started.url;
 
     admin = new Client({ connectionString: CONNECTION });
     await admin.connect();
-    await admin.query(`
-      do $$ begin
-        if not exists (select 1 from pg_roles where rolname = '${RUNTIME}') then
-          create role ${RUNTIME} login nosuperuser nobypassrls password '${PASSWORD}';
-        end if;
-      end $$`);
-    await admin.query(`alter role ${RUNTIME} login nosuperuser nobypassrls password '${PASSWORD}'`);
-    await admin.query(readFileSync(GRANTS, 'utf8'));
+    await applyRuntimeGrants(admin);
 
     tenantA = (await admin.query<{ id: string }>('select app_uuid_v7() as id')).rows[0]?.id ?? '';
     tenantB = (await admin.query<{ id: string }>('select app_uuid_v7() as id')).rows[0]?.id ?? '';
@@ -379,13 +297,7 @@ describeWithDatabase('cross-tenant access through the production composition (WK
     });
 
     it('7. a token with no organisation claim is not a principal', async () => {
-      const raw = signer.issueAccessToken({
-        subject: subjects.alice,
-        tenantId: '' as never,
-        tokenVersion: 1,
-        sessionId: `sess_${randomUUID()}` as never,
-        permissions: ADMIN_GRANTS,
-      }).token;
+      const raw = mintToken(subjects.alice, '', ADMIN_GRANTS).token;
       expect((await http().get('/api/v1/people/export').set(as(raw))).status).toBe(401);
     });
 
@@ -396,6 +308,7 @@ describeWithDatabase('cross-tenant access through the production composition (WK
       expect((await http().get('/api/v1/people/export').set(as(token))).status).toBe(200);
 
       await inTenant(
+        admin,
         tenantA,
         `update tenant_membership set status = 'suspended'
            where workforce_user_id = (select id from workforce_user where platform_user_id = $1)`,
