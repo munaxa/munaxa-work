@@ -26,7 +26,7 @@ import { AUDIENCE, ISSUER, IdentityStandIn, KID, keys } from './identity-stand-i
 const identity = new IdentityStandIn();
 
 const workInstance = (
-  cacheMs: number,
+  cacheMs: number | undefined,
   overrides: Record<string, string> = {},
 ): PlatformAuthenticationPort =>
   authenticationPortFor(
@@ -37,7 +37,7 @@ const workInstance = (
       PLATFORM_AUTH_ALGORITHM: 'ES256',
       PLATFORM_AUTH_PUBLIC_KEYS: JSON.stringify([{ kid: KID, publicKey: keys.publicKey }]),
       PLATFORM_AUTH_INTROSPECTION_URL: identity.url,
-      PLATFORM_AUTH_REVOCATION_CACHE_MS: String(cacheMs),
+      ...(cacheMs === undefined ? {} : { PLATFORM_AUTH_REVOCATION_CACHE_MS: String(cacheMs) }),
       PLATFORM_AUTH_INTROSPECTION_TIMEOUT_MS: '300',
       ...overrides,
     }),
@@ -80,7 +80,7 @@ describe('one session across two Work API instances', () => {
     expect(await asks(instanceB, access)).toBeDefined();
   });
 
-  it('2-3. is refused immediately after revocation, on both instances', async () => {
+  it('2. with no positive cache (window 0), refused on the very next request on both instances', async () => {
     const { access, sid } = identity.signIn(`acct-${randomUUID()}`);
     expect(await asks(instanceA, access)).toBeDefined();
     expect(await asks(instanceB, access)).toBeDefined();
@@ -91,7 +91,7 @@ describe('one session across two Work API instances', () => {
     expect(await asks(instanceB, access)).toBeUndefined();
   });
 
-  it('3. with the default 5 s window, both instances refuse once it has passed', async () => {
+  it('3. with a 300 ms window, both instances refuse once it has passed', async () => {
     const first = workInstance(300);
     const second = workInstance(300);
     const { access, sid } = identity.signIn(`acct-${randomUUID()}`);
@@ -104,6 +104,24 @@ describe('one session across two Work API instances', () => {
     expect(await asks(first, access)).toBeUndefined();
     expect(await asks(second, access)).toBeUndefined();
   });
+});
+
+describe('the shipped default window', () => {
+  it('3. with PLATFORM_AUTH_REVOCATION_CACHE_MS unset (5 s), a revoked session is refused within 5 s', async () => {
+    const first = workInstance(undefined);
+    const second = workInstance(undefined);
+    const { access, sid } = identity.signIn(`acct-${randomUUID()}`);
+    expect(await asks(first, access)).toBeDefined();
+    expect(await asks(second, access)).toBeDefined();
+
+    identity.revoke(sid);
+    // Inside the window a cached positive may still be honoured; that is the documented bound.
+    expect(await asks(first, access)).toBeDefined();
+
+    await sleep(5_050);
+    expect(await asks(first, access)).toBeUndefined();
+    expect(await asks(second, access)).toBeUndefined();
+  }, 15_000);
 });
 
 describe('refresh cannot restore a revoked session', () => {

@@ -49,8 +49,14 @@ export interface IdentitySessionStatusOptions {
   readonly cacheMs: number;
   readonly timeoutMs: number;
   readonly fetch?: typeof fetch;
-  /** Milliseconds since the epoch. Bound by tests. */
+  /** Milliseconds since the epoch, compared with a token's `exp`. Bound by tests. */
   readonly now?: () => number;
+  /**
+   * A clock that never steps backwards, for an answer's age. Defaults to `performance.now`, so an
+   * NTP correction of the wall clock cannot stretch the window; a test that binds `now` alone gets
+   * that clock for both.
+   */
+  readonly monotonic?: () => number;
   /** The most digests held. The oldest are dropped first; a dropped entry is simply asked again. */
   readonly maxEntries?: number;
   /** Told why Identity could not answer. Never told the token. */
@@ -59,8 +65,10 @@ export interface IdentitySessionStatusOptions {
 
 interface Entry {
   readonly active: boolean;
-  /** Epoch milliseconds after which the entry is not used. */
-  readonly until: number;
+  /** On the monotonic clock: when the question this answers was sent. */
+  readonly askedAt: number;
+  /** Epoch milliseconds: the token's own expiry. Nothing is kept past it. */
+  readonly expiresAt: number;
 }
 
 interface InFlight {
@@ -92,6 +100,7 @@ export class IdentitySessionStatus implements SessionStatus {
   readonly #timeoutMs: number;
   readonly #fetch: typeof fetch;
   readonly #now: () => number;
+  readonly #monotonic: () => number;
   readonly #maxEntries: number;
   readonly #onUnavailable: ((reason: UnavailableReason) => void) | undefined;
   readonly #entries = new Map<string, Entry>();
@@ -103,13 +112,15 @@ export class IdentitySessionStatus implements SessionStatus {
     this.#timeoutMs = options.timeoutMs;
     this.#fetch = options.fetch ?? globalThis.fetch;
     this.#now = options.now ?? Date.now;
+    this.#monotonic =
+      options.monotonic ?? options.now ?? ((): number => globalThis.performance.now());
     this.#maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
     this.#onUnavailable = options.onUnavailable;
   }
 
   public async isActive(token: string, claims: SessionClaims): Promise<boolean> {
     const key = digestOf(token);
-    const now = this.#now();
+    const now = this.#monotonic();
     const cached = this.#cached(key, now);
     if (cached !== undefined) return cached;
 
@@ -138,7 +149,8 @@ export class IdentitySessionStatus implements SessionStatus {
     const cached = this.#entries.get(key);
     if (cached === undefined) return undefined;
     if (!cached.active) return false;
-    if (now < cached.until) return true;
+    const age = now - cached.askedAt;
+    if (age >= 0 && age < this.#cacheMs && this.#now() < cached.expiresAt) return true;
     this.#entries.delete(key);
     return undefined;
   }
@@ -180,15 +192,12 @@ export class IdentitySessionStatus implements SessionStatus {
   }
 
   #remember(key: string, active: boolean, askedAt: number, exp: number): void {
-    const expiresAt = exp * 1_000;
     const existing = this.#entries.get(key);
     if (existing !== undefined && !existing.active) return;
-
-    const until = active ? Math.min(askedAt + this.#cacheMs, expiresAt) : expiresAt;
-    if (active && until <= this.#now()) return;
+    if (active && this.#monotonic() - askedAt >= this.#cacheMs) return;
 
     this.#entries.delete(key);
-    this.#entries.set(key, { active, until });
+    this.#entries.set(key, { active, askedAt, expiresAt: exp * 1_000 });
     this.#evict();
   }
 

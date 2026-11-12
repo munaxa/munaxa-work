@@ -3,7 +3,7 @@
 **Status** Accepted
 **Date** 2026-11-12
 **Author** Munaxa Work engineering
-**Approval** Independent security review (munaxa-platform agent report 2026-11-12-work-tenant-authorization-and-revocation)
+**Approval** Independent security review of munaxa-identity#15 and munaxa-work#31 (report in munaxa-platform `docs/aws-migration/agent-reports/2026-11-12-work-tenant-authorization-and-revocation/`); first round CHANGES REQUIRED, findings resolved, approval recorded there
 **Refines** [ADR-0032](0032-tenant-resolution-from-membership.md) and [ADR-0076](0076-cross-product-authorization-contract.md)
 **Relates to** [ADR-0077](0077-membership-resolution-role.md), munaxa-identity `GET /api/auth/introspect`
 
@@ -30,8 +30,10 @@ Two findings of the 11 Nov 2026 deployment-readiness audit (WK-01, WK-02), both 
    organisation `(platform_issuer, platform_tenant_id)` it belongs to. It is unique in both
    directions — one organisation per tenant, and **one tenant per organisation**, which is the
    property WK-01 needs. It has forced row-level security like every table, the runtime role may
-   read but not write it (`deploy/aws/runtime-grants.sql`), and `scripts/bootstrap-tenant.mjs`
-   writes it (`--platform-tenant-id`, required) and refuses to re-bind.
+   read but not write it (the migration revokes it and `deploy/aws/runtime-grants.sql` repeats it),
+   and `scripts/bootstrap-tenant.mjs` writes it (`--platform-tenant-id`, required). Bootstrap binds
+   only a tenant the operator named with `--tenant-id` or one already bound to that organisation;
+   it refuses to re-bind, to revive a retired binding, or to bind a person's other tenant.
 2. **Bound resolution.** Requests resolve memberships with
    `app_bound_memberships_of(sub, issuer, tid)`, a security-definer function owned by the NOLOGIN
    `work_membership_resolver` (as ADR-0077), which returns only memberships of the tenant bound to
@@ -43,8 +45,8 @@ Two findings of the 11 Nov 2026 deployment-readiness audit (WK-01, WK-02), both 
 4. **Session check.** After local verification, `IdentitySessionStatus` asks Identity's
    `GET /api/auth/introspect` (Bearer), which decides with Identity's own `resolvePrincipal`. It
    requires `active: true` with the token's own `sub`, `tid` and `sid`. A positive answer is reused
-   for at most `PLATFORM_AUTH_REVOCATION_CACHE_MS` (default 5000, maximum 30000), measured from when
-   it was asked and never past `exp`; a negative answer is kept until the token expires and is never
+   for at most `PLATFORM_AUTH_REVOCATION_CACHE_MS` (default 5000, maximum 30000), measured on a
+   monotonic clock from when it was asked, and never past `exp`; a negative answer is kept until the token expires and is never
    replaced; concurrent checks of one token share one call. Every failure — timeout
    (`PLATFORM_AUTH_INTROSPECTION_TIMEOUT_MS`, default 2000), network, any non-200, a malformed body,
    an answer about another subject, organisation or session — refuses the request and is not cached.
@@ -73,14 +75,17 @@ Two findings of the 11 Nov 2026 deployment-readiness audit (WK-01, WK-02), both 
 ## Consequences
 
 - An existing Work tenant has no binding until bootstrap is run for it again with
-  `--platform-tenant-id`; until then nobody can act in it. Work has never been deployed to AWS, so
+  `--tenant-id <that tenant>` and `--platform-tenant-id`; until then nobody can act in it. Work has never been deployed to AWS, so
   no live tenant is affected.
-- Every authenticated Work request now depends on Identity being reachable. Identity's edge applies
-  `api-per-ip` (300 per minute) to the introspection route, keyed by the Work task's address; with a
-  5 s cache that is roughly 25 continuously active users per Work task before Work's requests are
-  throttled and refused. This is ample for non-production. Production needs either a higher Identity
-  limit for authenticated product callers or a longer cache, and is tracked as a production
-  readiness item.
+- Every authenticated Work request now depends on Identity being reachable, and fails closed when
+  it is not.
+- Identity limits introspection by caller address (`introspect-per-ip`, 12,000 per minute, shared by
+  every Work task behind one NAT address) and per account (`introspect-per-user`, 600 answers per
+  minute). At one question per live token per 5 s that is about 1,000 continuously active users per
+  NAT address; past the per-account limit only that account is refused. It is no longer under the
+  browser limit `api-per-ip`, which about 25 users, or one user with many tokens, would have
+  exhausted for everyone. Load beyond that is a production capacity item (a longer window, or a
+  product-authenticated path).
 - A person who genuinely works for two organisations needs an Identity account in each (Identity
   accounts belong to one organisation), and uses the token of the organisation they are acting for.
 - The "15 minutes" note in ADR-0076's consequences is superseded by the revocation guarantee above.

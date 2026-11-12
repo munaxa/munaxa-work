@@ -214,6 +214,28 @@ describe('stale answers cannot restore authorization', () => {
     expect(await status.isActive(TOKEN, CLAIMS)).toBe(false);
   });
 
+  it('a wall clock stepped back does not stretch a positive answer past the window', async () => {
+    const scripted = identity();
+    const wall = clock();
+    const monotonic = clock(0);
+    const status = new IdentitySessionStatus({
+      url: INTROSPECTION_URL,
+      cacheMs: 5_000,
+      timeoutMs: 2_000,
+      fetch: scripted.fetch,
+      now: wall.now,
+      monotonic: monotonic.now,
+    });
+
+    expect(await status.isActive(TOKEN, CLAIMS)).toBe(true);
+    scripted.state = { active: false, status: 200 };
+    wall.advance(-60_000); // an NTP correction
+    monotonic.advance(5_000);
+
+    expect(await status.isActive(TOKEN, CLAIMS)).toBe(false);
+    expect(scripted.calls).toHaveLength(2);
+  });
+
   it('concurrent requests for one token share one question', async () => {
     const scripted = identity();
     scripted.state = { active: true, status: 200, delayMs: 10 };

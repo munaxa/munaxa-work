@@ -23,14 +23,11 @@
  * policy, with the tenant set transaction-locally exactly as `PostgresUnitOfWork` sets it. Nothing
  * here is granted, disabled or bypassed.
  *
- * **The binding (ADR-0080).** A Work tenant also records the one Platform organisation it belongs
- * to — the `tid` of the tokens its people present, and the organisation whose roles produced their
- * `perms`. Requests resolve only memberships of the tenant bound to the token's organisation, so an
- * unbound tenant admits nobody, and one organisation's grants can never be exercised in a second
- * Work tenant. The binding is written here, once, and is never changed by this script: a run that
- * names a different organisation for an already-bound tenant is refused. The runtime role cannot
- * write bindings at all (deploy/aws/runtime-grants.sql), so run this as the owner role, as
- * deploy/aws/README.md does.
+ * **The binding (ADR-0080).** A Work tenant records the one Platform organisation (`tid`) it
+ * belongs to; requests resolve only memberships of the tenant bound to the token's organisation.
+ * The binding is written here once and never changed: a different organisation for a bound tenant,
+ * a retired binding, or an unbound tenant the operator did not name with --tenant-id is refused.
+ * The runtime role cannot write bindings, so run this as the owner role (deploy/aws/README.md).
  *
  * Usage:
  *   DATABASE_URL=... node scripts/bootstrap-tenant.mjs --platform-user-id <id> \
@@ -74,9 +71,8 @@ const argument = (name) => {
 /**
  * A UUID v7, built from the epoch millisecond and random bits.
  *
- * Node ships no v7 generator, and the database's `app_uuid_v7()` cannot be reached before a
- * connection exists. The layout is the one the kernel's `uuidV7` produces and its `isUuidV7`
- * accepts: 48 bits of timestamp, version 7, variant 10.
+ * Node ships no v7 generator. The layout is the kernel's `uuidV7`: 48 bits of timestamp, version
+ * 7, variant 10.
  */
 const uuidV7 = () => {
   const stamp = Date.now().toString(16).padStart(12, '0');
@@ -91,14 +87,15 @@ const uuidV7 = () => {
  *
  * `app_memberships_of` is the product's own resolution path (ADR-0033), so a bootstrap that
  * consults it is checking the state the application will actually see rather than a second opinion
- * assembled from tables it cannot read.
+ * assembled from tables it cannot read. It is deliberately the unbound lookup: bootstrap must see
+ * every membership, including those in tenants not yet bound to an organisation.
  */
-const existingMembership = async (client, platformUserId) => {
+const membershipsOf = async (client, platformUserId) => {
   const found = await client.query(
     'select tenant_id, membership_id, workforce_user_id from app_memberships_of($1)',
     [platformUserId],
   );
-  return found.rows[0];
+  return found.rows;
 };
 
 /** The binding a tenant already has, read under its own tenant context. */
@@ -107,8 +104,8 @@ const bindingOf = async (client, tenantId) => {
   try {
     await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantId]);
     const found = await client.query(
-      `select platform_issuer, platform_tenant_id from tenant_platform_binding
-        where tenant_id = $1 and deleted_at is null`,
+      `select platform_issuer, platform_tenant_id, deleted_at from tenant_platform_binding
+        where tenant_id = $1`,
       [tenantId],
     );
     await client.query('commit');
@@ -126,11 +123,17 @@ const bindingOf = async (client, tenantId) => {
  */
 const bind = async (client, { tenantId, organisation }) => {
   const existing = await client.query(
-    `select platform_issuer, platform_tenant_id from tenant_platform_binding
-      where tenant_id = $1 and deleted_at is null`,
+    `select platform_issuer, platform_tenant_id, deleted_at from tenant_platform_binding
+      where tenant_id = $1`,
     [tenantId],
   );
   const row = existing.rows[0];
+  if (row?.deleted_at !== undefined && row.deleted_at !== null) {
+    throw new BindingConflict(
+      `Tenant ${tenantId} has a retired binding (organisation ${row.platform_tenant_id}).` +
+        ' Bootstrap will not revive or replace it; nothing was written.',
+    );
+  }
   if (row !== undefined) {
     if (
       row.platform_issuer === organisation.issuer &&
@@ -154,6 +157,39 @@ const bind = async (client, { tenantId, organisation }) => {
 };
 
 class BindingConflict extends Error {}
+
+/**
+ * The membership a re-run is about, or `undefined` for a first run. Bootstrap binds only a tenant
+ * the operator named or one already bound, never an unnamed unbound one: binding a person's other
+ * (perhaps legacy, unbound) tenant to this organisation would hand this organisation's grants that
+ * tenant's data (WK-01).
+ */
+const alreadyBootstrapped = async (client, memberships, namedTenant) => {
+  if (memberships.length === 0) return undefined;
+  const tenants = memberships.map((membership) => membership.tenant_id).join(', ');
+  if (namedTenant !== undefined) {
+    const named = memberships.find((membership) => membership.tenant_id === namedTenant);
+    if (named !== undefined) return named;
+    throw new BindingConflict(
+      `The person is already a member of tenant(s) ${tenants}, not of ${namedTenant}. Bootstrap ` +
+        'admits the first person of a new tenant only; nothing was written.',
+    );
+  }
+  if (memberships.length > 1) {
+    throw new BindingConflict(
+      `The person is a member of several tenants (${tenants}). Name one with --tenant-id; ` +
+        'nothing was written.',
+    );
+  }
+  const [only] = memberships;
+  if ((await bindingOf(client, only.tenant_id)) === undefined) {
+    throw new BindingConflict(
+      `Tenant ${only.tenant_id} is not bound to any organisation yet. Name it with --tenant-id to ` +
+        'bind it; bootstrap binds no tenant it was not given. Nothing was written.',
+    );
+  }
+  return only;
+};
 
 const ensureBinding = async (client, { tenantId, organisation }) => {
   await client.query('begin');
@@ -214,10 +250,11 @@ const create = async (client, { tenantId, platformUserId, organisation }) => {
  * difference between a message and an afternoon.
  */
 const verify = async (client, platformUserId, expectedTenantId, organisation) => {
-  const found = await client.query(
-    'select tenant_id from app_bound_memberships_of($1, $2, $3)',
-    [platformUserId, organisation.issuer, organisation.tenantId],
-  );
+  const found = await client.query('select tenant_id from app_bound_memberships_of($1, $2, $3)', [
+    platformUserId,
+    organisation.issuer,
+    organisation.tenantId,
+  ]);
 
   if (found.rows[0]?.tenant_id === expectedTenantId) return;
 
@@ -235,7 +272,8 @@ const verify = async (client, platformUserId, expectedTenantId, organisation) =>
 
 const run = async () => {
   const platformUserId = argument('platform-user-id');
-  const tenantId = argument('tenant-id') ?? uuidV7();
+  const namedTenant = argument('tenant-id');
+  const tenantId = namedTenant ?? uuidV7();
   const platformTenantId = argument('platform-tenant-id')?.trim();
   const platformIssuer = (argument('platform-issuer') ?? process.env.PLATFORM_AUTH_ISSUER)?.trim();
 
@@ -248,7 +286,11 @@ const run = async () => {
         'create Platform identities (ADR-0001); the account must already exist on Platform.',
     );
   }
-  if (platformTenantId === undefined || platformTenantId === '' || platformTenantId.startsWith('--')) {
+  if (
+    platformTenantId === undefined ||
+    platformTenantId === '' ||
+    platformTenantId.startsWith('--')
+  ) {
     return fail(
       'Give --platform-tenant-id: the Platform organisation id this tenant belongs to (the tid of ' +
         "the account's tokens). A Work tenant with no organisation admits nobody (ADR-0080).",
@@ -274,8 +316,8 @@ const run = async () => {
 
   try {
     const organisation = { issuer: platformIssuer, tenantId: platformTenantId };
-    const already = await existingMembership(client, platformUserId.trim());
-
+    const memberships = await membershipsOf(client, platformUserId.trim());
+    const already = await alreadyBootstrapped(client, memberships, namedTenant);
     if (already !== undefined) {
       // Idempotent, and deliberately without touching the membership: a second run reports the
       // state it found rather than reasserting it. Re-writing the row would move `updated_at` and
@@ -334,6 +376,16 @@ await run().catch((error) => {
     return fail(
       `Organisation ${argument('platform-tenant-id')} is already bound to another Work tenant. One ` +
         "organisation's grants may apply in one Work tenant only (ADR-0080); nothing was written.",
+    );
+  }
+  if (
+    error instanceof Error &&
+    error.code === '23505' &&
+    error.constraint === 'tenant_platform_binding_tenant_key'
+  ) {
+    return fail(
+      `Tenant ${argument('tenant-id')} was bound by another run while this one was working.` +
+        ' Nothing was written by this run; run it again to see the state it left.',
     );
   }
   fail(

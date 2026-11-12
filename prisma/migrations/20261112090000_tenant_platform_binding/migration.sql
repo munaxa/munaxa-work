@@ -108,3 +108,13 @@ do $$ begin
     execute 'revoke create on schema public from work_membership_resolver';
   end if;
 end $$;
+
+-- The runtime role reads bindings and never writes them. `deploy/aws/runtime-grants.sql` states
+-- this too; it is repeated here so that no deployment that skips or fails that step leaves the
+-- runtime able to rebind its own tenant. Where no `work_app` role exists yet there is nothing to
+-- revoke, and runtime-grants.sql applies the same rule when it creates the role's grants.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'work_app') then
+    execute 'revoke insert, update, delete, truncate on table tenant_platform_binding from work_app';
+  end if;
+end $$;

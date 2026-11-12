@@ -224,11 +224,76 @@ describeWithDatabase('pnpm db:bootstrap binds the tenant to its organisation (AD
       await admin.query('delete from tenant_platform_binding where tenant_id = $1', [tenantId]);
       expect(await resolvesFor(person, organisationOf(person))).toBe(0);
 
-      const result = await bootstrap('--platform-user-id', person);
+      const unnamed = await bootstrap('--platform-user-id', person);
+      expect(unnamed.code).toBe(1);
+      expect(unnamed.stderr).toContain('not bound to any organisation');
+      expect(await bindingsOf(tenantId)).toEqual([]);
+
+      const result = await bootstrap('--platform-user-id', person, '--tenant-id', tenantId ?? '');
 
       expect(result.code).toBe(0);
       expect(result.stdout).toContain('Bound the tenant');
       expect(await resolvesFor(person, organisationOf(person))).toBe(1);
+    });
+
+    it('never binds a legacy tenant the operator did not name (review H1)', async () => {
+      const person = platformUser('h1');
+      await bootstrap('--platform-user-id', person);
+      const legacy = (await membershipsOf(person))[0]?.tenant_id;
+      await admin.query('delete from tenant_platform_binding where tenant_id = $1', [legacy]);
+      const other =
+        (await admin.query<{ id: string }>('select app_uuid_v7() as id')).rows[0]?.id ?? '';
+
+      const result = await bootstrap(
+        '--platform-user-id',
+        person,
+        '--tenant-id',
+        other,
+        '--platform-tenant-id',
+        'org-bootstrap-test-y',
+      );
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(`not of ${other}`);
+      expect(await bindingsOf(legacy)).toEqual([]);
+      expect(await bindingsOf(other)).toEqual([]);
+      expect((await membershipsOf(person)).map((m) => m.tenant_id)).toEqual([legacy]);
+    });
+
+    it('asks for --tenant-id when the person belongs to several tenants', async () => {
+      const person = platformUser('two');
+      await bootstrap('--platform-user-id', person);
+      const [first] = await membershipsOf(person);
+      const second = (await admin.query<{ id: string }>('select app_uuid_v7() as id')).rows[0]?.id;
+      await admin.query(
+        `insert into tenant_membership (id, tenant_id, workforce_user_id, status, joined_at,
+           created_at, created_by, updated_at, updated_by, version)
+         values (app_uuid_v7(), $1, $2, 'active', now(), now(), 'test', now(), 'test', 1)`,
+        [second, first?.workforce_user_id],
+      );
+
+      const result = await bootstrap('--platform-user-id', person);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('several tenants');
+      expect(await bindingsOf(second)).toEqual([]);
+      await admin.query('delete from tenant_membership where tenant_id = $1', [second]);
+    });
+
+    it('will not revive or replace a retired binding', async () => {
+      const person = platformUser('retired');
+      await bootstrap('--platform-user-id', person);
+      const tenantId = (await membershipsOf(person))[0]?.tenant_id ?? '';
+      await admin.query(
+        `update tenant_platform_binding set deleted_at = now(), deleted_by = 'test'
+          where tenant_id = $1`,
+        [tenantId],
+      );
+
+      const result = await bootstrap('--platform-user-id', person, '--tenant-id', tenantId);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('retired binding');
     });
   });
 });
