@@ -25,6 +25,9 @@ const CLAIMS: VerifiedAccessToken = {
   sub: 'platform-user-7',
   iss: 'https://identity.example.com',
   iat: 1_780_000_000,
+  exp: 1_780_000_900,
+  tid: 'org-a',
+  sid: 'sess-1',
 };
 
 const verifying = (claims: VerifiedAccessToken): AccessTokenVerifier => ({
@@ -47,6 +50,8 @@ describe('a token Platform vouched for', () => {
     expect(await port.authenticate(bearer('a-token'))).toEqual({
       platformUserId: 'platform-user-7',
       issuer: 'https://identity.example.com',
+      platformTenantId: 'org-a',
+      sessionId: 'sess-1',
       authenticatedAt: new Date(1_780_000_000_000),
       // No `perms` claim, so Platform granted nothing: an authenticated caller who may do nothing.
       permissions: [],
@@ -77,22 +82,93 @@ describe('a token Platform vouched for', () => {
 });
 
 describe('the tenant claim', () => {
-  it('is not carried onto the principal, so nothing downstream can read a tenant from a token', async () => {
-    // A genuine Platform access token carries `tid`. Work's tenant comes from a stored
-    // membership (ADR-0032), so the principal must offer no tenant at all — not an ignored one.
-    const port = new PlatformTokenAuthenticationPort(
-      verifying({ ...CLAIMS, tid: 'tenant-a' } as VerifiedAccessToken),
-    );
+  it('is carried only as the Platform organisation, never as a Work tenant', async () => {
+    // Work's tenant comes from a stored membership (ADR-0032); `tid` only narrows which
+    // memberships are eligible (ADR-0080), so it reaches the principal under its own name.
+    const port = new PlatformTokenAuthenticationPort(verifying(CLAIMS));
     const principal = await port.authenticate(bearer('a-token'));
 
-    expect(principal).toEqual({
-      platformUserId: 'platform-user-7',
-      issuer: 'https://identity.example.com',
-      authenticatedAt: new Date(1_780_000_000_000),
-      permissions: [],
-    });
+    expect(principal?.platformTenantId).toBe('org-a');
     expect(Object.keys(principal ?? {})).not.toContain('tid');
     expect(Object.keys(principal ?? {})).not.toContain('tenantId');
+  });
+
+  it.each(['tid', 'sid', 'exp'] as const)(
+    'refuses a token without `%s`, which Identity always issues',
+    async (claim) => {
+      const { [claim]: _omitted, ...rest } = CLAIMS;
+      const port = new PlatformTokenAuthenticationPort(verifying(rest));
+
+      expect(await port.authenticate(bearer('a-token'))).toBeUndefined();
+    },
+  );
+
+  it('carries the assurance claims Identity issued, and drops malformed ones', async () => {
+    const assured = new PlatformTokenAuthenticationPort(
+      verifying({ ...CLAIMS, amr: ['pwd', 7, 'otp'], mfa: true }),
+    );
+    const malformed = new PlatformTokenAuthenticationPort(
+      verifying({ ...CLAIMS, amr: 'pwd', mfa: 'yes' }),
+    );
+
+    expect(await assured.authenticate(bearer('a-token'))).toMatchObject({
+      authenticationMethods: ['pwd', 'otp'],
+      mfaSatisfied: true,
+    });
+    const principal = await malformed.authenticate(bearer('a-token'));
+    expect(principal).toBeDefined();
+    expect(principal?.authenticationMethods).toBeUndefined();
+    expect(principal?.mfaSatisfied).toBeUndefined();
+  });
+});
+
+describe('the session check (WK-02)', () => {
+  const sessions = (answer: () => Promise<boolean>) => {
+    const asked: { token: string; claims: unknown }[] = [];
+    return {
+      asked,
+      status: {
+        isActive: (token: string, claims: unknown) => {
+          asked.push({ token, claims });
+          return answer();
+        },
+      },
+    };
+  };
+
+  it('asks about the exact token and its own subject, organisation, session and expiry', async () => {
+    const live = sessions(() => Promise.resolve(true));
+    const port = new PlatformTokenAuthenticationPort(verifying(CLAIMS), undefined, live.status);
+
+    expect(await port.authenticate(bearer('a-token'))).toBeDefined();
+    expect(live.asked).toEqual([
+      {
+        token: 'a-token',
+        claims: { sub: 'platform-user-7', tid: 'org-a', sid: 'sess-1', exp: 1_780_000_900 },
+      },
+    ]);
+  });
+
+  it('is no principal when Identity says the session has ended', async () => {
+    const ended = sessions(() => Promise.resolve(false));
+    const port = new PlatformTokenAuthenticationPort(verifying(CLAIMS), undefined, ended.status);
+
+    expect(await port.authenticate(bearer('a-token'))).toBeUndefined();
+  });
+
+  it('is no principal, not a 500, when the check itself throws', async () => {
+    const broken = sessions(() => Promise.reject(new Error('boom')));
+    const port = new PlatformTokenAuthenticationPort(verifying(CLAIMS), undefined, broken.status);
+
+    expect(await port.authenticate(bearer('a-token'))).toBeUndefined();
+  });
+
+  it('is never asked about a token whose signature failed', async () => {
+    const live = sessions(() => Promise.resolve(true));
+    const port = new PlatformTokenAuthenticationPort(refusing('bad'), undefined, live.status);
+
+    expect(await port.authenticate(bearer('a-token'))).toBeUndefined();
+    expect(live.asked).toEqual([]);
   });
 });
 

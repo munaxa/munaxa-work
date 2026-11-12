@@ -14,3 +14,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO wo
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO work_app;
 -- Prisma's own bookkeeping is the owner's alone.
 REVOKE ALL ON TABLE _prisma_migrations FROM work_app;
+-- The tenant-to-organisation binding decides whose grants apply in a tenant (ADR-0080). The runtime
+-- may read it under row-level security, and may never write it: re-binding a tenant to another
+-- organisation is an owner action (scripts/bootstrap-tenant.mjs), not something a request can do.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE tenant_platform_binding FROM work_app;

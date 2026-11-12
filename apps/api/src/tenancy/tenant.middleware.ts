@@ -44,7 +44,16 @@ export class TenantMiddleware implements NestMiddleware {
     @Inject(MEMBERSHIP_DIRECTORY) private readonly directory: TenantMembershipDirectory,
   ) {}
 
-  public async use(request: Request, _response: Response, next: NextFunction): Promise<void> {
+  public async use(request: Request, response: Response, next: NextFunction): Promise<void> {
+    // Every answer from here on may depend on who is asking and in which tenant, so no shared
+    // cache — a CDN, a proxy, a browser's back-forward cache on a shared machine — may keep it,
+    // and none may serve it to a different caller. Set before authentication so a 401 is not
+    // cached either. `setHeader` is guarded because the middleware's unit tests pass no response.
+    if (typeof response.setHeader === 'function' && !response.headersSent) {
+      response.setHeader('cache-control', 'no-store');
+      response.setHeader('vary', 'Authorization, X-Munaxa-Tenant');
+    }
+
     const correlated = request as CorrelatedRequest;
     // Typed alias rather than a cast at each assignment, matching the correlation middleware.
     // Nothing else in the process writes these two fields.

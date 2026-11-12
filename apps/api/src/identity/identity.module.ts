@@ -85,7 +85,7 @@ import {
   PERMISSION_CHECKER,
 } from './identity.tokens.js';
 import { PlatformPermissionChecker } from './permission-checker.js';
-import { authenticationPortFor } from './authentication-port.js';
+import { loggedAuthenticationPortFor } from './authentication-port.js';
 import { LicensingGate } from '../licensing/licensing.gate.js';
 
 /**
@@ -117,9 +117,8 @@ import { LicensingGate } from '../licensing/licensing.gate.js';
       provide: AUTHENTICATION_PORT,
       inject: [ENVIRONMENT, PinoLogger],
       useFactory: (environment: Environment, logger: PinoLogger): PlatformAuthenticationPort =>
-        authenticationPortFor(environment, undefined, (dropped) => {
-          // The grant name and the reason, and nothing else — never the token it arrived in.
-          logger.logger.warn({ dropped }, 'a Platform grant conferred no Work permission');
+        loggedAuthenticationPortFor(environment, (fields, message) => {
+          logger.logger.warn(fields, message);
         }),
     },
     {

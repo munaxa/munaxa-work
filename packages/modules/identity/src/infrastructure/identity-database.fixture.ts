@@ -60,6 +60,8 @@ export interface IdentityFixture {
   ): Promise<TResult>;
   seedUser(platformUserId: string): Promise<string>;
   seedMembership(tenantId: string, workforceUserId: string): Promise<string>;
+  /** Binds a Work tenant to one Platform organisation (ADR-0080), as bootstrap does. */
+  seedBinding(tenantId: string, organisation: { issuer: string; tenantId: string }): Promise<void>;
   truncate(): Promise<void>;
   close(): Promise<void>;
 }
@@ -116,6 +118,24 @@ const ensureApplicationRole = async (admin: Pool, role: string): Promise<string>
   return url.toString();
 };
 
+const seedBinding = async (
+  admin: Pool,
+  tenantId: string,
+  organisation: { issuer: string; tenantId: string },
+): Promise<void> => {
+  await admin.query(
+    `insert into tenant_platform_binding
+       (id, tenant_id, platform_issuer, platform_tenant_id,
+        created_at, created_by, updated_at, updated_by, version)
+     values ($1, $2, $3, $4, now(), 'test', now(), 'test', 1)`,
+    [uuidV7(), tenantId, organisation.issuer, organisation.tenantId],
+  );
+};
+
+const truncateAll = async (admin: Pool): Promise<void> => {
+  await admin.query(`truncate ${IDENTITY_TABLES.join(', ')}, tenant_platform_binding cascade`);
+};
+
 export const openIdentityFixture = async (role: string): Promise<IdentityFixture> => {
   const admin = new Pool({ connectionString: CONNECTION });
 
@@ -162,12 +182,11 @@ export const openIdentityFixture = async (role: string): Promise<IdentityFixture
       ),
     seedUser,
     seedMembership,
-    truncate: async () => {
-      await admin.query(`truncate ${IDENTITY_TABLES.join(', ')} cascade`);
-    },
+    seedBinding: (tenantId, organisation) => seedBinding(admin, tenantId, organisation),
+    truncate: () => truncateAll(admin),
     close: async () => {
       await application.end();
-      await admin.query(`truncate ${IDENTITY_TABLES.join(', ')} cascade`);
+      await truncateAll(admin);
       await admin.end();
     },
   };

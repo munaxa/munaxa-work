@@ -63,6 +63,7 @@ line; the decision that replaced it is a new record.
 | [0077](0077-membership-resolution-role.md)       | Membership resolution runs as a role that cannot log in | Accepted |
 | [0078](0078-licence-gate-through-the-shared-licensing-contract.md) | Licences cap requests through the shared licensing contract | Accepted |
 | [0079](0079-what-work-sells-modules-headcount-and-the-hosted-licence.md) | What Work sells: modules, headcount, and the hosted licence | Accepted |
+| [0080](0080-grants-are-bound-to-their-organisation-and-sessions-are-checked.md) | A token's grants apply only in the tenant bound to its organisation, and its session is checked with Identity | Accepted |
 
 Every ADR states: decision, reason, consequences, alternatives considered, date, author and
 approval status.

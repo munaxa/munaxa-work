@@ -41,6 +41,7 @@ const authenticating = (platformUserId?: string): PlatformAuthenticationPort => 
         ? undefined
         : {
             platformUserId,
+            platformTenantId: 'org-a',
             issuer: 'platform-test',
             email: 'sara@example.com',
             authenticatedAt: new Date('2026-08-05T00:00:00Z'),
