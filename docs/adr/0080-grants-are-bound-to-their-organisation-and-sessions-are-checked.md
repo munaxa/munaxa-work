@@ -3,7 +3,7 @@
 **Status** Accepted
 **Date** 2026-11-12
 **Author** Munaxa Work engineering
-**Approval** Independent security review of munaxa-identity#15 and munaxa-work#31 (report in munaxa-platform `docs/aws-migration/agent-reports/2026-11-12-work-tenant-authorization-and-revocation/`); first round CHANGES REQUIRED, findings resolved, approval recorded there
+**Approval** Independent security review of munaxa-identity#15 and munaxa-work#31 (report in munaxa-platform `docs/aws-migration/agent-reports/2026-11-12-work-tenant-authorization-and-revocation/`); each round's verdict and its resolution are recorded in that report
 **Refines** [ADR-0032](0032-tenant-resolution-from-membership.md) and [ADR-0076](0076-cross-product-authorization-contract.md)
 **Relates to** [ADR-0077](0077-membership-resolution-role.md), munaxa-identity `GET /api/auth/introspect`
 
