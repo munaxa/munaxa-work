@@ -26,13 +26,20 @@
 # fails here, loudly. apk verifies the package signature against the keys in the pinned image;
 # nothing else is added or upgraded. .github/scripts/verify-image.sh checks the result.
 FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS base
-# The split is the point: `apk list -I zlib` prints `zlib-<version> <arch> ...` and $1 is the first word.
+# OpenSSL is raised to 3.5.9-r1 on the same terms: the pinned image ships libssl3 and libcrypto3
+# 3.5.9-r0, which the CI image scan of 20 Nov 2026 (Grype) reports with 4 HIGH findings
+# (CVE-2026-88823, CVE-2026-95691, CVE-2026-95692, CVE-2026-107496), all fixed in Alpine's 3.5.9-r1
+# (aports 3.24-stable main/openssl/APKBUILD secfixes). Exact versions; the loop fails the build if
+# Alpine replaces any of them.
+# The split is the point: `apk list -I <name>` prints `<name>-<version> <arch> ...` and $1 is the first word.
 # hadolint ignore=SC2046
-RUN apk add --no-cache 'zlib=1.4-r0' && \
-    set -- $(apk list -I zlib 2>/dev/null) && installed="${1#zlib-}" && \
-    if [ "$installed" != "1.4-r0" ]; then \
-      echo "zlib is '$installed', expected 1.4-r0 (CVE-2026-4738)" >&2; exit 1; \
-    fi
+RUN apk add --no-cache 'zlib=1.4-r0' 'libssl3=3.5.9-r1' 'libcrypto3=3.5.9-r1' && \
+    for want in zlib=1.4-r0 libssl3=3.5.9-r1 libcrypto3=3.5.9-r1; do \
+      name="${want%%=*}" && set -- $(apk list -I "$name" 2>/dev/null) && installed="${1#"$name"-}" && \
+      if [ "$installed" != "${want#*=}" ]; then \
+        echo "$name is '$installed', expected ${want#*=}" >&2; exit 1; \
+      fi; \
+    done
 
 FROM base AS build
 WORKDIR /app
@@ -90,6 +97,14 @@ COPY deploy/aws/rds-ca-eu-central-1.crt /usr/local/share/ca-certificates/rds-ca-
 ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/rds-ca-eu-central-1.crt
 RUN addgroup -S work && adduser -S -G work work
 WORKDIR /app/apps/api
+# No package manager or Node tooling at run time. The service never runs npm, npx, corepack, yarn
+# or pnpm, and the CI image scan of 20 Nov 2026 found HIGH advisories in exactly those: npm's
+# bundled brace-expansion 2.0.2, ip-address 10.1.0, pacote and picomatch 4.0.3, and pnpm 10.33.0.
+# Removed, not upgraded: what is not there cannot be exploited or flagged.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx \
+      /opt/yarn-v* /root/.cache/node /root/.npm
 USER work
 # Then the runtime role's standing grant (deploy/aws/runtime-grants.sql), as the same owner.
 CMD ["sh", "-c", "export DATABASE_URL=\"$DATABASE_MIGRATION_URL\" && ./node_modules/.bin/prisma migrate deploy --schema ../../prisma/schema.prisma && exec ./node_modules/.bin/prisma db execute --schema ../../prisma/schema.prisma --file ../../deploy/aws/runtime-grants.sql"]
@@ -176,6 +191,14 @@ RUN addgroup -S work && adduser -S -G work work
 COPY --from=prune --chown=work:work /app /app
 
 WORKDIR /app/apps/api
+# No package manager or Node tooling at run time. The service never runs npm, npx, corepack, yarn
+# or pnpm, and the CI image scan of 20 Nov 2026 found HIGH advisories in exactly those: npm's
+# bundled brace-expansion 2.0.2, ip-address 10.1.0, pacote and picomatch 4.0.3, and pnpm 10.33.0.
+# Removed, not upgraded: what is not there cannot be exploited or flagged.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx \
+      /opt/yarn-v* /root/.cache/node /root/.npm
 USER work
 EXPOSE 3000
 
