@@ -85,6 +85,15 @@ jobs:
           .github/scripts/verify-image.sh "$IMAGE:gate" "$name"
           .github/scripts/scan-image.sh "$IMAGE:gate" "work-$name" image-reports
 
+      - name: Keep the SBOMs and scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-reports-ghcr
+          path: image-reports/
+          if-no-files-found: warn
+          retention-days: 400
+
       - name: Build and push
         id: build
         uses: docker/build-push-action@v6
