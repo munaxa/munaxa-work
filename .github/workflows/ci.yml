@@ -94,19 +94,14 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@munaxa'
 
-      # The shared design system is published from munaxa-platform to GitHub Packages.
-      # `GITHUB_TOKEN` is scoped to *this* repository, and `@munaxa/*` is published from
-      # munaxa-platform, so it can only read those packages if that package has separately been
-      # granted to this repository. It sufficed until this workspace actually took a dependency on
-      # `@munaxa/auth`, at which point install began failing with ERR_PNPM_FETCH_403 — the token was
-      # valid and simply not entitled to the package. `PLATFORM_PACKAGES_TOKEN` is the credential
-      # the configuration contract names for exactly this, and it is used when present; the
-      # fallback keeps the workflow working for whichever remedy an operator chooses, rather than
-      # hard-failing on the one they did not.
+      # The shared design system is published from munaxa-platform to GitHub Packages. This job's
+      # per-run GITHUB_TOKEN (packages: read above) reads @munaxa/* once each package grants this
+      # repository Actions access. No long-lived token: a repository secret is readable by any
+      # workflow a branch author pushes, so the only safe credential is the per-run one.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.PLATFORM_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Records the exact @munaxa/* versions the rest of this job compiles, lints and tests
       # against. That record is what a local run of the same gate has to match before anyone
@@ -221,7 +216,7 @@ jobs:
       # empty secret (HTTP 401 from GitHub Packages, the Control failure of 20 Nov 2026).
       - name: Build api, migrate and admin
         env:
-          NPM_TOKEN: ${{ secrets.PLATFORM_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           [ -n "$NPM_TOKEN" ] || { echo "::error::no package token reached this step"; exit 1; }

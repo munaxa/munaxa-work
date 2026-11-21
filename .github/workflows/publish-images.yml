@@ -15,8 +15,8 @@
 name: Publish images
 
 # Not on `image/**` tags any more: those are the ECR release tags (publish-images-ecr.yml), which
-# run behind the image-release environment. This GHCR job has no environment and holds
-# PLATFORM_PACKAGES_TOKEN, so it runs only when dispatched by hand, until Render is retired.
+# run behind the image-release environment. This GHCR job has no environment, so it runs only when
+# dispatched by hand, until Render is retired. It uses only this run's own token.
 on:
   workflow_dispatch:
     inputs:
@@ -75,12 +75,12 @@ jobs:
       # local daemon. The push below reuses the build cache, so it publishes the same layers.
       - name: Build, verify and scan before publishing
         env:
-          NPM_TOKEN: ${{ secrets.PLATFORM_PACKAGES_TOKEN }}
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE: ${{ matrix.image }}
           DOCKERFILE: ${{ matrix.dockerfile }}
         run: |
           set -euo pipefail
-          [ -n "$NPM_TOKEN" ] || { echo "::error::PLATFORM_PACKAGES_TOKEN is not set"; exit 1; }
+          [ -n "$NPM_TOKEN" ] || { echo "::error::no package token for the build"; exit 1; }
           name="${IMAGE#munaxa-work-}"
           docker buildx build --secret id=npm_token,env=NPM_TOKEN -f "$DOCKERFILE" -t "$IMAGE:gate" --load .
           .github/scripts/verify-image.sh "$IMAGE:gate" "$name"
@@ -110,7 +110,7 @@ jobs:
           # The credential reaches the build as a BuildKit secret — mounted at /run/secrets/npm_token
           # for the layers that need it and absent from every layer's filesystem and from history.
           secrets: |
-            npm_token=${{ secrets.PLATFORM_PACKAGES_TOKEN }}
+            npm_token=${{ secrets.GITHUB_TOKEN }}
           # A single-platform manifest, so the digest below names the image itself rather than an
           # index over it. Predictable pinning matters more here than multi-arch, which nothing in
           # this deployment asks for.
