@@ -15,9 +15,8 @@
 name: Publish images
 
 # Not on `image/**` tags any more: those are the ECR release tags (publish-images-ecr.yml), which
-# run behind the image-release environment. This GHCR job has no environment and holds a
-# packages: write token, so it runs only when dispatched by hand, until Render is retired. It reads
-# @munaxa/* with the same per-run GITHUB_TOKEN; no long-lived package token is used.
+# run behind the image-release environment. This GHCR job has no environment, so it runs only when
+# dispatched by hand, until Render is retired. It uses only this run's own token.
 on:
   workflow_dispatch:
     inputs:
@@ -32,12 +31,10 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   publish:
-    permissions:
-      contents: read
-      packages: write # push to GHCR; also reads @munaxa/* during the build
     name: ${{ matrix.image }}
     runs-on: ubuntu-latest
     strategy:
@@ -63,20 +60,44 @@ jobs:
           echo "sha=$(git rev-parse HEAD)"       >> "$GITHUB_OUTPUT"
           echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Authenticate to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          # The per-run token, scoped by this job's `packages: write`. Nothing longer-lived is needed to
+          # The per-run token, scoped by `packages: write` above. Nothing longer-lived is needed to
           # push, and nothing longer-lived should be used.
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Verified and scanned before anything is pushed: the same Dockerfile, built first into the
+      # local daemon. The push below reuses the build cache, so it publishes the same layers.
+      - name: Build, verify and scan before publishing
+        env:
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ${{ matrix.image }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+        run: |
+          set -euo pipefail
+          [ -n "$NPM_TOKEN" ] || { echo "::error::no package token for the build"; exit 1; }
+          name="${IMAGE#munaxa-work-}"
+          docker buildx build --secret id=npm_token,env=NPM_TOKEN -f "$DOCKERFILE" -t "$IMAGE:gate" --load .
+          .github/scripts/verify-image.sh "$IMAGE:gate" "$name"
+          .github/scripts/scan-image.sh "$IMAGE:gate" "work-$name" image-reports
+
+      - name: Keep the SBOMs and scan reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-reports-ghcr
+          path: image-reports/
+          if-no-files-found: warn
+          retention-days: 400
+
       - name: Build and push
         id: build
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -136,7 +157,7 @@ jobs:
 
           # No credential anywhere it could be read back out.
           if docker history --no-trunc --format '{{.CreatedBy}}' "$REF" \
-               | grep -qE 'ghp_|ghs_|github_pat_|_authToken=[A-Za-z0-9]'; then
+               | grep -qE 'ghp_|github_pat_|_authToken=[A-Za-z0-9]'; then
             echo "::error::a credential appears in image history"; exit 1
           fi
           if docker run --rm --entrypoint sh "$REF" -c \

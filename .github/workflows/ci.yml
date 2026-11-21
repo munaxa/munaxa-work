@@ -20,7 +20,7 @@ env:
   NODE_VERSION: '22'
   PNPM_VERSION: '10.33.0'
 
-# Least privilege by default: every job gets a read-only token unless it asks for more below.
+# Least privilege by default; a job that needs more declares it itself.
 permissions:
   contents: read
 
@@ -94,12 +94,10 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
           scope: '@munaxa'
 
-      # The shared design system is published from munaxa-platform to GitHub Packages, and this
-      # run's own GITHUB_TOKEN (packages: read above) reads it, because each @munaxa package grants
-      # this repository read access. No long-lived package token is used here: a repository secret
-      # is readable by any workflow pushed to any branch, so CI must not depend on one. If install
-      # fails with ERR_PNPM_FETCH_403, the fix is the package's "Manage Actions access" setting in
-      # munaxa-platform, never a personal access token.
+      # The shared design system is published from munaxa-platform to GitHub Packages. This job's
+      # per-run GITHUB_TOKEN (packages: read above) reads @munaxa/* once each package grants this
+      # repository Actions access. No long-lived token: a repository secret is readable by any
+      # workflow a branch author pushes, so the only safe credential is the per-run one.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
@@ -192,6 +190,64 @@ jobs:
       - name: Build
         working-directory: apps/mobile
         run: flutter build apk --debug
+
+  # The images are built on every pull request, not only at release: the b490b25 release was the
+  # first time the API image was built, and it shipped zlib 1.3.2-r1 (CVE-2026-4738, CRITICAL)
+  # because the floating `node:22-alpine` tag chose it. Built here, verified, scanned; never pushed.
+  image:
+    name: Images (api, migrate, admin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Every base image is pinned by digest
+        run: .github/scripts/check-pinned.sh apps/api/Dockerfile apps/admin/Dockerfile
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # The package credential reaches the build only as a BuildKit secret, as in the release. It
+      # must be set on this step: `env=` reads the step's environment, and an unset variable is an
+      # empty secret (HTTP 401 from GitHub Packages, the Control failure of 20 Nov 2026).
+      - name: Build api, migrate and admin
+        env:
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "$NPM_TOKEN" ] || { echo "::error::no package token reached this step"; exit 1; }
+          docker buildx build --secret id=npm_token,env=NPM_TOKEN -f apps/api/Dockerfile --target runtime -t munaxa-work-api:ci --load .
+          docker buildx build --secret id=npm_token,env=NPM_TOKEN -f apps/api/Dockerfile --target migrate -t munaxa-work-migrate:ci --load .
+          docker buildx build --secret id=npm_token,env=NPM_TOKEN -f apps/admin/Dockerfile --target runtime -t munaxa-work-admin:ci --load .
+
+      - name: Verify the images (zlib, packages, loaded libraries, Prisma, not root, no credential)
+        run: |
+          set -euo pipefail
+          for target in api migrate admin; do
+            .github/scripts/verify-image.sh "munaxa-work-$target:ci" "$target"
+          done
+
+      - name: Scan the images (SBOM, HIGH and CRITICAL fail)
+        run: |
+          set -euo pipefail
+          status=0
+          for target in api migrate admin; do
+            .github/scripts/scan-image.sh "munaxa-work-$target:ci" "work-$target" image-reports || status=1
+          done
+          exit $status
+
+      - name: Keep the SBOMs and scan reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-reports
+          path: image-reports/
+          if-no-files-found: warn
+          retention-days: 90
 
   boundaries:
     name: Product isolation
