@@ -105,6 +105,15 @@ export const startFakeWork = async (faults = {}) => {
       if (faults.unauthenticatedAllowed && token === undefined) return json(200, { items: [] });
       if (!known || isRevoked(token)) return json(401, { message: 'Not authenticated.' });
       const tenant = request.headers['x-munaxa-tenant'];
+      if (tenant !== undefined && tenant !== TENANT && faults.crossTenantNotFound) {
+        return json(404, { message: 'Not found.' });
+      }
+      if (tenant !== undefined && tenant !== TENANT && faults.crossTenantForbidden) {
+        return json(403, { message: 'Forbidden' });
+      }
+      if (tenant !== undefined && tenant !== TENANT && faults.crossTenantOtherUnauthorized) {
+        return json(401, { message: 'Not authenticated.' });
+      }
       if (tenant !== undefined && tenant !== TENANT && !faults.crossTenantLeaks) {
         return json(401, { message: 'No tenant resolved for this principal.' });
       }

@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, beforeEach, describe, test } from 'node:test';
@@ -53,6 +53,7 @@ const run = async (faults = {}, overrides = {}) => {
         write: (line) => lines.push(line),
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         readFile: () => '',
+        fileMode: () => 0o100600,
         now: () => performance.now(),
       },
     );
@@ -91,10 +92,17 @@ describe('a healthy Work host', () => {
     assert.match(logout.headers.cookie, /__Host-mx_session=/);
   });
 
-  test('WORK_HEALTH_URL=skip skips only the readiness probe', async () => {
-    const { summary } = await run({}, { WORK_HEALTH_URL: 'skip' });
+  test('WORK_HEALTH_URL=skip skips only the readiness probe and the run is not green', async () => {
+    const { summary, lines } = await run({}, { WORK_HEALTH_URL: 'skip' });
     assert.equal(summary.skipped, 1);
     assert.equal(summary.failed, 0);
+    assert.ok(lines.includes('readiness NOT VERIFIED'), lines.join('\n'));
+    assert.match(lines.at(-1), /^INCOMPLETE: 7 passed, 0 failed, 1 skipped$/);
+  });
+
+  test('cross-tenant passes on 403 as well as on 401 "No tenant resolved"', async () => {
+    const { summary, lines } = await run({ crossTenantForbidden: true });
+    assert.equal(outcome(summary, 'cross-tenant').ok, true, lines.join('\n'));
   });
 });
 
@@ -107,10 +115,12 @@ describe('each broken behaviour fails its probe', () => {
     ['entitlements', { licenceRefuses: true }],
     ['admin-signed-in', { adminSignedOut: true }],
     ['cross-tenant', { crossTenantLeaks: true }],
+    ['cross-tenant', { crossTenantNotFound: true }],
+    ['cross-tenant', { crossTenantOtherUnauthorized: true }],
     ['logout-revocation', { logoutDoesNotRevoke: true }],
   ];
   for (const [probe, faults] of cases) {
-    test(probe, async () => {
+    test(`${probe} (${Object.keys(faults).join(', ')})`, async () => {
       const { summary, lines } = await run(faults);
       assert.equal(outcome(summary, probe).ok, false, lines.join('\n'));
       assert.ok(summary.failed >= 1);
@@ -183,6 +193,19 @@ describe('redaction', () => {
     assert.equal(looksTokenShaped(text), false);
   });
 
+  test('Basic credentials and api_key / x-api-key values are removed', () => {
+    const { redact } = createRedactor();
+    const text = redact(
+      'authorization: Basic dXNlcjpzM2NyZXQ= x-api-key: k3y-one api_key=k3y-two ' +
+        '{"apiKey":"k3y-three"} url?api-key=k3y-four&page=1',
+    );
+    for (const value of ['dXNlcjpzM2NyZXQ=', 'k3y-one', 'k3y-two', 'k3y-three', 'k3y-four']) {
+      assert.ok(!text.includes(value), `${value} was printed: ${text}`);
+    }
+    assert.ok(text.includes('page=1'));
+    assert.equal(looksTokenShaped(text), false);
+  });
+
   test('a token echoed by a hostile server is not printed', async () => {
     const { lines } = await run({ loginFails: true, loginEchoesToken: true });
     assertNoSecrets(lines.join('\n'));
@@ -231,8 +254,8 @@ describe('the command', () => {
   });
 
   test('accepts token files instead of passwords, and never prints the tokens', async () => {
-    writeFileSync(join(directory, 'reader'), `${READER_TOKEN}\n`);
-    writeFileSync(join(directory, 'limited'), LIMITED_TOKEN);
+    writeFileSync(join(directory, 'reader'), `${READER_TOKEN}\n`, { mode: 0o600 });
+    writeFileSync(join(directory, 'limited'), LIMITED_TOKEN, { mode: 0o600 });
     const { code, stdout, stderr } = await command({
       ...smokeEnvironment(fake.url),
       SMOKE_READER_IDENTIFIER: '',
@@ -244,6 +267,33 @@ describe('the command', () => {
     });
     assert.equal(code, 0, stdout + stderr);
     assertNoSecrets(stdout + stderr);
+  });
+
+  test('exits 3 and says readiness was not verified when the probe is skipped', async () => {
+    const { code, stdout } = await command(smokeEnvironment(fake.url, { WORK_HEALTH_URL: 'skip' }));
+    assert.equal(code, 3, stdout);
+    assert.match(stdout, /readiness NOT VERIFIED/);
+    assert.match(stdout, /^INCOMPLETE: /m);
+  });
+
+  test('refuses a group- or world-readable token file unless overridden, then warns', async () => {
+    const tokenEnv = {
+      ...smokeEnvironment(fake.url),
+      SMOKE_READER_IDENTIFIER: '',
+      SMOKE_READER_PASSWORD: '',
+      SMOKE_READER_TOKEN_FILE: join(directory, 'shared'),
+    };
+    writeFileSync(join(directory, 'shared'), READER_TOKEN);
+    chmodSync(join(directory, 'shared'), 0o644);
+    const refused = await command(tokenEnv);
+    assert.equal(refused.code, 1);
+    assert.match(refused.stdout, /readable by group or others/);
+    assertNoSecrets(refused.stdout + refused.stderr);
+
+    const allowed = await command({ ...tokenEnv, SMOKE_ALLOW_SHARED_TOKEN_FILE: '1' });
+    assert.equal(allowed.code, 0, allowed.stdout + allowed.stderr);
+    assert.match(allowed.stdout, /^WARN the token file is readable by group or others/m);
+    assertNoSecrets(allowed.stdout + allowed.stderr);
   });
 
   test('exits 2 on incomplete inputs', async () => {

@@ -13,11 +13,13 @@
  *   logout-revocation     after Identity logout the reader's token answers 401 within the
  *                         revocation cache window
  *
- * Exit code: 0 when every probe passed, 1 when any failed, 2 when the inputs are incomplete.
+ * Exit code: 0 when every probe passed, 1 when any failed, 2 when the inputs are incomplete,
+ * 3 when nothing failed but a probe was skipped (the run is incomplete: with WORK_HEALTH_URL=skip
+ * it prints "readiness NOT VERIFIED", and it is never green).
  * Nothing secret is printed: every line goes through tooling/smoke/redact.mjs.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import { createRedactor } from './redact.mjs';
@@ -25,7 +27,11 @@ import { createRedactor } from './redact.mjs';
 export const SESSION_COOKIE = '__Host-mx_session';
 export const REFRESH_COOKIE = '__Secure-mx_refresh';
 export const TENANT_HEADER = 'x-munaxa-tenant';
+const NO_TENANT_TEXT = 'No tenant resolved';
 const SIGNED_OUT_TEXT = ['You are not signed in', 'No workspace for this account'];
+
+/** Exit code of a run in which nothing failed but something was not checked. */
+export const EXIT_INCOMPLETE = 3;
 
 export class ConfigurationError extends Error {}
 
@@ -75,6 +81,7 @@ export const loadConfig = (env) => {
     revocationWaitMs: number(env.SMOKE_REVOCATION_WAIT_SECONDS, 10) * 1000,
     pollIntervalMs: number(env.SMOKE_POLL_INTERVAL_MS, 1000),
     timeoutMs: number(env.SMOKE_TIMEOUT_MS, 10_000),
+    allowSharedTokenFile: env.SMOKE_ALLOW_SHARED_TOKEN_FILE === '1',
     reader,
     limited,
   };
@@ -123,10 +130,26 @@ const createClient = (config, fetchImpl) => {
   return { send };
 };
 
+/**
+ * A token file anyone but its owner can read is a token other local accounts can use. Refused
+ * unless SMOKE_ALLOW_SHARED_TOKEN_FILE=1, and then still warned about.
+ */
+const checkTokenFileMode = (config, path, io, write) => {
+  const shared = io.fileMode(path) & 0o077;
+  if (shared === 0) return;
+  if (!config.allowSharedTokenFile) {
+    throw new Error(
+      'the token file is readable by group or others; chmod 600 it, or set SMOKE_ALLOW_SHARED_TOKEN_FILE=1',
+    );
+  }
+  write('WARN the token file is readable by group or others (SMOKE_ALLOW_SHARED_TOKEN_FILE=1)');
+};
+
 /** A session for one persona: from Identity sign-in, or from a token file. */
-const openSession = async (config, client, entry, redactor, readFile) => {
+const openSession = async (config, client, entry, redactor, io, write) => {
   if (entry.tokenFile) {
-    const token = readFile(entry.tokenFile).trim();
+    checkTokenFileMode(config, entry.tokenFile, io, write);
+    const token = io.readFile(entry.tokenFile).trim();
     if (token === '') throw new Error('the token file is empty');
     redactor.add(token);
     return { token, refresh: undefined };
@@ -170,7 +193,7 @@ const isReady = (response) => {
 
 /**
  * Runs every probe. Never throws for a failed probe; returns { passed, failed, skipped, results }.
- * `io` is injectable for tests: fetch, write (one redacted line), sleep, readFile, now.
+ * `io` is injectable for tests: fetch, write (one redacted line), sleep, readFile, fileMode, now.
  */
 export const runSmoke = async (config, io) => {
   const redactor = io.redactor ?? createRedactor(secretsOf(config));
@@ -194,7 +217,7 @@ export const runSmoke = async (config, io) => {
 
   const session = async (key) => {
     if (sessions[key] === undefined) {
-      sessions[key] = openSession(config, client, config[key], redactor, io.readFile).catch(
+      sessions[key] = openSession(config, client, config[key], redactor, io, write).catch(
         (error) => ({ error }),
       );
     }
@@ -207,7 +230,7 @@ export const runSmoke = async (config, io) => {
 
   await probe('health-ready', async () =>
     config.healthUrl === 'skip'
-      ? { ok: true, skipped: true, detail: 'WORK_HEALTH_URL=skip' }
+      ? { ok: true, skipped: true, detail: 'readiness NOT VERIFIED (WORK_HEALTH_URL=skip)' }
       : isReady(await client.send('GET', config.healthUrl)),
   );
   await probe('unauthenticated', async () => expectStatus(await read(undefined), [401]));
@@ -254,9 +277,16 @@ export const runSmoke = async (config, io) => {
   });
   await probe('cross-tenant', async () => {
     const response = await read((await session('reader')).token, config.otherTenantId);
-    return response.status >= 200 && response.status < 300
-      ? { ok: false, detail: `another tenant's read answered ${response.status}` }
-      : expectStatus(response, [401, 403, 404]);
+    // Only a refusal naming the tenant counts. A 404 proves nothing: it is also what a tenant
+    // id that does not exist, or a wrong path, answers.
+    if (response.status === 403) return { ok: true, detail: '403' };
+    if (response.status === 401 && response.text.includes(NO_TENANT_TEXT)) {
+      return { ok: true, detail: '401 no tenant resolved' };
+    }
+    return {
+      ok: false,
+      detail: `expected 401 "${NO_TENANT_TEXT}" or 403, got ${response.status}`,
+    };
   });
   await probe('logout-revocation', async () => {
     const { token, refresh } = await session('reader');
@@ -287,9 +317,11 @@ export const runSmoke = async (config, io) => {
   const failed = results.filter((result) => !result.ok).length;
   const skipped = results.filter((result) => result.skipped).length;
   const passed = results.length - failed - skipped;
-  write(
-    `${failed === 0 ? 'OK' : 'FAILED'}: ${passed} passed, ${failed} failed, ${skipped} skipped`,
-  );
+  const verdict = failed > 0 ? 'FAILED' : skipped > 0 ? 'INCOMPLETE' : 'OK';
+  if (results.some((result) => result.name === 'health-ready' && result.skipped)) {
+    write('readiness NOT VERIFIED');
+  }
+  write(`${verdict}: ${passed} passed, ${failed} failed, ${skipped} skipped`);
   return { passed, failed, skipped, results };
 };
 
@@ -313,9 +345,12 @@ export const main = async (env = process.env) => {
     write: (line) => process.stdout.write(`${line}\n`),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     readFile: (path) => readFileSync(path, 'utf8'),
+    fileMode: (path) => statSync(path).mode,
     now: () => performance.now(),
   }).catch(fail);
-  return typeof summary === 'number' ? summary : summary.failed === 0 ? 0 : 1;
+  if (typeof summary === 'number') return summary;
+  if (summary.failed > 0) return 1;
+  return summary.skipped > 0 ? EXIT_INCOMPLETE : 0;
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

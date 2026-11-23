@@ -4,8 +4,9 @@
  * Every line the smoke script writes passes through `redact`. It removes, in this order:
  *   1. every secret the run was given (passwords, tokens read from files, cookie values),
  *   2. anything shaped like a JWT, wherever it appears,
- *   3. the value after `Bearer `, and the value of any `name=value` cookie pair whose name looks
- *      like a session, refresh or token cookie.
+ *   3. the value after `Bearer ` or `Basic `, the value of any `name=value` cookie pair whose
+ *      name looks like a session, refresh or token cookie, and the value of an `api_key`,
+ *      `api-key`, `apikey` or `x-api-key` field (`=`, `:` or a JSON `"key": "value"`).
  * The first rule is exact and the other two catch a secret the script never knew it had (a token
  * echoed in an error body, for instance). Node built-ins only.
  */
@@ -15,6 +16,8 @@ export const REDACTED = '[redacted]';
 /** Three base64url segments, the first starting `eyJ` (`{"`): every JWT, and few other things. */
 const JWT = /eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*/g;
 const BEARER = /\b(Bearer)\s+[^\s"',;]+/gi;
+const BASIC = /\b(Basic)\s+[A-Za-z0-9+/=._-]{4,}/gi;
+const API_KEY = /\b((?:x-)?api[_-]?key)("?\s*[:=]\s*"?)([^\s"',;&]+)/gi;
 const COOKIE_PAIR =
   /\b((?:__Host-|__Secure-)?[A-Za-z0-9_.-]*(?:session|refresh|token|auth|mfa)[A-Za-z0-9_.-]*)=([^;\s"',]+)/gi;
 
@@ -50,6 +53,8 @@ export const createRedactor = (initialSecrets = []) => {
     return text
       .replace(JWT, REDACTED)
       .replace(BEARER, `$1 ${REDACTED}`)
+      .replace(BASIC, `$1 ${REDACTED}`)
+      .replace(API_KEY, `$1$2${REDACTED}`)
       .replace(COOKIE_PAIR, `$1=${REDACTED}`);
   };
 
@@ -59,5 +64,6 @@ export const createRedactor = (initialSecrets = []) => {
 /** True when the text still holds something token-shaped. The tests assert this is false. */
 export const looksTokenShaped = (text) =>
   new RegExp(JWT.source).test(text) ||
-  /\bBearer\s+(?!\[redacted\])\S+/i.test(text) ||
+  /\b(?:Bearer|Basic)\s+(?!\[redacted\])\S+/i.test(text) ||
+  /\b(?:x-)?api[_-]?key"?\s*[:=]\s*"?(?!\[redacted\])[^\s"',;&]+/i.test(text) ||
   /mx_(?:session|refresh)=(?!\[redacted\])[^;\s]+/i.test(text);
