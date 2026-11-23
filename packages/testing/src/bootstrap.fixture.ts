@@ -79,9 +79,10 @@ export const operatorArguments = (
 };
 
 /**
- * Runs the script and reports both streams and the exit code. The environment is the test's with
- * NODE_ENV=test, the database and PLATFORM_AUTH_ISSUER set; `environment` overrides any of them,
- * and a value of `undefined` removes the variable.
+ * Runs the script with this Node binary and reports both streams and the exit code. The child gets
+ * only what the script reads: NODE_ENV=test, the database and PLATFORM_AUTH_ISSUER; `environment`
+ * overrides any of them or adds one, and a value of `undefined` removes the variable. Nothing is
+ * inherited from the test process, so no stray variable of the runner can change the outcome.
  */
 export const runBootstrap = async (
   args: readonly string[],
@@ -89,7 +90,6 @@ export const runBootstrap = async (
   environment: Readonly<Record<string, string | undefined>> = {},
 ): Promise<BootstrapResult> => {
   const merged: Readonly<Record<string, string | undefined>> = {
-    ...process.env,
     NODE_ENV: 'test',
     DATABASE_URL: databaseUrl,
     PLATFORM_AUTH_ISSUER: BOOTSTRAP_ISSUER,
@@ -99,7 +99,7 @@ export const runBootstrap = async (
     Object.entries(merged).filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
   try {
-    const { stdout, stderr } = await run('node', [SCRIPT, ...args], { env });
+    const { stdout, stderr } = await run(process.execPath, [SCRIPT, ...args], { env });
     return { stdout, stderr, code: 0 };
   } catch (error) {
     const failure = error as { stdout?: string; stderr?: string; code?: number };
