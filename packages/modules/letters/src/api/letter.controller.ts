@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -68,7 +68,9 @@ export class LetterRequestController {
 
   @Get(':letterRequestId')
   @ApiOperation({ summary: 'One request, its approval chain and the letter it produced' })
-  public async read(@Param('letterRequestId') letterRequestId: string): Promise<unknown> {
+  public async read(
+    @Param('letterRequestId', ParseUUIDPipe) letterRequestId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadRequest>({
         queryName: 'letters.read-request',
@@ -85,7 +87,7 @@ export class LetterRequestController {
       'erase what it reverses: the chain reads as the history it is.',
   })
   public async decide(
-    @Param('letterRequestId') letterRequestId: string,
+    @Param('letterRequestId', ParseUUIDPipe) letterRequestId: string,
     @Body() body: DecideLetterBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

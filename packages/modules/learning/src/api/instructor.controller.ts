@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -62,7 +62,7 @@ export class LearningInstructorController {
   @Post(':instructorId/deactivation')
   @ApiOperation({ summary: 'Stop offering an instructor. Not deletion' })
   public async deactivate(
-    @Param('instructorId') instructorId: string,
+    @Param('instructorId', ParseUUIDPipe) instructorId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

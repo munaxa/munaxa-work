@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -46,7 +46,7 @@ export class PersonLifecycleController {
   @ApiOperation({ summary: 'Correct the facts that have no history' })
   @ApiOkResponse({ description: 'The person.' })
   public async amend(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: AmendPersonBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -68,7 +68,7 @@ export class PersonLifecycleController {
   @ApiOperation({ summary: 'Move a person through their lifecycle. Archiving never deletes' })
   @ApiOkResponse({ description: 'The person.' })
   public async changeStatus(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: ChangePersonStatusBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -85,7 +85,7 @@ export class PersonLifecycleController {
   @ApiOperation({ summary: 'Record a legal name change, effective from a date (ADR-0037)' })
   @ApiOkResponse({ description: 'The person.' })
   public async recordName(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordNameBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -103,7 +103,7 @@ export class PersonLifecycleController {
   @ApiOperation({ summary: 'Replace tenant-authored metadata. Stored, never interpreted' })
   @ApiOkResponse({ description: 'The person.' })
   public async reviseMetadata(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: ReviseMetadataBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -120,7 +120,7 @@ export class PersonLifecycleController {
   @ApiOperation({ summary: 'Attach or remove a photograph held in the document store' })
   @ApiOkResponse({ description: 'The person.' })
   public async setPhoto(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: SetPhotoBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

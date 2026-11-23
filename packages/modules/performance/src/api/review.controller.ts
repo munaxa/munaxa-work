@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -67,7 +67,7 @@ export class PerformanceReviewController {
       'than 403, because confirming a review exists is the disclosure.',
   })
   public async read(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Query() query: Record<string, string | undefined>,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -82,7 +82,7 @@ export class PerformanceReviewController {
   @Post(':reviewId/status')
   @ApiOperation({ summary: 'Move a review. Completion and archival have their own routes' })
   public async move(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() body: MoveReviewBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

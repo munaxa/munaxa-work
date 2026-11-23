@@ -10,6 +10,7 @@ import { PostgresUnitOfWork } from '@work/persistence';
 import { postgresEmploymentStores } from '@work/employment';
 import { postgresCompensationStores } from '@work/compensation';
 import {
+  PayrollAdjustmentController,
   PayrollConfigurationController,
   PayrollDecisionController,
   PayrollDispatcher,
@@ -139,6 +140,7 @@ const nestOver = async (wired: Wired): Promise<INestApplication> => {
       PayrollConfigurationController,
       PayrollResultController,
       PayrollDecisionController,
+      PayrollAdjustmentController,
       PayrollRunController,
     ],
     providers: [

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { CreateDocumentCommand } from '../application/document.use-case.js';
@@ -91,7 +91,7 @@ export class DocumentController {
   @Get(':documentId')
   @ApiOperation({ summary: 'One document, its versions and its verification history' })
   @ApiOkResponse({ description: 'The read is recorded in the access trail.' })
-  public async read(@Param('documentId') documentId: string): Promise<unknown> {
+  public async read(@Param('documentId', ParseUUIDPipe) documentId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadDocument>({
         queryName: 'documents.read-document',
@@ -103,7 +103,7 @@ export class DocumentController {
   @Get(':documentId/audit')
   @ApiOperation({ summary: 'Who has reached this document. Behind its own permission' })
   public async audit(
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
     @Query() query: Record<string, string | undefined>,
   ): Promise<unknown> {
     return unwrapOrThrow(

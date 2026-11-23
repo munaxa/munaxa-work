@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -30,7 +30,7 @@ export class PortalAccessController {
   @ApiOperation({ summary: 'Open a portal to a member. Business configuration, not permission' })
   @ApiOkResponse({ description: 'The portal assignment.' })
   public async grantPortal(
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
     @Body() body: GrantPortalBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -46,7 +46,7 @@ export class PortalAccessController {
   @ApiOperation({ summary: 'Withdraw a portal. The record survives, revoked' })
   @ApiOkResponse({ description: 'The revoked assignment.' })
   public async revokePortal(
-    @Param('assignmentId') assignmentId: string,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
     @Body() body: ReasonedChangeBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

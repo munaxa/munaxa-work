@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -47,7 +47,7 @@ export class PerformanceAssessmentController {
   @Post(':reviewId/reviewers')
   @ApiOperation({ summary: 'Invite a reviewer to the panel' })
   public async assignReviewer(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() body: AssignReviewerBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -67,7 +67,7 @@ export class PerformanceAssessmentController {
       'the invitation is looked up, and an uninvited caller is refused.',
   })
   public async start(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() body: StartAssessmentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -101,7 +101,7 @@ export class PerformanceAssessmentItemController {
       'denominator rather than being scored zero.',
   })
   public async recordItem(
-    @Param('assessmentId') assessmentId: string,
+    @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
     @Body() body: RecordAssessmentItemBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -117,7 +117,7 @@ export class PerformanceAssessmentItemController {
   @Post(':assessmentId/submission')
   @ApiOperation({ summary: 'Submit an assessment. It is frozen from here' })
   public async submit(
-    @Param('assessmentId') assessmentId: string,
+    @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
     @Body() body: SubmitAssessmentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

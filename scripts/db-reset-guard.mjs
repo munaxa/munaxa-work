@@ -8,7 +8,7 @@
  *
  * - `DATABASE_URL` is set in the environment (not only in a `.env` file, which this guard cannot
  *   see and Prisma would read) and names this machine: localhost, 127.0.0.1 or ::1, with no
- *   `host=` parameter redirecting the connection elsewhere;
+ *   `host=` or `hostaddr=` parameter (any letter case) redirecting the connection elsewhere;
  * - `WORK_ALLOW_DB_RESET=1` is set, so nobody resets by accident or by habit.
  *
  * Usage: WORK_ALLOW_DB_RESET=1 DATABASE_URL=postgresql://work:work@localhost:5432/work pnpm db:reset
@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 export const OPT_IN = 'WORK_ALLOW_DB_RESET';
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+/** Connection parameters that override the URL's host, in any letter case. */
+const REDIRECTING_PARAMS = new Set(['host', 'hostaddr']);
 
 /**
  * @param {Record<string, string | undefined>} env
@@ -48,10 +50,13 @@ export function judgeReset(env) {
       reason: `DATABASE_URL points at "${url.hostname}". Only localhost, 127.0.0.1 or ::1 may be reset.`,
     };
   }
-  if (url.searchParams.has('host')) {
+  const redirect = [...url.searchParams.keys()].find((key) =>
+    REDIRECTING_PARAMS.has(key.toLowerCase()),
+  );
+  if (redirect !== undefined) {
     return {
       allowed: false,
-      reason: 'DATABASE_URL carries a host= parameter, which can send the connection elsewhere.',
+      reason: `DATABASE_URL carries a ${redirect}= parameter, which can send the connection elsewhere.`,
     };
   }
   if (env[OPT_IN] !== '1') {

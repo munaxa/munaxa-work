@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -52,7 +52,7 @@ export class IdentifiersController {
   })
   @ApiOkResponse({ description: 'The identifier, and how many duplicates were queued.' })
   public async record(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordIdentifierBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -76,7 +76,7 @@ export class IdentifiersController {
   @ApiOperation({ summary: 'Correct the dates or the primary flag. The value is not amendable' })
   @ApiOkResponse({ description: 'The identifier.' })
   public async amend(
-    @Param('identifierId') identifierId: string,
+    @Param('identifierId', ParseUUIDPipe) identifierId: string,
     @Body() body: AmendIdentifierBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -97,7 +97,7 @@ export class IdentifiersController {
   })
   @ApiOkResponse({ description: 'The identifier.' })
   public async withdraw(
-    @Param('identifierId') identifierId: string,
+    @Param('identifierId', ParseUUIDPipe) identifierId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -115,7 +115,7 @@ export class IdentifiersController {
   })
   @ApiOkResponse({ description: 'The nationality.' })
   public async recordNationality(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordNationalityBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

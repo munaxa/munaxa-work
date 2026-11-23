@@ -1,9 +1,7 @@
-import { execFile } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
-
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { Organisations, operatorArguments, runBootstrap } from './bootstrap.fixture.js';
 
 /**
  * Proves `pnpm db:bootstrap` makes a migrated database operable without becoming a way in. It runs
@@ -20,12 +18,7 @@ const PASSWORD = 'probe';
 const stamp = `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 const platformUser = (suffix: string): string => `bootstrap-test-${stamp}-${suffix}`;
 
-const run = promisify(execFile);
-
-const ISSUER = 'https://identity.bootstrap-test.invalid';
-const organisationOf = (platformUserId: string): string => `org-${platformUserId}`;
-
-const SCRIPT = fileURLToPath(new URL('../../../scripts/bootstrap-tenant.mjs', import.meta.url));
+const organisations = new Organisations();
 
 interface Membership {
   readonly tenant_id: string;
@@ -47,36 +40,9 @@ describeWithDatabase('pnpm db:bootstrap', () => {
   let applicationUrl: string;
 
   /** Runs the command exactly as an operator would, and reports both streams and the exit code. */
-  const bootstrap = async (
-    ...args: readonly string[]
-  ): Promise<{ readonly stdout: string; readonly stderr: string; readonly code: number }> => {
-    // Every run names an organisation, one per person (ADR-0080), unless told not to.
-    const userIndex = args.indexOf('--platform-user-id');
-    const withOrganisation =
-      userIndex === -1 ||
-      args.includes('--platform-tenant-id') ||
-      args.includes('--no-organisation')
-        ? args.filter((arg) => arg !== '--no-organisation')
-        : [...args, '--platform-tenant-id', organisationOf(args[userIndex + 1] ?? '')];
-    try {
-      const { stdout, stderr } = await run('node', [SCRIPT, ...withOrganisation], {
-        env: {
-          ...process.env,
-          NODE_ENV: 'test',
-          DATABASE_URL: applicationUrl,
-          PLATFORM_AUTH_ISSUER: ISSUER,
-        },
-      });
-      return { stdout, stderr, code: 0 };
-    } catch (error) {
-      const failure = error as { stdout?: string; stderr?: string; code?: number };
-      return {
-        stdout: failure.stdout ?? '',
-        stderr: failure.stderr ?? '',
-        code: failure.code ?? 1,
-      };
-    }
-  };
+  /** Runs the command exactly as an operator would, with the inputs the guard requires. */
+  const bootstrap = async (...args: readonly string[]) =>
+    runBootstrap(operatorArguments(args, organisations), applicationUrl);
 
   const membershipsOf = async (platformUserId: string): Promise<readonly Membership[]> => {
     const found = await admin.query<Membership>(
@@ -128,8 +94,8 @@ describeWithDatabase('pnpm db:bootstrap', () => {
     await application?.end();
     // Only this run's rows, named by the stamp: a suite that truncated the tables would take a
     // developer's own database with it.
-    await admin?.query('delete from tenant_platform_binding where platform_tenant_id like $1', [
-      `org-bootstrap-test-${stamp}-%`,
+    await admin?.query('delete from tenant_platform_binding where platform_tenant_id = any($1)', [
+      organisations.all(),
     ]);
     await admin?.query(
       `delete from tenant_membership m

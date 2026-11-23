@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -80,7 +80,7 @@ export class LeaveBalanceController {
   @Get(':employmentId/as-of')
   @ApiOperation({ summary: 'The balance on a past date, summed from the ledger independently' })
   public async asOf(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Query() query: Record<string, string>,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -96,7 +96,7 @@ export class LeaveBalanceController {
   @Get(':employmentId/projected')
   @ApiOperation({ summary: 'The year-end balance, assuming continued employment and policy' })
   public async projected(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Query() query: Record<string, string>,
   ): Promise<unknown> {
     return unwrapOrThrow(

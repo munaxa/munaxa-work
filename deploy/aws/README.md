@@ -25,15 +25,41 @@ A migrated database has no tenant, so every authenticated request answers 401 ("
 resolved") until one exists. `scripts/bootstrap-tenant.mjs` writes the Work side: a workforce user
 for an existing Identity account and an active membership. The runtime image cannot run it (the
 root `pg` dependency is pruned), but the migrate image can: it carries the build stage's full
-install and `scripts/`. Run the `work-migrate` task definition once, by hand, with a command
-override, after the migrate job and before anyone signs in:
+install and `scripts/`. Run the `work-migrate` task definition with a command override, after the
+migrate job and before anyone signs in. On Testing, run it through the platform's E-1 task guard
+(`scripts/aws/connector/e1-task-guard.py`, family `munaxa-nonprod-work-migrate`), not a bare
+`aws ecs run-task`.
+
+Rehearse first with `--dry-run`, then run the same command without it. The command runs as an
+argv, with no shell; the script reads the owner URL from `DATABASE_MIGRATION_URL`, which the task
+already holds:
 
 ```sh
-sh -c 'DATABASE_URL="$DATABASE_MIGRATION_URL" exec node ../../scripts/bootstrap-tenant.mjs \
+node ../../scripts/bootstrap-tenant.mjs \
   --platform-user-id <Identity user id, the token sub> \
   --platform-tenant-id <Identity organisation id, the token tid> \
-  --platform-issuer <PLATFORM_AUTH_ISSUER, exactly> --allow-production'
+  --confirm-organisation=<the same organisation id, after checking it in Identity> \
+  --issuer <PLATFORM_AUTH_ISSUER, exactly> --allow-production [--dry-run]
 ```
+
+The guard (MW-005) refuses before connecting when:
+
+- `--issuer` is missing, or is not character for character the `PLATFORM_AUTH_ISSUER` of the
+  environment it runs in. That variable must be set in the task; the stack sets it on
+  `work-migrate` (munaxa-platform `ops.tf`). An issuer that is not `https` is refused in production.
+- `--platform-tenant-id` is not an Identity organisation id (a lowercase UUID; a slug or `root` is
+  refused), or `--confirm-organisation` is missing or differs from it.
+- an option is unknown, repeated or has no value (a misspelt `--dry-run` never writes).
+
+**Known gap:** the script cannot check that the organisation exists in Identity. Identity exposes no
+credential-free lookup; its one product-facing route, `GET /api/auth/introspect`, needs a live
+access token of an account in the organisation. So the operator checks the id in Identity
+(the `identity_tenant` row the operator bootstrap created) and types it twice.
+
+Then every read, check, write and the resolution proof run in one transaction. It commits only if
+all of them pass. A refusal at any point leaves the database unchanged, including a rebind of a
+bound tenant to another organisation or issuer, or an organisation already bound elsewhere.
+`--dry-run` runs the same transaction and always rolls it back. It prints the planned writes.
 
 The organisation id binds the new Work tenant to that Identity organisation (ADR-0080): only tokens
 issued for it can act in the tenant, and its grants can act in no other tenant. One organisation

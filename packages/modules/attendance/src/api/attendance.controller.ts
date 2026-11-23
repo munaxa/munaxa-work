@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -126,7 +126,7 @@ export class AttendanceController {
   @ApiOperation({ summary: 'One day, its events — superseded included — and its exceptions' })
   @ApiOkResponse({ description: 'The day in full.' })
   public async day(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Param('attendanceDate') attendanceDate: string,
   ): Promise<unknown> {
     return unwrapOrThrow(

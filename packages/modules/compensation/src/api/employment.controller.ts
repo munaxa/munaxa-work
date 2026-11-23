@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -38,7 +38,9 @@ export class EmploymentCompensationController {
   @Get(':employmentId')
   @ApiOperation({ summary: "One employment's current compensation, by component and currency" })
   @ApiOkResponse({ description: 'Empty components is a real answer, not zero.' })
-  public async current(@Param('employmentId') employmentId: string): Promise<unknown> {
+  public async current(
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadEmploymentCompensation>({
         queryName: 'compensation.for-employment',
@@ -50,7 +52,7 @@ export class EmploymentCompensationController {
   @Get(':employmentId/as-of')
   @ApiOperation({ summary: 'Compensation as it stood on a past date' })
   public async asOf(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Query('date') date: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -64,7 +66,9 @@ export class EmploymentCompensationController {
 
   @Get(':employmentId/future')
   @ApiOperation({ summary: 'Changes stored and not yet effective' })
-  public async future(@Param('employmentId') employmentId: string): Promise<unknown> {
+  public async future(
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadFutureChanges>({
         queryName: 'compensation.future-changes',
@@ -76,7 +80,7 @@ export class EmploymentCompensationController {
   @Get(':employmentId/history')
   @ApiOperation({ summary: 'The change log — what happened, who did it and why' })
   public async history(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Query() query: Record<string, string>,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { IssueCustodyCommand } from '../application/custody.use-case.js';
@@ -28,7 +28,7 @@ export class AssetCustodyController {
       'The current holder is the open custody, derived rather than stored. Its absence means nobody holds the asset.',
   })
   public async forAsset(
-    @Param('assetId') assetId: string,
+    @Param('assetId', ParseUUIDPipe) assetId: string,
     @Query('asAt') asAt?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
@@ -51,7 +51,7 @@ export class AssetCustodyController {
       'Refused if the asset is already held, is not available, or the employment does not exist in this tenant.',
   })
   public async issue(
-    @Param('assetId') assetId: string,
+    @Param('assetId', ParseUUIDPipe) assetId: string,
     @Body() body: IssueCustodyBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

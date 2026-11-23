@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -32,7 +32,7 @@ export class PerformanceGoalProgressController {
   @ApiOperation({ summary: 'Append a progress entry. Entries are never rewritten' })
   @ApiOkResponse({ description: 'observedValue is an exact decimal string, never a JSON number.' })
   public async recordProgress(
-    @Param('goalId') goalId: string,
+    @Param('goalId', ParseUUIDPipe) goalId: string,
     @Body() body: RecordProgressBody,
   ): Promise<unknown> {
     const { observedValue, ...rest } = body;
@@ -55,7 +55,7 @@ export class PerformanceGoalProgressController {
   @Post(':goalId/closure')
   @ApiOperation({ summary: 'Close a goal as achieved, missed or cancelled' })
   public async close(
-    @Param('goalId') goalId: string,
+    @Param('goalId', ParseUUIDPipe) goalId: string,
     @Body() body: CloseGoalBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { RecordViolationCommand } from '../application/violation.use-case.js';
@@ -91,7 +91,9 @@ export class ViolationController {
 
   @Get(':violationId')
   @ApiOperation({ summary: 'One recorded violation. Reading it is recorded against your name' })
-  public async violation(@Param('violationId') violationId: string): Promise<unknown> {
+  public async violation(
+    @Param('violationId', ParseUUIDPipe) violationId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadViolation>({
         queryName: 'relations.read-violation',
