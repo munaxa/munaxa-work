@@ -20,9 +20,9 @@ One command loads, through the Work API and as an ordinary signed-in user, into 
   it; one position per department, budgeted there (establishment of 20).
 - **Leave:** type `syn-annual` (days) and policy `syn-annual-policy`, both published, the policy
   assigned tenant-wide; 14 days (6,720 minutes) opening entitlement per employee.
-- **Attendance:** policy `syn-attendance-policy`; shift `syn-day-shift` 08:00 to 16:00 with a
-  30-minute break; schedule `syn-week` (Asia/Amman, Sunday to Thursday), all published; every
-  employee assigned to the schedule.
+- **Attendance:** policy `syn-attendance-policy` (left a draft); shift `syn-day-shift` 08:00 to
+  16:00 with a 30-minute break and schedule `syn-week` (Asia/Amman, Sunday to Thursday), both
+  published; every employee assigned to the schedule.
 - **Compensation:** component `syn-base-salary` and plan `syn-standard-plan` (JOD), published, the
   plan assigned tenant-wide; a recurring base salary per employee, 450.000 to 940.000 JOD.
 - **Payroll:** group `syn-monthly`, a voluntary deduction `syn-voluntary-savings` (10.000 JOD) and
@@ -38,23 +38,34 @@ passport, IBAN, phone) is generated. The test suite asserts all of this.
 
 ### Running it
 
+> **Warning: Testing or local only.** The loader writes hundreds of records into the tenant it
+> reaches. It refuses every target host (`WORK_BASE_URL`, and `WORK_API_BASE_URL` and
+> `IDENTITY_BASE_URL` when set) unless the host is `localhost`, `127.0.0.1`, `::1` or ends in
+> `.test.munaxa.com`. Any other host needs `--target-confirm=<exact host>`, matching it exactly.
+> Production (`work.munaxa.com` and any host under it) is refused unconditionally, confirmation or
+> not. A refused target exits 2 before any request is sent.
+
 ```sh
-export WORK_BASE_URL='https://work.<testing domain>'
+export WORK_BASE_URL='https://work.test.munaxa.com'
 # Either a token file (the __Host-mx_session cookie value of a signed-in HR administrator) ...
 export LOADER_TOKEN_FILE=~/work-token
 # ... or Identity sign-in, which the Testing ALB serves on the same host under /api/auth:
 #   export LOADER_IDENTIFIER='<org admin persona>'; read -rs LOADER_PASSWORD; export LOADER_PASSWORD
+# ... or the password in a file only you can read (chmod 600; a group- or world-readable file is
+# refused unless LOADER_ALLOW_SHARED_PASSWORD_FILE=1, and then warned about):
+#   export LOADER_IDENTIFIER='<org admin persona>'; export LOADER_PASSWORD_FILE=~/loader-password
 
 node tooling/testing-data/load-synthetic.mjs --dry-run      # GET requests only: what would be created
 node tooling/testing-data/load-synthetic.mjs                # load 30 employees
 node tooling/testing-data/load-synthetic.mjs --employees 50 --period 2027-01
+node tooling/testing-data/load-synthetic.mjs --target-confirm=work.dev.example   # another test host
 ```
 
 Optional: `WORK_TENANT_ID` (sent as `X-Munaxa-Tenant` when the account belongs to several tenants),
 `WORK_API_BASE_URL`, `IDENTITY_BASE_URL`, `IDENTITY_ORIGIN`, `IDENTITY_ORGANISATION`. The account
 needs the HR, time and leave, compensation and payroll configuration grants: the
 `work-testing-org-admin` persona (MW-003). Exit codes: 0 done, 1 a request failed (the message names
-the route and the API's reason), 2 incomplete inputs. Output is codes and counts only; never a
+the route and the API's reason), 2 incomplete inputs or a refused target. Output is codes and counts only; never a
 token, a password or a person's name.
 
 ### Idempotency
@@ -69,10 +80,17 @@ handled as follows:
 - **Schedule assignments** have no list route; a repeat is refused by Attendance as an overlap
   (409), which the loader counts as present.
 - **Shift segments and schedule days** are added only while the shift or schedule is a draft.
-- **The attendance policy** has no list route, and a repeated code answers 500 rather than 409, so
-  it is created in the run that creates the shift, immediately before it.
+- **The attendance policy** has no read route of any kind (no list, no GET by id or code, and
+  neither the shift nor the schedule names it), and nothing later needs its id. It is created in
+  the run that creates the shift, immediately before it. If a run died between the two, the next
+  run sends the policy again: since MW-071 a repeated code is refused with 409
+  `policy_code_taken`, which the loader counts as present, and it carries on to the shift. An API
+  from before MW-071 answers 500 instead; the loader then stops once (no retry loop) with a message
+  naming the manual step: confirm with the Work operator that the tenant holds
+  `syn-attendance-policy`, then re-run with `--skip-attendance-policy`.
 
-A dry run reports schedule assignments as "not checkable without writing".
+A dry run reports schedule assignments, and the attendance policy while the shift is absent, as
+"not checkable without writing".
 
 ### How this was verified against the real API
 
@@ -102,7 +120,8 @@ GET /api/v1/payroll/periods                  syn-<YYYY-MM>, status open
   500 for every query: the repositories pass parameters the SQL does not use, and PostgreSQL
   refuses them ("could not determine data type of parameter $2"). The loader falls back to the
   hierarchy and to the establishment.
-- A repeated attendance policy code (and a repeated unit code) answers 500 instead of 409.
+- A repeated attendance policy code (and a repeated unit code) answers 500 instead of 409. Fixed
+  by MW-071 (#46); the loader handles both answers, as above.
 - A payroll calculation for a group whose `legalEntityId` is the legal entity's id refuses with
   `organization_unavailable`: the adapter asks Organization for the governing legal entity of a
   *unit* with that id (`apps/api/src/payroll/payroll-period-sources.ts`). The loader passes the
@@ -139,4 +158,8 @@ behaviours above (acknowledgement responses, drafts and publication, the 409s an
 second run creates nothing, with and without the broken organization lists; a larger count only
 appends; a run killed part way is completed and not duplicated; a dry run writes nothing; the
 dataset is deterministic, 20 to 50 strong and free of real personal data; the command prints no
-token or password.
+token or password. `load-synthetic-guards.test.mjs` covers the target guard (local and
+`.test.munaxa.com` hosts pass, others need a matching `--target-confirm`, production is refused even
+confirmed, all three base URLs are checked), recovery from a run that died between the attendance
+policy and its shift (409 and pre-MW-071 500), and `LOADER_PASSWORD_FILE` (owner-only, refused or
+warned when shared, never printed).

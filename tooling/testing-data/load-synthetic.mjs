@@ -4,15 +4,20 @@
  * See tooling/testing-data/README.md. Node built-ins only.
  *
  *   node tooling/testing-data/load-synthetic.mjs [--dry-run] [--employees 30] [--period 2026-12]
+ *     [--target-confirm=<host>] [--skip-attendance-policy]
  *
  * Idempotent: every record is looked up by a deterministic key before it is created, so a second
  * run against the same tenant creates nothing. `--dry-run` makes only GET requests and prints what
  * a real run would create. Prints codes and counts; never a token, a password or a person's name.
  *
- * Exit code: 0 on success, 1 when a request failed, 2 when the inputs are incomplete.
+ * Only localhost or a host under `.test.munaxa.com` is a target without `--target-confirm`;
+ * production is refused outright (target-guard.mjs).
+ *
+ * Exit code: 0 on success, 1 when a request failed, 2 when the inputs are incomplete or the target
+ * is refused.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import {
@@ -31,19 +36,31 @@ import {
   employees,
   payrollPeriod,
 } from './synthetic-dataset.mjs';
+import { ConfigurationError, accessToken, passwordOf } from './credentials.mjs';
+import { TargetRefusedError, guardTargets } from './target-guard.mjs';
 import { ApiError, createWorkClient, sanitize } from './work-client.mjs';
 
-export class ConfigurationError extends Error {}
+export { ConfigurationError, accessToken, passwordOf };
 
-const SESSION_COOKIE = '__Host-mx_session';
 const DEFAULT_PERIOD = '2026-12';
 
 export const parseArguments = (argv) => {
-  const options = { dryRun: false, employees: DEFAULT_EMPLOYEES, period: DEFAULT_PERIOD };
+  const options = {
+    dryRun: false,
+    employees: DEFAULT_EMPLOYEES,
+    period: DEFAULT_PERIOD,
+    targetConfirm: undefined,
+    skipAttendancePolicy: false,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--dry-run') options.dryRun = true;
-    else if (argument === '--employees') options.employees = Number(argv[(index += 1)]);
+    else if (argument === '--skip-attendance-policy') options.skipAttendancePolicy = true;
+    else if (argument.startsWith('--target-confirm=')) {
+      options.targetConfirm = argument.slice('--target-confirm='.length);
+      if (options.targetConfirm === '')
+        throw new ConfigurationError('--target-confirm needs a host.');
+    } else if (argument === '--employees') options.employees = Number(argv[(index += 1)]);
     else if (argument === '--period') options.period = argv[(index += 1)];
     else throw new ConfigurationError(`Unknown argument ${argument}.`);
   }
@@ -56,16 +73,21 @@ export const loadConfig = (env, argv) => {
   const options = parseArguments(argv);
   const missing = [];
   if (!env.WORK_BASE_URL) missing.push('WORK_BASE_URL');
-  const hasLogin = env.LOADER_IDENTIFIER && env.LOADER_PASSWORD;
+  const hasLogin = env.LOADER_IDENTIFIER && (env.LOADER_PASSWORD || env.LOADER_PASSWORD_FILE);
   if (!env.LOADER_TOKEN_FILE && !hasLogin) {
-    missing.push('LOADER_TOKEN_FILE, or LOADER_IDENTIFIER and LOADER_PASSWORD');
+    missing.push(
+      'LOADER_TOKEN_FILE, or LOADER_IDENTIFIER and LOADER_PASSWORD or LOADER_PASSWORD_FILE',
+    );
   }
   if (missing.length > 0) throw new ConfigurationError(`Missing inputs: ${missing.join('; ')}.`);
   const work = env.WORK_BASE_URL.replace(/\/+$/, '');
   const identity = (env.IDENTITY_BASE_URL || work).replace(/\/+$/, '');
+  const api = (env.WORK_API_BASE_URL || work).replace(/\/+$/, '');
+  // Every host that receives the credential or a write is checked, not only WORK_BASE_URL.
+  guardTargets([work, api, identity], options.targetConfirm);
   return {
     ...options,
-    api: (env.WORK_API_BASE_URL || work).replace(/\/+$/, ''),
+    api,
     identity,
     identityOrigin: env.IDENTITY_ORIGIN || new URL(identity).origin,
     organisation: env.IDENTITY_ORGANISATION || undefined,
@@ -73,34 +95,9 @@ export const loadConfig = (env, argv) => {
     tokenFile: env.LOADER_TOKEN_FILE || undefined,
     identifier: env.LOADER_IDENTIFIER || undefined,
     password: env.LOADER_PASSWORD || undefined,
+    passwordFile: env.LOADER_PASSWORD_FILE || undefined,
+    allowSharedPasswordFile: env.LOADER_ALLOW_SHARED_PASSWORD_FILE === '1',
   };
-};
-
-/** An access token: from the file, or by signing in to Identity as a browser would. */
-export const accessToken = async (config, io) => {
-  if (config.tokenFile) {
-    const token = io.readFile(config.tokenFile).trim();
-    if (token === '') throw new ConfigurationError('LOADER_TOKEN_FILE is empty.');
-    return token;
-  }
-  const response = await io.fetch(`${config.identity}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin: config.identityOrigin },
-    body: JSON.stringify({
-      identifier: config.identifier,
-      password: config.password,
-      ...(config.organisation ? { organisation: config.organisation } : {}),
-    }),
-    redirect: 'manual',
-  });
-  const cookie = response.headers
-    .getSetCookie()
-    .map((header) => header.split(';')[0])
-    .find((pair) => pair.startsWith(`${SESSION_COOKIE}=`));
-  if (response.status !== 200 || cookie === undefined) {
-    throw new Error(`Identity sign-in answered ${response.status}`);
-  }
-  return decodeURIComponent(cookie.slice(SESSION_COOKIE.length + 1));
 };
 
 /** A stand-in for a record a dry run would create: every `…Id` reads as "planned". */
@@ -299,7 +296,12 @@ export const runLoader = async (config, io) => {
       throw error;
     }
   };
-  const context = { api, ensure, isPlanned: (entry) => entry?.planned === true };
+  const context = {
+    api,
+    ensure,
+    isPlanned: (entry) => entry?.planned === true,
+    options: { skipAttendancePolicy: config.skipAttendancePolicy },
+  };
 
   const organization = await organizationSteps(context);
   const { leaveType } = await leaveSteps(context);
@@ -329,7 +331,11 @@ export const main = async (env = process.env, argv = process.argv.slice(2)) => {
   try {
     config = loadConfig(env, argv);
   } catch (error) {
-    if (!(error instanceof ConfigurationError) && !(error instanceof RangeError)) throw error;
+    const refused =
+      error instanceof ConfigurationError ||
+      error instanceof RangeError ||
+      error instanceof TargetRefusedError;
+    if (!refused) throw error;
     process.stderr.write(`load-synthetic: ${error.message} See tooling/testing-data/README.md.\n`);
     return 2;
   }
@@ -341,9 +347,15 @@ export const main = async (env = process.env, argv = process.argv.slice(2)) => {
       fetch: globalThis.fetch,
       write: (line) => process.stdout.write(`${clean(line)}\n`),
       readFile: (path) => readFileSync(path, 'utf8'),
+      fileMode: (path) => statSync(path).mode,
+      secret: (value) => secrets.push(value),
     });
     return 0;
   } catch (error) {
+    if (error instanceof ConfigurationError) {
+      process.stderr.write(`load-synthetic: ${clean(error.message)}\n`);
+      return 2;
+    }
     process.stderr.write(
       `load-synthetic: ${clean(error instanceof Error ? error.message : error)}\n`,
     );

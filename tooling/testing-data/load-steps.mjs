@@ -17,7 +17,6 @@ import {
   DEDUCTION,
   DEPARTMENTS,
   EFFECTIVE_FROM,
-  ENTITLEMENT_MINUTES,
   LEAVE_POLICY,
   LEAVE_TYPE,
   LEGAL_ENTITY,
@@ -216,18 +215,33 @@ export const attendanceSteps = async (context) => {
   const findShift = async () =>
     (await api.list(`${V1}/attendance/shifts`)).find(byCode(SHIFT.code));
   const existingShift = await findShift();
-  // Attendance has no list of policies, and a repeated policy code answers 500 rather than 409
-  // (as of 8a975f6, reported with MW-004), so the policy cannot be looked up. It is created in the
-  // run that creates the shift, immediately before it, and a found shift means a created policy.
-  if (existingShift === undefined) {
-    await ensure(`attendance policy ${ATTENDANCE_POLICY.code}`, {
-      find: async () => undefined,
-      create: () =>
-        api.post(`${V1}/attendance/policies`, {
-          ...ATTENDANCE_POLICY,
-          effectiveFrom: EFFECTIVE_FROM,
-        }),
-    });
+  // Attendance has no read of policies by code or id, and nothing later needs the policy's id. It
+  // is created in the run that creates the shift, immediately before it, so a found shift means a
+  // created policy. A run that died between the two is recovered by the refusal: since MW-071 a
+  // repeated code is 409 `policy_code_taken`, which counts as present. An API from before MW-071
+  // answers 500 instead; the loader then stops and names the manual step rather than retrying.
+  if (existingShift === undefined && !context.options.skipAttendancePolicy) {
+    try {
+      await ensure(`attendance policy ${ATTENDANCE_POLICY.code}`, {
+        find: async () => undefined,
+        create: () =>
+          api.post(`${V1}/attendance/policies`, {
+            ...ATTENDANCE_POLICY,
+            effectiveFrom: EFFECTIVE_FROM,
+          }),
+        conflictMeansExists: true,
+      });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 500) throw error;
+      throw new Error(
+        `Attendance answered 500 to attendance policy ${ATTENDANCE_POLICY.code}. On an API ` +
+          'without MW-071 that is how a repeated policy code is refused, so the policy most likely ' +
+          'exists from an interrupted run while its shift does not. Manual step: confirm with the ' +
+          `Work operator that the tenant holds attendance policy ${ATTENDANCE_POLICY.code}, then ` +
+          're-run with --skip-attendance-policy. See tooling/testing-data/README.md.',
+        { cause: error },
+      );
+    }
   }
   const shift = await ensure(`shift ${SHIFT.code}`, {
     find: async () => existingShift ?? findShift(),
