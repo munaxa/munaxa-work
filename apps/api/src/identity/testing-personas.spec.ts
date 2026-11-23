@@ -105,11 +105,16 @@ const SCOPES: Readonly<Record<string, Scope>> = {
       ['people identifier value', 'people.identifier.read-value'],
       ['employment.create-employment', 'employment.employment.manage'],
       ['relations.record-violation', 'relations.violation.record'],
+      // The organisation's side of career: deciding what the manager put forward.
+      ['career.decide-move', 'career.mobility.decide'],
+      ['career.confirm-successor', 'career.successor.confirm'],
     ],
     refused: [
       ['payroll.define-group', 'payroll.manage'],
       ['leave.decide-request', 'leave.approve'],
       ['compensation.assign-recurring', 'compensation.manage'],
+      ['career.recommend-move', 'career.mobility.recommend'],
+      ['career.nominate-successor', 'career.successor.nominate'],
     ],
   },
   'work-testing-time-leave-officer': {
@@ -179,9 +184,13 @@ const SCOPES: Readonly<Record<string, Scope>> = {
       ['recruitment.decide-offer', 'recruitment.offer.approve'],
       ['organization.approve-establishment', 'organization.establishment.approve'],
       ['performance.schedule-calibration', 'performance.calibrate'],
-      ['career.decide-move', 'career.mobility.decide'],
+      ['career.recommend-move', 'career.mobility.recommend'],
+      ['career.nominate-successor', 'career.successor.nominate'],
     ],
     refused: [
+      // Nominating and recommending are the manager's; agreeing with them is not (M2).
+      ['career.decide-move', 'career.mobility.decide'],
+      ['career.confirm-successor', 'career.successor.confirm'],
       ['payroll.approve', 'payroll.approve'],
       ['compensation.decide', 'compensation.approve'],
       ['leave.grant-entitlement', 'leave.entitlement.manage'],
@@ -266,6 +275,28 @@ describe('the Testing persona fixture', () => {
       expect(KEYS.filter((key) => conferred(key).granted.has(permission))).toEqual([
         'work-testing-payroll-approver',
       ]);
+    }
+  });
+
+  it('never puts a decision beside anything else in its module but reads and own records', () => {
+    // One rule for every persona, with no persona exempt by name: whoever decides in a module
+    // prepares nothing there, so nobody decides what they prepared. Decisions are named by Work's
+    // own verbs, not by the fixture's word for which grants are decisions.
+    const isDecision = (permission: string): boolean =>
+      /\.(approve|finalize|decide|confirm|payment|reverse)$/.test(permission);
+    const isReadOrOwn = (permission: string): boolean =>
+      /\.read(-[a-z-]+)?$/.test(permission) || permission.endsWith('-own');
+    const moduleOf = (permission: string): string => permission.split('.')[0] ?? '';
+
+    for (const key of KEYS) {
+      const granted = [...conferred(key).granted];
+      const deciding = new Set(granted.filter(isDecision).map(moduleOf));
+      const besideADecision = granted.filter(
+        (permission) =>
+          deciding.has(moduleOf(permission)) && !isDecision(permission) && !isReadOrOwn(permission),
+      );
+
+      expect([key, besideADecision]).toEqual([key, []]);
     }
   });
 });

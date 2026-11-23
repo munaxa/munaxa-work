@@ -58,8 +58,12 @@
   {
     "key": "work-testing-hr-officer",
     "name": "Munaxa Work - Testing only - HR records officer",
-    "description": "TESTING ONLY. People records (including sensitive fields and identifiers), employment records and contracts, and employee relations cases. Holds no decision.",
+    "description": "TESTING ONLY. People records (including sensitive fields and identifiers), employment records and contracts, and employee relations cases. Decides career matters for the organisation (confirms successors, decides mobility recommendations) that the manager persona nominates and recommends, and prepares none of them.",
     "grants": [
+      "work:career:mobility:decide",
+      "work:career:mobility:read",
+      "work:career:succession:read",
+      "work:career:successor:confirm",
       "work:employment:assignment:manage",
       "work:employment:assignment:read",
       "work:employment:contract:manage",
@@ -301,7 +305,7 @@
   {
     "key": "work-testing-manager",
     "name": "Munaxa Work - Testing only - approver and manager",
-    "description": "TESTING ONLY. Decides what the other personas prepare (attendance, leave, letters, establishment, requisitions, offers, workflow approvals), and runs performance and career for a team. Holds no payroll or compensation decision.",
+    "description": "TESTING ONLY. Decides what the other personas prepare (attendance, leave, letters, establishment, requisitions, offers, workflow approvals), and runs performance and career for a team: nominates successors and recommends moves, which the HR records officer persona confirms or decides. Holds no payroll, compensation or career decision.",
     "grants": [
       "work:attendance:approve",
       "work:attendance:correct:approve",
@@ -309,7 +313,6 @@
       "work:career:development:manage",
       "work:career:development:read",
       "work:career:development:read-own",
-      "work:career:mobility:decide",
       "work:career:mobility:read",
       "work:career:mobility:recommend",
       "work:career:path:manage",
@@ -325,7 +328,6 @@
       "work:career:readiness:record",
       "work:career:succession:manage",
       "work:career:succession:read",
-      "work:career:successor:confirm",
       "work:career:successor:nominate",
       "work:leave:approve",
       "work:leave:read",
@@ -357,7 +359,6 @@
       "work:recruitment:offer:approve",
       "work:recruitment:requisition:approve",
       "work:workflow:approval:decide",
-      "work:workflow:approval:escalate",
       "work:workflow:instance:read"
     ]
   },
