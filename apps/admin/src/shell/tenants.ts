@@ -6,6 +6,11 @@ interface SessionTenants {
   readonly tenants: readonly { readonly tenantId: string }[];
 }
 
+const tenantIdOf = (entry: unknown): string | undefined => {
+  if (typeof entry !== 'object' || entry === null || !('tenantId' in entry)) return undefined;
+  return typeof entry.tenantId === 'string' ? entry.tenantId : undefined;
+};
+
 /**
  * The tenants the signed-in caller may act in, as the API answers for their own credential.
  *
@@ -16,9 +21,11 @@ export const memberTenants = async (): Promise<ApiOutcome<readonly string[]>> =>
   const answer = await apiOutcome<SessionTenants>('/session/tenants');
   if (answer.kind !== 'ok') return answer;
 
-  const listed = Array.isArray(answer.value.tenants) ? answer.value.tenants : [];
+  const listed: readonly unknown[] = Array.isArray(answer.value.tenants)
+    ? answer.value.tenants
+    : [];
   return {
     kind: 'ok',
-    value: listed.map((entry) => entry.tenantId).filter((tenantId) => isTenantId(tenantId)),
+    value: listed.map(tenantIdOf).filter(isTenantId),
   };
 };
