@@ -10,6 +10,9 @@ on:
   # after it lands), and the only runs recorded against main were the image publishes.
   push:
     branches: [main]
+  # A manual run on any branch, without a pull request: how a gate is shown to fail on a
+  # deliberately broken branch (MW-008's proof) without proposing that branch for merge.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
