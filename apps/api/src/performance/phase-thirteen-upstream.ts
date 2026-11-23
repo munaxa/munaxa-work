@@ -156,8 +156,21 @@ const governingLegalEntity = (): QueryHandler<GoverningLegalEntity, unknown> => 
 
   handle: (query) =>
     Promise.resolve(
+      // Organization's published shape (`GoverningLegalEntity`), not the one the adapter would like:
+      // a stub answering `{ legalEntityId }` is what let the adapter read a field that does not
+      // exist (MW-074).
       query.unitId === UNIT_ID
-        ? success({ legalEntityId: LEGAL_ENTITY_ID })
+        ? success({
+            unitId: UNIT_ID,
+            asOf: new Date('2026-01-01T00:00:00Z'),
+            legalEntity: {
+              id: LEGAL_ENTITY_ID,
+              unitId: UNIT_ID,
+              countryCode: 'JO',
+              currencyCode: 'JOD',
+            },
+            throughUnitIds: [],
+          })
         : { ok: false as const, error: { kind: 'not_found' as const, resource: 'legal_entity' } },
     ),
 });
