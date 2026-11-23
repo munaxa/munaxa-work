@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -38,7 +38,7 @@ export class PerformanceReviewLifecycleController {
       'nobody assessed leaves the denominator, and the exclusion is kept with its reason.',
   })
   public async score(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -58,7 +58,7 @@ export class PerformanceReviewLifecycleController {
       'reorganization cannot change what the review says.',
   })
   public async complete(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -73,7 +73,7 @@ export class PerformanceReviewLifecycleController {
   @Post(':reviewId/archival')
   @ApiOperation({ summary: 'Archive a completed review. It stays readable' })
   public async archive(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

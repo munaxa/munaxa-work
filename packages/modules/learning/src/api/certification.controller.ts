@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -87,7 +87,7 @@ export class LearningCertificationController {
   @Post(':certificationId/revocation')
   @ApiOperation({ summary: 'Revoke a certificate. Its own permission, and a reason' })
   public async revoke(
-    @Param('certificationId') certificationId: string,
+    @Param('certificationId', ParseUUIDPipe) certificationId: string,
     @Body() body: ReasonedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

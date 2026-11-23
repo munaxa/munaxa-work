@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -69,7 +69,7 @@ export class AttendanceCorrectionController {
   @ApiOperation({ summary: 'Decide a correction. Refused when the decider requested it' })
   @ApiUnprocessableEntityResponse({ description: 'Self-approval, or a request already decided.' })
   public async decide(
-    @Param('correctionId') correctionId: string,
+    @Param('correctionId', ParseUUIDPipe) correctionId: string,
     @Body() body: DecideCorrectionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -84,7 +84,7 @@ export class AttendanceCorrectionController {
   @Post('corrections/:correctionId/withdrawal')
   @ApiOperation({ summary: 'Withdraw a request. The record of having asked stays' })
   public async withdraw(
-    @Param('correctionId') correctionId: string,
+    @Param('correctionId', ParseUUIDPipe) correctionId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -54,7 +54,7 @@ export class OnboardingsController {
   @Get(':onboardingId')
   @ApiOperation({ summary: 'One onboarding, its tasks and its progress' })
   @ApiOkResponse({ description: 'Progress is counted in the database, not by loading the list.' })
-  public async read(@Param('onboardingId') onboardingId: string): Promise<unknown> {
+  public async read(@Param('onboardingId', ParseUUIDPipe) onboardingId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadOnboarding>({
         queryName: 'onboarding.read',

@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -43,7 +43,7 @@ export class ContactsController {
   @ApiConflictResponse({ description: 'The value may belong to another person.' })
   @ApiOkResponse({ description: 'The contact, and how many duplicates were queued.' })
   public async recordContact(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordContactBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -66,7 +66,7 @@ export class ContactsController {
   @ApiOperation({ summary: 'End a contact point without replacing it' })
   @ApiOkResponse({ description: 'The contact.' })
   public async closeContact(
-    @Param('contactId') contactId: string,
+    @Param('contactId', ParseUUIDPipe) contactId: string,
     @Body() body: CloseAtBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -85,7 +85,7 @@ export class ContactsController {
   })
   @ApiOkResponse({ description: 'The address.' })
   public async recordAddress(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordAddressBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -107,7 +107,7 @@ export class ContactsController {
   @ApiOperation({ summary: 'End an address without replacing it' })
   @ApiOkResponse({ description: 'The address.' })
   public async closeAddress(
-    @Param('addressId') addressId: string,
+    @Param('addressId', ParseUUIDPipe) addressId: string,
     @Body() body: CloseAtBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

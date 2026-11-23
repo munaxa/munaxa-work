@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -43,7 +43,7 @@ export class PayrollResultController {
     description: 'Paginated and bounded. Nothing is ever totalled across currencies.',
   })
   public async results(
-    @Param('payrollRunId') payrollRunId: string,
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
     @Query() query: Record<string, string>,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -57,7 +57,9 @@ export class PayrollResultController {
 
   @Get('results/:payrollResultId/earnings')
   @ApiOperation({ summary: "A result's earning lines, each explaining itself" })
-  public async earnings(@Param('payrollResultId') payrollResultId: string): Promise<unknown> {
+  public async earnings(
+    @Param('payrollResultId', ParseUUIDPipe) payrollResultId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadEarnings>({
         queryName: 'payroll.earnings',
@@ -68,7 +70,9 @@ export class PayrollResultController {
 
   @Get('results/:payrollResultId/deductions')
   @ApiOperation({ summary: "A result's deduction lines, in priority order" })
-  public async deductions(@Param('payrollResultId') payrollResultId: string): Promise<unknown> {
+  public async deductions(
+    @Param('payrollResultId', ParseUUIDPipe) payrollResultId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadDeductions>({
         queryName: 'payroll.deductions',
@@ -83,7 +87,9 @@ export class PayrollResultController {
     description:
       'Payroll owns the data. Rendering, storage and delivery are NOT VERIFIED: no DocumentPort exists.',
   })
-  public async payslip(@Param('payrollResultId') payrollResultId: string): Promise<unknown> {
+  public async payslip(
+    @Param('payrollResultId', ParseUUIDPipe) payrollResultId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadPayslip>({
         queryName: 'payroll.payslip',
@@ -99,7 +105,7 @@ export class PayrollResultController {
       'Prepared in Payroll’s own table. There is no Finance module and nothing is posted anywhere.',
   })
   public async accounting(
-    @Param('payrollRunId') payrollRunId: string,
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
     @Query() query: Record<string, string>,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -118,7 +124,7 @@ export class PayrollResultController {
       'No account number, no credential, and no state beyond prepared. Execution is NOT VERIFIED.',
   })
   public async payments(
-    @Param('payrollRunId') payrollRunId: string,
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
     @Query() query: Record<string, string>,
   ): Promise<unknown> {
     return unwrapOrThrow(

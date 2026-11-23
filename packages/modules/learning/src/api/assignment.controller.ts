@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -76,7 +76,7 @@ export class LearningAssignmentController {
   @Post(':assignmentId/waiver')
   @ApiOperation({ summary: 'Excuse somebody from a requirement. Its own permission, and a reason' })
   public async waive(
-    @Param('assignmentId') assignmentId: string,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
     @Body() body: ReasonedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -92,7 +92,7 @@ export class LearningAssignmentController {
   @Post(':assignmentId/cancellation')
   @ApiOperation({ summary: 'Withdraw a requirement that should not have been made' })
   public async cancel(
-    @Param('assignmentId') assignmentId: string,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

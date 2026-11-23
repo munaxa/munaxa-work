@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -56,7 +56,7 @@ export class CalendarsController {
   @ApiOperation({ summary: 'Amend a calendar' })
   @ApiOkResponse({ description: 'The calendar.' })
   public async amend(
-    @Param('calendarId') calendarId: string,
+    @Param('calendarId', ParseUUIDPipe) calendarId: string,
     @Body() body: AmendCalendarBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -80,7 +80,7 @@ export class CalendarsController {
   })
   @ApiOkResponse({ description: 'The recorded day.' })
   public async recordDay(
-    @Param('calendarId') calendarId: string,
+    @Param('calendarId', ParseUUIDPipe) calendarId: string,
     @Body() body: RecordCalendarDayBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -98,7 +98,7 @@ export class CalendarsController {
   @ApiOperation({ summary: 'Remove a recorded day' })
   @ApiOkResponse({ description: 'The removed day.' })
   public async removeDay(
-    @Param('calendarId') calendarId: string,
+    @Param('calendarId', ParseUUIDPipe) calendarId: string,
     @Param('onDate') onDate: string,
   ): Promise<unknown> {
     return unwrapOrThrow(

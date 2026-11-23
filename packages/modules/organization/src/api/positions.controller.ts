@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -81,7 +81,7 @@ export class PositionsController {
   @ApiOperation({ summary: 'Revise a definition' })
   @ApiOkResponse({ description: 'The position.' })
   public async revise(
-    @Param('positionId') positionId: string,
+    @Param('positionId', ParseUUIDPipe) positionId: string,
     @Body() body: RevisePositionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -102,7 +102,7 @@ export class PositionsController {
   @ApiOperation({ summary: 'Retire a definition. Contracts naming it still resolve' })
   @ApiOkResponse({ description: 'The retired position.' })
   public async retire(
-    @Param('positionId') positionId: string,
+    @Param('positionId', ParseUUIDPipe) positionId: string,
     @Body() body: CloseEffectiveBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

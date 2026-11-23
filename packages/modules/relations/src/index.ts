@@ -54,7 +54,8 @@ export { ViolationCategoryController } from './api/violation-category.controller
 export { ViolationController } from './api/violation.controller.js';
 export { DisciplinaryRuleController } from './api/disciplinary-rule.controller.js';
 export { DisciplinaryActionController } from './api/disciplinary-action.controller.js';
-export { CaseHistoryController, InvestigationController } from './api/investigation.controller.js';
+export { InvestigationController } from './api/investigation.controller.js';
+export { CaseHistoryController } from './api/case-history.controller.js';
 
 export type {
   AmendViolationCategoryCommand,

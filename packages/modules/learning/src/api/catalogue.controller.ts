@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -80,7 +80,7 @@ export class LearningCourseController {
 
   @Get(':courseId')
   @ApiOperation({ summary: 'One course with every version it has had, and their assessments' })
-  public async read(@Param('courseId') courseId: string): Promise<unknown> {
+  public async read(@Param('courseId', ParseUUIDPipe) courseId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadCourse>({
         queryName: 'learning.read-course',
@@ -92,7 +92,7 @@ export class LearningCourseController {
   @Patch(':courseId')
   @ApiOperation({ summary: 'Amend a course’s description. Never its code, delivery or lifecycle' })
   public async update(
-    @Param('courseId') courseId: string,
+    @Param('courseId', ParseUUIDPipe) courseId: string,
     @Body() body: UpdateCourseBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -112,7 +112,7 @@ export class LearningCourseController {
   @Post(':courseId/versions')
   @ApiOperation({ summary: 'Publish the next version. Its number is derived, never supplied' })
   public async publishVersion(
-    @Param('courseId') courseId: string,
+    @Param('courseId', ParseUUIDPipe) courseId: string,
     @Body() body: PublishCourseVersionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -135,7 +135,7 @@ export class LearningCourseController {
   @Post(':courseId/archive')
   @ApiOperation({ summary: 'Archive a course. Terminal, and not deletion' })
   public async archive(
-    @Param('courseId') courseId: string,
+    @Param('courseId', ParseUUIDPipe) courseId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

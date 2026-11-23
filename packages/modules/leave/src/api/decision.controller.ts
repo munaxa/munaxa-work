@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -50,7 +50,9 @@ export class LeaveDecisionController {
   @ApiOkResponse({
     description: 'The decisions made, or an empty chain where the policy required no approval.',
   })
-  public async chain(@Param('leaveRequestId') leaveRequestId: string): Promise<unknown> {
+  public async chain(
+    @Param('leaveRequestId', ParseUUIDPipe) leaveRequestId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadApprovalChain>({
         queryName: 'leave.approval-chain',
@@ -62,7 +64,7 @@ export class LeaveDecisionController {
   @Post(':leaveRequestId/decision')
   @ApiOperation({ summary: 'Decide. The decider comes from the context, never from the body' })
   public async decide(
-    @Param('leaveRequestId') leaveRequestId: string,
+    @Param('leaveRequestId', ParseUUIDPipe) leaveRequestId: string,
     @Body() body: DecideBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -77,7 +79,7 @@ export class LeaveDecisionController {
   @Post(':leaveRequestId/cancellation')
   @ApiOperation({ summary: 'Unmake an approved request. Writes a reversal, never a deletion' })
   public async cancel(
-    @Param('leaveRequestId') leaveRequestId: string,
+    @Param('leaveRequestId', ParseUUIDPipe) leaveRequestId: string,
     @Body() body: CancelBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
