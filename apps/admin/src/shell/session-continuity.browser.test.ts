@@ -49,7 +49,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   page.close();
-  browser.close();
+  await browser.close();
   await origin.close();
 });
 

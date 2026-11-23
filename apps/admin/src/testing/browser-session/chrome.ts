@@ -47,7 +47,7 @@ const devToolsPort = async (profile: string): Promise<number> => {
 
 export interface Browser {
   readonly port: number;
-  close(): void;
+  close(): Promise<void>;
 }
 
 export const launchChrome = async (): Promise<Browser> => {
@@ -72,9 +72,19 @@ export const launchChrome = async (): Promise<Browser> => {
 
   return {
     port,
-    close: () => {
+    close: async () => {
+      // Chrome's helper processes can still be writing to the profile for a moment after the
+      // browser exits, so wait for the exit and let the removal retry.
+      const exited = new Promise<void>((resolve) => {
+        if (chrome.exitCode !== null || chrome.signalCode !== null) resolve();
+        else
+          chrome.once('exit', () => {
+            resolve();
+          });
+      });
       chrome.kill('SIGKILL');
-      rmSync(profile, { recursive: true, force: true });
+      await exited;
+      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     },
   };
 };
