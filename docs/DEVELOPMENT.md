@@ -210,6 +210,13 @@ colour, and never reach past the API into a domain — the lint layer enforces a
 **Tests boot the real composition.** `configureApplication` is shared by `main.ts` and the API
 tests, so routing, prefixes, validation and the error filter are tested as they actually run.
 
+**The SQL migrations are the database model, not `schema.prisma`.** Every migration is
+hand-written SQL in `prisma/migrations/`; a merged one is never edited. Never run
+`prisma migrate dev` or `prisma db push`: the Prisma schema cannot express the row-level security,
+exclusion constraints and partial indexes the SQL relies on, and Prisma would drop them. CI refuses
+a generated or edited migration and any growth of the measured drift. prisma/README.md has the
+rules and the gates.
+
 ## Running the integration tests without Docker
 
 The suites that prove tenant isolation need a real PostgreSQL, because the property under test
@@ -397,7 +404,10 @@ delete from tenant_membership m using workforce_user u
 delete from workforce_user where platform_user_id = '<platform user id>';
 ```
 
-To start over entirely, `pnpm db:reset` re-runs every migration on an empty database.
+To start over entirely, `pnpm db:reset` re-runs every migration on an empty database. It drops
+every table, so it runs only against this machine and only when asked twice:
+`WORK_ALLOW_DB_RESET=1 DATABASE_URL=postgresql://work:work@localhost:5432/work pnpm db:reset`
+(prisma/README.md).
 
 ## Running a portal locally
 
