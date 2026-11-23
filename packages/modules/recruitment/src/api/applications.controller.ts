@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -63,7 +63,9 @@ export class ApplicationsController {
 
   @Get(':applicationId')
   @ApiOperation({ summary: 'One application: its history, interviews and offers' })
-  public async read(@Param('applicationId') applicationId: string): Promise<unknown> {
+  public async read(
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadApplication>({
         queryName: 'recruitment.read-application',
@@ -88,7 +90,7 @@ export class ApplicationsController {
   @Post(':applicationId/stage')
   @ApiOperation({ summary: 'Move the application through the pipeline' })
   public async move(
-    @Param('applicationId') applicationId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
     @Body() body: MoveApplicationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -103,7 +105,7 @@ export class ApplicationsController {
   @Post(':applicationId/screening')
   @ApiOperation({ summary: 'Record a screening result. A result, not a status' })
   public async screen(
-    @Param('applicationId') applicationId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
     @Body() body: RecordScreeningBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -118,7 +120,7 @@ export class ApplicationsController {
   @Post(':applicationId/closure')
   @ApiOperation({ summary: 'Reject with a reason, or record a withdrawal' })
   public async close(
-    @Param('applicationId') applicationId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
     @Body() body: CloseApplicationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

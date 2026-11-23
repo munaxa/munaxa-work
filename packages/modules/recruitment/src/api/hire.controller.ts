@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -45,7 +45,7 @@ export class HireController {
       'No accepted offer, the requisition’s headcount is exhausted, the candidate matches several people, or a step did not complete. In every case the application is not left looking hired.',
   })
   public async hire(
-    @Param('applicationId') applicationId: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
     @Body() body: HireCandidateBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

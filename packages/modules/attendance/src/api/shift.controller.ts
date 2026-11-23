@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -65,7 +65,7 @@ export class AttendanceShiftController {
   @Post('shifts/:shiftId/segments')
   @ApiOperation({ summary: 'Add a work or break segment. Refused on a published shift' })
   public async addSegment(
-    @Param('shiftId') shiftId: string,
+    @Param('shiftId', ParseUUIDPipe) shiftId: string,
     @Body() body: AddSegmentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -80,7 +80,7 @@ export class AttendanceShiftController {
   @Post('shifts/:shiftId/publication')
   @ApiOperation({ summary: 'Freeze a shift. Refused with no work segment' })
   public async publishShift(
-    @Param('shiftId') shiftId: string,
+    @Param('shiftId', ParseUUIDPipe) shiftId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

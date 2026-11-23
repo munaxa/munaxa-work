@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -76,7 +76,7 @@ export class LearningEnrolmentController {
       'Nothing is totalled: no average, no percentage, no verdict over the set. The specification ' +
       'defines no formula, and aggregate scoring is NOT VERIFIED.',
   })
-  public async results(@Param('enrolmentId') enrolmentId: string): Promise<unknown> {
+  public async results(@Param('enrolmentId', ParseUUIDPipe) enrolmentId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadAssessmentResults>({
         queryName: 'learning.read-assessment-results',

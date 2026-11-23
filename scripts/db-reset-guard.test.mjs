@@ -41,9 +41,27 @@ describe('judgeReset', () => {
     }
   });
 
-  it('refuses a local URL whose host= parameter redirects the connection', () => {
-    const verdict = judgeReset({ DATABASE_URL: `${LOCAL}?host=db.example.com`, [OPT_IN]: '1' });
-    assert.equal(verdict.allowed, false);
+  it('refuses a local URL whose host= or hostaddr= parameter redirects the connection', () => {
+    for (const query of [
+      'host=db.example.com',
+      'HOST=db.example.com',
+      'Host=/var/run/postgresql',
+      'hostaddr=10.0.0.5',
+      'HostAddr=10.0.0.5',
+      'sslmode=disable&hOsT=db.example.com',
+      'h%6Fst=db.example.com',
+    ]) {
+      const verdict = judgeReset({ DATABASE_URL: `${LOCAL}?${query}`, [OPT_IN]: '1' });
+      assert.equal(verdict.allowed, false, query);
+    }
+  });
+
+  it('allows unrelated query parameters', () => {
+    const verdict = judgeReset({
+      DATABASE_URL: `${LOCAL}?sslmode=disable&schema=public`,
+      [OPT_IN]: '1',
+    });
+    assert.equal(verdict.allowed, true);
   });
 
   it('refuses a missing, malformed or non-PostgreSQL URL', () => {

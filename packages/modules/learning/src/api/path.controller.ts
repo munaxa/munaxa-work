@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -72,7 +72,7 @@ export class LearningPathController {
 
   @Get(':pathId')
   @ApiOperation({ summary: 'One path with its steps, in sequence' })
-  public async read(@Param('pathId') pathId: string): Promise<unknown> {
+  public async read(@Param('pathId', ParseUUIDPipe) pathId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadPath>({ queryName: 'learning.read-path', pathId }),
     );
@@ -81,7 +81,7 @@ export class LearningPathController {
   @Post(':pathId/steps')
   @ApiOperation({ summary: 'Add a course to a path at a sequence' })
   public async addStep(
-    @Param('pathId') pathId: string,
+    @Param('pathId', ParseUUIDPipe) pathId: string,
     @Body() body: AddPathStepBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -98,8 +98,8 @@ export class LearningPathController {
   @Delete(':pathId/steps/:stepId')
   @ApiOperation({ summary: 'Take a course back out. Assignments already generated are untouched' })
   public async removeStep(
-    @Param('pathId') pathId: string,
-    @Param('stepId') stepId: string,
+    @Param('pathId', ParseUUIDPipe) pathId: string,
+    @Param('stepId', ParseUUIDPipe) stepId: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.send<unknown, RemovePathStepCommand>({
@@ -113,7 +113,7 @@ export class LearningPathController {
   @Post(':pathId/publication')
   @ApiOperation({ summary: 'Publish a path. An empty one publishes nothing' })
   public async publish(
-    @Param('pathId') pathId: string,
+    @Param('pathId', ParseUUIDPipe) pathId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -128,7 +128,7 @@ export class LearningPathController {
   @Post(':pathId/archive')
   @ApiOperation({ summary: 'Archive a path. Terminal, and not deletion' })
   public async archive(
-    @Param('pathId') pathId: string,
+    @Param('pathId', ParseUUIDPipe) pathId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -32,7 +32,7 @@ export class EmploymentHistoryController {
   @Get(':employmentId/history')
   @ApiOperation({ summary: 'Status, placement, reporting and contract history in one response' })
   @ApiOkResponse({ description: 'Every period of every timeline, oldest first.' })
-  public async read(@Param('employmentId') employmentId: string): Promise<unknown> {
+  public async read(@Param('employmentId', ParseUUIDPipe) employmentId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadEmploymentHistory>({
         queryName: 'employment.read-history',

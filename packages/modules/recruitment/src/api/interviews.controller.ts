@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -48,7 +48,9 @@ export class InterviewsController {
   @Get('applications/:applicationId/interviews')
   @ApiOperation({ summary: 'The interviews arranged for an application' })
   @ApiOkResponse({ description: 'Panels are employment identifiers, never names.' })
-  public async list(@Param('applicationId') applicationId: string): Promise<unknown> {
+  public async list(
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadInterviews>({
         queryName: 'recruitment.read-interviews',
@@ -63,7 +65,9 @@ export class InterviewsController {
     description:
       'Not aggregated: whether three fours beat one five is a hiring policy, not something this module invents.',
   })
-  public async feedback(@Param('interviewId') interviewId: string): Promise<unknown> {
+  public async feedback(
+    @Param('interviewId', ParseUUIDPipe) interviewId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadFeedback>({
         queryName: 'recruitment.read-feedback',
@@ -87,7 +91,7 @@ export class InterviewsController {
   @Post('interviews/:interviewId/schedule')
   @ApiOperation({ summary: 'Move an interview to another time' })
   public async reschedule(
-    @Param('interviewId') interviewId: string,
+    @Param('interviewId', ParseUUIDPipe) interviewId: string,
     @Body() body: RescheduleInterviewBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -102,7 +106,7 @@ export class InterviewsController {
   @Post('interviews/:interviewId/conclusion')
   @ApiOperation({ summary: 'It happened, nobody came, or it was called off' })
   public async conclude(
-    @Param('interviewId') interviewId: string,
+    @Param('interviewId', ParseUUIDPipe) interviewId: string,
     @Body() body: ConcludeInterviewBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -120,7 +124,7 @@ export class InterviewsController {
     description: 'Not on the panel, or a verdict from this interviewer already exists.',
   })
   public async submitFeedback(
-    @Param('interviewId') interviewId: string,
+    @Param('interviewId', ParseUUIDPipe) interviewId: string,
     @Body() body: SubmitFeedbackBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -35,7 +35,7 @@ export class EmploymentLinkController {
   @ApiOperation({ summary: 'Attach a job to a member. Concurrent employment is supported' })
   @ApiOkResponse({ description: 'The employment link.' })
   public async linkEmployment(
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
     @Body() body: LinkEmploymentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -53,7 +53,7 @@ export class EmploymentLinkController {
   @ApiOkResponse({ description: 'The promoted link.' })
   @ApiUnprocessableEntityResponse({ description: 'The link is detached, or already primary.' })
   public async makePrimary(
-    @Param('linkId') linkId: string,
+    @Param('linkId', ParseUUIDPipe) linkId: string,
     @Body() body: ReasonedChangeBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -69,7 +69,7 @@ export class EmploymentLinkController {
   @ApiOperation({ summary: 'Detach a job. The person is untouched' })
   @ApiOkResponse({ description: 'The detached link.' })
   public async unlinkEmployment(
-    @Param('linkId') linkId: string,
+    @Param('linkId', ParseUUIDPipe) linkId: string,
     @Body() body: ReasonedChangeBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

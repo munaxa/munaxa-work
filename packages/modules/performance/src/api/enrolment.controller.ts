@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { EnrolParticipantsCommand } from '../application/enrolment.use-case.js';
@@ -38,7 +38,7 @@ export class PerformanceEnrolmentController {
       'enrolled is skipped rather than duplicated.',
   })
   public async enrol(
-    @Param('cycleId') cycleId: string,
+    @Param('cycleId', ParseUUIDPipe) cycleId: string,
     @Body() body: EnrolParticipantsBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

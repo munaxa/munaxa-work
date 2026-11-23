@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -79,7 +79,9 @@ export class IssuedLetterController {
       'A March certificate still reads March salary after April raise, because nothing re-reads a ' +
       'source after issue.',
   })
-  public async read(@Param('issuedLetterId') issuedLetterId: string): Promise<unknown> {
+  public async read(
+    @Param('issuedLetterId', ParseUUIDPipe) issuedLetterId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadIssuedLetter>({
         queryName: 'letters.read-issued',

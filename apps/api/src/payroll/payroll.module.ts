@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import {
+  PayrollAdjustmentController,
   PayrollConfigurationController,
   PayrollDecisionController,
   PayrollDispatcher,
@@ -37,6 +38,7 @@ import { IdentityModule } from '../identity/identity.module.js';
     PayrollConfigurationController,
     PayrollResultController,
     PayrollDecisionController,
+    PayrollAdjustmentController,
     PayrollRunController,
   ],
   providers: [
