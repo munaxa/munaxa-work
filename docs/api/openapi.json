@@ -6342,7 +6342,7 @@
     },
     "/api/v1/payroll/runs/{payrollRunId}/adjustment-reasons": {
       "get": {
-        "operationId": "PayrollDecisionController_adjustmentReasons_v1",
+        "operationId": "PayrollAdjustmentController_adjustmentReasons_v1",
         "parameters": [
           { "name": "payrollRunId", "required": true, "in": "path", "schema": { "type": "string" } }
         ],
@@ -6358,7 +6358,7 @@
     },
     "/api/v1/payroll/runs/{payrollRunId}/adjustments": {
       "get": {
-        "operationId": "PayrollDecisionController_adjustments_v1",
+        "operationId": "PayrollAdjustmentController_adjustments_v1",
         "parameters": [
           { "name": "payrollRunId", "required": true, "in": "path", "schema": { "type": "string" } }
         ],
@@ -6520,7 +6520,7 @@
     },
     "/api/v1/payroll/runs/adjustments": {
       "post": {
-        "operationId": "PayrollDecisionController_adjust_v1",
+        "operationId": "PayrollAdjustmentController_adjust_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
