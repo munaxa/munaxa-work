@@ -28,17 +28,20 @@ export const middleware = (request: NextRequest): NextResponse => {
 
   if (decision.kind === 'pass') {
     const passing = NextResponse.next();
-    if (decision.clearAttempt === true) passing.cookies.delete(REFRESH_ATTEMPT_COOKIE);
+    // Cleared with the attributes it was set with: `cookies.delete` sends a bare cookie (no
+    // `Secure`, `HttpOnly` or `SameSite`), which a browser may refuse to let replace this one.
+    if (decision.clearAttempt === true)
+      passing.cookies.set(REFRESH_ATTEMPT_COOKIE, '', { ...PORTAL_COOKIE, maxAge: 0 });
     return passing;
   }
 
-  // A relative `Location`, deliberately: behind the load balancer the request URL this process
-  // sees is not the public origin, and an absolute redirect built from it would leave the origin
-  // the session cookies belong to. Browsers resolve a relative `Location` against the page.
-  const response = new NextResponse(null, {
-    status: 307,
-    headers: { location: decision.location, 'cache-control': 'no-store' },
-  });
+  // An absolute URL on the request's own origin: Next's middleware adapter parses `Location` with
+  // `new URL()` and no base, so a relative one throws and every lapsed visit becomes a 500. Next
+  // then sends a same-host redirect relative again, so behind the load balancer (where this
+  // process sees `localhost`) the browser still stays on the public origin its cookies belong to.
+  // `decision.location` is always a path of this portal, built from `safeReturnTo`.
+  const response = NextResponse.redirect(new URL(decision.location, request.nextUrl), 307);
+  response.headers.set('cache-control', 'no-store');
   response.cookies.set(REFRESH_ATTEMPT_COOKIE, '1', {
     ...PORTAL_COOKIE,
     maxAge: REFRESH_ATTEMPT_SECONDS,

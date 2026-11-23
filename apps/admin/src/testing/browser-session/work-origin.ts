@@ -2,18 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { NextRequest } from 'next/server';
+
+import { middleware } from '../../middleware';
+
 import {
   IDENTITY_REFRESH_PATH,
   PLATFORM_SESSION_COOKIE,
-  REFRESH_ATTEMPT_COOKIE,
   REFRESH_PAGE,
   TENANT_PAGE,
   TENANT_SELECTION_COOKIE,
   chosenTenant,
   refreshAndReturn,
-  refreshAttemptHeader,
   safeReturnTo,
-  sessionDecision,
   tenantSelectionHeader,
 } from '../../shell/session-continuity';
 
@@ -21,10 +22,12 @@ import {
  * One origin, as `work.test.munaxa.com` is one origin: the Admin portal's session decisions and a
  * stand-in Identity behind `/api/auth/*`, exactly as the load balancer routes them.
  *
- * The portal half runs the production decisions — `sessionDecision`, `safeReturnTo`,
- * `chosenTenant`, the cookie attributes — and serves `refreshAndReturn` to the browser from its own
- * source, so the browser executes the code the refresh page runs. What it does not run is Next
- * itself; the routing around those decisions is a few lines below.
+ * The portal half runs the production code: every portal request goes through the real
+ * `middleware` from `src/middleware.ts` (called with a `NextRequest`, its `NextResponse` written
+ * back as is), the pages use `safeReturnTo`, `chosenTenant` and the cookie attributes, and the
+ * refresh page serves `refreshAndReturn` to the browser from its own source, so the browser executes
+ * the code the refresh page runs. What it does not run is the rest of Next; the page rendering
+ * around those pieces is a few lines below.
  *
  * Identity is reduced to its cookie contract (munaxa-identity `apps/api/src/auth/cookies.ts`): an
  * access token in `__Host-mx_session` on `/`, a rotating refresh token in `__Secure-mx_refresh`
@@ -103,8 +106,12 @@ class Origin implements WorkOrigin {
     return this.refreshCount;
   }
 
+  /**
+   * Starts at the real clock and runs faster, never behind it: the real middleware judges a token
+   * against `Date.now()`, so a token issued in simulated time is in date for it until it lapses.
+   */
   public simulatedNow(): number {
-    return Date.UTC(2026, 10, 23, 9) + (Date.now() - this.started) * SCALE;
+    return this.started + (Date.now() - this.started) * SCALE;
   }
 
   public revokeEverything(): void {
@@ -139,12 +146,13 @@ class Origin implements WorkOrigin {
       },
       [`POST ${TENANT_PAGE}`]: () => this.chooseTenant(request, response),
     };
+    if (!url.pathname.startsWith('/api/') && !this.passesMiddleware(request, url, response)) return;
     const handler = routes[route];
     if (handler !== undefined) {
       await handler();
       return;
     }
-    this.page(request, url, response);
+    this.page(request, response);
   }
 
   /** Identity: issue an access token and a refresh token, as sign-in and refresh both do. */
@@ -225,25 +233,31 @@ refreshAndReturn(${scriptJson(plan)}, {
     return { signedIn, tenant: signedIn ? tenant : '' };
   }
 
-  /** Any portal page: the middleware's decision first, then what the page would show. */
-  private page(request: IncomingMessage, url: URL, response: ServerResponse): void {
-    const jar = cookiesOf(request);
-    const decision = sessionDecision({
-      method: request.method ?? 'GET',
-      pathname: url.pathname,
-      search: url.search,
-      accessToken: jar.get(PLATFORM_SESSION_COOKIE),
-      attempted: jar.has(REFRESH_ATTEMPT_COOKIE),
-      nowMs: this.simulatedNow(),
-    });
-    if (decision.kind === 'refresh') {
-      response
-        .writeHead(307, { location: decision.location, 'set-cookie': refreshAttemptHeader(true) })
-        .end();
-      return;
+  /**
+   * Runs the real Admin middleware. Answers false when it ended the request (a redirect), true when
+   * the request continues, with any cookie the middleware set carried on the eventual response.
+   */
+  private passesMiddleware(request: IncomingMessage, url: URL, response: ServerResponse): boolean {
+    const headers = new Headers();
+    if (request.headers.cookie !== undefined) headers.set('cookie', request.headers.cookie);
+    const outcome = middleware(new NextRequest(url, { method: request.method ?? 'GET', headers }));
+    const cookies = outcome.headers.getSetCookie();
+    if (outcome.headers.get('x-middleware-next') === '1') {
+      if (cookies.length > 0) response.setHeader('set-cookie', cookies);
+      return true;
     }
-    if (decision.clearAttempt === true)
-      response.setHeader('set-cookie', refreshAttemptHeader(false));
+    response
+      .writeHead(outcome.status, {
+        location: outcome.headers.get('location') ?? '',
+        'cache-control': outcome.headers.get('cache-control') ?? '',
+        'set-cookie': cookies,
+      })
+      .end();
+    return false;
+  }
+
+  /** Any portal page, once the middleware has let it through: what the page would show. */
+  private page(request: IncomingMessage, response: ServerResponse): void {
     const { signedIn, tenant } = this.resolved(request);
     html(
       response,

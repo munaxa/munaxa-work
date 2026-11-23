@@ -243,7 +243,3 @@ export const tenantSelectionHeader = (tenantId: string | undefined): string =>
   tenantId === undefined
     ? `${TENANT_SELECTION_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`
     : `${TENANT_SELECTION_COOKIE}=${tenantId}; Path=/; Max-Age=${TENANT_SELECTION_SECONDS}; Secure; HttpOnly; SameSite=Lax`;
-
-/** A `Set-Cookie` value for the refresh-attempt marker, or one that clears it. */
-export const refreshAttemptHeader = (set: boolean): string =>
-  `${REFRESH_ATTEMPT_COOKIE}=${set ? '1' : ''}; Path=/; Max-Age=${set ? REFRESH_ATTEMPT_SECONDS : 0}; Secure; HttpOnly; SameSite=Lax`;
