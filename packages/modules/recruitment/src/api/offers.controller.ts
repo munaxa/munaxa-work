@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -62,7 +62,7 @@ export class OffersController {
   @Post(':offerId/submission')
   @ApiOperation({ summary: 'Submit the offer for internal decision' })
   public async submit(
-    @Param('offerId') offerId: string,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -78,7 +78,7 @@ export class OffersController {
   @ApiOperation({ summary: 'Approve or reject. Requires recruitment.offer.approve' })
   @ApiOkResponse({ description: 'The decision is recorded against the authenticated human.' })
   public async decide(
-    @Param('offerId') offerId: string,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
     @Body() body: DecideOfferBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -97,7 +97,7 @@ export class OffersController {
       'Another version is already live. Two open offers is two answers to which terms bind.',
   })
   public async issue(
-    @Param('offerId') offerId: string,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
     @Body() body: IssueOfferBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -116,7 +116,7 @@ export class OffersController {
       'An acceptance moves nothing else on its own: the hire is a separate, separately permissioned act.',
   })
   public async respond(
-    @Param('offerId') offerId: string,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
     @Body() body: OfferResponseBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -131,7 +131,7 @@ export class OffersController {
   @Post(':offerId/closure')
   @ApiOperation({ summary: 'Withdraw an offer, or record that it expired' })
   public async close(
-    @Param('offerId') offerId: string,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
     @Body() body: CloseOfferBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

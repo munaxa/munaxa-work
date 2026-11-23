@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiForbiddenResponse,
@@ -72,7 +72,9 @@ export class MembersController {
   @ApiOperation({ summary: 'Everything about one member' })
   @ApiOkResponse({ description: 'Membership, profile, preferences, portals, jobs, delegations.' })
   @ApiNotFoundResponse({ description: 'No such membership in this tenant.' })
-  public async describe(@Param('membershipId') membershipId: string): Promise<MemberDescription> {
+  public async describe(
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
+  ): Promise<MemberDescription> {
     return unwrapOrThrow(
       await this.dispatcher.ask<MemberDescription, DescribeMember>({
         queryName: 'identity.describe-member',
@@ -100,7 +102,7 @@ export class MembersController {
   @ApiOkResponse({ description: 'The membership’s new state.' })
   @ApiUnprocessableEntityResponse({ description: 'The transition is not permitted from here.' })
   public async change(
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
     @Body() body: ChangeMembershipBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

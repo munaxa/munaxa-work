@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -42,7 +42,7 @@ export class DocumentAccessController {
       'version; a second is refused.',
   })
   public async verify(
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
     @Body() body: VerifyBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -62,7 +62,7 @@ export class DocumentAccessController {
       'the retention code is opaque and is never interpreted here.',
   })
   public async legalHold(
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
     @Body() body: LegalHoldBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -83,7 +83,7 @@ export class DocumentAccessController {
       'assume a URL. The attempt is recorded either way.',
   })
   public async authorizeDownload(
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
     @Body() body: AuthorizeDownloadBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

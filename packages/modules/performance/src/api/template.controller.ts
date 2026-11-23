@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -61,7 +61,7 @@ export class PerformanceTemplateController {
   @Post(':templateId/retirement')
   @ApiOperation({ summary: 'Retire a template. Cycles already running are unaffected' })
   public async retire(
-    @Param('templateId') templateId: string,
+    @Param('templateId', ParseUUIDPipe) templateId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

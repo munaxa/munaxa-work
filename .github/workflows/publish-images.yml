@@ -10,7 +10,8 @@
 # **Dispatch only, not push- or tag-triggered.** Publishing is a decision about a specific validated
 # commit, not something every push should do. `image/**` tags are the ECR release tags
 # (publish-images-ecr.yml), so this workflow no longer listens to them; dispatch it from main and
-# name the commit to build.
+# name the commit to build. The commit must be on main with a green CI run for that exact commit
+# (the `source` job, .github/scripts/require-green-ci.mjs), or nothing is built or pushed.
 
 name: Publish images
 
@@ -31,12 +32,56 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
+  # MW-009: the commit is resolved to a full SHA and must have green CI (a completed, successful
+  # run of ci.yml on a push to main for exactly this commit) before anything is built or pushed.
+  # Same gate as publish-images-ecr.yml; any API error refuses (fail closed).
+  source:
+    name: Resolve the commit and require green CI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # the CI gate reads this repository's workflow runs, nothing else
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ inputs.commit || github.sha }}
+
+      - name: Resolve the full commit SHA
+        id: resolve
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$' || { echo "::error::cannot resolve a commit SHA"; exit 1; }
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$sha" origin/main || { echo "::error::$sha is not on main"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+
+      - name: Test the CI gate (offline)
+        run: node --test .github/scripts/require-green-ci.test.mjs
+
+      - name: Require green CI for this commit
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/require-green-ci.mjs "$SHA"
+
   publish:
     name: ${{ matrix.image }}
+    needs: source
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false # one image failing should not hide the other's result
       matrix:
@@ -52,7 +97,7 @@ jobs:
           # The commit to build, which is deliberately not tied to where this workflow file lives:
           # `.github/` is in .dockerignore, so a commit that only adds this workflow produces a
           # byte-identical image to the commit it was added on top of.
-          ref: ${{ inputs.commit || github.sha }}
+          ref: ${{ needs.source.outputs.sha }}
 
       - name: Record what is being built
         id: source

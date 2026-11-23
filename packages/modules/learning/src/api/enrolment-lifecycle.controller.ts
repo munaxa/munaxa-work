@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -39,7 +39,7 @@ export class LearningEnrolmentLifecycleController {
   @Post(':enrolmentId/start')
   @ApiOperation({ summary: 'Record that somebody began' })
   public async start(
-    @Param('enrolmentId') enrolmentId: string,
+    @Param('enrolmentId', ParseUUIDPipe) enrolmentId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -54,7 +54,7 @@ export class LearningEnrolmentLifecycleController {
   @Post(':enrolmentId/completion')
   @ApiOperation({ summary: 'Record that somebody finished, on the day they finished' })
   public async complete(
-    @Param('enrolmentId') enrolmentId: string,
+    @Param('enrolmentId', ParseUUIDPipe) enrolmentId: string,
     @Body() body: CompleteEnrolmentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -71,7 +71,7 @@ export class LearningEnrolmentLifecycleController {
   @Post(':enrolmentId/failure')
   @ApiOperation({ summary: 'End an enrolment unsuccessfully. Not a completion' })
   public async fail(
-    @Param('enrolmentId') enrolmentId: string,
+    @Param('enrolmentId', ParseUUIDPipe) enrolmentId: string,
     @Body() body: EndEnrolmentBody,
   ): Promise<unknown> {
     return this.end('learning.fail-enrolment', enrolmentId, body);
@@ -80,7 +80,7 @@ export class LearningEnrolmentLifecycleController {
   @Post(':enrolmentId/withdrawal')
   @ApiOperation({ summary: 'Take somebody off a course. Not a failure and not a completion' })
   public async withdraw(
-    @Param('enrolmentId') enrolmentId: string,
+    @Param('enrolmentId', ParseUUIDPipe) enrolmentId: string,
     @Body() body: EndEnrolmentBody,
   ): Promise<unknown> {
     return this.end('learning.withdraw-enrolment', enrolmentId, body);

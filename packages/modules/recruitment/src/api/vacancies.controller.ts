@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -52,7 +52,7 @@ export class VacanciesController {
   @Get(':vacancyId/pipeline')
   @ApiOperation({ summary: 'The pipeline board: counts per status' })
   @ApiOkResponse({ description: 'Counted in the database rather than by loading applications.' })
-  public async pipeline(@Param('vacancyId') vacancyId: string): Promise<unknown> {
+  public async pipeline(@Param('vacancyId', ParseUUIDPipe) vacancyId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadPipeline>({
         queryName: 'recruitment.read-pipeline',
@@ -79,7 +79,7 @@ export class VacanciesController {
   @Post(':vacancyId/publication')
   @ApiOperation({ summary: 'Publish. Requires recruitment.vacancy.publish' })
   public async publish(
-    @Param('vacancyId') vacancyId: string,
+    @Param('vacancyId', ParseUUIDPipe) vacancyId: string,
     @Body() body: PublishVacancyBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -94,7 +94,7 @@ export class VacanciesController {
   @Post(':vacancyId/closure')
   @ApiOperation({ summary: 'Close a vacancy' })
   public async close(
-    @Param('vacancyId') vacancyId: string,
+    @Param('vacancyId', ParseUUIDPipe) vacancyId: string,
     @Body() body: CloseVacancyBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

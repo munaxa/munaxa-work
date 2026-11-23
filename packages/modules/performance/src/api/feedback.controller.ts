@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -57,7 +57,7 @@ export class PerformanceFeedbackController {
   @ApiOperation({ summary: 'Withdraw feedback. Every word of it is kept' })
   @ApiOkResponse({ description: 'A trigger refuses a delete and refuses a content change.' })
   public async withdraw(
-    @Param('feedbackId') feedbackId: string,
+    @Param('feedbackId', ParseUUIDPipe) feedbackId: string,
     @Body() body: WithdrawFeedbackBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
