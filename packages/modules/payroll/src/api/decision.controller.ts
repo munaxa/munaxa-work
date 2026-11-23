@@ -9,19 +9,15 @@ import type {
   FinalizeRunCommand,
   ReverseRunCommand,
 } from '../application/finalization.use-case.js';
-import type { RecordAdjustmentCommand } from '../application/adjustment.use-case.js';
-import type {
-  ListAdjustmentReasons,
-  ListAdjustments,
-  ReadApprovalChain,
-} from '../application/run-queries.js';
+import type { ReadApprovalChain } from '../application/run-queries.js';
 
-import { AdjustmentBody, DecisionBody, ReversalBody } from './payroll.dto.js';
+import { DecisionBody, ReversalBody } from './payroll.dto.js';
 import { PayrollDispatcher } from './payroll-dispatcher.js';
 import { unwrapOrThrow } from './handler-result.js';
 
 /**
- * The decisions somebody makes about a run: approve, reverse an approval, finalize, reverse, adjust.
+ * The decisions somebody makes about a run: approve, reverse an approval, finalize, reverse. Adjusting
+ * is in `adjustment.controller.ts`.
  *
  * Four permissions, deliberately separate. `payroll.approve` accepts responsibility for what a
  * workforce is about to be paid; `payroll.finalize` is the stronger one that makes it immutable;
@@ -109,46 +105,6 @@ export class PayrollDecisionController {
       await this.dispatcher.send<unknown, ReverseRunCommand>({
         commandName: 'payroll.reverse-run',
         payrollRunId,
-        ...body,
-      }),
-    );
-  }
-
-  @Get(':payrollRunId/adjustments')
-  @ApiOperation({ summary: 'The adjustments on a run, without their reasons' })
-  public async adjustments(
-    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
-  ): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.ask<unknown, ListAdjustments>({
-        queryName: 'payroll.adjustments',
-        payrollRunId,
-      }),
-    );
-  }
-
-  @Get(':payrollRunId/adjustment-reasons')
-  @ApiOperation({ summary: 'The same adjustments **with** their reasons' })
-  @ApiOkResponse({
-    description: 'Behind `payroll.adjust`: reading a figure is not reading the reason behind it.',
-  })
-  public async adjustmentReasons(
-    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
-  ): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.ask<unknown, ListAdjustmentReasons>({
-        queryName: 'payroll.adjustment-reasons',
-        payrollRunId,
-      }),
-    );
-  }
-
-  @Post('adjustments')
-  @ApiOperation({ summary: 'Record an adjustment, with the sentence explaining why' })
-  public async adjust(@Body() body: AdjustmentBody): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.send<unknown, RecordAdjustmentCommand>({
-        commandName: 'payroll.record-adjustment',
         ...body,
       }),
     );
