@@ -121,41 +121,68 @@ describe('findForbiddenScripts', () => {
     assert.equal(scripts({ b: 'pnpm --filter @work/api exec prisma db push' }).length, 1);
   });
 
-  it('refuses an unguarded reset and accepts a guarded one', () => {
-    assert.equal(scripts({ r: 'prisma migrate reset --schema s' }).length, 1);
-    assert.equal(
-      scripts({ r: 'prisma migrate reset && node scripts/db-reset-guard.mjs' }).length,
-      1,
-    );
+  const guard = 'node scripts/db-reset-guard.mjs';
+  const reset =
+    'pnpm --filter @work/api exec prisma migrate reset --schema ../../prisma/schema.prisma';
+
+  it('accepts the root db:reset exactly as committed', () => {
+    const root = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    assert.equal(root.scripts['db:reset'], `${guard} && ${reset}`);
+    assert.deepEqual(findForbiddenScripts('package.json', root), []);
+  });
+
+  it('accepts the allowed reset form with harmless flags', () => {
+    assert.deepEqual(scripts({ r: `${guard} && prisma migrate reset` }), []);
     assert.deepEqual(
-      scripts({ r: 'node scripts/db-reset-guard.mjs && prisma migrate reset --schema s' }),
+      scripts({ r: `${guard} && prisma migrate reset --schema prisma/schema.prisma --skip-seed` }),
       [],
     );
   });
 
-  it('refuses a guard whose refusal another operator can bypass', () => {
-    const guard = 'node scripts/db-reset-guard.mjs';
-    const reset = 'pnpm --filter @work/api exec prisma migrate reset --schema s';
+  it('refuses an unguarded reset and a guard that runs after it', () => {
+    assert.equal(scripts({ r: 'prisma migrate reset --schema s' }).length, 1);
+    assert.equal(scripts({ r: `${reset} && ${guard}` }).length, 1);
+  });
+
+  it('refuses every way to run a reset the guard refused', () => {
     for (const command of [
       `${guard} || true && ${reset}`,
+      `true || ${guard} && ${reset}`,
       `${guard}; ${reset}`,
-      `${guard} ; true && ${reset}`,
       `${guard} & ${reset}`,
       `${guard} | cat && ${reset}`,
-      `true || ${guard} && ${reset}`,
-      `${guard} && true || ${reset}`,
       `${guard}\n${reset}`,
       `${guard} && $(${reset})`,
+      `${guard} && \`${reset}\``,
       `echo ${guard} && ${reset}`,
+      // A second reset after the first: only the first used to be checked.
+      `${guard} && ${reset} || ${reset}`,
+      `${guard} && echo migrate reset; ${reset}`,
+      `${guard} && ${reset} || exit 1`,
+      `${guard} && ${reset}; true`,
+      // Changing what the reset connects to or where it runs after the guard approved.
+      `${guard} && DATABASE_URL=postgresql://db.example.com/work ${reset}`,
+      `${guard} && env DATABASE_URL=postgresql://db.example.com/work ${reset}`,
+      `${guard} && cd apps/api && prisma migrate reset`,
+      `cd apps/api && ${guard} && prisma migrate reset`,
+      // Quoting and escaping that a shell reads as the same command.
+      `${guard} && prisma migrate 'reset'`,
+      `${guard} && prisma migrate "reset"`,
+      `${guard} && prisma migrate re\\set`,
+      `prisma 'migrate' re''set`,
+      // Flags beyond the harmless ones, and the other commands.
+      `${guard} && ${reset} --force`,
+      `${guard} && ${reset} --schema=../../elsewhere.prisma --url postgresql://db`,
+      `${guard} && prisma migrate dev --name x`,
+      `${guard} && prisma migrate 'd'ev`,
     ]) {
       assert.equal(scripts({ r: command }).length, 1, command);
     }
   });
 
-  it('accepts a guarded reset with a further && step and a trailing ||', () => {
-    const guard = 'node scripts/db-reset-guard.mjs';
-    assert.deepEqual(scripts({ r: `${guard} && echo resetting && prisma migrate reset` }), []);
-    assert.deepEqual(scripts({ r: `${guard} && prisma migrate reset || exit 1` }), []);
+  it('refuses db push however it is quoted', () => {
+    assert.equal(scripts({ p: "prisma db 'push'" }).length, 1);
+    assert.equal(scripts({ p: 'prisma db pu\\sh --accept-data-loss' }).length, 1);
   });
 
   it('accepts migrate deploy and a manifest with no scripts', () => {

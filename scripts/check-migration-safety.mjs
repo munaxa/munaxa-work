@@ -33,7 +33,6 @@ import { fileURLToPath } from 'node:url';
 export const MIGRATIONS_DIR = 'prisma/migrations';
 const MIGRATION_NAME = /^\d{14}_[a-z0-9]+(_[a-z0-9]+)*$/;
 const RESET_GUARD = 'scripts/db-reset-guard.mjs';
-const GUARDED_PREFIX = /(^|&&)\s*node\s+scripts\/db-reset-guard\.mjs\s*&&/;
 
 /** One comment line naming a schema step, as `prisma migrate dev` writes before every statement. */
 const PRISMA_STEP_MARKER = /^--\s+(Create|Alter|Drop|Rename|Add|Redefine)[A-Z][A-Za-z]*\s*$/m;
@@ -108,29 +107,35 @@ export function judgeMigrationChanges(changes, baseMigrations) {
   return { errors, warnings, added };
 }
 
+/**
+ * The one shape a script that resets the database may take: the guard, `&&`, then the reset with
+ * an optional schema path and harmless flags, and nothing else. An allow-list rather than a list
+ * of bypasses, because a shell offers too many ways (`||`, `;`, `&`, a newline, a substitution, an
+ * environment assignment, a `cd`, quoting, escaping) to run a reset the guard refused.
+ */
+const ALLOWED_RESET =
+  /^node scripts\/db-reset-guard\.mjs && (pnpm --filter @work\/api exec )?prisma migrate reset( --schema [A-Za-z0-9_./-]+)?( --(skip-seed|skip-generate))*$/;
+
+/** What a shell would make of quoting and escaping, for detection only: `'re'\set` reads `reset`. */
+const unquoted = (command) => command.replace(/['"\\]/g, '').toLowerCase();
+
 /** Package scripts that would let Prisma write the database model instead of the SQL. */
 export function findForbiddenScripts(manifestPath, manifest) {
   const errors = [];
   for (const [name, command] of Object.entries(manifest.scripts ?? {})) {
     const where = `${manifestPath} script "${name}"`;
-    if (/\bmigrate\s+dev\b/.test(command)) {
-      errors.push(`${where} runs \`prisma migrate dev\`; migrations are hand-written SQL.`);
-    }
-    if (/\bdb\s+push\b/.test(command)) {
+    const plain = unquoted(command);
+    if (/db\s*push/.test(plain)) {
       errors.push(`${where} runs \`prisma db push\`; it rewrites the schema without a migration.`);
+      continue;
     }
-    const reset = command.search(/\bmigrate\s+reset\b/);
-    if (reset !== -1) {
-      // Everything before the reset must be a plain `&&` chain that runs the guard: any `||`,
-      // `;`, `|`, lone `&`, newline or substitution could run the reset after the guard refused.
-      const head = command.slice(0, reset);
-      const chained = !/[;|\n`]|\$\(|(?<!&)&(?!&)/.test(head);
-      const guarded = GUARDED_PREFIX.test(head);
-      if (!chained || !guarded) {
-        errors.push(
-          `${where} runs \`prisma migrate reset\` without \`node ${RESET_GUARD} &&\` first, in a plain && chain.`,
-        );
-      }
+    if (!/migrate/.test(plain) || !/reset|push|dev/.test(plain)) continue;
+    if (!ALLOWED_RESET.test(command)) {
+      errors.push(
+        `${where} can run \`prisma migrate dev\`, \`push\` or \`reset\` outside the one allowed ` +
+          `form: \`node ${RESET_GUARD} && [pnpm --filter @work/api exec ]prisma migrate reset ` +
+          '[--schema <path>] [--skip-seed] [--skip-generate]`, with nothing before or after it.',
+      );
     }
   }
   return errors;
