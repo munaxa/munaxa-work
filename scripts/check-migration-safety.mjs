@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 export const MIGRATIONS_DIR = 'prisma/migrations';
 const MIGRATION_NAME = /^\d{14}_[a-z0-9]+(_[a-z0-9]+)*$/;
 const RESET_GUARD = 'scripts/db-reset-guard.mjs';
+const GUARDED_PREFIX = /(^|&&)\s*node\s+scripts\/db-reset-guard\.mjs\s*&&/;
 
 /** One comment line naming a schema step, as `prisma migrate dev` writes before every statement. */
 const PRISMA_STEP_MARKER = /^--\s+(Create|Alter|Drop|Rename|Add|Redefine)[A-Z][A-Za-z]*\s*$/m;
@@ -120,10 +121,14 @@ export function findForbiddenScripts(manifestPath, manifest) {
     }
     const reset = command.search(/\bmigrate\s+reset\b/);
     if (reset !== -1) {
-      const guard = command.indexOf(RESET_GUARD);
-      if (guard === -1 || guard > reset || !/&&/.test(command.slice(guard, reset))) {
+      // Everything before the reset must be a plain `&&` chain that runs the guard: any `||`,
+      // `;`, `|`, lone `&`, newline or substitution could run the reset after the guard refused.
+      const head = command.slice(0, reset);
+      const chained = !/[;|\n`]|\$\(|(?<!&)&(?!&)/.test(head);
+      const guarded = GUARDED_PREFIX.test(head);
+      if (!chained || !guarded) {
         errors.push(
-          `${where} runs \`prisma migrate reset\` without \`node ${RESET_GUARD} &&\` first.`,
+          `${where} runs \`prisma migrate reset\` without \`node ${RESET_GUARD} &&\` first, in a plain && chain.`,
         );
       }
     }
@@ -133,21 +138,32 @@ export function findForbiddenScripts(manifestPath, manifest) {
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
 
+/**
+ * The refs to take the base from. A base the caller named (CI passes the pull request's base SHA)
+ * is the only candidate: if it cannot be resolved the gate fails rather than quietly comparing
+ * with something else. Only when none is named (or git reports the all-zero SHA of a new ref) is
+ * `origin/main` used.
+ */
+export function baseCandidates(named) {
+  const value = (named ?? '').trim();
+  return value === '' || /^0+$/.test(value) ? ['origin/main'] : [value];
+}
+
 function resolveBase() {
-  const candidates = [process.env.MIGRATION_BASE_REF, 'origin/main'].filter(
-    (ref) => ref && !/^0+$/.test(ref),
-  );
-  for (const ref of candidates) {
-    try {
-      return git('merge-base', ref, 'HEAD').trim();
-    } catch {
-      // Not in this clone; try the next candidate.
-    }
+  const [ref] = baseCandidates(process.env.MIGRATION_BASE_REF);
+  try {
+    return execFileSync('git', ['merge-base', ref, 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    process.stderr.write(
+      `::error::Migration safety cannot resolve the base ${ref} in this clone, so it refuses ` +
+        'rather than compare with anything else. Check out with full history (fetch-depth: 0) ' +
+        'or set MIGRATION_BASE_REF to a ref the clone has.\n',
+    );
+    process.exit(1);
   }
-  throw new Error(
-    `no base to compare against (tried ${candidates.join(', ') || 'nothing'}). ` +
-      'Check out with full history (fetch-depth: 0) or set MIGRATION_BASE_REF.',
-  );
 }
 
 function packageManifests() {

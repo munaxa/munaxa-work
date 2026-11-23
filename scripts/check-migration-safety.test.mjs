@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
+  baseCandidates,
   findForbiddenScripts,
   findGeneratedSignals,
   judgeMigrationChanges,
@@ -132,8 +133,46 @@ describe('findForbiddenScripts', () => {
     );
   });
 
+  it('refuses a guard whose refusal another operator can bypass', () => {
+    const guard = 'node scripts/db-reset-guard.mjs';
+    const reset = 'pnpm --filter @work/api exec prisma migrate reset --schema s';
+    for (const command of [
+      `${guard} || true && ${reset}`,
+      `${guard}; ${reset}`,
+      `${guard} ; true && ${reset}`,
+      `${guard} & ${reset}`,
+      `${guard} | cat && ${reset}`,
+      `true || ${guard} && ${reset}`,
+      `${guard} && true || ${reset}`,
+      `${guard}\n${reset}`,
+      `${guard} && $(${reset})`,
+      `echo ${guard} && ${reset}`,
+    ]) {
+      assert.equal(scripts({ r: command }).length, 1, command);
+    }
+  });
+
+  it('accepts a guarded reset with a further && step and a trailing ||', () => {
+    const guard = 'node scripts/db-reset-guard.mjs';
+    assert.deepEqual(scripts({ r: `${guard} && echo resetting && prisma migrate reset` }), []);
+    assert.deepEqual(scripts({ r: `${guard} && prisma migrate reset || exit 1` }), []);
+  });
+
   it('accepts migrate deploy and a manifest with no scripts', () => {
     assert.deepEqual(scripts({ m: 'prisma migrate deploy --schema s' }), []);
     assert.deepEqual(findForbiddenScripts('package.json', {}), []);
+  });
+});
+
+describe('baseCandidates', () => {
+  it('uses only the named base, so an unresolvable one fails instead of falling back', () => {
+    assert.deepEqual(baseCandidates('8a975f682406'), ['8a975f682406']);
+    assert.deepEqual(baseCandidates(' origin/release '), ['origin/release']);
+  });
+
+  it('falls back to origin/main only when no base is named', () => {
+    assert.deepEqual(baseCandidates(undefined), ['origin/main']);
+    assert.deepEqual(baseCandidates(''), ['origin/main']);
+    assert.deepEqual(baseCandidates('0000000000000000000000000000000000000000'), ['origin/main']);
   });
 });
