@@ -111,7 +111,11 @@ describe('the payroll preparer and approver personas', () => {
       .expect(201);
 
     // The preparer still cannot reverse what was finalized.
-    await request(http).post(`/api/v1/payroll/runs/${runId}/reversal`).send({}).expect(403);
+    // A valid request, so the refusal is the grant's and not the body's.
+    await request(http)
+      .post(`/api/v1/payroll/runs/${runId}/reversal`)
+      .send({ reasonCode: 'incorrect-input' })
+      .expect(403);
   });
 
   it('refuse the approver every preparation route', async () => {
