@@ -1,0 +1,651 @@
+# Munaxa Work API: manual testing collection for workflows A to J (MW-004)
+#
+# Format: VS Code "REST Client" (humao.rest-client); JetBrains HTTP Client reads the same requests.
+# Run the requests of a workflow top to bottom: later requests read ids from earlier named
+# responses ({{name.response.body.$.field}}). Routes and bodies follow docs/api/openapi.json and
+# the DTOs in packages/modules/*/src/api at 8a975f6.
+#
+# No secret is stored here. The access token comes from the environment of the editor:
+#   export WORK_ACCESS_TOKEN="$(cat ~/work-token)"   # the __Host-mx_session cookie value
+# and WORK_BASE_URL is e.g. https://work.<testing domain>. A caller who belongs to several Work
+# tenants adds the header `X-Munaxa-Tenant: <tenant id>` to each request; a caller with one
+# membership leaves it out (an empty header is refused as "not a member").
+#
+# A state change carries "expectedVersion": the record's current `version` (1 for a record just
+# created; read it with the matching GET when a step has moved it on). A stale one answers 409.
+#
+# All data below is synthetic: codes start with syn-, e-mails are at example.test, names are
+# spelling-alphabet words. Codes are fixed, so a repeated create answers 409; change the suffix to
+# run a workflow twice. tooling/testing-data/load-synthetic.mjs loads a full dataset idempotently.
+
+@baseUrl = {{$processEnv WORK_BASE_URL}}
+@api = {{baseUrl}}/api/v1
+@token = {{$processEnv WORK_ACCESS_TOKEN}}
+@from = 2026-01-01
+
+### Readiness (public; on the Testing host /health/* is not routed to the API)
+GET {{baseUrl}}/health/ready
+
+########################################################################################
+# A. Organization setup
+########################################################################################
+
+### A1 Define the company level
+# @name unitTypeCompany
+POST {{api}}/organization/unit-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-company", "name": { "en": "Manual company", "ar": "شركة يدوية" }, "ordinal": 1, "allowedAtRoot": true, "carriesLegalEntity": true }
+
+### A2 Define the department level
+# @name unitTypeDepartment
+POST {{api}}/organization/unit-types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-department", "name": { "en": "Manual department", "ar": "قسم يدوي" }, "ordinal": 2, "allowedParentCodes": ["syn-m-company"], "allowedAtRoot": false }
+
+### A3 Create the company unit
+# @name company
+POST {{api}}/organization/units
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "unitTypeId": "{{unitTypeCompany.response.body.$.unitTypeId}}", "code": "syn-m-co", "name": { "en": "Manual Testing Co", "ar": "شركة الاختبار اليدوي" }, "effectiveFrom": "{{from}}" }
+
+### A4 Place it at the root
+POST {{api}}/organization/units/{{company.response.body.$.unitId}}/placement
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "effectiveFrom": "{{from}}" }
+
+### A5 Register its legal entity (country and currency)
+# @name legalEntity
+POST {{api}}/organization/units/{{company.response.body.$.unitId}}/legal-entity
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "countryCode": "JO", "registeredName": { "en": "Manual Testing Co LLC", "ar": "شركة الاختبار اليدوي ذ.م.م" }, "registrationNumber": "SYN-M-REG-1", "currencyCode": "JOD", "effectiveFrom": "{{from}}" }
+
+### A6 Create a department
+# @name department
+POST {{api}}/organization/units
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "unitTypeId": "{{unitTypeDepartment.response.body.$.unitTypeId}}", "code": "syn-m-dept", "name": { "en": "Manual department", "ar": "قسم يدوي" }, "effectiveFrom": "{{from}}" }
+
+### A7 Place it under the company
+POST {{api}}/organization/units/{{department.response.body.$.unitId}}/placement
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "parentUnitId": "{{company.response.body.$.unitId}}", "effectiveFrom": "{{from}}" }
+
+### A8 Define a position
+# @name position
+POST {{api}}/organization/positions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-analyst", "title": { "en": "Analyst", "ar": "محلل" }, "effectiveFrom": "{{from}}" }
+
+### A9 Budget it in the department (establishment)
+POST {{api}}/organization/establishment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "positionId": "{{position.response.body.$.positionId}}", "unitId": "{{department.response.body.$.unitId}}", "budgetedHeadcount": 5, "effectiveFrom": "{{from}}" }
+
+### A10 Calendar: Sunday to Thursday (ISO weekdays: 1 = Monday, 7 = Sunday)
+# @name calendar
+POST {{api}}/organization/calendars
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-calendar", "name": { "en": "Manual calendar", "ar": "تقويم يدوي" }, "timeZone": "Asia/Amman", "workingDays": [7, 1, 2, 3, 4], "effectiveFrom": "{{from}}" }
+
+### A11 Read the structure
+GET {{api}}/organization/hierarchy
+Authorization: Bearer {{token}}
+
+### A12 Legal entities
+GET {{api}}/organization/legal-entities
+Authorization: Bearer {{token}}
+
+########################################################################################
+# B. Employee lifecycle
+########################################################################################
+
+### B1 Create a person (duplicate detection runs first; 409 person_may_already_exist)
+# @name person
+POST {{api}}/people
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "personNumber": "syn-m-p-001", "legalName": { "en": "Mike Manualtest", "ar": "مايك اختبار-يدوي" }, "dateOfBirth": "1991-03-03", "effectiveFrom": "{{from}}" }
+
+### B2 Work e-mail
+POST {{api}}/people/{{person.response.body.$.personId}}/contacts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "channel": "email", "purpose": "work", "value": "mike.manualtest@example.test", "isPrimary": true, "effectiveFrom": "{{from}}" }
+
+### B3 An obviously synthetic identifier (never a real national number)
+POST {{api}}/people/{{person.response.body.$.personId}}/identifiers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "identifierType": "synthetic-test-id", "value": "SYN-ID-0000001", "isPrimary": true }
+
+### B4 Profile
+GET {{api}}/people/{{person.response.body.$.personId}}/profile
+Authorization: Bearer {{token}}
+
+### B5 Employment
+# @name employment
+POST {{api}}/employments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "personId": "{{person.response.body.$.personId}}", "externalEmployeeNumber": "SYN-M-E-001", "employmentTypeCode": "permanent", "startDate": "2026-02-01" }
+
+### B6 Assignment to the department and position
+POST {{api}}/employments/{{employment.response.body.$.employmentId}}/assignments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "unitId": "{{department.response.body.$.unitId}}", "positionId": "{{position.response.body.$.positionId}}", "assignmentType": "primary", "fte": 1, "effectiveFrom": "2026-02-01" }
+
+### B7 Contract
+POST {{api}}/employments/{{employment.response.body.$.employmentId}}/contracts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "contractTypeCode": "indefinite", "startDate": "2026-02-01", "probationEndDate": "2026-04-30", "noticePeriodDays": 30 }
+
+### B8 Employment with history
+GET {{api}}/employments/{{employment.response.body.$.employmentId}}
+Authorization: Bearer {{token}}
+
+### B9 End the employment (termination)
+POST {{api}}/employments/{{employment.response.body.$.employmentId}}/end
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "endDate": "2026-12-31", "endReasonCode": "resignation", "expectedVersion": 1 }
+
+########################################################################################
+# C. Recruitment (requisition -> vacancy -> candidate -> application -> interview -> offer -> hire)
+########################################################################################
+
+### C1 Requisition (requestedByEmploymentId: an employment of the requester)
+# @name requisition
+POST {{api}}/recruitment/requisitions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "positionId": "{{position.response.body.$.positionId}}", "unitId": "{{department.response.body.$.unitId}}", "headcountRequested": 1, "reasonCode": "new-role", "requestedByEmploymentId": "{{employment.response.body.$.employmentId}}" }
+
+### C2 Submit it for approval (routed through Workflow; see I)
+POST {{api}}/recruitment/requisitions/{{requisition.response.body.$.requisitionId}}/submission
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### C3 Open the requisition once approved in I2 (expectedVersion: its current version, from GET)
+POST {{api}}/recruitment/requisitions/{{requisition.response.body.$.requisitionId}}/opening
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 3 }
+
+### C4 Vacancy
+# @name vacancy
+POST {{api}}/recruitment/vacancies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "requisitionId": "{{requisition.response.body.$.requisitionId}}", "title": { "en": "Analyst", "ar": "محلل" } }
+
+### C5 Publish the vacancy
+POST {{api}}/recruitment/vacancies/{{vacancy.response.body.$.vacancyId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "channels": ["internal"], "expectedVersion": 1 }
+
+### C6 Candidate (a candidate is not a person until hired)
+# @name candidate
+POST {{api}}/recruitment/candidates
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "displayName": { "en": "Lima Synthetic", "ar": "ليما تجريبي" }, "email": "lima.synthetic@example.test", "sourceCode": "referral" }
+
+### C7 Application
+# @name application
+POST {{api}}/recruitment/applications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "candidateId": "{{candidate.response.body.$.candidateId}}", "vacancyId": "{{vacancy.response.body.$.vacancyId}}", "sourceCode": "referral" }
+
+### C8 Move through the pipeline
+POST {{api}}/recruitment/applications/{{application.response.body.$.applicationId}}/stage
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "interviewing", "expectedVersion": 1 }
+
+### C9 Interview
+# @name interview
+POST {{api}}/recruitment/interviews
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "applicationId": "{{application.response.body.$.applicationId}}", "roundNumber": 1, "modeCode": "video", "interviewerEmploymentIds": ["{{employment.response.body.$.employmentId}}"] }
+
+### C10 Feedback
+POST {{api}}/recruitment/interviews/{{interview.response.body.$.interviewId}}/feedback
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "interviewerEmploymentId": "{{employment.response.body.$.employmentId}}", "score": 4, "recommendation": "yes" }
+
+### C11 Offer
+# @name offer
+POST {{api}}/recruitment/offers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "applicationId": "{{application.response.body.$.applicationId}}", "proposedStartDate": "2026-03-01", "proposedEmploymentTypeCode": "permanent", "currencyCode": "JOD" }
+
+### C12 Candidate accepts (after submission, decision and issue on /offers/{id}/...)
+POST {{api}}/recruitment/offers/{{offer.response.body.$.offerId}}/response
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "response": "accepted", "expectedVersion": 4 }
+
+### C13 Hire: creates the Person and the Employment
+POST {{api}}/recruitment/applications/{{application.response.body.$.applicationId}}/hire
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "startDate": "2026-03-01", "employmentTypeCode": "permanent", "expectedVersion": 1 }
+
+########################################################################################
+# D. Onboarding (started by command, not by the hire)
+########################################################################################
+
+### D1 Plan
+# @name onboardingPlan
+POST {{api}}/onboarding/plans
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-onboarding", "name": { "en": "Manual onboarding", "ar": "تهيئة يدوية" } }
+
+### D2 Read the plan (its draft version id)
+GET {{api}}/onboarding/plans/{{onboardingPlan.response.body.$.planId}}
+Authorization: Bearer {{token}}
+
+### D3 Task template on the draft version (set planVersionId from D2)
+@planVersionId = paste-the-draft-version-id
+POST {{api}}/onboarding/plan-versions/{{planVersionId}}/templates
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-welcome", "sequence": 1, "title": { "en": "Read the welcome pack", "ar": "اقرأ حزمة الترحيب" }, "kind": "acknowledgement", "ownerKind": "employee", "required": true }
+
+### D4 Publish the version
+POST {{api}}/onboarding/plan-versions/{{planVersionId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### D5 Start onboarding for an employment
+POST {{api}}/onboarding/onboardings
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "employmentId": "{{employment.response.body.$.employmentId}}", "planId": "{{onboardingPlan.response.body.$.planId}}", "plannedStartOn": "2026-02-01" }
+
+### D6 Tasks
+GET {{api}}/onboarding/tasks
+Authorization: Bearer {{token}}
+
+### D7 Complete a task (an employee completes their own with onboarding.task.complete-own)
+@taskId = paste-a-task-id
+POST {{api}}/onboarding/tasks/{{taskId}}/completion
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "note": "Done." }
+
+########################################################################################
+# E. Attendance
+########################################################################################
+
+### E1 Policy
+POST {{api}}/attendance/policies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-attendance", "name": { "en": "Manual attendance", "ar": "حضور يدوي" }, "effectiveFrom": "{{from}}", "lateToleranceMinutes": 10 }
+
+### E2 Shift
+# @name shift
+POST {{api}}/attendance/shifts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-shift", "name": { "en": "Manual day shift", "ar": "وردية يدوية" }, "kind": "fixed", "startLocal": "08:00", "endLocal": "16:00" }
+
+### E3 Work segment (a shift publishes only with one)
+POST {{api}}/attendance/shifts/{{shift.response.body.$.shiftId}}/segments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "sequence": 1, "kind": "work", "startLocal": "08:00", "endLocal": "16:00", "paid": true }
+
+### E4 Publish the shift
+POST {{api}}/attendance/shifts/{{shift.response.body.$.shiftId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### E5 Schedule (one week, day 0 is the anchor Sunday)
+# @name schedule
+POST {{api}}/attendance/schedules
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-week", "name": { "en": "Manual week", "ar": "أسبوع يدوي" }, "zone": "Asia/Amman", "cycleLengthDays": 7, "cycleAnchorDate": "2026-01-04" }
+
+### E6 Place the shift on day 0 (repeat for 1 to 4)
+POST {{api}}/attendance/schedules/{{schedule.response.body.$.scheduleId}}/placements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "cyclePosition": 0, "shiftId": "{{shift.response.body.$.shiftId}}" }
+
+### E7 Publish the schedule
+POST {{api}}/attendance/schedules/{{schedule.response.body.$.scheduleId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### E8 Assign the schedule (an overlap is refused with 409)
+POST {{api}}/attendance/schedules/{{schedule.response.body.$.scheduleId}}/assignments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "employmentId": "{{employment.response.body.$.employmentId}}", "effectiveFrom": "2026-02-01" }
+
+### E9 Record a punch on behalf of the employee
+POST {{api}}/attendance/events
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "employmentId": "{{employment.response.body.$.employmentId}}", "kind": "clock_in", "source": "web", "idempotencyKey": "syn-m-punch-1" }
+
+### E10 Recalculate, then read days and exceptions
+POST {{api}}/attendance/recalculation
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "employmentId": "{{employment.response.body.$.employmentId}}" }
+
+### E11 Days
+GET {{api}}/attendance/days?employmentId={{employment.response.body.$.employmentId}}
+Authorization: Bearer {{token}}
+
+### E12 Freeze the payable snapshot Payroll reads
+POST {{api}}/attendance/periods/freeze
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "periodStart": "2026-02-01", "periodEnd": "2026-02-28", "employmentId": "{{employment.response.body.$.employmentId}}" }
+
+########################################################################################
+# F. Leave
+########################################################################################
+
+### F1 Leave type
+# @name leaveType
+POST {{api}}/leave/types
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-annual", "name": { "en": "Manual annual leave", "ar": "إجازة سنوية يدوية" }, "unit": "days", "paidTreatmentCode": "full-pay" }
+
+### F2 Publish the type
+POST {{api}}/leave/types/{{leaveType.response.body.$.leaveTypeId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### F3 Policy (every limit is inert unless set)
+# @name leavePolicy
+POST {{api}}/leave/policies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "leaveTypeId": "{{leaveType.response.body.$.leaveTypeId}}", "code": "syn-m-annual-policy", "name": { "en": "Manual annual policy", "ar": "سياسة سنوية يدوية" }, "effectiveFrom": "{{from}}", "approvalsRequired": 1 }
+
+### F4 Publish the policy (assignment of a draft is refused)
+POST {{api}}/leave/policies/{{leavePolicy.response.body.$.leavePolicyId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### F5 Assign it tenant-wide
+POST {{api}}/leave/policies/{{leavePolicy.response.body.$.leavePolicyId}}/assignments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "scope": "tenant", "effectiveFrom": "{{from}}" }
+
+### F6 Entitlement: 14 days of 8 hours, in minutes
+POST {{api}}/leave/entitlements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "employmentId": "{{employment.response.body.$.employmentId}}", "leaveTypeId": "{{leaveType.response.body.$.leaveTypeId}}", "onDate": "{{from}}", "grantedMinutes": 6720, "source": "opening" }
+
+### F7 Request on behalf of the employee (the dates must include working days of the employee)
+# @name leaveRequest
+POST {{api}}/leave/requests
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "employmentId": "{{employment.response.body.$.employmentId}}", "leaveTypeId": "{{leaveType.response.body.$.leaveTypeId}}", "fromDate": "2026-03-08", "toDate": "2026-03-09" }
+
+### F8 Submit
+POST {{api}}/leave/requests/{{leaveRequest.response.body.$.leaveRequestId}}/submission
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### F9 Decide: a different person than the requester (self-approval is refused)
+POST {{api}}/leave/requests/{{leaveRequest.response.body.$.leaveRequestId}}/decision
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "decision": "approved", "comment": "Approved in manual testing.", "expectedVersion": 2 }
+
+### F10 Balance
+GET {{api}}/leave/balances?employmentId={{employment.response.body.$.employmentId}}
+Authorization: Bearer {{token}}
+
+########################################################################################
+# G. Compensation
+########################################################################################
+
+### G1 Base salary component
+# @name component
+POST {{api}}/compensation/components
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-base", "name": { "en": "Manual base salary", "ar": "راتب أساسي يدوي" }, "kind": "base", "calculationBasis": "fixed_amount", "roundingMode": "half-up", "recurrence": "recurring", "payrollTreatmentCode": "basic-salary", "proratable": true }
+
+### G2 Publish it
+POST {{api}}/compensation/components/{{component.response.body.$.componentId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### G3 Plan in JOD (exponent 3: amounts are in fils)
+# @name plan
+POST {{api}}/compensation/plans
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "code": "syn-m-plan", "name": { "en": "Manual plan", "ar": "خطة يدوية" }, "defaultCurrencyCode": "JOD", "defaultCurrencyExponent": 3 }
+
+### G4 Permit the component on the draft plan
+POST {{api}}/compensation/plans/{{plan.response.body.$.compensationPlanId}}/components
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "componentId": "{{component.response.body.$.componentId}}", "mandatory": true }
+
+### G5 Publish, then assign tenant-wide
+POST {{api}}/compensation/plans/{{plan.response.body.$.compensationPlanId}}/publication
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "expectedVersion": 1 }
+
+### G6 Assign the plan
+POST {{api}}/compensation/plans/{{plan.response.body.$.compensationPlanId}}/assignments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "scope": "tenant", "effectiveFrom": "{{from}}" }
+
+### G7 Recurring base salary: 650.000 JOD a month (an overlap is refused; with two tenant-wide
+# plans in force, e.g. after load-synthetic.mjs, Compensation answers plan_assignment_ambiguous)
+POST {{api}}/compensation/recurring
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "employmentId": "{{employment.response.body.$.employmentId}}", "componentId": "{{component.response.body.$.componentId}}", "amount": { "amountMinor": "650000", "currencyCode": "JOD", "currencyExponent": 3 }, "effectiveFrom": "2026-02-01" }
+
+### G8 What Payroll will read for the employment
+GET {{api}}/compensation/employments/{{employment.response.body.$.employmentId}}
+Authorization: Bearer {{token}}
+
+########################################################################################
+# H. Payroll
+########################################################################################
+
+### H1 Group (see the MW-004 report: the calculation reads legalEntityId as a unit id)
+# @name payrollGroup
+POST {{api}}/payroll/groups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "legalEntityId": "{{legalEntity.response.body.$.legalEntityId}}", "code": "syn-m-monthly", "name": { "en": "Manual monthly", "ar": "شهري يدوي" }, "payFrequency": "monthly", "permittedCurrencies": [{ "code": "JOD", "exponent": 3 }], "prorationBasis": "calendar_days", "roundingMode": "half-up", "paysSuspended": false, "expenseAccount": "syn-6100", "deductionAccount": "syn-2300", "payableAccount": "syn-2100", "paymentMethodCode": "bank-transfer" }
+
+### H2 Tenant-defined deduction
+POST {{api}}/payroll/deduction-definitions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "payrollGroupId": "{{payrollGroup.response.body.$.payrollGroupId}}", "code": "syn-m-savings", "name": { "en": "Manual savings", "ar": "ادخار يدوي" }, "deductionSource": "voluntary", "payrollTreatmentCode": "voluntary-savings", "basis": "fixed_amount", "fixedAmount": { "amountMinor": "10000", "currencyCode": "JOD", "currencyExponent": 3 }, "roundingMode": "half-up", "priority": 100 }
+
+### H3 Period
+# @name payrollPeriod
+POST {{api}}/payroll/periods
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "payrollGroupId": "{{payrollGroup.response.body.$.payrollGroupId}}", "code": "syn-m-2026-02", "periodStart": "2026-02-01", "periodEnd": "2026-02-28", "paymentDate": "2026-02-25" }
+
+### H4 Open it
+POST {{api}}/payroll/periods/{{payrollPeriod.response.body.$.payrollPeriodId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "status": "open", "expectedVersion": 1 }
+
+### H5 Calculate (resumable; repeat while "complete" is false)
+# @name payrollRun
+POST {{api}}/payroll/runs/calculation
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "payrollPeriodId": "{{payrollPeriod.response.body.$.payrollPeriodId}}" }
+
+### H6 Results and exceptions
+GET {{api}}/payroll/runs/{{payrollRun.response.body.$.payrollRunId}}
+Authorization: Bearer {{token}}
+
+### H7 Approve: as the payroll approver persona, never the preparer
+POST {{api}}/payroll/runs/{{payrollRun.response.body.$.payrollRunId}}/approval
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "comment": "Approved in manual testing." }
+
+### H8 Finalize (immutable afterwards)
+POST {{api}}/payroll/runs/{{payrollRun.response.body.$.payrollRunId}}/finalization
+Authorization: Bearer {{token}}
+
+########################################################################################
+# I. Approvals (Workflow engine: recruitment requisitions)
+########################################################################################
+
+### I1 My pending approvals
+GET {{api}}/workflow/approvals/pending
+Authorization: Bearer {{token}}
+
+### I2 Decide a step (instanceId from I1)
+@instanceId = paste-an-instance-id
+POST {{api}}/workflow/approvals/{{instanceId}}/decision
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "decision": "approved", "comment": "Approved in manual testing." }
+
+### I3 Status of the instance
+GET {{api}}/workflow/approvals/{{instanceId}}/status
+Authorization: Bearer {{token}}
+
+### I4 Decided by me
+GET {{api}}/workflow/approvals/decided
+Authorization: Bearer {{token}}
+
+########################################################################################
+# J. Employee and manager self-service (API only; there is no portal screen)
+########################################################################################
+
+### J1 As the employee persona: my approval queue (workflow.approval.read-own)
+GET {{api}}/workflow/approvals/pending
+Authorization: Bearer {{token}}
+
+### J2 As the employee persona: complete my own onboarding task (onboarding.task.complete-own)
+POST {{api}}/onboarding/tasks/{{taskId}}/completion
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "note": "Completed by the employee." }
+
+### J3 As the employee persona: a read the persona lacks answers 403
+GET {{api}}/payroll/groups
+Authorization: Bearer {{token}}

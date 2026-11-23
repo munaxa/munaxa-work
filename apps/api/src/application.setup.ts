@@ -1,6 +1,6 @@
 import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import type { Environment } from '@work/config';
 
 import { ProblemDetailsFilter } from './errors/problem-details.filter.js';
@@ -34,9 +34,18 @@ export const configureApplication = (
   application.enableShutdownHooks();
 };
 
-/** Publishes OpenAPI at `<prefix>/docs`. Separate because a deployment may disable it. */
-export const configureOpenApi = (application: INestApplication, environment: Environment): void => {
-  const document = SwaggerModule.createDocument(
+/**
+ * Builds the OpenAPI document for an application that `configureApplication` has already set up.
+ *
+ * Shared by `configureOpenApi` and by `scripts/generate-openapi.mjs`, which writes the committed
+ * `docs/api/openapi.json` from the built application, so the published file and the served
+ * document cannot drift apart in how they are composed.
+ */
+export const createOpenApiDocument = (
+  application: INestApplication,
+  environment: Environment,
+): OpenAPIObject =>
+  SwaggerModule.createDocument(
     application,
     new DocumentBuilder()
       .setTitle('Munaxa Work API')
@@ -45,5 +54,11 @@ export const configureOpenApi = (application: INestApplication, environment: Env
       .build(),
   );
 
-  SwaggerModule.setup(`${environment.API_PREFIX}/docs`, application, document);
+/** Publishes OpenAPI at `<prefix>/docs`. Separate because a deployment may disable it. */
+export const configureOpenApi = (application: INestApplication, environment: Environment): void => {
+  SwaggerModule.setup(
+    `${environment.API_PREFIX}/docs`,
+    application,
+    createOpenApiDocument(application, environment),
+  );
 };
