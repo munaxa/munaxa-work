@@ -1,0 +1,35 @@
+# Offline tests of the release gate that both publish workflows run before any build or push
+# (.github/scripts/require-green-ci.mjs, MW-009). The publish workflows run the same tests again at
+# release time; this runs them on the pull requests that change the gate, so a broken gate is
+# caught before it is needed. Not a required check, so the path filter cannot leave a pull request
+# waiting on a check that never starts. No network, no dependencies, no credentials.
+
+name: Release gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/require-green-ci*.mjs'
+      - '.github/workflows/publish-images*.yml'
+      - '.github/workflows/release-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: CI gate tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+
+      - name: Test the CI gate
+        run: node --test .github/scripts/require-green-ci.test.mjs

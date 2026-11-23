@@ -107,25 +107,35 @@ export function judgeMigrationChanges(changes, baseMigrations) {
   return { errors, warnings, added };
 }
 
+/**
+ * The one shape a script that resets the database may take: the guard, `&&`, then the reset with
+ * an optional schema path and harmless flags, and nothing else. An allow-list rather than a list
+ * of bypasses, because a shell offers too many ways (`||`, `;`, `&`, a newline, a substitution, an
+ * environment assignment, a `cd`, quoting, escaping) to run a reset the guard refused.
+ */
+const ALLOWED_RESET =
+  /^node scripts\/db-reset-guard\.mjs && (pnpm --filter @work\/api exec )?prisma migrate reset( --schema [A-Za-z0-9_./-]+)?( --(skip-seed|skip-generate))*$/;
+
+/** What a shell would make of quoting and escaping, for detection only: `'re'\set` reads `reset`. */
+const unquoted = (command) => command.replace(/['"\\]/g, '').toLowerCase();
+
 /** Package scripts that would let Prisma write the database model instead of the SQL. */
 export function findForbiddenScripts(manifestPath, manifest) {
   const errors = [];
   for (const [name, command] of Object.entries(manifest.scripts ?? {})) {
     const where = `${manifestPath} script "${name}"`;
-    if (/\bmigrate\s+dev\b/.test(command)) {
-      errors.push(`${where} runs \`prisma migrate dev\`; migrations are hand-written SQL.`);
-    }
-    if (/\bdb\s+push\b/.test(command)) {
+    const plain = unquoted(command);
+    if (/db\s*push/.test(plain)) {
       errors.push(`${where} runs \`prisma db push\`; it rewrites the schema without a migration.`);
+      continue;
     }
-    const reset = command.search(/\bmigrate\s+reset\b/);
-    if (reset !== -1) {
-      const guard = command.indexOf(RESET_GUARD);
-      if (guard === -1 || guard > reset || !/&&/.test(command.slice(guard, reset))) {
-        errors.push(
-          `${where} runs \`prisma migrate reset\` without \`node ${RESET_GUARD} &&\` first.`,
-        );
-      }
+    if (!/migrate/.test(plain) || !/reset|push|dev/.test(plain)) continue;
+    if (!ALLOWED_RESET.test(command)) {
+      errors.push(
+        `${where} can run \`prisma migrate dev\`, \`push\` or \`reset\` outside the one allowed ` +
+          `form: \`node ${RESET_GUARD} && [pnpm --filter @work/api exec ]prisma migrate reset ` +
+          '[--schema <path>] [--skip-seed] [--skip-generate]`, with nothing before or after it.',
+      );
     }
   }
   return errors;
@@ -133,21 +143,32 @@ export function findForbiddenScripts(manifestPath, manifest) {
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
 
+/**
+ * The refs to take the base from. A base the caller named (CI passes the pull request's base SHA)
+ * is the only candidate: if it cannot be resolved the gate fails rather than quietly comparing
+ * with something else. Only when none is named (or git reports the all-zero SHA of a new ref) is
+ * `origin/main` used.
+ */
+export function baseCandidates(named) {
+  const value = (named ?? '').trim();
+  return value === '' || /^0+$/.test(value) ? ['origin/main'] : [value];
+}
+
 function resolveBase() {
-  const candidates = [process.env.MIGRATION_BASE_REF, 'origin/main'].filter(
-    (ref) => ref && !/^0+$/.test(ref),
-  );
-  for (const ref of candidates) {
-    try {
-      return git('merge-base', ref, 'HEAD').trim();
-    } catch {
-      // Not in this clone; try the next candidate.
-    }
+  const [ref] = baseCandidates(process.env.MIGRATION_BASE_REF);
+  try {
+    return execFileSync('git', ['merge-base', ref, 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    process.stderr.write(
+      `::error::Migration safety cannot resolve the base ${ref} in this clone, so it refuses ` +
+        'rather than compare with anything else. Check out with full history (fetch-depth: 0) ' +
+        'or set MIGRATION_BASE_REF to a ref the clone has.\n',
+    );
+    process.exit(1);
   }
-  throw new Error(
-    `no base to compare against (tried ${candidates.join(', ') || 'nothing'}). ` +
-      'Check out with full history (fetch-depth: 0) or set MIGRATION_BASE_REF.',
-  );
 }
 
 function packageManifests() {

@@ -14,6 +14,11 @@
 # environment and an image/* tag, and it may push only to this product's repositories. No registry
 # credential exists.
 #
+# **Green CI first.** The `source` job refuses the release unless the workflow "CI" (ci.yml) has a
+# completed, successful run on a push to `main` for exactly this commit
+# (.github/scripts/require-green-ci.mjs); nothing is built or pushed otherwise. Tag only after
+# main's CI run for the commit is green.
+#
 # **No `latest`.** Two immutable tags per image (`<short>`, `sha-<full>`) and the digest, which is
 # what the stack's tfvars name. Inert until the owner sets the repository variable
 # AWS_IMAGE_PUBLISHER_ROLE_ARN (munaxa-platform infra/aws/README.md, gate G2).
@@ -40,6 +45,9 @@ jobs:
   source:
     name: Resolve the source commit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # the CI gate below reads this repository's workflow runs, nothing else
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
       short: ${{ steps.resolve.outputs.short }}
@@ -73,6 +81,24 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA is not on main"; exit 1; }
+
+      # MW-009: CI must have passed for this exact commit before anything is built or pushed. The
+      # gate accepts only a completed, successful run of ci.yml triggered by a push to main whose
+      # head_sha is this commit, and the latest such run decides; pull_request runs never count.
+      # Any API error refuses the release (fail closed). The publish job needs this job, so a
+      # refusal here stops the release before the image-release environment is even requested.
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+
+      - name: Test the CI gate (offline)
+        run: node --test .github/scripts/require-green-ci.test.mjs
+
+      - name: Require green CI for this commit
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/require-green-ci.mjs "$SHA"
 
   publish:
     name: ${{ matrix.repository }}
