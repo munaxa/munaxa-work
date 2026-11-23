@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -9,19 +9,15 @@ import type {
   FinalizeRunCommand,
   ReverseRunCommand,
 } from '../application/finalization.use-case.js';
-import type { RecordAdjustmentCommand } from '../application/adjustment.use-case.js';
-import type {
-  ListAdjustmentReasons,
-  ListAdjustments,
-  ReadApprovalChain,
-} from '../application/run-queries.js';
+import type { ReadApprovalChain } from '../application/run-queries.js';
 
-import { AdjustmentBody, DecisionBody, ReversalBody } from './payroll.dto.js';
+import { DecisionBody, ReversalBody } from './payroll.dto.js';
 import { PayrollDispatcher } from './payroll-dispatcher.js';
 import { unwrapOrThrow } from './handler-result.js';
 
 /**
- * The decisions somebody makes about a run: approve, reverse an approval, finalize, reverse, adjust.
+ * The decisions somebody makes about a run: approve, reverse an approval, finalize, reverse. Adjusting
+ * is in `adjustment.controller.ts`.
  *
  * Four permissions, deliberately separate. `payroll.approve` accepts responsibility for what a
  * workforce is about to be paid; `payroll.finalize` is the stronger one that makes it immutable;
@@ -37,7 +33,9 @@ export class PayrollDecisionController {
 
   @Get(':payrollRunId/approval-chain')
   @ApiOperation({ summary: 'Who decided what, and what was reversed' })
-  public async approvalChain(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
+  public async approvalChain(
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadApprovalChain>({
         queryName: 'payroll.approval-chain',
@@ -53,7 +51,7 @@ export class PayrollDecisionController {
       'The approver comes from the authenticated context. Self-approval and a stale run are refused.',
   })
   public async approve(
-    @Param('payrollRunId') payrollRunId: string,
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
     @Body() body: DecisionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -68,7 +66,7 @@ export class PayrollDecisionController {
   @Post('approvals/:approvalDecisionId/reversal')
   @ApiOperation({ summary: 'Reverse an approval without erasing it' })
   public async reverseApproval(
-    @Param('approvalDecisionId') approvalDecisionId: string,
+    @Param('approvalDecisionId', ParseUUIDPipe) approvalDecisionId: string,
     @Body() body: DecisionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -86,7 +84,9 @@ export class PayrollDecisionController {
     description:
       'Prepared, not posted and not executed. After this no update path can change a figure.',
   })
-  public async finalize(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
+  public async finalize(
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.send<unknown, FinalizeRunCommand>({
         commandName: 'payroll.finalize',
@@ -98,49 +98,13 @@ export class PayrollDecisionController {
   @Post(':payrollRunId/reversal')
   @ApiOperation({ summary: 'Reverse a finalized run into a new run, preserving the original' })
   public async reverse(
-    @Param('payrollRunId') payrollRunId: string,
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
     @Body() body: ReversalBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.send<unknown, ReverseRunCommand>({
         commandName: 'payroll.reverse-run',
         payrollRunId,
-        ...body,
-      }),
-    );
-  }
-
-  @Get(':payrollRunId/adjustments')
-  @ApiOperation({ summary: 'The adjustments on a run, without their reasons' })
-  public async adjustments(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.ask<unknown, ListAdjustments>({
-        queryName: 'payroll.adjustments',
-        payrollRunId,
-      }),
-    );
-  }
-
-  @Get(':payrollRunId/adjustment-reasons')
-  @ApiOperation({ summary: 'The same adjustments **with** their reasons' })
-  @ApiOkResponse({
-    description: 'Behind `payroll.adjust`: reading a figure is not reading the reason behind it.',
-  })
-  public async adjustmentReasons(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.ask<unknown, ListAdjustmentReasons>({
-        queryName: 'payroll.adjustment-reasons',
-        payrollRunId,
-      }),
-    );
-  }
-
-  @Post('adjustments')
-  @ApiOperation({ summary: 'Record an adjustment, with the sentence explaining why' })
-  public async adjust(@Body() body: AdjustmentBody): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.send<unknown, RecordAdjustmentCommand>({
-        commandName: 'payroll.record-adjustment',
         ...body,
       }),
     );

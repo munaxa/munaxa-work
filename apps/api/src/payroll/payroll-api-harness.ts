@@ -7,6 +7,7 @@ import request from 'supertest';
 import { loadEnvironment } from '@work/config';
 import { Dispatcher, runInContext, uuidV7, type PermissionChecker } from '@work/kernel';
 import {
+  PayrollAdjustmentController,
   PayrollConfigurationController,
   PayrollDecisionController,
   PayrollDispatcher,
@@ -145,6 +146,7 @@ export const applicationWith = async (
       PayrollConfigurationController,
       PayrollResultController,
       PayrollDecisionController,
+      PayrollAdjustmentController,
       PayrollRunController,
     ],
     providers: [

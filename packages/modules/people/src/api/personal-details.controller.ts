@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -37,7 +37,7 @@ export class PersonalDetailsController {
   @ApiOperation({ summary: 'Record who to reach in an emergency. Priority 1 is called first' })
   @ApiOkResponse({ description: 'The emergency contact.' })
   public async recordEmergencyContact(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordEmergencyContactBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -63,7 +63,7 @@ export class PersonalDetailsController {
   })
   @ApiOkResponse({ description: 'The preference.' })
   public async recordPreference(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordPreferenceBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

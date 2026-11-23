@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -74,7 +74,7 @@ export class AttendanceScheduleController {
   @Post('schedules/:scheduleId/placements')
   @ApiOperation({ summary: 'Put a shift at a cycle position. A position left empty is a rest day' })
   public async placeShift(
-    @Param('scheduleId') scheduleId: string,
+    @Param('scheduleId', ParseUUIDPipe) scheduleId: string,
     @Body() body: PlaceShiftBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -89,7 +89,7 @@ export class AttendanceScheduleController {
   @Post('schedules/:scheduleId/publication')
   @ApiOperation({ summary: 'Freeze a schedule' })
   public async publishSchedule(
-    @Param('scheduleId') scheduleId: string,
+    @Param('scheduleId', ParseUUIDPipe) scheduleId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -105,7 +105,7 @@ export class AttendanceScheduleController {
   @ApiOperation({ summary: 'Put somebody on a schedule. Marks the days it now governs' })
   @ApiConflictResponse({ description: 'An assignment already in force covers that period.' })
   public async assign(
-    @Param('scheduleId') scheduleId: string,
+    @Param('scheduleId', ParseUUIDPipe) scheduleId: string,
     @Body() body: AssignScheduleBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -121,7 +121,7 @@ export class AttendanceScheduleController {
   @ApiOperation({ summary: 'Close an assignment, which is how somebody moves schedule' })
   @ApiConflictResponse({ description: 'That assignment already has an end date.' })
   public async endAssignment(
-    @Param('assignmentId') assignmentId: string,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
     @Body() body: EndAssignmentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

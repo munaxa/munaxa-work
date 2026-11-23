@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -64,7 +64,7 @@ export class LeavePolicyController {
   @Post(':leavePolicyId/publication')
   @ApiOperation({ summary: 'Freeze a policy version, so it may be assigned' })
   public async publish(
-    @Param('leavePolicyId') leavePolicyId: string,
+    @Param('leavePolicyId', ParseUUIDPipe) leavePolicyId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -79,7 +79,7 @@ export class LeavePolicyController {
   @Post(':leavePolicyId/assignments')
   @ApiOperation({ summary: 'Bind a published policy version to a scope, effective-dated' })
   public async assign(
-    @Param('leavePolicyId') leavePolicyId: string,
+    @Param('leavePolicyId', ParseUUIDPipe) leavePolicyId: string,
     @Body() body: AssignPolicyBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

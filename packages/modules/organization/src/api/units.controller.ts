@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -85,7 +85,7 @@ export class UnitsController {
   @ApiOperation({ summary: 'Rename a unit, in both languages' })
   @ApiOkResponse({ description: 'The renamed unit.' })
   public async renameUnit(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body() body: RenameUnitBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -103,7 +103,7 @@ export class UnitsController {
   @ApiOperation({ summary: 'Move a unit through its lifecycle. Closing never deletes it' })
   @ApiOkResponse({ description: 'The unit.' })
   public async changeStatus(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body() body: ChangeUnitStatusBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -121,7 +121,7 @@ export class UnitsController {
   @ApiOperation({ summary: 'Replace tenant-authored metadata. Stored, never interpreted' })
   @ApiOkResponse({ description: 'The unit.' })
   public async reviseMetadata(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body() body: ReviseMetadataBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

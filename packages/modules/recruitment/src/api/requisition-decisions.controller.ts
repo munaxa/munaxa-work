@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -45,7 +45,7 @@ export class RequisitionDecisionsController {
   @Post(':requisitionId/submission')
   @ApiOperation({ summary: 'Submit a draft requisition for decision' })
   public async submit(
-    @Param('requisitionId') requisitionId: string,
+    @Param('requisitionId', ParseUUIDPipe) requisitionId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -61,7 +61,7 @@ export class RequisitionDecisionsController {
   @ApiOperation({ summary: 'Approve or reject. Requires recruitment.requisition.approve' })
   @ApiOkResponse({ description: 'The decision is recorded against the authenticated human.' })
   public async decide(
-    @Param('requisitionId') requisitionId: string,
+    @Param('requisitionId', ParseUUIDPipe) requisitionId: string,
     @Body() body: DecideRequisitionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -76,7 +76,7 @@ export class RequisitionDecisionsController {
   @Post(':requisitionId/decision/reversal')
   @ApiOperation({ summary: 'Reverse the last decision. A new row, never an edit' })
   public async reverse(
-    @Param('requisitionId') requisitionId: string,
+    @Param('requisitionId', ParseUUIDPipe) requisitionId: string,
     @Body() body: ReverseDecisionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -91,7 +91,7 @@ export class RequisitionDecisionsController {
   @Post(':requisitionId/opening')
   @ApiOperation({ summary: 'Open an approved requisition for recruiting' })
   public async open(
-    @Param('requisitionId') requisitionId: string,
+    @Param('requisitionId', ParseUUIDPipe) requisitionId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -106,7 +106,7 @@ export class RequisitionDecisionsController {
   @Post(':requisitionId/closure')
   @ApiOperation({ summary: 'Close a requisition, or cancel it' })
   public async close(
-    @Param('requisitionId') requisitionId: string,
+    @Param('requisitionId', ParseUUIDPipe) requisitionId: string,
     @Body() body: CloseRequisitionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

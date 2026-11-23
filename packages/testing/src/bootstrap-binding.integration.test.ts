@@ -1,9 +1,12 @@
-import { execFile } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
-
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import {
+  BOOTSTRAP_ISSUER as ISSUER,
+  Organisations,
+  operatorArguments,
+  runBootstrap,
+} from './bootstrap.fixture.js';
 
 /**
  * The binding half of the bootstrap suite (ADR-0080), split from `bootstrap-tenant.integration.test.ts`
@@ -30,12 +33,8 @@ const PASSWORD = 'probe';
 const stamp = `b${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 const platformUser = (suffix: string): string => `bootstrap-test-${stamp}-${suffix}`;
 
-const run = promisify(execFile);
-
-const ISSUER = 'https://identity.bootstrap-test.invalid';
-const organisationOf = (platformUserId: string): string => `org-${platformUserId}`;
-
-const SCRIPT = fileURLToPath(new URL('../../../scripts/bootstrap-tenant.mjs', import.meta.url));
+const organisations = new Organisations();
+const organisationOf = (platformUserId: string): string => organisations.of(platformUserId);
 
 interface Membership {
   readonly tenant_id: string;
@@ -57,37 +56,9 @@ describeWithDatabase('pnpm db:bootstrap binds the tenant to its organisation (AD
   let applicationUrl: string;
 
   /** Runs the command exactly as an operator would, and reports both streams and the exit code. */
-  const bootstrap = async (
-    ...args: readonly string[]
-  ): Promise<{ readonly stdout: string; readonly stderr: string; readonly code: number }> => {
-    // Every run names an organisation unless the test is about leaving it out: one per person, so
-    // the one-organisation-one-tenant rule (ADR-0080) holds across the suite.
-    const userIndex = args.indexOf('--platform-user-id');
-    const withOrganisation =
-      userIndex === -1 ||
-      args.includes('--platform-tenant-id') ||
-      args.includes('--no-organisation')
-        ? args.filter((arg) => arg !== '--no-organisation')
-        : [...args, '--platform-tenant-id', organisationOf(args[userIndex + 1] ?? '')];
-    try {
-      const { stdout, stderr } = await run('node', [SCRIPT, ...withOrganisation], {
-        env: {
-          ...process.env,
-          NODE_ENV: 'test',
-          DATABASE_URL: applicationUrl,
-          PLATFORM_AUTH_ISSUER: ISSUER,
-        },
-      });
-      return { stdout, stderr, code: 0 };
-    } catch (error) {
-      const failure = error as { stdout?: string; stderr?: string; code?: number };
-      return {
-        stdout: failure.stdout ?? '',
-        stderr: failure.stderr ?? '',
-        code: failure.code ?? 1,
-      };
-    }
-  };
+  /** Runs the command exactly as an operator would, with the inputs the guard requires. */
+  const bootstrap = async (...args: readonly string[]) =>
+    runBootstrap(operatorArguments(args, organisations), applicationUrl);
 
   const membershipsOf = async (platformUserId: string): Promise<readonly Membership[]> => {
     const found = await admin.query<Membership>(
@@ -128,8 +99,8 @@ describeWithDatabase('pnpm db:bootstrap binds the tenant to its organisation (AD
     await application?.end();
     // Only this run's rows, named by the stamp: a suite that truncated the tables would take a
     // developer's own database with it.
-    await admin?.query('delete from tenant_platform_binding where platform_tenant_id like $1', [
-      `org-bootstrap-test-${stamp}-%`,
+    await admin?.query('delete from tenant_platform_binding where platform_tenant_id = any($1)', [
+      organisations.all(),
     ]);
     await admin?.query(
       `delete from tenant_membership m
@@ -207,7 +178,7 @@ describeWithDatabase('pnpm db:bootstrap binds the tenant to its organisation (AD
         '--platform-user-id',
         person,
         '--platform-tenant-id',
-        'org-bootstrap-test-hijack',
+        organisations.fresh(),
       );
 
       expect(result.code).toBe(1);
@@ -250,7 +221,7 @@ describeWithDatabase('pnpm db:bootstrap binds the tenant to its organisation (AD
         '--tenant-id',
         other,
         '--platform-tenant-id',
-        'org-bootstrap-test-y',
+        organisations.fresh(),
       );
 
       expect(result.code).toBe(1);

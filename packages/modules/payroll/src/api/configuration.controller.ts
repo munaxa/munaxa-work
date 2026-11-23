@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -131,7 +131,7 @@ export class PayrollConfigurationController {
   @Post('periods/:payrollPeriodId/status')
   @ApiOperation({ summary: 'Move a period through its lifecycle' })
   public async movePeriod(
-    @Param('payrollPeriodId') payrollPeriodId: string,
+    @Param('payrollPeriodId', ParseUUIDPipe) payrollPeriodId: string,
     @Body() body: MovePeriodBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

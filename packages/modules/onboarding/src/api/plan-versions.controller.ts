@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -50,7 +50,7 @@ export class PlanVersionsController {
   @ApiCreatedResponse({ description: 'The version identifier and its number.' })
   @ApiConflictResponse({ description: 'A draft already exists, or the plan is retired.' })
   public async draft(
-    @Param('planId') planId: string,
+    @Param('planId', ParseUUIDPipe) planId: string,
     @Body() body: DraftPlanVersionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -72,7 +72,7 @@ export class PlanVersionsController {
     description: 'The owner and its kind disagree, or a document task names no document type.',
   })
   public async defineTemplate(
-    @Param('planVersionId') planVersionId: string,
+    @Param('planVersionId', ParseUUIDPipe) planVersionId: string,
     @Body() body: DefineTaskTemplateBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -88,7 +88,7 @@ export class PlanVersionsController {
   @ApiOperation({ summary: 'Remove a template from a draft version. Soft — the row is kept' })
   @ApiConflictResponse({ description: 'The version is published.' })
   public async removeTemplate(
-    @Param('planVersionId') planVersionId: string,
+    @Param('planVersionId', ParseUUIDPipe) planVersionId: string,
     @Param('code') code: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -107,7 +107,7 @@ export class PlanVersionsController {
       'The version holds no templates. An empty checklist produces onboardings that complete the moment they begin.',
   })
   public async publish(
-    @Param('planVersionId') planVersionId: string,
+    @Param('planVersionId', ParseUUIDPipe) planVersionId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

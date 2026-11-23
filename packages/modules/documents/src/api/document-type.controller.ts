@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -54,7 +54,7 @@ export class DocumentTypeController {
   @Post(':documentTypeId')
   @ApiOperation({ summary: 'Amend a type. Its code and permitted owners are not editable' })
   public async amendType(
-    @Param('documentTypeId') documentTypeId: string,
+    @Param('documentTypeId', ParseUUIDPipe) documentTypeId: string,
     @Body() body: AmendTypeBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -56,7 +56,7 @@ export class EstablishmentController {
   @ApiOperation({ summary: 'Approve a line. A requisition is validated against the approved one' })
   @ApiOkResponse({ description: 'The approved line.' })
   public async approve(
-    @Param('establishmentId') establishmentId: string,
+    @Param('establishmentId', ParseUUIDPipe) establishmentId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -78,7 +78,7 @@ export class EstablishmentController {
   @ApiQuery({ name: 'asOf', required: false })
   @ApiOkResponse({ description: 'The posture per position.' })
   public async posture(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Query('asOf') asOf?: string,
   ): Promise<unknown> {
     return unwrapOrThrow(

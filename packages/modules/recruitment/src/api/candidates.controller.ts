@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -58,7 +58,7 @@ export class CandidatesController {
 
   @Get(':candidateId')
   @ApiOperation({ summary: 'One candidate, their profile and their applications' })
-  public async read(@Param('candidateId') candidateId: string): Promise<unknown> {
+  public async read(@Param('candidateId', ParseUUIDPipe) candidateId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadCandidate>({
         queryName: 'recruitment.read-candidate',
@@ -75,7 +75,7 @@ export class CandidatesController {
     description:
       'Nothing is linked by running this. The recruiter does not hold People’s read permission; the module holds it for the duration of the operation (ADR-0043).',
   })
-  public async matches(@Param('candidateId') candidateId: string): Promise<unknown> {
+  public async matches(@Param('candidateId', ParseUUIDPipe) candidateId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, MatchCandidateToPeople>({
         queryName: 'recruitment.match-candidate',
@@ -103,7 +103,7 @@ export class CandidatesController {
   @Post(':candidateId/amendment')
   @ApiOperation({ summary: 'Correct a candidate’s details' })
   public async amend(
-    @Param('candidateId') candidateId: string,
+    @Param('candidateId', ParseUUIDPipe) candidateId: string,
     @Body() body: AmendCandidateBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -46,7 +46,9 @@ export class RequisitionsController {
   @Get(':requisitionId')
   @ApiOperation({ summary: 'One requisition, its decisions and its vacancies' })
   @ApiOkResponse({ description: 'Including every decision, so an audit can follow the authority.' })
-  public async read(@Param('requisitionId') requisitionId: string): Promise<unknown> {
+  public async read(
+    @Param('requisitionId', ParseUUIDPipe) requisitionId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadRequisition>({
         queryName: 'recruitment.read-requisition',
