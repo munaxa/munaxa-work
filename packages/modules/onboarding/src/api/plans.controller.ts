@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -56,7 +56,7 @@ export class PlansController {
   @Get(':planId')
   @ApiOperation({ summary: 'One plan, its versions and the templates of each' })
   @ApiOkResponse({ description: 'The plan with its version history.' })
-  public async read(@Param('planId') planId: string): Promise<unknown> {
+  public async read(@Param('planId', ParseUUIDPipe) planId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadPlan>({ queryName: 'onboarding.read-plan', planId }),
     );
@@ -78,7 +78,7 @@ export class PlansController {
   @Post(':planId/amendment')
   @ApiOperation({ summary: "Correct a plan's own details. Cannot reach a running onboarding" })
   public async amend(
-    @Param('planId') planId: string,
+    @Param('planId', ParseUUIDPipe) planId: string,
     @Body() body: AmendPlanBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -93,7 +93,7 @@ export class PlansController {
   @Post(':planId/retirement')
   @ApiOperation({ summary: 'Retire a plan. Onboardings generated from it are untouched' })
   public async retire(
-    @Param('planId') planId: string,
+    @Param('planId', ParseUUIDPipe) planId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

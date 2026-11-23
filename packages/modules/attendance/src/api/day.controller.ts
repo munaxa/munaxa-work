@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -55,7 +55,7 @@ export class AttendanceDayController {
   @Post('days/:attendanceDayId/review')
   @ApiOperation({ summary: 'Take a day out of the automatic flow so a human is looking at it' })
   public async review(
-    @Param('attendanceDayId') attendanceDayId: string,
+    @Param('attendanceDayId', ParseUUIDPipe) attendanceDayId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -73,7 +73,7 @@ export class AttendanceDayController {
     description: 'A day whose clock-out never arrived has no defensible worked figure.',
   })
   public async approve(
-    @Param('attendanceDayId') attendanceDayId: string,
+    @Param('attendanceDayId', ParseUUIDPipe) attendanceDayId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -88,7 +88,7 @@ export class AttendanceDayController {
   @Post('exceptions/:exceptionId/resolution')
   @ApiOperation({ summary: 'Resolve or waive an exception. Neither deletes anything' })
   public async resolve(
-    @Param('exceptionId') exceptionId: string,
+    @Param('exceptionId', ParseUUIDPipe) exceptionId: string,
     @Body() body: ResolveExceptionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

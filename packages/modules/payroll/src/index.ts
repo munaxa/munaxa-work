@@ -92,4 +92,5 @@ export { PayrollDispatcher } from './api/payroll-dispatcher.js';
 export { PayrollConfigurationController } from './api/configuration.controller.js';
 export { PayrollRunController } from './api/run.controller.js';
 export { PayrollDecisionController } from './api/decision.controller.js';
+export { PayrollAdjustmentController } from './api/adjustment.controller.js';
 export { PayrollResultController } from './api/result.controller.js';

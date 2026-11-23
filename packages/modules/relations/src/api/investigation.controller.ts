@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -6,11 +6,7 @@ import type {
   OpenInvestigationCommand,
 } from '../application/investigation.use-case.js';
 import type { CorrectInvestigationCommand } from '../application/investigation-correction.use-case.js';
-import type {
-  ListInvestigations,
-  ReadCaseHistory,
-  ReadInvestigation,
-} from '../application/relations-queries.js';
+import type { ListInvestigations, ReadInvestigation } from '../application/relations-queries.js';
 
 import {
   ConcludeInvestigationBody,
@@ -71,7 +67,9 @@ export class InvestigationController {
 
   @Get(':investigationId')
   @ApiOperation({ summary: 'One inquiry. Reading it is recorded against your name' })
-  public async investigation(@Param('investigationId') investigationId: string): Promise<unknown> {
+  public async investigation(
+    @Param('investigationId', ParseUUIDPipe) investigationId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadInvestigation>({
         queryName: 'relations.read-investigation',
@@ -88,7 +86,7 @@ export class InvestigationController {
   @Post(':investigationId/conclusion')
   @ApiOperation({ summary: 'Conclude an inquiry with findings and a recommendation' })
   public async conclude(
-    @Param('investigationId') investigationId: string,
+    @Param('investigationId', ParseUUIDPipe) investigationId: string,
     @Body() body: ConcludeInvestigationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -110,7 +108,7 @@ export class InvestigationController {
   @ApiOperation({ summary: 'Correct a concluded inquiry by recording a new, linked one' })
   @ApiOkResponse({ description: 'The corrected inquiry is unchanged. Both accounts survive.' })
   public async correct(
-    @Param('investigationId') investigationId: string,
+    @Param('investigationId', ParseUUIDPipe) investigationId: string,
     @Body() body: CorrectInvestigationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -118,31 +116,6 @@ export class InvestigationController {
         commandName: 'relations.correct-investigation',
         investigationId,
         ...body,
-      }),
-    );
-  }
-}
-
-/**
- * A case's current state and every transition behind it.
- *
- * Its own controller because its path is the *violation's*, not an investigation's: a case is
- * identified by the matter it concerns, and the inquiries are things that happened to it.
- */
-@ApiTags('relations')
-@ApiForbiddenResponse({ description: 'The caller lacks the permission the operation requires.' })
-@Controller({ path: 'relations/cases', version: '1' })
-export class CaseHistoryController {
-  public constructor(private readonly dispatcher: RelationsDispatcher) {}
-
-  @Get(':violationId/history')
-  @ApiOperation({ summary: 'Where a case is, and every transition that got it there' })
-  @ApiOkResponse({ description: 'The current state is derived from the history, not stored.' })
-  public async history(@Param('violationId') violationId: string): Promise<unknown> {
-    return unwrapOrThrow(
-      await this.dispatcher.ask<unknown, ReadCaseHistory>({
-        queryName: 'relations.case-history',
-        violationId,
       }),
     );
   }

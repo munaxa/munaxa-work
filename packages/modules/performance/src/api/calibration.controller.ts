@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -69,7 +69,7 @@ export class PerformanceCalibrationController {
   @Post(':calibrationSessionId/status')
   @ApiOperation({ summary: 'Open a session. Concluding one has its own route' })
   public async move(
-    @Param('calibrationSessionId') calibrationSessionId: string,
+    @Param('calibrationSessionId', ParseUUIDPipe) calibrationSessionId: string,
     @Body() body: MoveCalibrationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -90,7 +90,7 @@ export class PerformanceCalibrationController {
       'refuses an update that would.',
   })
   public async decide(
-    @Param('calibrationSessionId') calibrationSessionId: string,
+    @Param('calibrationSessionId', ParseUUIDPipe) calibrationSessionId: string,
     @Body() body: RecordCalibrationDecisionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -105,7 +105,7 @@ export class PerformanceCalibrationController {
   @Post(':calibrationSessionId/conclusion')
   @ApiOperation({ summary: 'Conclude a session. A named human, never the auto-approver' })
   public async conclude(
-    @Param('calibrationSessionId') calibrationSessionId: string,
+    @Param('calibrationSessionId', ParseUUIDPipe) calibrationSessionId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

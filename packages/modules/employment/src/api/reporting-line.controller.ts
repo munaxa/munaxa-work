@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -37,7 +37,7 @@ export class ReportingLineController {
   @Get(':employmentId/reporting-lines')
   @ApiOperation({ summary: "An employment's reporting history, oldest first" })
   @ApiOkResponse({ description: 'Every period, including the closed ones.' })
-  public async list(@Param('employmentId') employmentId: string): Promise<unknown> {
+  public async list(@Param('employmentId', ParseUUIDPipe) employmentId: string): Promise<unknown> {
     const history = await this.dispatcher.ask<
       { readonly reportingLines: unknown },
       ReadEmploymentHistory
@@ -56,7 +56,7 @@ export class ReportingLineController {
       'The manager’s employment has ended, or the change would close a loop in the hierarchy.',
   })
   public async changeManager(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: ChangeManagerBody,
   ): Promise<unknown> {
     const parsed = asOfFrom(body.effectiveFrom);

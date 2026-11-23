@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -68,7 +68,7 @@ export class PerformanceRatingScaleController {
     summary: 'Retire a scale. Completed reviews keep the copy they were rated against',
   })
   public async retire(
-    @Param('ratingScaleId') ratingScaleId: string,
+    @Param('ratingScaleId', ParseUUIDPipe) ratingScaleId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -112,7 +112,7 @@ export class PerformanceGoalCategoryController {
   @Patch(':goalCategoryId')
   @ApiOperation({ summary: 'Take a category out of use, or put it back' })
   public async setActive(
-    @Param('goalCategoryId') goalCategoryId: string,
+    @Param('goalCategoryId', ParseUUIDPipe) goalCategoryId: string,
     @Body() body: SetGoalCategoryActiveBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

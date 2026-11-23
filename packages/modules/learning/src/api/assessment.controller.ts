@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { DefineAssessmentCommand } from '../application/catalogue.use-case.js';
@@ -26,7 +26,7 @@ export class LearningCourseVersionController {
   @Post(':courseVersionId/assessments')
   @ApiOperation({ summary: 'Define an assessment. A kind and a title — no pass mark, no weight' })
   public async define(
-    @Param('courseVersionId') courseVersionId: string,
+    @Param('courseVersionId', ParseUUIDPipe) courseVersionId: string,
     @Body() body: DefineAssessmentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -66,7 +66,7 @@ export class LearningAssessmentController {
   @Post(':assessmentId/results')
   @ApiOperation({ summary: 'Record an outcome. Stated by an assessor; nothing computes it' })
   public async record(
-    @Param('assessmentId') assessmentId: string,
+    @Param('assessmentId', ParseUUIDPipe) assessmentId: string,
     @Body() body: RecordAssessmentResultBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

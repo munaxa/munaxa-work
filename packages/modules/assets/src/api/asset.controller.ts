@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -69,7 +69,7 @@ export class AssetController {
 
   @Get(':assetId')
   @ApiOperation({ summary: 'One item. Another tenant’s identifier answers as not found' })
-  public async read(@Param('assetId') assetId: string): Promise<unknown> {
+  public async read(@Param('assetId', ParseUUIDPipe) assetId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadAsset>({
         queryName: 'assets.read-asset',
@@ -81,7 +81,7 @@ export class AssetController {
   @Post(':assetId')
   @ApiOperation({ summary: 'Correct what is recorded. Category, tag and status are not editable' })
   public async amend(
-    @Param('assetId') assetId: string,
+    @Param('assetId', ParseUUIDPipe) assetId: string,
     @Body() body: AmendAssetBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -96,7 +96,7 @@ export class AssetController {
   @Post(':assetId/status')
   @ApiOperation({ summary: 'Move the item through the in-service lifecycle. Retired is terminal' })
   public async changeStatus(
-    @Param('assetId') assetId: string,
+    @Param('assetId', ParseUUIDPipe) assetId: string,
     @Body() body: ChangeAssetStatusBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -14,6 +14,7 @@ import {
 } from '@work/kernel';
 import { PostgresUnitOfWork } from '@work/persistence';
 import {
+  PayrollAdjustmentController,
   PayrollConfigurationController,
   PayrollDecisionController,
   PayrollDispatcher,
@@ -232,6 +233,7 @@ const nestFor = async (
       PayrollConfigurationController,
       PayrollResultController,
       PayrollDecisionController,
+      PayrollAdjustmentController,
       PayrollRunController,
     ],
     providers: [

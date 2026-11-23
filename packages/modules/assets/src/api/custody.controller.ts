@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { ReturnCustodyCommand } from '../application/custody.use-case.js';
@@ -104,7 +104,7 @@ export class CustodyController {
       'A custody that is already returned is refused, and the database refuses it again from any path.',
   })
   public async returnCustody(
-    @Param('assetCustodyId') assetCustodyId: string,
+    @Param('assetCustodyId', ParseUUIDPipe) assetCustodyId: string,
     @Body() body: ReturnCustodyBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

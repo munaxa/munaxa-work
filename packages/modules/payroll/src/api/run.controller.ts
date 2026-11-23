@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { CalculateRunCommand } from '../application/calculation-contract.js';
@@ -58,7 +58,7 @@ export class PayrollRunController {
 
   @Get(':payrollRunId')
   @ApiOperation({ summary: 'One run, and everything it was calculated under' })
-  public async run(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
+  public async run(@Param('payrollRunId', ParseUUIDPipe) payrollRunId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadRun>({ queryName: 'payroll.run', payrollRunId }),
     );
@@ -69,7 +69,9 @@ export class PayrollRunController {
   @ApiOkResponse({
     description: 'A real answer per employment. Never a silent skip and never a result of zero.',
   })
-  public async exceptions(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
+  public async exceptions(
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ListExceptions>({
         queryName: 'payroll.exceptions',
@@ -83,7 +85,9 @@ export class PayrollRunController {
   @ApiOkResponse({
     description: 'A pull. Correctness never depends on an event having been delivered.',
   })
-  public async reconcile(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
+  public async reconcile(
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.send<unknown, ReconcileRunCommand>({
         commandName: 'payroll.reconcile',
@@ -94,7 +98,9 @@ export class PayrollRunController {
 
   @Get(':payrollRunId/reconciliation')
   @ApiOperation({ summary: 'What reconciliation found. Nothing here repaired anything' })
-  public async reconciliation(@Param('payrollRunId') payrollRunId: string): Promise<unknown> {
+  public async reconciliation(
+    @Param('payrollRunId', ParseUUIDPipe) payrollRunId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadReconciliation>({
         queryName: 'payroll.reconciliation',

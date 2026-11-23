@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -34,7 +34,7 @@ export class DelegationController {
     description: 'Delegation to self, an inverted period, or a period that has already passed.',
   })
   public async delegate(
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
     @Body() body: CreateDelegationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -54,7 +54,7 @@ export class DelegationController {
   @ApiOperation({ summary: 'Withdraw cover before its period ends' })
   @ApiOkResponse({ description: 'The revoked delegation.' })
   public async revokeDelegation(
-    @Param('delegationId') delegationId: string,
+    @Param('delegationId', ParseUUIDPipe) delegationId: string,
     @Body() body: ReasonedChangeBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

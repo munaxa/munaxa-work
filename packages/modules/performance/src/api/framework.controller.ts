@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -67,7 +67,7 @@ export class PerformanceFrameworkController {
       'rather than zero — the difference decides whether the competency leaves the denominator.',
   })
   public async defineCompetency(
-    @Param('frameworkId') frameworkId: string,
+    @Param('frameworkId', ParseUUIDPipe) frameworkId: string,
     @Body() body: DefineCompetencyBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -82,7 +82,7 @@ export class PerformanceFrameworkController {
   @Post(':frameworkId/retirement')
   @ApiOperation({ summary: 'Retire a framework. Reviews rated against it keep their frozen copy' })
   public async retire(
-    @Param('frameworkId') frameworkId: string,
+    @Param('frameworkId', ParseUUIDPipe) frameworkId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

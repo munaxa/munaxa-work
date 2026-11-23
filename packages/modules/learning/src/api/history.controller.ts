@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -46,7 +46,7 @@ export class LearningHistoryController {
     description: 'No such record, or none this caller may see. Deliberately the same answer.',
   })
   public async read(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Query() query: Record<string, string | undefined>,
   ): Promise<unknown> {
     return unwrapOrThrow(
