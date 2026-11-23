@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -70,7 +70,7 @@ export class CompensationApprovalController {
   @ApiOperation({ summary: 'The approval chain, in the shape Phase 16 will keep' })
   public async chain(
     @Param('subjectKind') subjectKind: string,
-    @Param('subjectId') subjectId: string,
+    @Param('subjectId', ParseUUIDPipe) subjectId: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadApprovalChain>({

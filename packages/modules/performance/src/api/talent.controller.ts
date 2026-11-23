@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { RecordPlacementCommand } from '../application/calibration.use-case.js';
@@ -38,7 +38,7 @@ export class PerformanceTalentController {
   @Post('placements/:reviewId')
   @ApiOperation({ summary: 'Place a review on the matrix. Performance comes from the rating' })
   public async place(
-    @Param('reviewId') reviewId: string,
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
     @Body() body: RecordPlacementBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

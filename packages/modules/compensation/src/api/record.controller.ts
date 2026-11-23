@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -69,7 +69,7 @@ export class CompensationRecordController {
   @Post('recurring/:recurringId/amendment')
   @ApiOperation({ summary: 'Change an amount: closes the previous period, opens a new one' })
   public async amend(
-    @Param('recurringId') recurringId: string,
+    @Param('recurringId', ParseUUIDPipe) recurringId: string,
     @Body() body: AmendRecurringBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -84,7 +84,7 @@ export class CompensationRecordController {
   @Post('recurring/:recurringId/end')
   @ApiOperation({ summary: 'Close an entitlement. Nothing is deleted' })
   public async end(
-    @Param('recurringId') recurringId: string,
+    @Param('recurringId', ParseUUIDPipe) recurringId: string,
     @Body() body: EndRecurringBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

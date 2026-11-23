@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -45,7 +45,7 @@ export class ProfileController {
   })
   @ApiOkResponse({ description: 'The capability.' })
   public async recordCapability(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordCapabilityBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -68,7 +68,7 @@ export class ProfileController {
   @ApiOperation({ summary: 'Withdraw a capability. The claim stays answerable' })
   @ApiOkResponse({ description: 'The capability.' })
   public async withdrawCapability(
-    @Param('capabilityId') capabilityId: string,
+    @Param('capabilityId', ParseUUIDPipe) capabilityId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -86,7 +86,7 @@ export class ProfileController {
   })
   @ApiOkResponse({ description: 'The history record.' })
   public async recordHistory(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: RecordHistoryBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -110,7 +110,7 @@ export class ProfileController {
   @ApiOperation({ summary: 'Apply a tag. A code, never a list this product ships' })
   @ApiOkResponse({ description: 'The tag.' })
   public async applyTag(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: ApplyTagBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -128,7 +128,7 @@ export class ProfileController {
   })
   @ApiOkResponse({ description: 'The note.' })
   public async writeNote(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: WriteNoteBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

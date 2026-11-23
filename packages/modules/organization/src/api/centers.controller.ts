@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -52,7 +52,7 @@ export class CentersController {
   @ApiOperation({ summary: 'Close a cost centre. Postings against it still resolve' })
   @ApiOkResponse({ description: 'The closed centre.' })
   public async closeCost(
-    @Param('centerId') centerId: string,
+    @Param('centerId', ParseUUIDPipe) centerId: string,
     @Body() body: CloseEffectiveBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -81,7 +81,7 @@ export class CentersController {
   @ApiOperation({ summary: 'Close a profit centre' })
   @ApiOkResponse({ description: 'The closed centre.' })
   public async closeProfit(
-    @Param('centerId') centerId: string,
+    @Param('centerId', ParseUUIDPipe) centerId: string,
     @Body() body: CloseEffectiveBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

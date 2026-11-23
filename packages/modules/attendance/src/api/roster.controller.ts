@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -83,7 +83,7 @@ export class AttendanceRosterController {
   @Post('policies/:policyId/publication')
   @ApiOperation({ summary: 'Publish a policy, marking every day it now governs' })
   public async publishPolicy(
-    @Param('policyId') policyId: string,
+    @Param('policyId', ParseUUIDPipe) policyId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

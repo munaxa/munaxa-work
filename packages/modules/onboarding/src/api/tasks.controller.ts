@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -72,7 +72,7 @@ export class TasksController {
   @Get(':taskId/history')
   @ApiOperation({ summary: 'Everything that happened to one task, oldest first' })
   @ApiOkResponse({ description: 'Append-only. No endpoint amends a history row.' })
-  public async history(@Param('taskId') taskId: string): Promise<unknown> {
+  public async history(@Param('taskId', ParseUUIDPipe) taskId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadTaskHistory>({
         queryName: 'onboarding.read-task-history',
@@ -87,7 +87,7 @@ export class TasksController {
     description: 'The task is blocked, already concluded, or a document task named no reference.',
   })
   public async complete(
-    @Param('taskId') taskId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
     @Body() body: CompleteTaskBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -102,7 +102,7 @@ export class TasksController {
   @Post(':taskId/waiver')
   @ApiOperation({ summary: 'Waive a task, naming why. Requires onboarding.task.waive' })
   public async waive(
-    @Param('taskId') taskId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
     @Body() body: WaiveTaskBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -117,7 +117,7 @@ export class TasksController {
   @Post(':taskId/assignment')
   @ApiOperation({ summary: 'Reassign a task to another owner' })
   public async reassign(
-    @Param('taskId') taskId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
     @Body() body: ReassignTaskBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -134,7 +134,7 @@ export class TasksController {
     summary: 'Move a deadline. Audited — a date that quietly moved is a date missed',
   })
   public async reschedule(
-    @Param('taskId') taskId: string,
+    @Param('taskId', ParseUUIDPipe) taskId: string,
     @Body() body: RescheduleTaskBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

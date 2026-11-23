@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -39,7 +39,7 @@ export class ContractsController {
   @Get(':employmentId/contracts')
   @ApiOperation({ summary: "An employment's contract history, oldest first" })
   @ApiOkResponse({ description: 'Every period, including the superseded ones.' })
-  public async list(@Param('employmentId') employmentId: string): Promise<unknown> {
+  public async list(@Param('employmentId', ParseUUIDPipe) employmentId: string): Promise<unknown> {
     const history = await this.dispatcher.ask<
       { readonly contracts: unknown },
       ReadEmploymentHistory
@@ -52,7 +52,7 @@ export class ContractsController {
   @ApiOperation({ summary: 'Record a contract. A renewal is a new period, never an edit' })
   @ApiCreatedResponse({ description: 'The contract period.' })
   public async record(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: RecordContractBody,
   ): Promise<unknown> {
     const { effectiveFrom, ...rest } = body;
@@ -75,8 +75,8 @@ export class ContractsController {
       'There is no probation on this contract, or it has already concluded. A probation somebody did not pass ends the employment instead.',
   })
   public async concludeProbation(
-    @Param('employmentId') employmentId: string,
-    @Param('contractId') contractId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
+    @Param('contractId', ParseUUIDPipe) contractId: string,
     @Body() body: ConcludeProbationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

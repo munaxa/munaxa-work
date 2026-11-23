@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { RespondToAssignmentCommand } from '../application/review.use-case.js';
@@ -18,7 +18,7 @@ export class PerformanceReviewerAssignmentController {
   @Post(':reviewerAssignmentId/response')
   @ApiOperation({ summary: 'Accept or decline an invitation to review' })
   public async respond(
-    @Param('reviewerAssignmentId') reviewerAssignmentId: string,
+    @Param('reviewerAssignmentId', ParseUUIDPipe) reviewerAssignmentId: string,
     @Body() body: RespondToAssignmentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -62,7 +62,9 @@ export class LetterTemplateController {
       'A version reports whether it is still editable. The freeze is caused by issuance, not by ' +
       'publication.',
   })
-  public async read(@Param('letterTemplateId') letterTemplateId: string): Promise<unknown> {
+  public async read(
+    @Param('letterTemplateId', ParseUUIDPipe) letterTemplateId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadTemplate>({
         queryName: 'letters.read-template',
@@ -79,7 +81,7 @@ export class LetterTemplateController {
       'rather than an expression. Substitution is a lookup; nothing evaluates.',
   })
   public async draft(
-    @Param('letterTemplateId') letterTemplateId: string,
+    @Param('letterTemplateId', ParseUUIDPipe) letterTemplateId: string,
     @Body() body: VersionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -99,7 +101,7 @@ export class LetterTemplateController {
       'historical letter claims to have been generated from.',
   })
   public async amend(
-    @Param('letterTemplateVersionId') letterTemplateVersionId: string,
+    @Param('letterTemplateVersionId', ParseUUIDPipe) letterTemplateVersionId: string,
     @Body() body: AmendVersionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -119,7 +121,7 @@ export class LetterTemplateController {
       'is the difference between withdrawing a letter type and rewriting history.',
   })
   public async move(
-    @Param('letterTemplateVersionId') letterTemplateVersionId: string,
+    @Param('letterTemplateVersionId', ParseUUIDPipe) letterTemplateVersionId: string,
     @Body() body: MoveVersionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

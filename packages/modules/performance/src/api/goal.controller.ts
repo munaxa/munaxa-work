@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -78,7 +78,7 @@ export class PerformanceGoalController {
 
   @Get(':goalId')
   @ApiOperation({ summary: 'One goal with its progress history' })
-  public async read(@Param('goalId') goalId: string): Promise<unknown> {
+  public async read(@Param('goalId', ParseUUIDPipe) goalId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadGoal>({ queryName: 'performance.read-goal', goalId }),
     );
@@ -87,7 +87,7 @@ export class PerformanceGoalController {
   @Patch(':goalId')
   @ApiOperation({ summary: 'Amend a goal that has not been closed' })
   public async update(
-    @Param('goalId') goalId: string,
+    @Param('goalId', ParseUUIDPipe) goalId: string,
     @Body() body: UpdateGoalBody,
   ): Promise<unknown> {
     const { dueDate, ...rest } = body;
@@ -105,7 +105,7 @@ export class PerformanceGoalController {
   @Post(':goalId/approval')
   @ApiOperation({ summary: 'Approve a goal. A named human, never the auto-approver' })
   public async approve(
-    @Param('goalId') goalId: string,
+    @Param('goalId', ParseUUIDPipe) goalId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -119,7 +119,10 @@ export class PerformanceGoalController {
 
   @Post(':goalId/status')
   @ApiOperation({ summary: 'Move a goal. Closing has its own route' })
-  public async move(@Param('goalId') goalId: string, @Body() body: MoveGoalBody): Promise<unknown> {
+  public async move(
+    @Param('goalId', ParseUUIDPipe) goalId: string,
+    @Body() body: MoveGoalBody,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.send<unknown, MoveGoalCommand>({
         commandName: 'performance.move-goal',

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { IssueDisciplinaryActionCommand } from '../application/disciplinary-action.use-case.js';
@@ -31,7 +31,9 @@ export class DisciplinaryActionController {
       'Decision support. Derived at read time, writes nothing, and returns no action where the ' +
       'tenant has configured no rule.',
   })
-  public async applicable(@Param('violationId') violationId: string): Promise<unknown> {
+  public async applicable(
+    @Param('violationId', ParseUUIDPipe) violationId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadApplicableAction>({
         queryName: 'relations.applicable-action',
@@ -42,7 +44,7 @@ export class DisciplinaryActionController {
 
   @Get(':violationId/action')
   @ApiOperation({ summary: 'The disciplinary action issued on this case' })
-  public async action(@Param('violationId') violationId: string): Promise<unknown> {
+  public async action(@Param('violationId', ParseUUIDPipe) violationId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadDisciplinaryAction>({
         queryName: 'relations.disciplinary-action',
@@ -66,7 +68,7 @@ export class DisciplinaryActionController {
       'approval — the two most serious actions are recommendations another module executes.',
   })
   public async issue(
-    @Param('violationId') violationId: string,
+    @Param('violationId', ParseUUIDPipe) violationId: string,
     @Body() body: IssueDisciplinaryActionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

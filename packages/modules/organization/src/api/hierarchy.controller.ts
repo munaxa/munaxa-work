@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -57,7 +57,7 @@ export class HierarchyController {
   @ApiQuery({ name: 'asOf', required: false })
   @ApiOkResponse({ description: 'The parent and the ancestor chain, nearest first.' })
   public async ancestry(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Query('asOf') asOf?: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -72,7 +72,7 @@ export class HierarchyController {
   @Get('units/:unitId/placements')
   @ApiOperation({ summary: 'Every period this unit has sat somewhere. History is never rewritten' })
   @ApiOkResponse({ description: 'The placement periods, oldest first.' })
-  public async placements(@Param('unitId') unitId: string): Promise<unknown> {
+  public async placements(@Param('unitId', ParseUUIDPipe) unitId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask({
         queryName: 'organization.placement-history',
@@ -91,7 +91,7 @@ export class HierarchyController {
   @ApiQuery({ name: 'asOf', required: false })
   @ApiOkResponse({ description: 'The governing entity, or none, and the chain walked to it.' })
   public async governingLegalEntity(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Query('asOf') asOf?: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -109,7 +109,7 @@ export class HierarchyController {
   })
   @ApiOkResponse({ description: 'The new placement period.' })
   public async place(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body() body: PlaceUnitBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -126,7 +126,7 @@ export class HierarchyController {
   @ApiOperation({ summary: 'End the open placement. The unit survives, unplaced' })
   @ApiOkResponse({ description: 'The closed placement period.' })
   public async detach(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body() body: DetachUnitBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

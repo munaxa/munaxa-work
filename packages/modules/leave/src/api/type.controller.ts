@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -58,7 +58,7 @@ export class LeaveTypeController {
   @Post(':leaveTypeId/publication')
   @ApiOperation({ summary: 'Freeze a leave type, so policies may reference it' })
   public async publish(
-    @Param('leaveTypeId') leaveTypeId: string,
+    @Param('leaveTypeId', ParseUUIDPipe) leaveTypeId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
