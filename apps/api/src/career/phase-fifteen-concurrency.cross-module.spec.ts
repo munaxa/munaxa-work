@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -55,25 +55,38 @@ interface Joined {
 }
 
 /**
- * Waits until `count` sessions of this role are queued on a lock at an `update career_plan`.
- * Polls PostgreSQL's own lock table rather than sleeping a fixed time, and gives up loudly.
+ * Waits until `count` other sessions of this role are queued on a lock. Polls PostgreSQL's own
+ * lock table rather than sleeping a fixed time, and gives up loudly, naming what each session was
+ * doing.
+ *
+ * It polls on the pool, outside the lock holder's transaction: each poll is its own transaction,
+ * so it reads the sessions as they are now rather than a snapshot taken at the first poll.
  */
-const waitForBlockedUpdates = async (
-  client: PoolClient,
+const waitForBlockedSessions = async (
+  pool: Pool,
   count: number,
-  deadline = Date.now() + 10_000,
+  deadline = Date.now() + 15_000,
 ): Promise<void> => {
-  const { rows } = await client.query<{ waiting: number }>(
-    `select count(*)::int as waiting
+  const { rows } = await pool.query<{ waiting: number }>(
+    `select count(distinct l.pid)::int as waiting
        from pg_locks l join pg_stat_activity a on a.pid = l.pid
-      where not l.granted and a.usename = current_user and a.query ilike 'update career_plan%'`,
+      where not l.granted and a.usename = current_user and a.pid <> pg_backend_pid()`,
   );
   const waiting = rows[0]?.waiting ?? 0;
 
   if (waiting >= count) return;
-  if (Date.now() > deadline) throw new Error(`Only ${String(waiting)} of ${String(count)} queued.`);
+  if (Date.now() > deadline) {
+    const sessions = await pool.query<{ state: string; wait: string; query: string }>(
+      `select state, coalesce(wait_event_type, '-') as wait, left(query, 60) as query
+         from pg_stat_activity where usename = current_user and pid <> pg_backend_pid()`,
+    );
+
+    throw new Error(
+      `Only ${String(waiting)} of ${String(count)} sessions queued: ${JSON.stringify(sessions.rows)}`,
+    );
+  }
   await new Promise((resolve) => setTimeout(resolve, 10));
-  return waitForBlockedUpdates(client, count, deadline);
+  return waitForBlockedSessions(pool, count, deadline);
 };
 
 suite('phase 15 — concurrency and convergence', () => {
@@ -342,7 +355,7 @@ suite('phase 15 — concurrency and convergence', () => {
    *
    * A third connection holds the row lock (`select ... for update`, which a plain read does not
    * wait for), so both handlers read version 1 and then queue behind it at their `update`. Only
-   * once PostgreSQL reports both waiting is the lock released; one update wins, and the other
+   * once PostgreSQL reports both sessions waiting is the lock released; one update wins, and the other
    * re-evaluates its `version = 1` predicate against the committed row and matches nothing.
    */
   it('refuses the second of two moves that both read the same version', async () => {
@@ -360,7 +373,7 @@ suite('phase 15 — concurrency and convergence', () => {
         second.inTenant(TENANT, 'user:hr-2', () => attempt(second, move)),
       ]);
 
-      await waitForBlockedUpdates(holder, 2);
+      await waitForBlockedSessions(first.pool, 2);
       await holder.query('commit');
 
       const outcomes = await racing;
@@ -374,5 +387,5 @@ suite('phase 15 — concurrency and convergence', () => {
       holder.release();
     }
     await expectMovedExactlyOnce(careerPlanId);
-  });
+  }, 20_000);
 });
