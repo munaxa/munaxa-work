@@ -27,37 +27,30 @@ interface PositionRow {
 const COLUMNS =
   'id, tenant_id, code, title, description, family, grade, criticality, status, metadata, effective_from, effective_to, version';
 
-/** The `where` clause and its parameters, extracted to keep `list` inside the repository budget. */
-const whereClauses = (query: PositionQuery): readonly string[] =>
-  [
-    'tenant_id = $1',
-    'deleted_at is null',
-    query.status === undefined ? undefined : 'status = $2',
-    query.family === undefined ? undefined : 'family = $3',
-    query.term === undefined
-      ? undefined
-      : "(code ilike $4 or title->>'en' ilike $4 or title->>'ar' ilike $4)",
-    // Equality on the primary key, never a pattern: this answers "does this exact identifier
-    // exist in my tenant", and it is the one filter here that cannot be used to discover a
-    // position the caller did not already name.
-    query.positionId === undefined ? undefined : 'id = $7',
-  ].filter((clause): clause is string => clause !== undefined);
+/**
+ * The list filter. Every parameter is referenced, and typed, whether or not its filter is set, as
+ * in the unit list: PostgreSQL refuses a parameter it cannot type. An unset filter is passed as
+ * null and its clause is then true.
+ *
+ * The position id is equality on the primary key, never a pattern: it answers "does this exact
+ * identifier exist in my tenant", and it is the one filter here that cannot be used to discover a
+ * position the caller did not already name.
+ */
+const LIST_WHERE = `tenant_id = $1 and deleted_at is null
+  and ($2::text is null or status = $2::text)
+  and ($3::text is null or family = $3::text)
+  and ($4::text is null
+    or code ilike $4::text or title->>'en' ilike $4::text or title->>'ar' ilike $4::text)
+  and ($5::uuid is null or id = $5::uuid)`;
 
-const filtersFor = (
-  tenantId: string,
-  query: PositionQuery,
-): { readonly where: string; readonly parameters: readonly unknown[] } => ({
-  where: whereClauses(query).join(' and '),
-  parameters: [
-    tenantId,
-    query.status ?? null,
-    query.family ?? null,
-    query.term === undefined ? null : `%${query.term}%`,
-    query.limit,
-    query.offset,
-    query.positionId ?? null,
-  ],
-});
+/** The filter's parameters, $1 to $5; the page's limit and offset follow them in the list only. */
+const filtersFor = (tenantId: string, query: PositionQuery): readonly unknown[] => [
+  tenantId,
+  query.status ?? null,
+  query.family ?? null,
+  query.term === undefined ? null : `%${query.term}%`,
+  query.positionId ?? null,
+];
 
 const toState = (row: PositionRow): PositionState => ({
   id: row.id,
@@ -103,15 +96,16 @@ export class PositionRepository
     transaction: Transaction,
     query: PositionQuery,
   ): Promise<{ readonly items: readonly PositionState[]; readonly total: number }> {
-    const { where, parameters } = filtersFor(transaction.tenantId, query);
+    const filters = filtersFor(transaction.tenantId, query);
 
     const rows = await transaction.execute<PositionRow>(
-      `select ${COLUMNS} from job_position where ${where} order by code limit $5 offset $6`,
-      parameters,
+      `select ${COLUMNS} from job_position where ${LIST_WHERE}
+        order by code limit $6 offset $7`,
+      [...filters, query.limit, query.offset],
     );
     const counted = await transaction.execute<{ total: string }>(
-      `select count(*)::text as total from job_position where ${where}`,
-      parameters,
+      `select count(*)::text as total from job_position where ${LIST_WHERE}`,
+      filters,
     );
 
     return { items: rows.map(toState), total: Number(counted[0]?.total ?? '0') };

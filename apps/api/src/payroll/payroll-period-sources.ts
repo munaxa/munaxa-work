@@ -11,7 +11,7 @@ import {
 } from '@work/payroll';
 import type { PayableSnapshotView } from '@work/attendance';
 import type { LeavePayrollPeriodView } from '@work/leave';
-import type { GoverningLegalEntity } from '@work/organization';
+import type { GoverningLegalEntity, LegalEntityView } from '@work/organization';
 import { runWithServiceGrant, type HandlerFailure, type Query, type Result } from '@work/kernel';
 
 import type { Asking } from './asking.js';
@@ -41,6 +41,10 @@ interface LeavePeriodQuery extends Query {
   readonly employmentIds: readonly string[];
   readonly periodStart: string;
   readonly periodEnd: string;
+}
+
+interface ListLegalEntitiesQuery extends Query {
+  readonly queryName: 'organization.list-legal-entities';
 }
 
 interface GoverningLegalEntityQuery extends Query {
@@ -169,7 +173,11 @@ const leaveOf = (view: LeavePayrollPeriodView): LeaveFacts => ({
 });
 
 /**
- * Organization, asked **one** bounded question: which legal entity governs a unit.
+ * Organization, asked two bounded questions: which unit the group's legal entity is registered
+ * on, then which legal entity governs that unit. A payroll group names a legal *entity*, and the
+ * governing-entity query walks from a *unit*; asking it with the entity's id found no unit, so
+ * every calculation refused with `organization_unavailable` (MW-072). The first question reads the
+ * tenant's legal-entity registrations, which are few by nature (one per registered company).
  *
  * `organization.export-structure` is never called from a payroll path — an unbounded structure
  * export per run is the read D-17 forbids. Where a cost-centre code is wanted for a human-readable
@@ -192,18 +200,25 @@ export class PayrollOrganizationSource implements OrganizationSourcePort {
         };
       }
   > {
-    const result = await runWithServiceGrant(
-      {
-        module: 'payroll',
-        operation: 'payroll.calculate',
-        permits: [ORGANIZATION_READ],
-        reason: 'reading the legal entity whose country governs a payroll run',
-      },
-      () =>
-        this.ask<GoverningLegalEntity, GoverningLegalEntityQuery>({
-          queryName: 'organization.governing-legal-entity',
-          unitId: legalEntityId,
-        }),
+    const listed = await this.withGrant(() =>
+      this.ask<readonly LegalEntityView[], ListLegalEntitiesQuery>({
+        queryName: 'organization.list-legal-entities',
+      }),
+    );
+
+    if (!listed.ok) return { known: false };
+
+    const named = listed.value.find((entity) => entity.id === legalEntityId);
+
+    // An identifier Organization does not hold cannot be resolved to a country, which is what an
+    // unknown unit answered before; the calculation refuses rather than running under none.
+    if (named === undefined) return { known: false };
+
+    const result = await this.withGrant(() =>
+      this.ask<GoverningLegalEntity, GoverningLegalEntityQuery>({
+        queryName: 'organization.governing-legal-entity',
+        unitId: named.unitId,
+      }),
     );
 
     if (!result.ok) return { known: false };
@@ -224,6 +239,17 @@ export class PayrollOrganizationSource implements OrganizationSourcePort {
             },
           }),
     };
+  }
+  private withGrant<TResult>(work: () => Promise<TResult>): Promise<TResult> {
+    return runWithServiceGrant(
+      {
+        module: 'payroll',
+        operation: 'payroll.calculate',
+        permits: [ORGANIZATION_READ],
+        reason: 'reading the legal entity whose country governs a payroll run',
+      },
+      work,
+    );
   }
   private ask<TResult, TQuery extends Query>(
     query: TQuery,

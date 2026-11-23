@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Put } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Put } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiOkResponse,
@@ -34,7 +34,7 @@ export class MemberProfileController {
     description: 'The display name is missing one of the first-class languages.',
   })
   public async reviseProfile(
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
     @Body() body: ReviseProfileBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -57,7 +57,7 @@ export class MemberProfileController {
   @ApiOkResponse({ description: 'The preferences, and the direction they imply.' })
   @ApiUnprocessableEntityResponse({ description: 'An unknown time zone or language tag.' })
   public async revisePreference(
-    @Param('membershipId') membershipId: string,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
     @Body() body: RevisePreferenceBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

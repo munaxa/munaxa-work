@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -57,7 +57,7 @@ export class LegalEntitiesController {
   })
   @ApiOkResponse({ description: 'The registration.' })
   public async register(
-    @Param('unitId') unitId: string,
+    @Param('unitId', ParseUUIDPipe) unitId: string,
     @Body() body: RegisterLegalEntityBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -87,7 +87,7 @@ export class LegalEntitiesController {
   })
   @ApiOkResponse({ description: 'The amended registration.' })
   public async amend(
-    @Param('legalEntityId') legalEntityId: string,
+    @Param('legalEntityId', ParseUUIDPipe) legalEntityId: string,
     @Body() body: AmendLegalEntityBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -109,7 +109,7 @@ export class LegalEntitiesController {
   @ApiOperation({ summary: 'Close a registration from a date. Everything under it still resolves' })
   @ApiOkResponse({ description: 'The closed registration.' })
   public async close(
-    @Param('legalEntityId') legalEntityId: string,
+    @Param('legalEntityId', ParseUUIDPipe) legalEntityId: string,
     @Body() body: CloseEffectiveBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

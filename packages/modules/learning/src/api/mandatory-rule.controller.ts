@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiOkResponse,
@@ -90,7 +90,7 @@ export class LearningMandatoryRuleController {
   @Post(':mandatoryRuleId/retirement')
   @ApiOperation({ summary: 'Retire a rule. What it already asked of people is left alone' })
   public async retire(
-    @Param('mandatoryRuleId') mandatoryRuleId: string,
+    @Param('mandatoryRuleId', ParseUUIDPipe) mandatoryRuleId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -110,7 +110,7 @@ export class LearningMandatoryRuleController {
     description: 'The rule is retired, or a dependency could not answer. Never reported as zero.',
   })
   public async reconcile(
-    @Param('mandatoryRuleId') mandatoryRuleId: string,
+    @Param('mandatoryRuleId', ParseUUIDPipe) mandatoryRuleId: string,
     @Body() body: ReconcileBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

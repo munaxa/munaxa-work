@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -70,7 +70,7 @@ export class UnitTypesController {
   @ApiOperation({ summary: 'Retire a level. Units already of this type keep it' })
   @ApiOkResponse({ description: 'The retired unit type.' })
   public async retireUnitType(
-    @Param('unitTypeId') unitTypeId: string,
+    @Param('unitTypeId', ParseUUIDPipe) unitTypeId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
