@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -10,6 +11,7 @@ import {
   attempt,
   harnessFor,
   named,
+  reasonOf,
   requireDatabaseInCi,
   send,
   upstream,
@@ -51,6 +53,28 @@ interface Joined {
   readonly membershipId: string;
   readonly created: boolean;
 }
+
+/**
+ * Waits until `count` sessions of this role are queued on a lock at an `update career_plan`.
+ * Polls PostgreSQL's own lock table rather than sleeping a fixed time, and gives up loudly.
+ */
+const waitForBlockedUpdates = async (
+  client: PoolClient,
+  count: number,
+  deadline = Date.now() + 10_000,
+): Promise<void> => {
+  const { rows } = await client.query<{ waiting: number }>(
+    `select count(*)::int as waiting
+       from pg_locks l join pg_stat_activity a on a.pid = l.pid
+      where not l.granted and a.usename = current_user and a.query ilike 'update career_plan%'`,
+  );
+  const waiting = rows[0]?.waiting ?? 0;
+
+  if (waiting >= count) return;
+  if (Date.now() > deadline) throw new Error(`Only ${String(waiting)} of ${String(count)} queued.`);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  return waitForBlockedUpdates(client, count, deadline);
+};
 
 suite('phase 15 — concurrency and convergence', () => {
   let first: CrossModuleHarness;
@@ -221,13 +245,24 @@ suite('phase 15 — concurrency and convergence', () => {
   });
 
   /**
-   * A stale version is not a retry, and must not converge.
+   * A stale version is not a retry, and must not converge: of two moves issued from version 1,
+   * exactly one commits and the plan's version advances by exactly one.
    *
-   * Both callers read version 1 and both decide to move the plan. The second is acting on a state
-   * that no longer exists by the time it writes, and the version predicate in the `update`'s own
-   * `where` clause — not a read before it — is what refuses it.
+   * **How the second is refused depends on when PostgreSQL serializes it, and both ways are
+   * correct.** The handler reads the plan, asks the domain whether the move is allowed, and only
+   * then writes with the version predicate in the `update`'s own `where` clause:
+   *
+   * - If both transactions read version 1 before either writes, the second `update` waits for the
+   *   first's row lock, re-checks `version = 1` against the committed row, matches nothing, and the
+   *   repository throws `ConcurrencyException` (a 409), rolling the transaction back.
+   * - If the second reads after the first committed, it reads the plan as already `active`, and the
+   *   domain refuses `active -> active` (`plan-transition-refused`) before any write is attempted.
+   *
+   * Either way nothing is written twice. The two tests after this one force each interleaving, so
+   * both paths are proven on every run rather than whichever one the scheduler happened to pick
+   * (MW-073: this test once asserted only the first path and failed when CI produced the second).
    */
-  it('refuses the second of two moves issued from the same version', async () => {
+  const createPlan = async (): Promise<string> => {
     const { careerPlanId } = await first.inTenant(TENANT, 'user:hr', () =>
       send<{ careerPlanId: string }>(first, {
         commandName: 'career.create-plan',
@@ -236,41 +271,108 @@ suite('phase 15 — concurrency and convergence', () => {
       }),
     );
 
-    const move = {
-      commandName: 'career.move-plan',
-      careerPlanId,
-      to: 'active',
-      expectedVersion: 1,
-    };
-    const outcomes = await Promise.allSettled([
-      first.inTenant(TENANT, 'user:hr', () => attempt(first, move)),
-      second.inTenant(TENANT, 'user:hr-2', () => attempt(second, move)),
-    ]);
+    return careerPlanId;
+  };
 
-    /**
-     * One committed; the other raised `ConcurrencyException` out of the repository's `update`.
-     *
-     * It is *thrown* rather than returned as a refusal because the shared `Repository` raises it
-     * from inside the transaction, where returning a value would commit whatever else the command
-     * had already written. The API layer turns it into a 409 — so a caller sees a conflict, and the
-     * database saw a rollback.
-     */
-    const failed = outcomes.filter((outcome) => outcome.status === 'rejected');
+  const moveFromVersionOne = (careerPlanId: string) => ({
+    commandName: 'career.move-plan',
+    careerPlanId,
+    to: 'active',
+    expectedVersion: 1,
+  });
 
-    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
-    expect(failed).toHaveLength(1);
-    expect(String(failed[0]?.status === 'rejected' ? failed[0].reason : '')).toContain(
-      'career_plan was modified by someone else',
-    );
+  const STALE_VERSION = 'career_plan was modified by someone else';
+  const ALREADY_MOVED = 'career.rejection.plan-transition-refused';
 
+  type Outcome = PromiseSettledResult<Awaited<ReturnType<typeof attempt>>>;
+
+  const committed = (outcome: Outcome): boolean =>
+    outcome.status === 'fulfilled' && outcome.value.ok;
+
+  /** The refusal each interleaving produces, or `undefined` for anything that is not a refusal. */
+  const refusalOf = (outcome: Outcome): string | undefined => {
+    if (outcome.status === 'rejected') {
+      return String(outcome.reason).includes(STALE_VERSION) ? STALE_VERSION : undefined;
+    }
+    return outcome.value.ok ? undefined : reasonOf(outcome.value);
+  };
+
+  const expectMovedExactlyOnce = async (careerPlanId: string): Promise<void> => {
     const rows = await first.rowsIn<{ status: string; version: number }>(
       TENANT,
       `select status, version from career_plan where id = $1`,
       [careerPlanId],
     );
 
-    // And the plan moved exactly once.
+    expect(rows).toHaveLength(1);
     expect(rows[0]?.status).toBe('active');
     expect(Number(rows[0]?.version)).toBe(2);
+  };
+
+  it('refuses the second of two moves issued from the same version', async () => {
+    const careerPlanId = await createPlan();
+    const move = moveFromVersionOne(careerPlanId);
+    const outcomes = await Promise.allSettled([
+      first.inTenant(TENANT, 'user:hr', () => attempt(first, move)),
+      second.inTenant(TENANT, 'user:hr-2', () => attempt(second, move)),
+    ]);
+
+    expect(outcomes.filter(committed)).toHaveLength(1);
+    expect(outcomes.filter((outcome) => !committed(outcome)).map(refusalOf)).toEqual([
+      expect.stringMatching(new RegExp(`^(${STALE_VERSION}|${ALREADY_MOVED})$`)),
+    ]);
+    await expectMovedExactlyOnce(careerPlanId);
+  });
+
+  it('refuses a move from a version that was already moved, without writing', async () => {
+    const careerPlanId = await createPlan();
+    const move = moveFromVersionOne(careerPlanId);
+
+    const mine = await first.inTenant(TENANT, 'user:hr', () => attempt(first, move));
+    const theirs = await second.inTenant(TENANT, 'user:hr-2', () => attempt(second, move));
+
+    expect(mine.ok).toBe(true);
+    expect(theirs.ok).toBe(false);
+    expect(reasonOf(theirs)).toBe(ALREADY_MOVED);
+    await expectMovedExactlyOnce(careerPlanId);
+  });
+
+  /**
+   * Both read version 1, and both reach the `update` before either commits.
+   *
+   * A third connection holds the row lock (`select ... for update`, which a plain read does not
+   * wait for), so both handlers read version 1 and then queue behind it at their `update`. Only
+   * once PostgreSQL reports both waiting is the lock released; one update wins, and the other
+   * re-evaluates its `version = 1` predicate against the committed row and matches nothing.
+   */
+  it('refuses the second of two moves that both read the same version', async () => {
+    const careerPlanId = await createPlan();
+    const move = moveFromVersionOne(careerPlanId);
+    const holder = await first.pool.connect();
+
+    try {
+      await holder.query('begin');
+      await holder.query(`select set_config('app.tenant_id', $1, true)`, [TENANT]);
+      await holder.query(`select id from career_plan where id = $1 for update`, [careerPlanId]);
+
+      const racing = Promise.allSettled([
+        first.inTenant(TENANT, 'user:hr', () => attempt(first, move)),
+        second.inTenant(TENANT, 'user:hr-2', () => attempt(second, move)),
+      ]);
+
+      await waitForBlockedUpdates(holder, 2);
+      await holder.query('commit');
+
+      const outcomes = await racing;
+
+      expect(outcomes.filter(committed)).toHaveLength(1);
+      expect(outcomes.filter((outcome) => !committed(outcome)).map(refusalOf)).toEqual([
+        STALE_VERSION,
+      ]);
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+    await expectMovedExactlyOnce(careerPlanId);
   });
 });
