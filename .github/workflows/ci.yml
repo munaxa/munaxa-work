@@ -32,6 +32,8 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
+          # The migration safety gate compares prisma/migrations with the base branch.
+          fetch-depth: 0
       # Deliberately runs before (and without) `pnpm install`: the standards gate must not
       # depend on the package registry being reachable. See docs/ENGINEERING_STANDARDS.md.
       - name: Engineering standards
@@ -51,6 +53,19 @@ jobs:
       # installing, where it can also compare what is on disk. See the script's header.
       - name: Platform parity
         run: node scripts/check-platform-parity.mjs
+
+      # The SQL migrations are the authoritative database model (prisma/README.md, MW-008). Fails
+      # on a migration Prisma generated, on any change to a merged migration, and on a package
+      # script that runs `prisma migrate dev`, `prisma db push` or an unguarded `migrate reset`.
+      - name: Migration safety
+        run: node scripts/check-migration-safety.mjs
+        env:
+          MIGRATION_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+      # The node:test suites of the repository's own tooling (scripts/**, tooling/**). They import
+      # only node built-ins, so they belong here rather than behind `pnpm install`.
+      - name: Tooling tests
+        run: node scripts/run-node-tests.mjs
 
   node:
     name: Lint · Typecheck · Test · Build
@@ -129,6 +144,20 @@ jobs:
       # creates its own throwaway table and applies the policy procedure to it by hand.
       - name: Apply migrations
         run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://work:work@localhost:5432/work
+
+      # Before the tests, which create tables of their own: this compares exactly what the SQL
+      # migrations built with prisma/schema.prisma. The counts may stay or shrink, never grow, against
+      # prisma/drift-baseline.json (MW-008).
+      - name: Schema drift may only shrink
+        run: |
+          set -euo pipefail
+          pnpm --filter @work/api exec prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel ../../prisma/schema.prisma \
+            --script > "$RUNNER_TEMP/drift.sql"
+          node scripts/check-migration-drift.mjs "$RUNNER_TEMP/drift.sql"
         env:
           DATABASE_URL: postgresql://work:work@localhost:5432/work
 
