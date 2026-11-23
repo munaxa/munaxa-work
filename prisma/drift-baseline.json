@@ -1,0 +1,20 @@
+{
+  "statements": 528,
+  "tablesAffected": 184,
+  "createTable": 0,
+  "dropTable": 0,
+  "addColumn": 0,
+  "dropColumn": 0,
+  "columnType": 0,
+  "columnNullability": 0,
+  "columnDefault": 128,
+  "addForeignKey": 12,
+  "addPrimaryKey": 0,
+  "addConstraint": 0,
+  "dropConstraint": 255,
+  "createIndex": 130,
+  "dropIndex": 17,
+  "renameIndex": 1,
+  "enumChange": 0,
+  "other": 0
+}
