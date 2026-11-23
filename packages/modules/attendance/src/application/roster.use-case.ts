@@ -13,6 +13,7 @@ import {
 } from './attendance-context.js';
 import { DEFAULT_ZONE, zoneFor } from './expectation-resolution.js';
 import { FAR_FUTURE, markDay } from './assignment.use-case.js';
+import { isUniqueViolation } from './ingest.use-case.js';
 import { AttendancePermissions } from './attendance-permissions.js';
 import type { AttendanceDependencies } from './attendance-dependencies.js';
 
@@ -155,7 +156,14 @@ export const definePolicyHandler = (
 
       if (!policy.ok) return refusedBy(policy.error);
 
-      await dependencies.stores.policies.insert(transaction, policy.value.snapshot());
+      // The policy store has no read by code, so the unique index is the check: a repeated code is
+      // "that code is taken", which the caller can act on, not a constraint violation (a 500).
+      try {
+        await dependencies.stores.policies.insert(transaction, policy.value.snapshot());
+      } catch (error: unknown) {
+        if (!isUniqueViolation(error)) throw error;
+        return conflicted('policy_code_taken');
+      }
       return success({
         policyId: policy.value.id,
         code: command.code,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -84,7 +84,7 @@ export class PerformanceCycleController {
   @Post(':cycleId/status')
   @ApiOperation({ summary: 'Move a cycle. Closing and cancelling have their own routes' })
   public async move(
-    @Param('cycleId') cycleId: string,
+    @Param('cycleId', ParseUUIDPipe) cycleId: string,
     @Body() body: MoveCycleBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -101,7 +101,7 @@ export class PerformanceCycleController {
   @ApiOperation({ summary: 'Close a cycle. A named human closes it; nothing closes on a timer' })
   @ApiOkResponse({ description: 'A closed cycle does not reopen. Its reviews are immutable.' })
   public async close(
-    @Param('cycleId') cycleId: string,
+    @Param('cycleId', ParseUUIDPipe) cycleId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -116,7 +116,7 @@ export class PerformanceCycleController {
   @Post(':cycleId/cancellation')
   @ApiOperation({ summary: 'Cancel a cycle. The reason is mandatory' })
   public async cancel(
-    @Param('cycleId') cycleId: string,
+    @Param('cycleId', ParseUUIDPipe) cycleId: string,
     @Body() body: CancelCycleBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

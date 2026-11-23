@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -58,7 +58,7 @@ export class CompensationComponentController {
   @Post(':componentId/publication')
   @ApiOperation({ summary: 'Freeze a component, so plans and assignments may reference it' })
   public async publish(
-    @Param('componentId') componentId: string,
+    @Param('componentId', ParseUUIDPipe) componentId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

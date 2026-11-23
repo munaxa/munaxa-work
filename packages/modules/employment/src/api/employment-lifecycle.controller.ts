@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -45,7 +45,7 @@ export class EmploymentLifecycleController {
     description: 'The employment, moved. The transition is recorded in its history.',
   })
   public async changeStatus(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: ChangeStatusBody,
   ): Promise<unknown> {
     const { effectiveFrom, ...rest } = body;
@@ -66,7 +66,7 @@ export class EmploymentLifecycleController {
   })
   @ApiOkResponse({ description: 'The employment, ended. Payroll reads this for final settlement.' })
   public async end(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: EndEmploymentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

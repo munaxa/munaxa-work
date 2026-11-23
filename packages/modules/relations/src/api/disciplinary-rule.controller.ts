@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -63,7 +63,7 @@ export class DisciplinaryRuleController {
   @Post(':disciplinaryRuleId')
   @ApiOperation({ summary: 'Amend a rung, or take it out of service' })
   public async amend(
-    @Param('disciplinaryRuleId') disciplinaryRuleId: string,
+    @Param('disciplinaryRuleId', ParseUUIDPipe) disciplinaryRuleId: string,
     @Body() body: AmendDisciplinaryRuleBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

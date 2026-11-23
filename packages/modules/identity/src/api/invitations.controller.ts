@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiOkResponse,
@@ -74,7 +84,7 @@ export class InvitationsController {
     description: 'Withdrawn, lapsed, already accepted, or addressed to somebody else.',
   })
   public async accept(
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUUIDPipe) invitationId: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<unknown> {
     const { principal } = request;
@@ -102,7 +112,7 @@ export class InvitationsController {
   @ApiOperation({ summary: 'Withdraw an invitation that has not been accepted' })
   @ApiOkResponse({ description: 'The withdrawn invitation.' })
   public async revoke(
-    @Param('invitationId') invitationId: string,
+    @Param('invitationId', ParseUUIDPipe) invitationId: string,
     @Body() body: ReasonedChangeBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

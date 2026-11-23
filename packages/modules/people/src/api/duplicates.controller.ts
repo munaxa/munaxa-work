@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -65,7 +65,7 @@ export class DuplicatesController {
   })
   @ApiOkResponse({ description: 'The candidate.' })
   public async review(
-    @Param('candidateId') candidateId: string,
+    @Param('candidateId', ParseUUIDPipe) candidateId: string,
     @Body() body: ReviewDuplicateBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -82,7 +82,7 @@ export class DuplicatesController {
   @Post('duplicates/rescan/:personId')
   @ApiOperation({ summary: 'Re-run detection for one person. Idempotent, and safe to repeat' })
   @ApiOkResponse({ description: 'How many new candidates were queued.' })
-  public async rescan(@Param('personId') personId: string): Promise<unknown> {
+  public async rescan(@Param('personId', ParseUUIDPipe) personId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.send({
         commandName: 'people.rescan-person',
@@ -97,7 +97,7 @@ export class DuplicatesController {
   })
   @ApiOkResponse({ description: 'The merged person.' })
   public async merge(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Body() body: MergePeopleBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

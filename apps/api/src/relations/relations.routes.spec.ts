@@ -31,6 +31,7 @@ const CONTROLLER_FILES = [
   'violation-category.controller.ts',
   'violation.controller.ts',
   'investigation.controller.ts',
+  'case-history.controller.ts',
   'disciplinary-rule.controller.ts',
   'disciplinary-action.controller.ts',
 ];
@@ -195,10 +196,9 @@ describe('the relations HTTP surface', () => {
 
     // The two lifecycle controllers own distinct literal prefixes, so neither is shadowed by the
     // `:violationId` route above them whatever order Nest resolves them in.
-    const controllers = readFileSync(
-      join(RELATIONS_PACKAGE, 'investigation.controller.ts'),
-      'utf8',
-    );
+    const controllers = ['investigation.controller.ts', 'case-history.controller.ts']
+      .map((file) => sourceOf(file))
+      .join('\n');
 
     expect(controllers).toContain("path: 'relations/investigations'");
     expect(controllers).toContain("path: 'relations/cases'");

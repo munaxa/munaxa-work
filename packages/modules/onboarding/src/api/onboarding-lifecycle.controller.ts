@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -44,7 +44,7 @@ export class OnboardingLifecycleController {
   @Post(':onboardingId/preboarding')
   @ApiOperation({ summary: 'Work begins before the first day. A state of the onboarding only' })
   public async beginPreboarding(
-    @Param('onboardingId') onboardingId: string,
+    @Param('onboardingId', ParseUUIDPipe) onboardingId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -59,7 +59,7 @@ export class OnboardingLifecycleController {
   @Post(':onboardingId/commencement')
   @ApiOperation({ summary: 'The joiner has started. Employment status is unaffected' })
   public async beginOnboarding(
-    @Param('onboardingId') onboardingId: string,
+    @Param('onboardingId', ParseUUIDPipe) onboardingId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -77,7 +77,7 @@ export class OnboardingLifecycleController {
     description: 'A required task is neither done nor waived.',
   })
   public async complete(
-    @Param('onboardingId') onboardingId: string,
+    @Param('onboardingId', ParseUUIDPipe) onboardingId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -92,7 +92,7 @@ export class OnboardingLifecycleController {
   @Post(':onboardingId/cancellation')
   @ApiOperation({ summary: 'Cancel it and every open task. Ends no employment' })
   public async cancel(
-    @Param('onboardingId') onboardingId: string,
+    @Param('onboardingId', ParseUUIDPipe) onboardingId: string,
     @Body() body: CancelOnboardingBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

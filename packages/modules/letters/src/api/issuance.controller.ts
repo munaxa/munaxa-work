@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { CancelLetterCommand } from '../application/letter-request.use-case.js';
@@ -33,7 +33,7 @@ export class LetterIssuanceController {
       'exists in this repository, so an issued letter carries its content and no artefact.',
   })
   public async issue(
-    @Param('letterRequestId') letterRequestId: string,
+    @Param('letterRequestId', ParseUUIDPipe) letterRequestId: string,
     @Body() body: IssueLetterBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -48,7 +48,7 @@ export class LetterIssuanceController {
   @Post(':letterRequestId/cancel')
   @ApiOperation({ summary: 'Cancel a request. An issued letter is terminal and is not reachable' })
   public async cancel(
-    @Param('letterRequestId') letterRequestId: string,
+    @Param('letterRequestId', ParseUUIDPipe) letterRequestId: string,
     @Body() body: CancelLetterBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -60,7 +60,7 @@ export class AssetCategoryController {
   @Post(':assetCategoryId')
   @ApiOperation({ summary: 'Amend a type. Its code is not editable' })
   public async amendCategory(
-    @Param('assetCategoryId') assetCategoryId: string,
+    @Param('assetCategoryId', ParseUUIDPipe) assetCategoryId: string,
     @Body() body: AmendAssetCategoryBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

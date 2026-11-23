@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -43,7 +43,7 @@ export class AssignmentsController {
   @ApiOperation({ summary: "An employment's placement history, oldest first" })
   @ApiQuery({ name: 'asOf', required: false })
   @ApiOkResponse({ description: 'Every period, including the closed ones.' })
-  public async list(@Param('employmentId') employmentId: string): Promise<unknown> {
+  public async list(@Param('employmentId', ParseUUIDPipe) employmentId: string): Promise<unknown> {
     const history = await this.dispatcher.ask<
       { readonly assignments: unknown },
       ReadEmploymentHistory
@@ -57,7 +57,7 @@ export class AssignmentsController {
   @ApiCreatedResponse({ description: 'The assignment.' })
   @ApiConflictResponse({ description: 'A primary assignment is already in force on that date.' })
   public async create(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: AssignmentBody,
   ): Promise<unknown> {
     const { effectiveFrom, ...rest } = body;
@@ -79,7 +79,7 @@ export class AssignmentsController {
   @ApiOkResponse({ description: 'The new assignment period.' })
   @ApiConflictResponse({ description: 'There is no primary assignment in force to change.' })
   public async change(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: AssignmentBody,
   ): Promise<unknown> {
     const { effectiveFrom, assignmentType: _ignored, ...rest } = body;

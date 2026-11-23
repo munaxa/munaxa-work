@@ -5,6 +5,7 @@
       "event_race_lost": "Another submission of this punch landed first.",
       "shift_code_taken": "That shift code is already in use in this tenant.",
       "schedule_code_taken": "That schedule code is already in use in this tenant.",
+      "policy_code_taken": "That attendance policy code is already in use in this tenant.",
       "roster_entry_exists": "This day is already rostered. Send the entry's version to replace it.",
       "assignment_overlaps": "An assignment already in force covers that period.",
       "assignment_already_ended": "That assignment already has an end date.",

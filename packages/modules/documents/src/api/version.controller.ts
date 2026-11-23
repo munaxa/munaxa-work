@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { AddVersionCommand, MoveDocumentCommand } from '../application/document.use-case.js';
@@ -32,7 +32,7 @@ export class DocumentVersionController {
       'employees legitimately hold the same blank form.',
   })
   public async addVersion(
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
     @Body() body: AddVersionBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -47,7 +47,7 @@ export class DocumentVersionController {
   @Post(':documentId/status')
   @ApiOperation({ summary: 'Archive or restore. There is no permanent deletion in this phase' })
   public async move(
-    @Param('documentId') documentId: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
     @Body() body: MoveDocumentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
