@@ -132,7 +132,23 @@
       "unavailable": {
         "title": "Munaxa Work is unavailable",
         "detail": "The service did not answer. This is not a problem with your account or your permissions."
-      }
+      },
+      "chooseTenant": "Choose a workspace"
+    },
+    "session": {
+      "refreshing": "Renewing your session…",
+      "continue": "Continue",
+      "noScript": "Your session needs renewing, which this page does with JavaScript. Continue to sign in again."
+    },
+    "tenant": {
+      "title": "Choose a workspace",
+      "detail": "Your account belongs to these Munaxa Work workspaces. The one you choose is remembered in this browser; the service checks your membership on every request.",
+      "choose": "Use this workspace",
+      "current": "In use",
+      "clear": "Forget my choice",
+      "none": "This account is not an active member of any workspace this session can reach.",
+      "unavailable": "The list of workspaces could not be loaded. Try again in a moment.",
+      "signedOut": "Sign in to choose a workspace."
     }
   }
 }
