@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -64,7 +64,7 @@ export class CompensationPlanController {
   @Post(':compensationPlanId/publication')
   @ApiOperation({ summary: 'Freeze a plan version, so it may be assigned' })
   public async publish(
-    @Param('compensationPlanId') compensationPlanId: string,
+    @Param('compensationPlanId', ParseUUIDPipe) compensationPlanId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -79,7 +79,7 @@ export class CompensationPlanController {
   @Post(':compensationPlanId/components')
   @ApiOperation({ summary: 'Permit a component under a draft plan, and on what terms' })
   public async permit(
-    @Param('compensationPlanId') compensationPlanId: string,
+    @Param('compensationPlanId', ParseUUIDPipe) compensationPlanId: string,
     @Body() body: PermitComponentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -94,7 +94,7 @@ export class CompensationPlanController {
   @Post(':compensationPlanId/assignments')
   @ApiOperation({ summary: 'Bind a published plan version to a scope, effective-dated' })
   public async assign(
-    @Param('compensationPlanId') compensationPlanId: string,
+    @Param('compensationPlanId', ParseUUIDPipe) compensationPlanId: string,
     @Body() body: AssignPlanBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

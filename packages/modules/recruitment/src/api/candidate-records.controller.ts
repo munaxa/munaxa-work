@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -44,7 +44,7 @@ export class CandidateRecordsController {
       'Self-declared and never verified by this module. Any document is a reference; Recruitment stores no bytes.',
   })
   public async recordProfileEntry(
-    @Param('candidateId') candidateId: string,
+    @Param('candidateId', ParseUUIDPipe) candidateId: string,
     @Body() body: ProfileEntryBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -60,7 +60,7 @@ export class CandidateRecordsController {
   @ApiOperation({ summary: 'Link this candidate to a Person. Explicit, and write-once' })
   @ApiOkResponse({ description: 'The candidate now resolves to that Person.' })
   public async linkPerson(
-    @Param('candidateId') candidateId: string,
+    @Param('candidateId', ParseUUIDPipe) candidateId: string,
     @Body() body: LinkPersonBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -79,7 +79,7 @@ export class CandidateRecordsController {
       'Irreversible, separately permissioned, and physically deletes nothing: every reference still resolves and the audit trail still reads.',
   })
   public async anonymize(
-    @Param('candidateId') candidateId: string,
+    @Param('candidateId', ParseUUIDPipe) candidateId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

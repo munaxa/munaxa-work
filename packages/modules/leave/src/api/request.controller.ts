@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -73,7 +73,9 @@ export class LeaveRequestController {
 
   @Get(':leaveRequestId')
   @ApiOperation({ summary: 'One request, with the dates it covers' })
-  public async read(@Param('leaveRequestId') leaveRequestId: string): Promise<unknown> {
+  public async read(
+    @Param('leaveRequestId', ParseUUIDPipe) leaveRequestId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadRequest>({
         queryName: 'leave.request',
@@ -96,7 +98,7 @@ export class LeaveRequestController {
   @Post(':leaveRequestId/submission')
   @ApiOperation({ summary: 'Assert the request. A policy requiring no approval approves it here' })
   public async submit(
-    @Param('leaveRequestId') leaveRequestId: string,
+    @Param('leaveRequestId', ParseUUIDPipe) leaveRequestId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -111,7 +113,7 @@ export class LeaveRequestController {
   @Post(':leaveRequestId/withdrawal')
   @ApiOperation({ summary: 'Take back an undecided request. Refused once a decision exists' })
   public async withdraw(
-    @Param('leaveRequestId') leaveRequestId: string,
+    @Param('leaveRequestId', ParseUUIDPipe) leaveRequestId: string,
     @Body() body: VersionedBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -126,7 +128,7 @@ export class LeaveRequestController {
   @Post(':leaveRequestId/amendment')
   @ApiOperation({ summary: 'Supersede an approved request with a new one' })
   public async amend(
-    @Param('leaveRequestId') leaveRequestId: string,
+    @Param('leaveRequestId', ParseUUIDPipe) leaveRequestId: string,
     @Body() body: AmendBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

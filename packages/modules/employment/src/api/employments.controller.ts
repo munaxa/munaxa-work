@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -71,7 +71,7 @@ export class EmploymentsController {
   @ApiOperation({ summary: 'One employment as it stood on a date' })
   @ApiQuery({ name: 'asOf', required: false })
   public async read(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Query('asOf') asOf?: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -102,7 +102,7 @@ export class EmploymentsController {
   @ApiOperation({ summary: 'Amend how an employment is classified' })
   @ApiConflictResponse({ description: 'The employment changed since the caller read it.' })
   public async amend(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: AmendEmploymentBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -117,7 +117,7 @@ export class EmploymentsController {
   @Patch(':employmentId/metadata')
   @ApiOperation({ summary: "Replace the tenant's own metadata on an employment" })
   public async reviseMetadata(
-    @Param('employmentId') employmentId: string,
+    @Param('employmentId', ParseUUIDPipe) employmentId: string,
     @Body() body: ReviseMetadataBody,
   ): Promise<unknown> {
     return unwrapOrThrow(

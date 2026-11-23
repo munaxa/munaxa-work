@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
@@ -76,7 +76,7 @@ export class PeopleController {
   @ApiQuery({ name: 'asOf', required: false })
   @ApiOkResponse({ description: 'The person, with the name in force on that date.' })
   public async read(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Query('asOf') asOf?: string,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -95,7 +95,7 @@ export class PeopleController {
       'Sections the caller may not read are absent and named in `withheld` — an empty list would assert the person holds none.',
   })
   public async profile(
-    @Param('personId') personId: string,
+    @Param('personId', ParseUUIDPipe) personId: string,
     @Query('asOf') asOf?: string,
   ): Promise<unknown> {
     return unwrapOrThrow(

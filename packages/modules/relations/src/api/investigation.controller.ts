@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type {
@@ -71,7 +71,9 @@ export class InvestigationController {
 
   @Get(':investigationId')
   @ApiOperation({ summary: 'One inquiry. Reading it is recorded against your name' })
-  public async investigation(@Param('investigationId') investigationId: string): Promise<unknown> {
+  public async investigation(
+    @Param('investigationId', ParseUUIDPipe) investigationId: string,
+  ): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadInvestigation>({
         queryName: 'relations.read-investigation',
@@ -88,7 +90,7 @@ export class InvestigationController {
   @Post(':investigationId/conclusion')
   @ApiOperation({ summary: 'Conclude an inquiry with findings and a recommendation' })
   public async conclude(
-    @Param('investigationId') investigationId: string,
+    @Param('investigationId', ParseUUIDPipe) investigationId: string,
     @Body() body: ConcludeInvestigationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -110,7 +112,7 @@ export class InvestigationController {
   @ApiOperation({ summary: 'Correct a concluded inquiry by recording a new, linked one' })
   @ApiOkResponse({ description: 'The corrected inquiry is unchanged. Both accounts survive.' })
   public async correct(
-    @Param('investigationId') investigationId: string,
+    @Param('investigationId', ParseUUIDPipe) investigationId: string,
     @Body() body: CorrectInvestigationBody,
   ): Promise<unknown> {
     return unwrapOrThrow(
@@ -138,7 +140,7 @@ export class CaseHistoryController {
   @Get(':violationId/history')
   @ApiOperation({ summary: 'Where a case is, and every transition that got it there' })
   @ApiOkResponse({ description: 'The current state is derived from the history, not stored.' })
-  public async history(@Param('violationId') violationId: string): Promise<unknown> {
+  public async history(@Param('violationId', ParseUUIDPipe) violationId: string): Promise<unknown> {
     return unwrapOrThrow(
       await this.dispatcher.ask<unknown, ReadCaseHistory>({
         queryName: 'relations.case-history',
