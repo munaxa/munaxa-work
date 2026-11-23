@@ -50,6 +50,59 @@ export interface Browser {
   close(): Promise<void>;
 }
 
+/** Resolves when the process has exited, or after `timeoutMs`, whichever comes first. */
+const exitOf = (chrome: ChildProcess, timeoutMs: number): Promise<void> =>
+  new Promise((resolve) => {
+    if (chrome.exitCode !== null || chrome.signalCode !== null) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(resolve, timeoutMs);
+    chrome.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+
+/** Asks Chrome to shut down over DevTools, so it stops its helpers and flushes its profile. */
+const askToClose = async (port: number): Promise<void> => {
+  const version = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()) as {
+    readonly webSocketDebuggerUrl: string;
+  };
+  const socket = new WebSocket(version.webSocketDebuggerUrl);
+  await new Promise<void>((resolve, reject) => {
+    socket.addEventListener('open', () => {
+      resolve();
+    });
+    socket.addEventListener('error', () => {
+      reject(new Error('Could not connect to Chrome.'));
+    });
+  });
+  socket.send(JSON.stringify({ id: 1, method: 'Browser.close' }));
+};
+
+/**
+ * Stops Chrome and removes its profile. A graceful close first; then the whole process group is
+ * killed, because helper processes outlive a kill of the browser alone and keep writing to the
+ * profile; the removal retries for the last of those writes.
+ */
+const shutDown = async (chrome: ChildProcess, port: number, profile: string): Promise<void> => {
+  try {
+    await askToClose(port);
+  } catch {
+    // Already gone, or not answering: the group kill below ends it either way.
+  }
+  await exitOf(chrome, 5_000);
+  if (chrome.pid !== undefined) {
+    try {
+      process.kill(-chrome.pid, 'SIGKILL');
+    } catch {
+      // The group has already exited.
+    }
+  }
+  rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+};
+
 export const launchChrome = async (): Promise<Browser> => {
   const profile = mkdtempSync(join(tmpdir(), 'work-admin-browser-'));
   const chrome: ChildProcess = spawn(
@@ -61,31 +114,21 @@ export const launchChrome = async (): Promise<Browser> => {
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-gpu',
+      '--disable-crash-reporter',
+      '--disable-breakpad',
       // A throwaway profile visiting one local test server. The sandbox is unavailable to an
       // unprivileged process on current Ubuntu runners, and nothing here is untrusted content.
       '--no-sandbox',
       'about:blank',
     ],
-    { stdio: 'ignore' },
+    // Its own process group, so closing can end every helper Chrome started.
+    { stdio: 'ignore', detached: true },
   );
   const port = await devToolsPort(profile);
 
   return {
     port,
-    close: async () => {
-      // Chrome's helper processes can still be writing to the profile for a moment after the
-      // browser exits, so wait for the exit and let the removal retry.
-      const exited = new Promise<void>((resolve) => {
-        if (chrome.exitCode !== null || chrome.signalCode !== null) resolve();
-        else
-          chrome.once('exit', () => {
-            resolve();
-          });
-      });
-      chrome.kill('SIGKILL');
-      await exited;
-      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-    },
+    close: () => shutDown(chrome, port, profile),
   };
 };
 
