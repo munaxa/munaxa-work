@@ -67,19 +67,28 @@ export const resolveForPrincipal = async (
   directory: TenantMembershipDirectory,
   principal: PlatformPrincipal,
   requestedTenantId: string | undefined,
-): Promise<TenantResolution> => {
-  // No organisation, no tenant. A principal whose grants cannot be tied to the organisation they
-  // were computed in has nowhere they can safely be exercised (WK-01, ADR-0080).
-  const organisation = principal.platformTenantId;
-  if (organisation === undefined || organisation.trim() === '') return { kind: 'no-membership' };
+): Promise<TenantResolution> =>
+  resolveTenant(await membershipsForPrincipal(directory, principal), requestedTenantId);
 
-  return resolveTenant(
-    await directory.activeMembershipsOf(principal.platformUserId, {
-      issuer: principal.issuer,
-      tenantId: organisation,
-    }),
-    requestedTenantId,
-  );
+/**
+ * Every active membership this principal may act in, before any choice is made.
+ *
+ * No organisation, no tenant. A principal whose grants cannot be tied to the organisation they
+ * were computed in has nowhere they can safely be exercised (WK-01, ADR-0080). Shared by the
+ * middleware, which chooses from this set, and by `GET /session/tenants`, which lists it, so the
+ * two can never disagree about what a person may select.
+ */
+export const membershipsForPrincipal = async (
+  directory: TenantMembershipDirectory,
+  principal: PlatformPrincipal,
+): Promise<readonly ResolvedMembership[]> => {
+  const organisation = principal.platformTenantId;
+  if (organisation === undefined || organisation.trim() === '') return [];
+
+  return directory.activeMembershipsOf(principal.platformUserId, {
+    issuer: principal.issuer,
+    tenantId: organisation,
+  });
 };
 
 /**

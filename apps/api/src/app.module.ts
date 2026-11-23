@@ -7,6 +7,7 @@ import { environmentProvider } from './configuration/environment.provider.js';
 import { DatabaseModule } from './persistence/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { SessionModule } from './tenancy/session.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
 import { PeopleModule } from './people/people.module.js';
 import { EmploymentModule } from './employment/employment.module.js';
@@ -62,6 +63,7 @@ import { loggingOptions } from './observability/logging.js';
     CareerModule,
     WorkflowModule,
     HealthModule,
+    SessionModule,
   ],
   providers: [
     environmentProvider,

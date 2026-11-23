@@ -3,6 +3,7 @@ import { loadPortalProcessEnvironment } from '@work/config';
 
 import type { ApiState } from './api-request';
 import { translator, type Language } from './locale';
+import { TENANT_PAGE } from './session-continuity';
 
 /**
  * What a screen says when it has no data, and why.
@@ -82,6 +83,16 @@ export const AccessState = ({ state, language }: AccessStateProps): ReactNode =>
             </a>
           </p>
         ))}
+
+      {state === 'no-membership' && (
+        // Signed in, and no tenant resolved: either a member of nothing, or this browser's choice
+        // is not one of theirs. The picker lists what they may choose, and says so when it is none.
+        <p className="text-sm">
+          <a className="underline underline-offset-4" href={`${TENANT_PAGE}?lang=${language}`}>
+            {t('admin.access.chooseTenant')}
+          </a>
+        </p>
+      )}
     </section>
   );
 };
