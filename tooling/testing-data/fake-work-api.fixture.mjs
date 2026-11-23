@@ -4,7 +4,8 @@
  * acknowledgement (`{ <thing>Id, code }`) rather than the view, definitions start as drafts and
  * publish with `expectedVersion`, Leave and Compensation refuse to assign a draft, a shift needs a
  * work segment to publish, a repeated schedule assignment is a 409, a repeated attendance policy
- * code is 409 `policy_code_taken` as after MW-071 (500 as before it, with `legacyPolicyConflict`),
+ * code is 409 `policy_code_taken` as after MW-071 (500 as before it, with `legacyPolicyConflict`;
+ * another detail with `policyConflictDetail`),
  * and (with `brokenOrganizationLists`) the units and positions lists answer 500.
  */
 
@@ -16,6 +17,7 @@ export const FAKE_TOKEN = 'fake-loader-token-0123456789';
 export const startFakeWorkApi = async ({
   brokenOrganizationLists = false,
   legacyPolicyConflict = false,
+  policyConflictDetail = 'policy_code_taken',
 } = {}) => {
   const tables = new Map();
   const table = (name) => {
@@ -148,7 +150,7 @@ export const startFakeWorkApi = async ({
     table('attendancePolicies').some((policy) => policy.code === body.code)
       ? legacyPolicyConflict
         ? failure()
-        : conflict('policy_code_taken')
+        : conflict(policyConflictDetail)
       : ok(add('attendancePolicies', draft({ policyId: randomUUID(), ...body }))),
   );
   route('GET', `${V}/attendance/shifts`, () => ok(table('shifts')));

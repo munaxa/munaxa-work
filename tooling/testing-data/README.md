@@ -41,9 +41,11 @@ passport, IBAN, phone) is generated. The test suite asserts all of this.
 > **Warning: Testing or local only.** The loader writes hundreds of records into the tenant it
 > reaches. It refuses every target host (`WORK_BASE_URL`, and `WORK_API_BASE_URL` and
 > `IDENTITY_BASE_URL` when set) unless the host is `localhost`, `127.0.0.1`, `::1` or ends in
-> `.test.munaxa.com`. Any other host needs `--target-confirm=<exact host>`, matching it exactly.
-> Production (`work.munaxa.com` and any host under it) is refused unconditionally, confirmation or
-> not. A refused target exits 2 before any request is sent.
+> `.test.munaxa.com`. Every other Munaxa host (`munaxa.com` and anything under it outside
+> `.test.munaxa.com`, such as `work.munaxa.com` or `id.munaxa.com`) is treated as production and
+> refused unconditionally, confirmation or not, so the loader's password can never reach production
+> Identity. Any non-Munaxa host needs `--target-confirm=<exact host>`, matching it exactly. A
+> refused target exits 2 before any request is sent.
 
 ```sh
 export WORK_BASE_URL='https://work.test.munaxa.com'
@@ -84,7 +86,8 @@ handled as follows:
   neither the shift nor the schedule names it), and nothing later needs its id. It is created in
   the run that creates the shift, immediately before it. If a run died between the two, the next
   run sends the policy again: since MW-071 a repeated code is refused with 409
-  `policy_code_taken`, which the loader counts as present, and it carries on to the shift. An API
+  `policy_code_taken`, which the loader counts as present, and it carries on to the shift. Only
+  that detail counts; any other 409 fails the run. An API
   from before MW-071 answers 500 instead; the loader then stops once (no retry loop) with a message
   naming the manual step: confirm with the Work operator that the tenant holds
   `syn-attendance-policy`, then re-run with `--skip-attendance-policy`.
@@ -160,6 +163,7 @@ appends; a run killed part way is completed and not duplicated; a dry run writes
 dataset is deterministic, 20 to 50 strong and free of real personal data; the command prints no
 token or password. `load-synthetic-guards.test.mjs` covers the target guard (local and
 `.test.munaxa.com` hosts pass, others need a matching `--target-confirm`, production is refused even
-confirmed, all three base URLs are checked), recovery from a run that died between the attendance
-policy and its shift (409 and pre-MW-071 500), and `LOADER_PASSWORD_FILE` (owner-only, refused or
+confirmed, as is every Munaxa host outside `.test.munaxa.com`, all three base URLs are checked),
+recovery from a run that died between the attendance
+policy and its shift (409 `policy_code_taken`, any other 409 failing, and pre-MW-071 500), and `LOADER_PASSWORD_FILE` (owner-only, refused or
 warned when shared, never printed).

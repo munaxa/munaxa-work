@@ -265,7 +265,14 @@ export const runLoader = async (config, io) => {
   const counts = { created: 0, existing: 0, planned: 0, unverifiable: 0 };
   const verb = config.dryRun ? 'would create' : 'created';
 
-  const ensure = async (label, { find, create, conflictMeansExists = false }) => {
+  /**
+   * `conflictMeansExists`: a 409 on create counts as already present. With `conflictDetail`, only a
+   * 409 whose detail is exactly that reason does; any other 409 fails the run.
+   */
+  const ensure = async (
+    label,
+    { find, create, conflictMeansExists = false, conflictDetail = undefined },
+  ) => {
     const found = await find();
     if (found !== undefined) {
       counts.existing += 1;
@@ -289,7 +296,12 @@ export const runLoader = async (config, io) => {
       // the record is read back the way a later run would find it.
       return { record: withId((await find()) ?? answer ?? {}), created: true };
     } catch (error) {
-      if (conflictMeansExists && error instanceof ApiError && error.status === 409) {
+      const present =
+        conflictMeansExists &&
+        error instanceof ApiError &&
+        error.status === 409 &&
+        (conflictDetail === undefined || error.detail === conflictDetail);
+      if (present) {
         counts.existing += 1;
         return { record: {}, created: false };
       }

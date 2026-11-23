@@ -69,6 +69,42 @@ describe('the target guard', () => {
     }
   });
 
+  test('refuses every Munaxa host outside .test.munaxa.com, even confirmed', () => {
+    for (const host of [
+      'id.munaxa.com',
+      'admin.munaxa.com',
+      'munaxa.com',
+      'test.munaxa.com',
+      'nottest.munaxa.com',
+      'test.munaxa.com.work.munaxa.com',
+    ]) {
+      assert.throws(() => configFor(`https://${host}`, [`--target-confirm=${host}`]), /production/);
+    }
+    assert.throws(
+      () => configFor('https://ID.Munaxa.COM.', ['--target-confirm=id.munaxa.com']),
+      /production/,
+    );
+  });
+
+  test('a confirmed Identity host on production Identity is refused before any request', async () => {
+    // The password goes to IDENTITY_BASE_URL: confirming it must not be enough.
+    const env = {
+      PATH: process.env.PATH,
+      WORK_BASE_URL: 'http://localhost:9',
+      IDENTITY_BASE_URL: 'https://id.munaxa.com',
+      LOADER_IDENTIFIER: 'loader@example.test',
+      LOADER_PASSWORD: 'Synthetic-Password-Not-Real-3!',
+    };
+    assert.throws(
+      () => loadConfig(env, ['--target-confirm=id.munaxa.com']),
+      /id\.munaxa\.com is a Munaxa host/,
+    );
+    const refused = await run(env, ['--target-confirm=id.munaxa.com']);
+    assert.equal(refused.code, 2);
+    assert.equal(refused.stdout, '');
+    assert.ok(!refused.stderr.includes('Synthetic-Password-Not-Real-3!'));
+  });
+
   test('checks the API and Identity hosts too, not only WORK_BASE_URL', () => {
     const local = 'http://localhost:3000';
     assert.throws(
@@ -123,6 +159,17 @@ describe('a run that died between the attendance policy and its shift', () => {
       assert.equal(fake.count('attendancePolicies'), 1);
       assert.equal(fake.count('shifts'), 1);
       assert.equal(fake.count('people'), 20);
+    } finally {
+      await fake.close();
+    }
+  });
+
+  test('another 409 on the policy is a failure, not "already present"', async () => {
+    const fake = await startFakeWorkApi({ policyConflictDetail: 'policy_effective_date_invalid' });
+    try {
+      await assert.rejects(load(fake, ['--employees', '20'], diesBeforeShift()));
+      await assert.rejects(load(fake), /answered 409: policy_effective_date_invalid/);
+      assert.equal(fake.count('shifts'), 0);
     } finally {
       await fake.close();
     }

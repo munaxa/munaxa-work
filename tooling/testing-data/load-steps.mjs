@@ -229,7 +229,9 @@ export const attendanceSteps = async (context) => {
             ...ATTENDANCE_POLICY,
             effectiveFrom: EFFECTIVE_FROM,
           }),
+        // Only the repeated code is "present"; any other conflict is a real refusal.
         conflictMeansExists: true,
+        conflictDetail: 'policy_code_taken',
       });
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 500) throw error;

@@ -1,15 +1,17 @@
 /**
  * The loader writes hundreds of records, so it refuses any host that is not plainly Testing or
  * local (MW-004). Allowed without confirmation: localhost, 127.0.0.1, ::1 and any host under
- * `.test.munaxa.com`. Any other host needs `--target-confirm=<exact host>`. Production
- * (`work.munaxa.com` and hosts under it) is refused unconditionally, confirmation or not.
+ * `.test.munaxa.com`. Every other Munaxa host (`munaxa.com` and anything under it that is not under
+ * `.test.munaxa.com`: work, id, admin, ...) is refused unconditionally, confirmation or not, so the
+ * loader's password can never reach production Identity. Any non-Munaxa host needs
+ * `--target-confirm=<exact host>`.
  */
 
 export class TargetRefusedError extends Error {}
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1']);
 const TESTING_SUFFIX = '.test.munaxa.com';
-const PRODUCTION = 'work.munaxa.com';
+const MUNAXA = 'munaxa.com';
 
 /** The host name of a URL, lower-cased, without IPv6 brackets or a trailing dot. */
 export const hostOf = (url) => {
@@ -25,7 +27,9 @@ export const hostOf = (url) => {
     .replace(/\.$/, '');
 };
 
-export const isProduction = (host) => host === PRODUCTION || host.endsWith(`.${PRODUCTION}`);
+/** A Munaxa host outside Testing: production or anything not plainly a test environment. */
+export const isProduction = (host) =>
+  (host === MUNAXA || host.endsWith(`.${MUNAXA}`)) && !host.endsWith(TESTING_SUFFIX);
 
 export const isTestingOrLocal = (host) => LOOPBACK.has(host) || host.endsWith(TESTING_SUFFIX);
 
@@ -38,7 +42,8 @@ export const guardTargets = (urls, confirmedHost) => {
     const host = hostOf(url);
     if (isProduction(host)) {
       throw new TargetRefusedError(
-        `${host} is production; the synthetic loader never runs against it.`,
+        `${host} is a Munaxa host outside ${TESTING_SUFFIX} (production); the synthetic ` +
+          'loader never runs against it, confirmed or not.',
       );
     }
     if (isTestingOrLocal(host)) continue;
