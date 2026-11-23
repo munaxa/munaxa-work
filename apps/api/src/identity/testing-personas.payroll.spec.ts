@@ -7,7 +7,7 @@ import type { Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { currentContext, isSystemContext, type PermissionChecker } from '@work/kernel';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, it } from 'vitest';
 
 import {
   APPROVER,
