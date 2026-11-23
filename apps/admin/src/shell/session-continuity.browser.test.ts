@@ -45,13 +45,13 @@ beforeAll(async () => {
   origin = await startWorkOrigin();
   browser = await launchChrome();
   page = await Page.open(browser);
-}, 30_000);
+}, 60_000);
 
 afterAll(async () => {
   page.close();
   await browser.close();
   await origin.close();
-});
+}, 30_000);
 
 /** Navigates and waits until the page that settles is the one `settled` describes. */
 const visit = async (path: string, settled: (seen: Seen) => boolean): Promise<Seen | undefined> => {

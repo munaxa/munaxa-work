@@ -35,7 +35,8 @@ const pause = (milliseconds: number): Promise<void> =>
 /** Waits for Chrome to write the port it chose, which it does once DevTools is listening. */
 const devToolsPort = async (profile: string): Promise<number> => {
   const file = join(profile, 'DevToolsActivePort');
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  // Generous: a CI runner busy with every other package's tests can be slow to start Chrome.
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     if (existsSync(file)) {
       const port = Number(readFileSync(file, 'utf8').split('\n')[0]);
       if (Number.isInteger(port) && port > 0) return port;
@@ -114,8 +115,6 @@ export const launchChrome = async (): Promise<Browser> => {
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-gpu',
-      '--disable-crash-reporter',
-      '--disable-breakpad',
       // A throwaway profile visiting one local test server. The sandbox is unavailable to an
       // unprivileged process on current Ubuntu runners, and nothing here is untrusted content.
       '--no-sandbox',
