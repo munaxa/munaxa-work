@@ -30,7 +30,16 @@ interface Seen {
   readonly returnTo: string;
 }
 
-const PROBE = `({
+/**
+ * Set on a document just before the test leaves it (a navigation, a click, a submit), and never on
+ * the document that replaces it. Without it, a wait that starts before the browser has left the
+ * old page can be satisfied by the old page: a picker that is still on screen looks exactly like
+ * the picker the server answers with, and the cookie would be read before that answer arrived.
+ */
+const STALE = 'window.__workTestStale = true';
+
+/** What the current document shows; `undefined` while it is still one the test has left. */
+const PROBE = `window.__workTestStale === true ? undefined : ({
   path: location.pathname + location.search,
   state: document.body ? (document.body.dataset.state || '') : '',
   tenant: document.body ? (document.body.dataset.tenant || '') : '',
@@ -55,6 +64,7 @@ afterAll(async () => {
 
 /** Navigates and waits until the page that settles is the one `settled` describes. */
 const visit = async (path: string, settled: (seen: Seen) => boolean): Promise<Seen | undefined> => {
+  await page.evaluate(STALE);
   await page.navigate(`${origin.origin}${path}`);
   return page.until<Seen>(PROBE, (seen) => seen !== undefined && settled(seen));
 };
@@ -79,7 +89,9 @@ describe('an Admin session in a real browser', () => {
   it('remembers a tenant chosen from the picker, and only that one', async () => {
     await visit('/people?before=picker', (s) => s.state === 'signed-in');
     await visit('/session/tenant?returnTo=%2Fpeople', (s) => s.state === 'picker');
-    await page.evaluate(`document.querySelector('button[data-tenant="${TENANT_B}"]').click()`);
+    await page.evaluate(
+      `${STALE}; document.querySelector('button[data-tenant="${TENANT_B}"]').click()`,
+    );
     const seen = await page.until<Seen>(
       PROBE,
       (s) => s?.path === '/people' && s.state === 'signed-in',
@@ -142,9 +154,12 @@ describe('an Admin session in a real browser', () => {
     await visit('/people?before=picker', (s) => s.state === 'signed-in');
     await visit('/session/tenant?returnTo=%2Fpeople', (s) => s.state === 'picker');
     await page.evaluate(
-      `(() => { const form = document.querySelector('form'); form.tenantId.value = '${forged}'; form.submit(); })()`,
+      `(() => { const form = document.querySelector('form'); form.tenantId.value = '${forged}'; ${STALE}; form.submit(); })()`,
     );
-    await page.until<Seen>(PROBE, (s) => s?.state === 'picker');
+    // The picker the server answers with, not the one the form was submitted from: the refusal and
+    // its cookie deletion arrive on that response, so only then is the cookie worth reading.
+    const answered = await page.until<Seen>(PROBE, (s) => s?.state === 'picker');
+    expect(answered?.path).toBe('/session/tenant');
 
     expect(await cookie('munaxa_work_tenant')).toBeUndefined();
     expect([TENANT_A, TENANT_B]).not.toContain(forged);
