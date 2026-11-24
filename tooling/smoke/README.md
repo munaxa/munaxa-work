@@ -93,20 +93,15 @@ PASS logout-revocation: 401 after 3100 ms (3300 ms)
 OK: 8 passed, 0 failed, 0 skipped
 ```
 
-**Readiness in Testing: a known gap.** No public address in the Testing stack reaches the API's
-`/health/ready` (munaxa-platform `infra/aws/stack/edge.tf` and `services.tf`). On the Work host
-the ALB sends `/api/auth/*` to Identity (priority 50), `/api/v1/*` to the API (51) and everything
-else to the admin (52). The API serves its health routes unprefixed (`/health/ready`, not
-`/api/v1/health/ready`), so `https://work.<testing domain>/health/ready` reaches the admin, which
-does not answer with the API's readiness body: the probe fails rather than passing on the wrong
-service. The only address that reaches the API is its Cloud Map name,
-`http://work-api.nonprod.munaxa.internal:3000/health/ready`, which resolves only inside the VPC and
-which the API's security group admits only from the Work admin task (and the ALB). So from an
-operator machine the Testing value is `WORK_HEALTH_URL=skip`, and the run exits `3` with
-`readiness NOT VERIFIED`; readiness then has to be taken from the ALB target group's health for
-`work-api` (its health check path is `/health/ready`) and recorded separately. Closing the gap
-needs a platform change (for example a route for an API health path on the Work host), which is
-for the lead to decide.
+**Readiness in Testing.** Since MW-075 (munaxa-platform#168, `a57c54f`) listener rule 49 on the
+Work host forwards exactly `GET /health/ready` to work-api (priority 49, ahead of the admin catch-all
+52; `infra/aws/stack/services.tf`). So from an operator machine the default `WORK_HEALTH_URL`
+(`$WORK_API_BASE_URL/health/ready`, which is `https://work.<testing domain>/health/ready` when only
+`WORK_BASE_URL` is set) reaches the API's readiness, and the
+probe is read from outside, as it is for Identity, Control and School. `WORK_HEALTH_URL=skip`
+remains only for a stack without that rule; the run then exits `3` with `readiness NOT VERIFIED`
+and is never green. Rule 49 exists only while the Work services and the edge do, so the probe needs
+a running Testing session.
 
 **A persona that signs in with MFA** cannot be used with a password: Identity answers
 `AUTH_MFA_REQUIRED`. Use a token file for it, taken from the browser's `__Host-mx_session` cookie
