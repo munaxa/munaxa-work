@@ -117,12 +117,12 @@ Terraform 1.16.5 and the locked AWS provider 6.67.0 (checksums verified): **102 
 
 ## 7. Changes implemented in this pass
 
-1. **munaxa-work#53, MW-008c (migration gate).** A package script may not use `$`, backticks, `eval`
+1. **munaxa-work#53, MW-008c (migration gate), merged `baad621` (24 Nov 03:39 UTC).** Required jobs green on run 45319210721; Images failed on MW-001 only. A package script may not use `$`, backticks, `eval`
    or `sh -c` (none does); the allowed reset accepts only `[../../]prisma/schema.prisma`; tracked
    shell scripts, Dockerfiles, workflows and compose files are read and `db push`, `migrate dev` and
    `migrate reset` are refused there; every tracked `package.json` at any depth is read. 13 new
    `node:test` cases; every previously refused case is still refused.
-2. **munaxa-platform#170 (`@munaxa/rbac` flake).** The large-grant-set test runs the same 100,000
+2. **munaxa-platform#170 (`@munaxa/rbac` flake), merged `7c81811` (24 Nov 03:41 UTC).** CI run 45319412904 green, including the full turbo test. The large-grant-set test runs the same 100,000
    checks as five batches and compares the fastest with the same per-check budget (75 µs), and now
    also asserts the answers. Test only.
 3. **This PR:** the corrected smoke README and this report and plan.
