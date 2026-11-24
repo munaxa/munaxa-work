@@ -9412,6 +9412,14 @@
         "tags": ["relations"]
       }
     },
+    "/api/v1/session/tenants": {
+      "get": {
+        "operationId": "SessionTenantsController_tenants_v1",
+        "parameters": [],
+        "responses": { "200": { "description": "" } },
+        "tags": ["SessionTenants"]
+      }
+    },
     "/api/v1/workflow/approval-groups": {
       "get": {
         "operationId": "WorkflowApprovalGroupController_search_v1",
