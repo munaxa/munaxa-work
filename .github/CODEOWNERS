@@ -1,10 +1,46 @@
-# Munaxa Work — critical security and deployment controls
-# Owner: authenticated GitHub user
+# Munaxa Work: critical security and deployment controls.
+#
+# Every pattern here must match at least one tracked file, and every file in REQUIRED_OWNED of
+# scripts/check-codeowners.mjs must be covered; `node scripts/run-node-tests.mjs` (CI job
+# "Standards · Architecture · Localization") fails otherwise. Patterns are anchored with a leading
+# slash so a file of the same name elsewhere does not pick up, or escape, an owner.
+#
+# This file only names owners. Reviews are enforced only when the owner turns on "Require review
+# from Code Owners" on main; that is a repository setting, not changed here.
 
-.github/workflows/*                 @tam2om
-.github/scripts/*                   @tam2om
-scripts/check-migration-safety.mjs  @tam2om
-scripts/check-migration-drift.mjs   @tam2om
-scripts/db-reset-guard.mjs          @tam2om
-prisma/drift-baseline.json         @tam2om
-scripts/bootstrap-tenant*.mjs      @tam2om
+# This file itself: without it, anyone could remove an owner in the same PR as the change.
+/.github/CODEOWNERS                              @tam2om
+
+# CI, release and publish workflows; MW-009 green-CI and image scan/verify gates.
+/.github/workflows/                              @tam2om
+/.github/scripts/                                @tam2om
+
+# Migration safety (MW-008): forbidden commands, drift ratchet and its baseline, reset guard.
+/scripts/check-migration-safety.mjs              @tam2om
+/scripts/check-migration-drift.mjs               @tam2om
+/scripts/db-reset-guard.mjs                      @tam2om
+/prisma/drift-baseline.json                      @tam2om
+/prisma/migrations/migration_lock.toml           @tam2om
+
+# Tenant bootstrap guard (MW-005) and Testing data target guard (MW-003).
+/scripts/bootstrap-tenant*.mjs                   @tam2om
+/tooling/testing-data/target-guard.mjs           @tam2om
+
+# This file's own validator.
+/scripts/check-codeowners.mjs                    @tam2om
+
+# Container images: pinned base digest and pinned OpenSSL/zlib (MW-001, Grype gate).
+/apps/api/Dockerfile                             @tam2om
+/apps/admin/Dockerfile                           @tam2om
+
+# Package registry configuration (supply chain).
+/.npmrc                                          @tam2om
+
+# Database runtime grants and RDS CA bundle used by the AWS deployment.
+/deploy/                                         @tam2om
+
+# Tenant isolation and request authentication.
+/apps/api/src/tenancy/authenticated-tenant.guard.ts      @tam2om
+/apps/api/src/tenancy/tenant-resolution.ts               @tam2om
+/apps/api/src/licensing/entitlement.guard.ts             @tam2om
+/packages/persistence/src/isolation-guard.ts             @tam2om
