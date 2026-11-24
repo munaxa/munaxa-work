@@ -16,7 +16,11 @@
  *   failure: `migrate deploy` still applies it, but databases that already ran the later one apply
  *   the two in a different order from a fresh database, so the author should confirm they commute.
  * - **A package script that bypasses the SQL.** `prisma migrate dev` and `prisma db push` are
- *   forbidden in every script; `prisma migrate reset` only behind scripts/db-reset-guard.mjs.
+ *   forbidden in every script of every workspace manifest; `prisma migrate reset` only behind
+ *   scripts/db-reset-guard.mjs, against the repository's own schema. A package script may not use
+ *   shell expansion (`$`, backticks) or `eval`/`sh -c`, so a reset cannot be spelled in pieces.
+ * - **A shell script, Dockerfile, workflow or compose file that bypasses the SQL.** The same three
+ *   commands are refused there outright: the only reset is the guarded package script.
  *
  * The base is `MIGRATION_BASE_REF` (CI passes the pull request's base SHA), else `origin/main`.
  * Dependency-free: it runs on a bare checkout, before `pnpm install`. It needs git history for
@@ -114,16 +118,34 @@ export function judgeMigrationChanges(changes, baseMigrations) {
  * environment assignment, a `cd`, quoting, escaping) to run a reset the guard refused.
  */
 const ALLOWED_RESET =
-  /^node scripts\/db-reset-guard\.mjs && (pnpm --filter @work\/api exec )?prisma migrate reset( --schema [A-Za-z0-9_./-]+)?( --(skip-seed|skip-generate))*$/;
+  /^node scripts\/db-reset-guard\.mjs && (pnpm --filter @work\/api exec )?prisma migrate reset( --schema (\.\.\/\.\.\/)?prisma\/schema\.prisma)?( --(skip-seed|skip-generate))*$/;
 
 /** What a shell would make of quoting and escaping, for detection only: `'re'\set` reads `reset`. */
 const unquoted = (command) => command.replace(/['"\\]/g, '').toLowerCase();
+
+/**
+ * Shell features that build a command from pieces at run time: parameter expansion, command
+ * substitution, backticks, ANSI-C quoting, `eval` and a nested shell. A static check cannot see
+ * through them (`pri$(echo s)ma`), so a package script may not use them at all. No script in this
+ * repository needs them; one that does belongs in a file under scripts/ that this gate can read.
+ */
+const SHELL_INDIRECTION = /[$`]|\beval\b|\b(ba|z|da)?sh\s+-c\b/;
+
+/** The three commands that let Prisma write the database instead of the SQL, after unquoting. */
+const FORBIDDEN_COMMAND = /\bprisma\b.*\b(db\s+push|migrate\s+(dev|reset))\b/;
 
 /** Package scripts that would let Prisma write the database model instead of the SQL. */
 export function findForbiddenScripts(manifestPath, manifest) {
   const errors = [];
   for (const [name, command] of Object.entries(manifest.scripts ?? {})) {
     const where = `${manifestPath} script "${name}"`;
+    if (SHELL_INDIRECTION.test(command)) {
+      errors.push(
+        `${where} uses shell expansion, \`eval\` or \`sh -c\`; a package script must spell its ` +
+          'command literally so this gate can read it. Move the logic into a file under scripts/.',
+      );
+      continue;
+    }
     const plain = unquoted(command);
     if (/db\s*push/.test(plain)) {
       errors.push(`${where} runs \`prisma db push\`; it rewrites the schema without a migration.`);
@@ -134,12 +156,37 @@ export function findForbiddenScripts(manifestPath, manifest) {
       errors.push(
         `${where} can run \`prisma migrate dev\`, \`push\` or \`reset\` outside the one allowed ` +
           `form: \`node ${RESET_GUARD} && [pnpm --filter @work/api exec ]prisma migrate reset ` +
-          '[--schema <path>] [--skip-seed] [--skip-generate]`, with nothing before or after it.',
+          '[--schema [../../]prisma/schema.prisma] [--skip-seed] [--skip-generate]`, with nothing ' +
+          'before or after it.',
       );
     }
   }
   return errors;
 }
+
+/**
+ * Lines of a shell script, Dockerfile, workflow or compose file that run `prisma db push`,
+ * `prisma migrate dev` or `prisma migrate reset`. Comment lines are skipped; quoting and escaping
+ * are undone first. These files have no allowed form: the guarded package script is the only reset.
+ */
+export function findForbiddenCommands(path, text) {
+  const errors = [];
+  text.split('\n').forEach((line, index) => {
+    if (/^\s*#/.test(line)) return;
+    const plain = unquoted(line);
+    if (FORBIDDEN_COMMAND.test(plain)) {
+      errors.push(
+        `${path}:${index + 1} runs \`prisma db push\`, \`migrate dev\` or \`migrate reset\`. ` +
+          'Outside the guarded db:reset package script Prisma may only `migrate deploy`.',
+      );
+    }
+  });
+  return errors;
+}
+
+/** Files other than package manifests that can run a command: shell, Docker, CI and compose. */
+export const COMMAND_FILE =
+  /(^|\/)(Dockerfile[^/]*|[^/]+\.(sh|bash)|docker-compose[^/]*\.ya?ml)$|^\.github\/workflows\/[^/]+\.ya?ml$/;
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
 
@@ -171,16 +218,12 @@ function resolveBase() {
   }
 }
 
-function packageManifests() {
-  const paths = ['package.json'];
-  for (const root of ['apps', 'packages']) {
-    if (!existsSync(root)) continue;
-    for (const entry of readdirSync(root)) {
-      const path = join(root, entry, 'package.json');
-      if (existsSync(path)) paths.push(path);
-    }
-  }
-  return paths;
+/**
+ * Every tracked package.json, at any depth (the workspace includes packages/modules/*), and every
+ * tracked file COMMAND_FILE matches. From git, so ignored output such as node_modules is skipped.
+ */
+function trackedFiles() {
+  return git('ls-files', '-z').split('\0').filter(Boolean);
 }
 
 function main() {
@@ -208,13 +251,22 @@ function main() {
       errors.push(`${path} looks generated by Prisma: it ${reason}.`);
     }
   }
-  for (const path of packageManifests()) {
+  const tracked = trackedFiles();
+  const manifests = tracked.filter(
+    (path) => path === 'package.json' || path.endsWith('/package.json'),
+  );
+  for (const path of manifests) {
     errors.push(...findForbiddenScripts(path, JSON.parse(readFileSync(path, 'utf8'))));
+  }
+  const commandFiles = tracked.filter((path) => COMMAND_FILE.test(path));
+  for (const path of commandFiles) {
+    errors.push(...findForbiddenCommands(path, readFileSync(path, 'utf8')));
   }
 
   process.stdout.write(
     `Migration safety: base ${base.slice(0, 12)}, ${baseMigrations.length} merged, ` +
-      `${added.length} new, ${all.length} checked.\n`,
+      `${added.length} new, ${all.length} checked, ${manifests.length} manifests and ` +
+      `${commandFiles.length} command files read.\n`,
   );
   for (const warning of warnings) process.stderr.write(`::warning::${warning}\n`);
   if (errors.length > 0) {
