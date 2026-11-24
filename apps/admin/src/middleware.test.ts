@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 
-import { config, middleware } from './middleware';
+import { config, middleware, publicOrigin } from './middleware';
 import {
   PLATFORM_SESSION_COOKIE,
   REFRESH_ATTEMPT_COOKIE,
@@ -12,8 +12,10 @@ import {
  * The real Admin middleware, called the way Next calls it: a `NextRequest` in, a `NextResponse` out.
  *
  * Next's adapter parses a redirect's `Location` with `new URL()` and no base, so a relative one
- * throws and the visitor gets a 500. These tests pin an absolute, same-origin `Location` and the
- * attempt marker; the decision table itself is `shell/session-continuity.test.ts`.
+ * throws and the visitor gets a 500. These tests pin an absolute `Location` on the browser's own
+ * origin and the attempt marker; the decision table itself is `shell/session-continuity.test.ts`.
+ * Under `next start`, `nextUrl` is `localhost:<port>` whatever the browser asked for, so the origin
+ * comes from `Host` (tested below the way Next presents it).
  */
 
 const ORIGIN = 'https://work.test.munaxa.com';
@@ -106,6 +108,36 @@ describe('the Admin middleware', () => {
     expect(middleware(visit('/session/tenant', {}, 'POST')).headers.get('x-middleware-next')).toBe(
       '1',
     );
+  });
+
+  // Under `next start` the request URL is always localhost; the browser's host is in `Host`.
+  const behindLoadBalancer = (path: string, host: string): NextRequest =>
+    new NextRequest(`https://localhost:3001${path}`, { headers: { host } });
+
+  it('redirects to the public host, not to the localhost Next runs on', () => {
+    const location = middleware(behindLoadBalancer('/people', 'work.test.munaxa.com')).headers.get(
+      'location',
+    );
+
+    expect(location).toBe(
+      `https://work.test.munaxa.com/session/refresh?returnTo=${encodeURIComponent('/people')}`,
+    );
+  });
+
+  it('keeps the scheme Next derived and a port in Host', () => {
+    expect(publicOrigin(behindLoadBalancer('/', 'work.test.munaxa.com:8443'))).toBe(
+      'https://work.test.munaxa.com:8443',
+    );
+    expect(
+      publicOrigin(new NextRequest('http://localhost:3001/', { headers: { host: 'a.b' } })),
+    ).toBe('http://a.b');
+  });
+
+  it('falls back to the request URL when Host is missing or malformed', () => {
+    for (const host of ['evil.example/x', 'user@evil.example', 'a b', '', 'evil.example:99999']) {
+      expect(publicOrigin(behindLoadBalancer('/', host))).toBe('https://localhost:3001');
+    }
+    expect(publicOrigin(new NextRequest('https://localhost:3001/'))).toBe('https://localhost:3001');
   });
 
   it('applies to pages only', () => {
