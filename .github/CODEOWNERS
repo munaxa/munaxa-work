@@ -1,0 +1,10 @@
+# Munaxa Work — critical security and deployment controls
+# Owner: authenticated GitHub user
+
+.github/workflows/*                 @tam2om
+.github/scripts/*                   @tam2om
+scripts/check-migration-safety.mjs  @tam2om
+scripts/check-migration-drift.mjs   @tam2om
+scripts/db-reset-guard.mjs          @tam2om
+prisma/drift-baseline.json         @tam2om
+scripts/bootstrap-tenant*.mjs      @tam2om
