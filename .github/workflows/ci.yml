@@ -172,6 +172,13 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # The browser test runs the real middleware outside Next; this asks the production build
+      # itself (`next start`) the questions MW-007's High failed: a signed-out visit is a 307 to the
+      # refresh page on this origin, not a 500, and the marker cookie keeps its attributes (R-2).
+      - name: Admin built app answers signed-out visits
+        run: node tooling/smoke/admin-built-app.mjs --start apps/admin
+        timeout-minutes: 3
+
       # After the build, because the document is generated from the built API (decorator metadata
       # that tsc emits). Fails when docs/api/openapi.json no longer matches the code, so the file
       # testers read cannot drift from the API they test (MW-004). Regenerate with

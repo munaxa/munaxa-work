@@ -117,3 +117,17 @@ They start a fake Work host (`fake-work.fixture.mjs`, `node:http`) that serves I
 `/api/auth`, the API and the admin, run every probe against it healthy and then once per broken
 behaviour, and run the command as a child process to check its exit codes and that neither stdout
 nor stderr contains a supplied password, a token or a cookie value.
+
+## Admin built-app check (CI)
+
+`admin-built-app.mjs` starts the production build of the Admin portal (`next start`, after
+`pnpm build`) and checks over plain HTTP that a signed-out visit is a `307` to
+`/session/refresh` on the same origin with a same-origin `returnTo`, `no-store`, and the
+refresh-attempt cookie set `HttpOnly; Secure; SameSite=Lax; Path=/`; that a visit with the marker
+already set renders (no loop); that a `POST` and the session pages are not redirected; that
+`//evil.example/...` does not leave the origin; and that there is no `x-powered-by` header. It runs
+in CI after the build (Wave 2 R-2) and needs no network, Identity or database. Locally:
+
+```sh
+pnpm build && node tooling/smoke/admin-built-app.mjs --start apps/admin
+```
