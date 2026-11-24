@@ -8,6 +8,8 @@ import { describe, it } from 'node:test';
 
 import {
   baseCandidates,
+  COMMAND_FILE,
+  findForbiddenCommands,
   findForbiddenScripts,
   findGeneratedSignals,
   judgeMigrationChanges,
@@ -188,6 +190,120 @@ describe('findForbiddenScripts', () => {
   it('accepts migrate deploy and a manifest with no scripts', () => {
     assert.deepEqual(scripts({ m: 'prisma migrate deploy --schema s' }), []);
     assert.deepEqual(findForbiddenScripts('package.json', {}), []);
+  });
+});
+
+describe('findForbiddenScripts after Wave 1 closure (MW-008c)', () => {
+  const scripts = (map) => findForbiddenScripts('package.json', { scripts: map });
+  const guard = 'node scripts/db-reset-guard.mjs';
+
+  it('refuses a reset spelled with shell expansion, which a static check cannot read', () => {
+    for (const command of [
+      `${guard} && pri$(echo s)ma migrate reset`,
+      `${guard} && prisma migrate re\${X}set`,
+      `${guard} && prisma migrate re$X\set`,
+      "prisma migrate $'\\x72eset'",
+      `${guard} && prisma migrate \`printf reset\``,
+      `eval "prisma migrate reset"`,
+      `sh -c 'prisma migrate reset'`,
+      `bash -c 'prisma db push'`,
+      // Expansion is refused whatever it builds, because what it builds cannot be known here.
+      'echo $HOME',
+    ]) {
+      assert.equal(scripts({ r: command }).length, 1, command);
+      assert.match(scripts({ r: command })[0], /shell expansion|outside the one allowed form/);
+    }
+  });
+
+  it('accepts the reset only against the repository schema', () => {
+    assert.deepEqual(
+      scripts({ r: `${guard} && prisma migrate reset --schema ../../prisma/schema.prisma` }),
+      [],
+    );
+    assert.deepEqual(
+      scripts({ r: `${guard} && prisma migrate reset --schema prisma/schema.prisma` }),
+      [],
+    );
+    for (const schema of [
+      '/tmp/other.prisma',
+      '../../../elsewhere/schema.prisma',
+      'prisma/schema.prisma.bak',
+      'other/prisma/schema.prisma',
+    ]) {
+      const command = `${guard} && prisma migrate reset --schema ${schema}`;
+      assert.equal(scripts({ r: command }).length, 1, command);
+    }
+  });
+
+  it('still accepts every committed manifest at every depth of the workspace', () => {
+    for (const path of ['../package.json', '../packages/modules/leave/package.json']) {
+      const manifest = JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+      assert.deepEqual(findForbiddenScripts(path, manifest), [], path);
+    }
+  });
+});
+
+describe('findForbiddenCommands', () => {
+  it('refuses push, dev and reset in a shell script, Dockerfile or workflow line', () => {
+    for (const line of [
+      'npx prisma db push --accept-data-loss',
+      './node_modules/.bin/prisma migrate dev --name x',
+      'pnpm --filter @work/api exec prisma migrate reset --force',
+      'RUN prisma migrate "reset" --force',
+      'CMD ["sh", "-c", "prisma migrate reset --force"]',
+      '          run: prisma migrate re\\set --force',
+    ]) {
+      assert.equal(findForbiddenCommands('x.sh', `#!/bin/sh\n${line}\n`).length, 1, line);
+    }
+  });
+
+  it('reports the file and line', () => {
+    assert.deepEqual(findForbiddenCommands('deploy/run.sh', 'set -eu\nprisma db push\n'), [
+      'deploy/run.sh:2 runs `prisma db push`, `migrate dev` or `migrate reset`. Outside the ' +
+        'guarded db:reset package script Prisma may only `migrate deploy`.',
+    ]);
+  });
+
+  it('accepts migrate deploy, migrate diff, db execute and comments', () => {
+    const text = [
+      '# never run `prisma migrate dev` here',
+      '      # script that runs `prisma migrate dev`, `prisma db push` or an unguarded `migrate reset`.',
+      'prisma migrate deploy --schema ../../prisma/schema.prisma',
+      'pnpm --filter @work/api exec prisma migrate diff --from-migrations prisma/migrations',
+      'prisma db execute --file deploy/aws/runtime-grants.sql',
+    ].join('\n');
+    assert.deepEqual(findForbiddenCommands('ci.yml', text), []);
+  });
+
+  it('accepts the committed api Dockerfile and CI workflow', () => {
+    for (const path of ['../apps/api/Dockerfile', '../.github/workflows/ci.yml']) {
+      const text = readFileSync(new URL(path, import.meta.url), 'utf8');
+      assert.deepEqual(findForbiddenCommands(path, text), [], path);
+    }
+  });
+
+  it('reads shell scripts, Dockerfiles, workflows and compose files, and nothing else', () => {
+    for (const path of [
+      'deploy/aws/run.sh',
+      '.github/scripts/scan-image.sh',
+      'tools/x.bash',
+      'apps/api/Dockerfile',
+      'apps/admin/Dockerfile.dev',
+      'Dockerfile',
+      'docker-compose.yml',
+      'docker-compose.test.yaml',
+      '.github/workflows/ci.yml',
+    ]) {
+      assert.ok(COMMAND_FILE.test(path), path);
+    }
+    for (const path of [
+      'README.md',
+      'scripts/check-migration-safety.mjs',
+      'docs/x.sh.md',
+      'shell',
+    ]) {
+      assert.ok(!COMMAND_FILE.test(path), path);
+    }
   });
 });
 
