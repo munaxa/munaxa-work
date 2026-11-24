@@ -63,6 +63,14 @@ import {
 export const TENANT = uuidV7();
 export const NOW = new Date('2026-07-01T09:00:00Z');
 
+/**
+ * The one legal entity the Organization stub holds, and the unit it is registered on. Distinct
+ * identifiers on purpose: a stub that answered for any id it was handed is what let the payroll
+ * adapter ask about a legal entity's id as if it were a unit's (MW-072).
+ */
+export const LEGAL_ENTITY_ID = uuidV7();
+export const LEGAL_ENTITY_UNIT_ID = uuidV7();
+
 const permitting = (...granted: readonly string[]): PermissionChecker => ({
   holds: (permission) => Promise.resolve(granted.includes(permission)),
 });
@@ -243,7 +251,8 @@ interface Stubs {
  */
 const registerSourceStubs = (dispatcher: Dispatcher, stubs: Stubs): void => {
   registerAttendance(dispatcher, stubs);
-  registerLeaveAndOrganization(dispatcher, stubs);
+  registerLeave(dispatcher, stubs);
+  registerOrganization(dispatcher, stubs);
 };
 
 const registerAttendance = (dispatcher: Dispatcher, stubs: Stubs): void => {
@@ -279,7 +288,7 @@ const registerAttendance = (dispatcher: Dispatcher, stubs: Stubs): void => {
   } as never);
 };
 
-const registerLeaveAndOrganization = (dispatcher: Dispatcher, stubs: Stubs): void => {
+const registerLeave = (dispatcher: Dispatcher, stubs: Stubs): void => {
   dispatcher.registerQuery({
     queryName: 'leave.payroll-period',
     permission: 'leave.read',
@@ -303,24 +312,45 @@ const registerLeaveAndOrganization = (dispatcher: Dispatcher, stubs: Stubs): voi
           : { ok: false as const, error: { kind: 'unavailable', reason: 'leave_unavailable' } },
       ),
   } as never);
+};
+
+const registerOrganization = (dispatcher: Dispatcher, stubs: Stubs): void => {
+  dispatcher.registerQuery({
+    queryName: 'organization.list-legal-entities',
+    permission: 'organization.legal-entity.read',
+    handle: () =>
+      Promise.resolve(
+        stubs.organizationAvailable()
+          ? {
+              ok: true as const,
+              value: [
+                {
+                  id: LEGAL_ENTITY_ID,
+                  unitId: LEGAL_ENTITY_UNIT_ID,
+                  countryCode: 'JO',
+                  currencyCode: 'JOD',
+                },
+              ],
+            }
+          : { ok: false as const, error: { kind: 'unavailable', reason: 'organization_down' } },
+      ),
+  } as never);
 
   dispatcher.registerQuery({
     queryName: 'organization.governing-legal-entity',
     permission: 'organization.legal-entity.read',
     handle: (query: Query & { readonly unitId: string }) =>
       Promise.resolve(
-        stubs.organizationAvailable()
-          ? {
-              ok: true as const,
-              value: {
-                legalEntity: {
-                  id: query.unitId,
-                  countryCode: 'JO',
-                  currencyCode: 'JOD',
+        !stubs.organizationAvailable()
+          ? { ok: false as const, error: { kind: 'unavailable', reason: 'organization_down' } }
+          : query.unitId === LEGAL_ENTITY_UNIT_ID
+            ? {
+                ok: true as const,
+                value: {
+                  legalEntity: { id: LEGAL_ENTITY_ID, countryCode: 'JO', currencyCode: 'JOD' },
                 },
-              },
-            }
-          : { ok: false as const, error: { kind: 'unavailable', reason: 'organization_down' } },
+              }
+            : { ok: false as const, error: { kind: 'not_found', resource: 'unit' } },
       ),
   } as never);
 };

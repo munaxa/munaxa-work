@@ -11,6 +11,7 @@ import type { Request } from 'express';
 
 import type { IdentityRequestContext } from '@work/identity';
 
+import { PRINCIPAL_ROUTE } from './principal-route.decorator.js';
 import { PUBLIC_ROUTE } from './public-route.decorator.js';
 
 /**
@@ -51,6 +52,16 @@ export class AuthenticatedTenantGuard implements CanActivate {
     if (isPublic === true) return true;
 
     const request = context.switchToHttp().getRequest<Request & IdentityRequestContext>();
+    const principalOnly = this.reflector.getAllAndOverride<boolean>(PRINCIPAL_ROUTE, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    // A principal and no tenant: the one route that lists which tenants may be chosen.
+    if (principalOnly === true) {
+      if (request.principal === undefined) throw new UnauthorizedException('Not authenticated.');
+      return true;
+    }
     const established = currentContext();
 
     if (established === undefined || isSystemContext(established)) {

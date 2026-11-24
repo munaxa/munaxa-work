@@ -1,5 +1,9 @@
 import { cookies } from 'next/headers';
 
+import { PLATFORM_SESSION_COOKIE, TENANT_SELECTION_COOKIE, isTenantId } from './session-continuity';
+
+export { PLATFORM_SESSION_COOKIE, TENANT_SELECTION_COOKIE };
+
 /**
  * The authenticated caller's credential, as it reaches this portal.
  *
@@ -7,8 +11,9 @@ import { cookies } from 'next/headers';
  * defines `__Host-mx_session` and sets it with the access token as its value; it is `httpOnly`,
  * `secure` and `__Host-` prefixed, which is not configurable there and must not be reinvented
  * here. This portal reads it and nothing else: it does not issue it, refresh it, validate it or
- * decode it. Refresh lives at Platform's own endpoint, path-scoped so the long-lived credential
- * is not attached to any request this application makes.
+ * decode it. Refresh lives at Identity's own endpoint, path-scoped so the long-lived credential
+ * is not attached to any request this application makes; `session-continuity.ts` and the
+ * middleware send the *browser* there when the access cookie has lapsed (MW-007).
  *
  * **Why this file exists at all.** Reading a cookie is one line; keeping the *rules* about it in
  * one place is the point. There are three, and each closes a specific way a portal leaks a
@@ -25,21 +30,15 @@ import { cookies } from 'next/headers';
  *
  * Until Platform's authentication service is deployed, nothing sets this cookie and every read
  * answers "signed out" — which is honest, and is what the sign-in state says.
- */
-
-/** Platform's session cookie. The name is `@munaxa/auth`'s `SESSION_COOKIE`, not ours. */
-export const PLATFORM_SESSION_COOKIE = '__Host-mx_session';
-
-/**
- * Which of the caller's tenants this browser last chose.
  *
- * Work's own cookie rather than Platform's, because the choice is Work's concept: Platform has no
- * opinion about which Munaxa Work tenant somebody is looking at. It carries a *selection* and
- * never an authority — the API resolves the caller's active memberships from stored rows and uses
- * this only to narrow that set (ADR-0032). A browser that invents a value here reaches a tenant it
- * is not a member of exactly as far as it would have without one: nowhere.
+ * `TENANT_SELECTION_COOKIE` records which of the caller's tenants this browser last chose. Work's
+ * own cookie rather than Platform's, because the choice is Work's concept. It carries a *selection*
+ * and never an authority — the API resolves the caller's active memberships from stored rows and
+ * uses this only to narrow that set (ADR-0032). The tenant picker writes it only after checking the
+ * value against the tenants the API lists for this principal, and it is read back here only when it
+ * has the shape of a tenant identifier. A browser that invents a value reaches a tenant it is not a
+ * member of exactly as far as it would have without one: nowhere.
  */
-export const TENANT_SELECTION_COOKIE = 'munaxa_work_tenant';
 
 /** The header the API reads a tenant *selection* from. Never a grant. */
 export const TENANT_HEADER = 'x-munaxa-tenant';
@@ -60,7 +59,7 @@ export const authorization = async (): Promise<string | undefined> => {
 export const selectedTenant = async (): Promise<string | undefined> => {
   const chosen = (await cookies()).get(TENANT_SELECTION_COOKIE)?.value;
 
-  return chosen === undefined || chosen.trim() === '' ? undefined : chosen.trim();
+  return isTenantId(chosen) ? chosen.trim() : undefined;
 };
 
 /** Whether a credential is present at all. What the shell asks to decide what to render. */

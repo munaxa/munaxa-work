@@ -14,6 +14,7 @@ import type {
 } from '@work/performance';
 import type { EmploymentView } from '@work/employment';
 import type { DocumentView } from '@work/documents';
+import type { GoverningLegalEntity } from '@work/organization';
 
 import type { Asking } from '../payroll/asking.js';
 
@@ -214,13 +215,15 @@ export class PerformanceOrganization implements OrganizationPort {
           'A completed review snapshots where the work happened, so a later move cannot change it.',
       },
       () =>
-        asking<{ readonly legalEntityId?: string }, GoverningLegalEntityQuery>(this.dispatcher, {
+        asking<GoverningLegalEntity, GoverningLegalEntityQuery>(this.dispatcher, {
           queryName: 'organization.governing-legal-entity',
           unitId: organizationUnitId,
         }),
     );
 
-    return found.ok ? found.value.legalEntityId : undefined;
+    // Organization answers the governing entity as a view, `legalEntity`, absent when no entity
+    // governs the unit. There is no `legalEntityId` on the answer (MW-074).
+    return found.ok ? found.value.legalEntity?.id : undefined;
   }
 }
 
