@@ -3,7 +3,7 @@
 **Date:** 23 November 2026 · **Audit this report follows:**
 [`docs/launch-readiness/2026-11-23/`](../2026-11-23/) (unchanged by this report) · **Baselines at
 the start of Wave 1 (20:25 UTC):** `munaxa-work` `main` `8a975f6`, `munaxa-identity` `main`
-`0b94951`, `munaxa-platform` `main` `d2e6fcf` · **Final `munaxa-work` `main`:** `3addcb7` (MW-004, the last Wave 1 merge; a later MW-004b merge would move it)
+`0b94951`, `munaxa-platform` `main` `d2e6fcf` · **Final `munaxa-work` `main`:** `50b6334` (MW-007b, the last Wave 1 merge)
 
 Wave 1 implemented the nine "must fix before Internal Testing" items of the audit (MW-001 to MW-009)
 as far as the repositories allow, and six items it discovered on the way (MW-070 to MW-075). Every
@@ -42,6 +42,9 @@ DNS, GitHub environment or ECS change.
 | MW-074 | Performance organization source read a field the answer does not have    | Found by review  |
 | MW-075 | Work API readiness not reachable from outside in Testing                 | Found by MW-006  |
 
+Three follow-up pull requests are reported under their parent item: MW-004b (OpenAPI drift fails
+CI), MW-007b (a race in a browser test) and MW-008b (migration gate hardening).
+
 ## The owner's instructions for this wave
 
 **MW-001, OpenSSL (decision recorded 23 Nov 2026, as relayed by the lead):**
@@ -64,6 +67,5 @@ The other standing rules, from the Wave 1 contract:
 
 ## Status of this report
 
-Every merge SHA and CI run is filled in. One item is still in progress: MW-004b, which makes CI fail
-on OpenAPI drift, is referred to as `<<PR-MW004b>>` until its pull request exists. If MW-004b merges
-after this report, `main` moves past `3addcb7`.
+Every merge SHA and CI run is filled in, and no placeholder is left. The report describes
+`munaxa-work` `main` at `50b6334`.

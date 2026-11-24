@@ -118,9 +118,13 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
   - Round 2, Lows (fixed in round 3): every 409 was counted as "already present" (now only a 409
     with detail `policy_code_taken`), and other production `*.munaxa.com` hosts were accepted after
     confirmation (now every `*.munaxa.com` host outside `.test` is refused, even when confirmed).
-- **In progress:** `node scripts/generate-openapi.mjs --check` is not yet a CI step. Agent D is
-  opening "MW-004b: fail CI on OpenAPI drift" (`<<PR-MW004b>>`). The tooling tests already run in CI through
-  the "Tooling tests" step that MW-008 added.
+- **Follow-up MW-004b:** [munaxa-work#50](https://github.com/munaxa/munaxa-work/pull/50), merged
+  `61174dc`, CI run 45295903420. It adds the step "OpenAPI document is current"
+  (`node scripts/generate-openapi.mjs --check`) to the Lint · Typecheck · Test · Build job; the lead
+  verified the diff is that one CI step. Proof: run 45295889529 on the branch
+  `claude/project-thread-vglde2-mw004b-proof` (a stale document at `fd58280`, reverted at
+  `d774ed6`) failed as intended. The tooling tests already ran in CI through the "Tooling tests"
+  step that MW-008 added.
 - **Defects found and fixed separately:** MW-070, MW-071, MW-072.
 
 ## MW-005: guarded tenant bootstrap
@@ -182,6 +186,15 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
 - **Verifier rounds:** round 1, **High** (fixed): a relative `Location` in the middleware made
   Next 15.5 answer 500 to every signed-out visit. Round 2 verified a real `next build` and
   `next start`.
+- **Follow-up MW-007b:** [munaxa-work#52](https://github.com/munaxa/munaxa-work/pull/52), merged
+  `50b6334`, CI run 45298507998; test only, diff verified by the lead.
+  - **Defect:** the forged-tenant-cookie browser test raced. After `form.submit()` it could read the
+    cookie from the old picker page before the answer arrived. It failed once, on run 45295968648
+    of munaxa-work#51.
+  - **Fix:** the test marks every document it leaves as stale and asserts that the page answering
+    the post has the path `/session/tenant`. The forged-cookie assertion itself is unchanged.
+  - **Evidence:** locally 45 of 50 runs passed before the fix and 150 of 150 after; a mutation
+    check confirms the test still catches a real defect.
 - **Open:** no CI test runs the built app (checked by hand); switching to a tenant in another
   Identity organisation is not wired up.
 

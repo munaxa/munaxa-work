@@ -28,6 +28,15 @@ Lint · Typecheck · Test · Build) were green on every merged head recorded in
 [01-EXECUTION-REPORT.md](01-EXECUTION-REPORT.md). The Images failures read in this wave, for example
 run 45264138891, show only the known OpenSSL findings. Identity's Images job passed on identity#27.
 
+## Flaky tests observed
+
+- **Fixed in this wave:** the career concurrency test (MW-073, work#48) and the forged-tenant-cookie
+  browser test (MW-007b, work#52).
+- **Observed, not fixed, pre-existing:** on munaxa-platform#169, a documentation-only pull request,
+  the `@munaxa/rbac` performance test "checks against a large grant set in microseconds" failed at
+  7500.15 ms against its 7500 ms bound (run 45296061427). It is a timing flake in platform code that
+  this report does not touch. It is recorded here for a follow-up and was not changed.
+
 ## Steps outside the agreed rules
 
 - **Agent C read GitHub Actions jobs once with `gh api`.** The contract allowed `gh api` only for

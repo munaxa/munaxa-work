@@ -19,8 +19,9 @@ decision point, then the AWS steps from the MW-002 pin package.
    - `scripts/check-migration-safety.mjs`, `scripts/check-migration-drift.mjs`,
      `scripts/db-reset-guard.mjs`, `prisma/drift-baseline.json` (MW-008 gates);
    - `scripts/bootstrap-tenant*.mjs` (MW-005 guard).
-3. **Approve deleting the branch `claude/project-thread-vglde2-mw008-proof`.** It holds the
-   deliberately broken MW-008 proof (CI run 45260369090) and was never meant to merge.
+3. **Approve deleting the branches `claude/project-thread-vglde2-mw008-proof` and
+   `claude/project-thread-vglde2-mw004b-proof`.** They hold the deliberately broken MW-008 proof
+   (CI run 45260369090) and MW-004b proof (CI run 45295889529) and were never meant to merge.
 4. **Optional: approve turning on auto-merge** for the repository. Wave 1 merged by hand because
    it is off; the required checks stay as they are.
 
