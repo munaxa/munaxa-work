@@ -172,6 +172,13 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # After the build, because the document is generated from the built API (decorator metadata
+      # that tsc emits). Fails when docs/api/openapi.json no longer matches the code, so the file
+      # testers read cannot drift from the API they test (MW-004). Regenerate with
+      # `node scripts/generate-openapi.mjs` after `pnpm build` and commit the result.
+      - name: OpenAPI document is current
+        run: node scripts/generate-openapi.mjs --check
+
       # After the build, because it inspects the emitted artefact rather than the source: it walks
       # the module graph from apps/api/dist/main.js and fails if a test double, a harness or
       # @work/testing is reachable from it. Phase 10 shipped an image that died at startup on
