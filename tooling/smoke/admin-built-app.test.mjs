@@ -7,7 +7,12 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { after, describe, it } from 'node:test';
 
-import { ATTEMPT_COOKIE, refreshRedirectFindings, runChecks } from './admin-built-app.mjs';
+import {
+  ATTEMPT_COOKIE,
+  refreshRedirectFindings,
+  runChecks,
+  sameOrigin,
+} from './admin-built-app.mjs';
 
 const MARKER = `${ATTEMPT_COOKIE}=1; Path=/; Max-Age=60; HttpOnly; Secure; SameSite=lax`;
 
@@ -27,10 +32,18 @@ const portal = (defect = '') =>
         return;
       }
       const returnTo = raw.startsWith('//') ? '/' : raw;
+      // As the fixed middleware answers under `next start`: absolute, on the Host the browser
+      // used, with the scheme the load balancer forwarded; Next writes loopback as `localhost`.
+      const port = request.socket.localPort;
+      const host =
+        defect === 'localhost-location'
+          ? `localhost:${port}`
+          : (request.headers.host ?? '').replace(/^127\.0\.0\.1(?=:|$)/, 'localhost');
+      const scheme = request.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
       const location =
         defect === 'open-redirect' && raw.startsWith('//')
           ? `http:${raw}`
-          : `/session/refresh?returnTo=${encodeURIComponent(returnTo)}`;
+          : `${scheme}://${host}/session/refresh?returnTo=${encodeURIComponent(returnTo)}`;
       response.writeHead(307, {
         location,
         'cache-control': defect === 'cacheable' ? 'public' : 'no-store',
@@ -63,13 +76,23 @@ describe('admin built-app checks', () => {
     const { passed, lines } = await runChecks(await start());
     assert.deepEqual(failing(lines), []);
     assert.equal(passed, true);
-    assert.equal(lines.length, 8);
+    assert.equal(lines.length, 9);
   });
 
   it('fail on the MW-007 High: a signed-out visit answering 500', async () => {
     const { passed, lines } = await runChecks(await start('relative-location-500'));
     assert.equal(passed, false);
-    assert.deepEqual(failing(lines), ['signed-out-root', 'signed-out-deep', 'no-open-redirect']);
+    assert.deepEqual(failing(lines), [
+      'signed-out-root',
+      'signed-out-deep',
+      'behind-load-balancer',
+      'no-open-redirect',
+    ]);
+  });
+
+  it('fail only behind-load-balancer when Location is on the localhost Next runs on', async () => {
+    const { lines } = await runChecks(await start('localhost-location'));
+    assert.deepEqual(failing(lines), ['behind-load-balancer']);
   });
 
   for (const [defect, check] of [
@@ -111,6 +134,13 @@ describe('refreshRedirectFindings', () => {
       headers: { ...ok.headers, location: `${base}${ok.headers.location}` },
     };
     assert.deepEqual(refreshRedirectFindings(base, absolute, '/people'), []);
+  });
+
+  it('counts the loopback names as one origin, and nothing else', () => {
+    assert.ok(sameOrigin('http://localhost:3001/a', 'http://127.0.0.1:3001'));
+    assert.ok(!sameOrigin('http://localhost:3002/a', 'http://127.0.0.1:3001'));
+    assert.ok(!sameOrigin('https://localhost:3001/a', 'http://127.0.0.1:3001'));
+    assert.ok(!sameOrigin('http://evil.example:3001/a', 'http://127.0.0.1:3001'));
   });
 
   it('refuses a protocol-relative returnTo', () => {

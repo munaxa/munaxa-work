@@ -123,7 +123,9 @@ nor stderr contains a supplied password, a token or a cookie value.
 `admin-built-app.mjs` starts the production build of the Admin portal (`next start`, after
 `pnpm build`) and checks over plain HTTP that a signed-out visit is a `307` to
 `/session/refresh` on the same origin with a same-origin `returnTo`, `no-store`, and the
-refresh-attempt cookie set `HttpOnly; Secure; SameSite=Lax; Path=/`; that a visit with the marker
+refresh-attempt cookie set `HttpOnly; Secure; SameSite=Lax; Path=/`; that a request carrying
+`Host: work.test.munaxa.com` and `X-Forwarded-Proto: https`, as the load balancer sends it, is
+redirected on `https://work.test.munaxa.com` and not on the `localhost` Next runs on; that a visit with the marker
 already set renders (no loop); that a `POST` and the session pages are not redirected; that
 `//evil.example/...` does not leave the origin; and that there is no `x-powered-by` header. It runs
 in CI after the build (Wave 2 R-2) and needs no network, Identity or database. Locally:

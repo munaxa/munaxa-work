@@ -8,6 +8,28 @@ import {
   sessionDecision,
 } from './shell/session-continuity';
 
+/** `host[:port]`: letters, digits, dots and hyphens only, so no userinfo, path or second host. */
+const HOST_HEADER = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::\d{1,5})?$/;
+
+/**
+ * The origin the browser is on: the request's `Host` with the scheme Next derived (it honours the
+ * load balancer's `X-Forwarded-Proto`). A malformed or missing `Host` falls back to `nextUrl`.
+ *
+ * `Host` is the client's own claim, so a forged one only redirects that client to the host it
+ * named, and the answer is `no-store`. In Testing and production the load balancer forwards a
+ * request to this service only for the portal's hostname.
+ */
+export const publicOrigin = (request: NextRequest): string => {
+  const host = request.headers.get('host')?.trim().toLowerCase();
+  if (host === undefined || !HOST_HEADER.test(host)) return request.nextUrl.origin;
+  try {
+    // Rejects what the pattern lets through but a URL cannot hold, such as port 99999.
+    return new URL(`${request.nextUrl.protocol}//${host}`).origin;
+  } catch {
+    return request.nextUrl.origin;
+  }
+};
+
 /**
  * Keeps a session alive across the access token's fifteen-minute life (MW-007).
  *
@@ -35,12 +57,13 @@ export const middleware = (request: NextRequest): NextResponse => {
     return passing;
   }
 
-  // An absolute URL on the request's own origin: Next's middleware adapter parses `Location` with
-  // `new URL()` and no base, so a relative one throws and every lapsed visit becomes a 500. Next
-  // then sends a same-host redirect relative again, so behind the load balancer (where this
-  // process sees `localhost`) the browser still stays on the public origin its cookies belong to.
-  // `decision.location` is always a path of this portal, built from `safeReturnTo`.
-  const response = NextResponse.redirect(new URL(decision.location, request.nextUrl), 307);
+  // An absolute URL: Next's middleware adapter parses `Location` with `new URL()` and no base,
+  // so a relative one throws and every lapsed visit becomes a 500. Absolute on the *public* origin,
+  // though, not on `request.nextUrl`: under `next start` that is `http(s)://localhost:<port>`
+  // whatever the browser asked for, and Next sends it as is. Behind the load balancer that sent
+  // every signed-out visit to `https://localhost:3001/session/refresh` (found by the built-app
+  // check, Wave 2 R-2). `decision.location` is always a path of this portal (`safeReturnTo`).
+  const response = NextResponse.redirect(new URL(decision.location, publicOrigin(request)), 307);
   response.headers.set('cache-control', 'no-store');
   response.cookies.set(REFRESH_ATTEMPT_COOKIE, '1', {
     ...PORTAL_COOKIE,

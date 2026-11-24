@@ -12,6 +12,9 @@
  *                        origin, `no-store`, and the refresh-attempt marker set HttpOnly, Secure,
  *                        SameSite=Lax, Path=/
  *   signed-out-deep      GET /people?tab=a: returnTo keeps the path and query
+ *   behind-load-balancer GET /people with `Host: work.test.munaxa.com` and
+ *                        `X-Forwarded-Proto: https`, as the load balancer sends it: Location is on
+ *                        https://work.test.munaxa.com, not on the localhost Next runs on
  *   no-open-redirect     GET //evil.example/people: any redirect stays on this origin, and one to
  *                        the refresh page carries a same-origin returnTo
  *   attempted-renders    GET / with the marker already set: 200 (the signed-out state), no loop
@@ -61,8 +64,26 @@ const setCookies = (headers) => {
   return value === undefined ? [] : Array.isArray(value) ? value : [value];
 };
 
-/** The refresh redirect's findings, or [] when `response` is the redirect `returnTo` expects. */
-export const refreshRedirectFindings = (base, response, returnTo) => {
+/** The host the load balancer forwards in Testing; any public name would do. */
+export const PUBLIC_ORIGIN = 'https://work.test.munaxa.com';
+
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Whether two URLs share an origin, counting the loopback names as one: Next writes
+ * `localhost` for a request it received on 127.0.0.1, which is the same server.
+ */
+export const sameOrigin = (a, b) => {
+  const [left, right] = [new URL(a), new URL(b)];
+  const name = (url) => (LOOPBACK.has(url.hostname) ? 'localhost' : url.hostname);
+  return left.protocol === right.protocol && name(left) === name(right) && left.port === right.port;
+};
+
+/**
+ * The refresh redirect's findings, or [] when `response` is the redirect `returnTo` expects, on
+ * `origin` (the server's own unless the request named a public host).
+ */
+export const refreshRedirectFindings = (base, response, returnTo, origin = base) => {
   const findings = [];
   if (response.status !== 307) return [`status ${response.status}, expected 307`];
   const location = response.headers.location;
@@ -73,8 +94,9 @@ export const refreshRedirectFindings = (base, response, returnTo) => {
   } catch {
     return [`Location ${JSON.stringify(location)} is not a URL`];
   }
-  if (target.origin !== new URL(base).origin)
-    findings.push(`Location leaves the origin: ${location}`);
+  if (!sameOrigin(target, origin)) {
+    findings.push(`Location ${location} is not on ${new URL(origin).origin}`);
+  }
   if (target.pathname !== REFRESH_PAGE) findings.push(`Location path ${target.pathname}`);
   const actual = target.searchParams.get('returnTo');
   if (returnTo !== undefined && actual !== returnTo) {
@@ -125,6 +147,15 @@ export const CHECKS = [
       refreshRedirectFindings(base, await exchange(base, '/people?tab=a'), '/people?tab=a'),
   ],
   [
+    'behind-load-balancer',
+    async (base) => {
+      const response = await exchange(base, '/people', {
+        headers: { host: new URL(PUBLIC_ORIGIN).host, 'x-forwarded-proto': 'https' },
+      });
+      return refreshRedirectFindings(base, response, '/people', PUBLIC_ORIGIN);
+    },
+  ],
+  [
     'no-open-redirect',
     async (base) => {
       const response = await exchange(base, '//evil.example/people');
@@ -137,8 +168,7 @@ export const CHECKS = [
       const location = response.headers.location;
       if (typeof location !== 'string') return [`${response.status} without a Location`];
       const target = new URL(location, base);
-      if (target.origin !== new URL(base).origin)
-        return [`Location leaves the origin: ${location}`];
+      if (!sameOrigin(target, base)) return [`Location leaves the origin: ${location}`];
       return target.pathname === REFRESH_PAGE
         ? refreshRedirectFindings(base, response, undefined)
         : [];
