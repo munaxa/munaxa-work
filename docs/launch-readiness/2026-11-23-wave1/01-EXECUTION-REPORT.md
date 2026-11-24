@@ -20,7 +20,8 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
   - The OpenSSL 3.5 release notes list 3.5.9 (29 Sep 2026) as the newest release.
   - Every Work CI run in this wave fails the Images scan on `libssl3`/`libcrypto3` `3.5.9-r1`:
     CVE-2026-124709, -107494, -121482, -107493 and -84786 (HIGH).
-- **Recheck:** 24 Nov 2026, 09:07 UTC: `<<MW-001-RECHECK-24NOV>>`.
+- **Recheck:** last checked 20:52 UTC on 23 Nov 2026: Alpine 3.5.10 not published (edge `3.5.9-r1`,
+  v3.22 and v3.23 `3.5.9-r0`). The next recheck is scheduled for 24 Nov 2026, 09:07 UTC.
 - **Nothing changed:** work#35 (the 3.5.10 bump), the D-SSL exception, its expiry and the Grype
   gates are untouched.
 
@@ -53,9 +54,11 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
 
 - **PRs:** [munaxa-identity#27](https://github.com/munaxa/munaxa-identity/pull/27) (the roles) and
   [munaxa-work#40](https://github.com/munaxa/munaxa-work/pull/40) (the Work tests), branch `-mw003`.
-- **Reviewed heads:** identity `5a7edaf` (round 3), work `9fdf79a` (round 2).
-- **Merged:** identity `55def2c`; work `<<SHA-#40>>`.
-- **CI:** identity run 45279785416 (verify: success, Images: success); work `<<CI-#40>>`.
+- **Reviewed heads:** identity `5a7edaf` (round 3, delta checked by the lead), work `9fdf79a`
+  (round 2).
+- **Merged:** identity `55def2c`; work `a4ed27b`.
+- **CI:** identity run 45279785416 (verify: success, Images: success); work run 45282094317 on final head
+  `f29228e` (green; Images failed on MW-001).
 - **What it does:**
   - Eight roles, `work-testing-org-admin`, `-hr-officer`, `-time-leave-officer`,
     `-payroll-preparer`, `-payroll-approver`, `-recruiter`, `-manager` and `-employee`, marked
@@ -73,7 +76,8 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
     `testing-personas.payroll.spec.ts` (the preparer is refused approval, finalization, payment and
     reversal on the real payroll pipeline; the approver is refused definition and calculation).
 - **Verifier rounds:**
-  - M1, Medium (fixed in round 3): the seed script did not check the database it writes to. It now
+  - M1, Medium (fixed in round 3, `database-target.mjs`): the seed script did not check the
+    database it writes to, and round 2's check used `new URL()`, which pg reads differently. It now
     parses the connection string with pg's own parser and refuses production hosts, `host=` and
     `hostaddr=` overrides, sockets, empty hosts, non-loopback addresses, `PGHOST`/`PGDATABASE` and
     production-named databases.
@@ -89,8 +93,10 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
 ## MW-004: OpenAPI artifact, synthetic data loader, API collection
 
 - **PR:** [munaxa-work#44](https://github.com/munaxa/munaxa-work/pull/44), branch `-mw004`.
-- **Reviewed head:** `1a42951` (round 3, delta check by the lead). **Merged:** `<<SHA-#44>>`.
-- **CI:** `<<CI-#44>>`.
+- **Reviewed head:** `1a42951` (round 3, delta check by the lead); final head `d54a9ba` (round 4:
+  `main` merged and `docs/api/openapi.json` regenerated, now 430 paths and 517 operations, `--check`
+  passes). **Merged:** `3addcb7`.
+- **CI:** run 45293744881 (green; Images failed on MW-001).
 - **What it does:**
   - `docs/api/openapi.json` generated offline by `scripts/generate-openapi.mjs` from the built
     application, with `--check` to detect drift. Regenerated after MW-071.
@@ -109,11 +115,11 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
   - Round 1, Lows: attendance crash window (fixed: policy 409 recovery), password only from the
     environment (fixed: password file), `openapi --check` not in CI (open, see below), a `+966`
     example number in a decorator (open, Low).
-  - Round 2, Lows (fixed in round 3): every 409 was counted as "already present" (now only the
-    known conflict details), and other production `*.munaxa.com` hosts were accepted after
-    confirmation (now refused).
-- **Open:** `node scripts/generate-openapi.mjs --check` is not yet a CI step; Agent D adds it to
-  `ci.yml` after this merge: `<<PR-CI-OPENAPI-CHECK>>`. The tooling tests already run in CI through
+  - Round 2, Lows (fixed in round 3): every 409 was counted as "already present" (now only a 409
+    with detail `policy_code_taken`), and other production `*.munaxa.com` hosts were accepted after
+    confirmation (now every `*.munaxa.com` host outside `.test` is refused, even when confirmed).
+- **In progress:** `node scripts/generate-openapi.mjs --check` is not yet a CI step. Agent D is
+  opening "MW-004b: fail CI on OpenAPI drift" (`<<PR-MW004b>>`). The tooling tests already run in CI through
   the "Tooling tests" step that MW-008 added.
 - **Defects found and fixed separately:** MW-070, MW-071, MW-072.
 
@@ -162,8 +168,9 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
 ## MW-007: admin session refresh and tenant picker
 
 - **PR:** [munaxa-work#42](https://github.com/munaxa/munaxa-work/pull/42), branch `-mw007`.
-- **Reviewed head:** `8b0dd78` (round 2). **Merged:** `<<SHA-#42>>`.
-- **CI:** run 45276255461 on `8b0dd78` (green); final `<<CI-#42>>`.
+- **Reviewed head:** `8b0dd78` (round 2). **Merged:** `8f4ce15`.
+- **CI:** run 45276255461 on `8b0dd78` (green); final head `cc4349e`, run 45291459552 (green; Images
+  failed on MW-001).
 - **What it does:** the admin middleware redirects to `/session/refresh` when the access cookie is
   absent or about to expire, refreshes through Identity's `POST /api/auth/refresh` on the same
   origin, and guards against loops with a 60-second marker. A tenant picker writes
@@ -218,7 +225,8 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
 ## MW-070: organization lists answered 500
 
 - **PR:** [munaxa-work#45](https://github.com/munaxa/munaxa-work/pull/45), branch `-mw070`.
-- **Reviewed head:** `23958e5`. **Merged:** `<<SHA-#45>>`. **CI:** `<<CI-#45>>`.
+- **Reviewed head:** `23958e5`; final head `2b4c852`. **Merged:** `c7e5afd`. **CI:** run 45284668626 (green; Images failed
+  on MW-001).
 - **Fix:** every filter parameter is referenced and typed in the unit, position and financial
   center list statements; counts no longer receive limit and offset.
 - **Tests added:** `organization-lists.integration.test.ts`, 13 cases (all fail without the fix).
@@ -238,7 +246,8 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
 ## MW-072: payroll organization source
 
 - **PR:** [munaxa-work#47](https://github.com/munaxa/munaxa-work/pull/47), branch `-mw072`.
-- **Reviewed head:** `1dd848f`. **Merged:** `<<SHA-#47>>`. **CI:** `<<CI-#47>>`.
+- **Reviewed head:** `1dd848f`; final head `a38e9fd`. **Merged:** `27d7321`. **CI:** run 45287068018 (green; Images failed
+  on MW-001).
 - **Fix:** the adapter finds the group's legal entity among the registrations and asks about the
   unit it is registered on; the test harness stub no longer hides the defect.
 - **Tests added:** `payroll-organization-source.postgres.spec.ts` (real Organization module, no
@@ -260,7 +269,8 @@ Branch names all follow `claude/project-thread-vglde2-<id>`.
 ## MW-074: performance organization source
 
 - **PR:** [munaxa-work#49](https://github.com/munaxa/munaxa-work/pull/49), branch `-mw074`.
-- **Reviewed head:** `426b2b1`. **Merged:** `<<SHA-#49>>`. **CI:** `<<CI-#49>>`.
+- **Reviewed head:** `426b2b1`; final head `e641574`. **Merged:** `e03747a`. **CI:** run 45289320384 (green; Images failed
+  on MW-001).
 - **Fix:** the adapter reads `legalEntity?.id` from the published answer; the harness stub now
   answers the published shape.
 - **Tests added:** `performance-organization.postgres.spec.ts` (fails without the fix).

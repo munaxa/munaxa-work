@@ -3,7 +3,7 @@
 **Date:** 23 November 2026 · **Audit this report follows:**
 [`docs/launch-readiness/2026-11-23/`](../2026-11-23/) (unchanged by this report) · **Baselines at
 the start of Wave 1 (20:25 UTC):** `munaxa-work` `main` `8a975f6`, `munaxa-identity` `main`
-`0b94951`, `munaxa-platform` `main` `d2e6fcf` · **Final `munaxa-work` `main`:** `<<SHA-MAIN-FINAL>>`
+`0b94951`, `munaxa-platform` `main` `d2e6fcf` · **Final `munaxa-work` `main`:** `3addcb7` (MW-004, the last Wave 1 merge; a later MW-004b merge would move it)
 
 Wave 1 implemented the nine "must fix before Internal Testing" items of the audit (MW-001 to MW-009)
 as far as the repositories allow, and six items it discovered on the way (MW-070 to MW-075). Every
@@ -62,9 +62,8 @@ The other standing rules, from the Wave 1 contract:
   migration is ever edited.
 - Agents never merge. The lead merges after an independent verification of the reviewed head.
 
-## Placeholders
+## Status of this report
 
-The lead fills these in when the merge queue is finished: `<<SHA-MAIN-FINAL>>`, `<<SHA-#40>>`,
-`<<SHA-#42>>`, `<<SHA-#44>>`, `<<SHA-#45>>`, `<<SHA-#47>>`, `<<SHA-#49>>`, `<<CI-#40>>`,
-`<<CI-#42>>`, `<<CI-#44>>`, `<<CI-#45>>`, `<<CI-#47>>`, `<<CI-#49>>`, `<<PR-CI-OPENAPI-CHECK>>` and
-`<<MW-001-RECHECK-24NOV>>`.
+Every merge SHA and CI run is filled in. One item is still in progress: MW-004b, which makes CI fail
+on OpenAPI drift, is referred to as `<<PR-MW004b>>` until its pull request exists. If MW-004b merges
+after this report, `main` moves past `3addcb7`.
