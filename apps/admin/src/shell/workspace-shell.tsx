@@ -26,7 +26,8 @@ import { directionOf, isLanguage, otherThan, translator, type Language } from '.
  * as one product, and none of it needed anything to be built — `@munaxa/ui` has shipped
  * `AppShell`, `Sidebar`, `SidebarNav`, `TopBar`, `NavigationDrawer` and `SkipLink` all along.
  *
- * **This is the only client component in the portal, and it holds no business logic.** It knows
+ * **This is one of two client components in the portal, and it holds no business logic.** (The
+ * other is `session-refresh.tsx`, which renews the session from the browser.) It knows
  * which screens exist, which one is being shown and which language the reader chose. It fetches
  * nothing, decides nothing about the domain, and renders no data.
  *

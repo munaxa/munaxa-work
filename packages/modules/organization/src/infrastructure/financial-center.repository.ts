@@ -81,24 +81,18 @@ export class FinancialCenterRepository
     transaction: Transaction,
     query: CenterQuery,
   ): Promise<{ readonly items: readonly FinancialCenterState[]; readonly total: number }> {
+    // Every parameter referenced and typed, set or not, as in the unit list: PostgreSQL refuses a
+    // parameter it cannot type. The count takes the filter's parameters only.
     const where =
-      query.status === undefined
-        ? 'tenant_id = $1 and kind = $2 and deleted_at is null'
-        : 'tenant_id = $1 and kind = $2 and status = $3 and deleted_at is null';
-    const parameters = [
-      transaction.tenantId,
-      query.kind,
-      query.status ?? null,
-      query.limit,
-      query.offset,
-    ];
+      'tenant_id = $1 and kind = $2 and ($3::text is null or status = $3::text) and deleted_at is null';
+    const filters = [transaction.tenantId, query.kind, query.status ?? null];
     const rows = await transaction.execute<CenterRow>(
       `select ${COLUMNS} from financial_center where ${where} order by code limit $4 offset $5`,
-      parameters,
+      [...filters, query.limit, query.offset],
     );
     const counted = await transaction.execute<{ total: string }>(
       `select count(*)::text as total from financial_center where ${where}`,
-      parameters,
+      filters,
     );
 
     return { items: rows.map(toState), total: Number(counted[0]?.total ?? '0') };

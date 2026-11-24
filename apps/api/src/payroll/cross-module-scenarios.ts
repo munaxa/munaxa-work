@@ -1,6 +1,6 @@
 import { uuidV7 } from '@work/kernel';
 
-import { ask, send, type Wired } from './cross-module-harness.js';
+import { LEGAL_ENTITY_ID, ask, send, type Wired } from './cross-module-harness.js';
 
 /**
  * The configuration every cross-module case starts from: a real employment, a real salary through
@@ -78,7 +78,7 @@ export const configured = async (wired: Wired, personId = uuidV7()): Promise<Rea
 const openPeriodFor = async (wired: Wired, employmentId: string): Promise<Ready> => {
   const group = await send<{ payrollGroupId: string }>(wired, {
     commandName: 'payroll.define-group',
-    legalEntityId: uuidV7(),
+    legalEntityId: LEGAL_ENTITY_ID,
     code: 'monthly-staff',
     name: { en: 'Monthly staff', ar: 'الموظفون الشهريون' },
     payFrequency: 'monthly',

@@ -44,6 +44,8 @@ const ENTRY_POINTS = [
    */
   /\/app\/(.*\/)?(route|manifest|sitemap|robots|opengraph-image|twitter-image|icon|apple-icon)\.ts$/,
   /next-env\.d\.ts$/,
+  // Next.js middleware, discovered by filename at the source root like a route (MW-007).
+  /^apps\/[a-z-]+\/src\/middleware\.ts$/,
   /*
    * A package's declared subpath entry points. `src/testing.ts` backs `@work/<module>/testing`, so
    * it is imported across the package boundary by name and never by path — which is exactly what

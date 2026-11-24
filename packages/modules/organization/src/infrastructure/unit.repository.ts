@@ -26,37 +26,24 @@ const COLUMNS =
   'id, tenant_id, unit_type_id, code, name, description, status, metadata, effective_from, effective_to, version';
 
 /**
- * The `where` clause and its parameters, built once.
- *
- * Extracted from `list` so the method stays inside the complexity budget repositories are held
- * to — five, deliberately tighter than the general limit, because a repository that needs
- * branching is usually one with a business rule creeping into it.
+ * The list filter. Every parameter is referenced, and typed, whether or not its filter is set:
+ * PostgreSQL refuses a statement with a parameter it cannot type ("could not determine data type
+ * of parameter"), which is what an unset filter left out of the clause used to be. An unset filter
+ * is passed as null and its clause is then true.
  */
-const whereClauses = (query: UnitQuery): readonly string[] =>
-  [
-    'tenant_id = $1',
-    'deleted_at is null',
-    query.unitTypeId === undefined ? undefined : 'unit_type_id = $2',
-    query.status === undefined ? undefined : 'status = $3',
-    query.term === undefined
-      ? undefined
-      : "(code ilike $4 or name->>'en' ilike $4 or name->>'ar' ilike $4)",
-  ].filter((clause): clause is string => clause !== undefined);
+const LIST_WHERE = `tenant_id = $1 and deleted_at is null
+  and ($2::uuid is null or unit_type_id = $2::uuid)
+  and ($3::text is null or status = $3::text)
+  and ($4::text is null
+    or code ilike $4::text or name->>'en' ilike $4::text or name->>'ar' ilike $4::text)`;
 
-const filtersFor = (
-  tenantId: string,
-  query: UnitQuery,
-): { readonly where: string; readonly parameters: readonly unknown[] } => ({
-  where: whereClauses(query).join(' and '),
-  parameters: [
-    tenantId,
-    query.unitTypeId ?? null,
-    query.status ?? null,
-    query.term === undefined ? null : `%${query.term}%`,
-    query.limit,
-    query.offset,
-  ],
-});
+/** The filter's parameters, $1 to $4; the page's limit and offset follow them in the list only. */
+const filtersFor = (tenantId: string, query: UnitQuery): readonly unknown[] => [
+  tenantId,
+  query.unitTypeId ?? null,
+  query.status ?? null,
+  query.term === undefined ? null : `%${query.term}%`,
+];
 
 const toState = (row: UnitRow): OrganizationUnitState => ({
   id: row.id,
@@ -127,15 +114,16 @@ export class UnitRepository
     transaction: Transaction,
     query: UnitQuery,
   ): Promise<{ readonly items: readonly OrganizationUnitState[]; readonly total: number }> {
-    const { where, parameters } = filtersFor(transaction.tenantId, query);
+    const filters = filtersFor(transaction.tenantId, query);
 
     const rows = await transaction.execute<UnitRow>(
-      `select ${COLUMNS} from organization_unit where ${where} order by code limit $5 offset $6`,
-      parameters,
+      `select ${COLUMNS} from organization_unit where ${LIST_WHERE}
+        order by code limit $5 offset $6`,
+      [...filters, query.limit, query.offset],
     );
     const counted = await transaction.execute<{ total: string }>(
-      `select count(*)::text as total from organization_unit where ${where}`,
-      parameters,
+      `select count(*)::text as total from organization_unit where ${LIST_WHERE}`,
+      filters,
     );
 
     return { items: rows.map(toState), total: Number(counted[0]?.total ?? '0') };
