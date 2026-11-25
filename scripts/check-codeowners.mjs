@@ -27,6 +27,7 @@ export const REQUIRED_OWNED = [
   '.github/workflows/ci.yml',
   '.github/workflows/publish-images.yml',
   '.github/workflows/publish-images-ecr.yml',
+  '.github/workflows/publish-images-testing.yml',
   '.github/workflows/release-gate.yml',
   '.github/scripts/require-green-ci.mjs',
   '.github/scripts/scan-image.sh',
