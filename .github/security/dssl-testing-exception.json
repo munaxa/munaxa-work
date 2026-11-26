@@ -1,0 +1,71 @@
+{
+  "schema": "munaxa-scan-exception/v1",
+  "id": "D-SSL-2026-11",
+  "decision": "Owner decision, Tamer, 26 Nov 2026 12:35 UTC (decision card, thread 'Bring Munaxa Work to Testing like Docs'): the Testing-only D-SSL acceptance of 22 Nov 2026 is extended to the Munaxa Work Testing images (api, migrate, admin), the same five OpenSSL 3.5.9-r1 CVEs and the same hard expiry; never production; OpenSSL 3.5.10 remains the required remediation. For Testing only, this supersedes the 23 Nov 2026 MW-001 wait decision.",
+  "environment": "testing",
+  "expires_utc": "2026-12-01T00:00:00Z",
+  "workflows": [".github/workflows/ci.yml", ".github/workflows/publish-images-testing.yml"],
+  "images": ["work-api", "work-migrate", "work-admin"],
+  "findings": [
+    {
+      "vulnerability": "CVE-2026-107493",
+      "package": "libcrypto3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-107493",
+      "package": "libssl3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-107494",
+      "package": "libcrypto3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-107494",
+      "package": "libssl3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-121482",
+      "package": "libcrypto3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-121482",
+      "package": "libssl3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-124709",
+      "package": "libcrypto3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-124709",
+      "package": "libssl3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-84786",
+      "package": "libcrypto3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    },
+    {
+      "vulnerability": "CVE-2026-84786",
+      "package": "libssl3",
+      "version": "3.5.9-r1",
+      "type": "apk"
+    }
+  ]
+}

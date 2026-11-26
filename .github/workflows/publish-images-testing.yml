@@ -241,7 +241,11 @@ jobs:
           name="${REPOSITORY#munaxa-work/}"
           REF="$REGISTRY/$REPOSITORY:testing-sha-$SHA"
           .github/scripts/verify-image.sh "$REF" "$name"
-          .github/scripts/scan-image.sh "$REF" "work-$name" image-reports
+          # Permanent gate first; only if it fails, the TEMPORARY Testing-only D-SSL exception (expires
+          # 2026-12-01T00:00:00Z, exact OpenSSL 3.5.9-r1 findings only). An image accepted this way is
+          # a Testing-only image: the platform stack refuses every product image in production while
+          # the exception exists (munaxa-platform infra/aws/stack/dssl-exception.tf).
+          .github/scripts/scan-image-testing.sh "$REF" "work-$name" image-reports testing
 
       - name: Keep the SBOM and scan report
         if: always()
