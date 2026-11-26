@@ -183,7 +183,11 @@ suite('documents concurrency', () => {
       fixture.stores.versions.byId(transaction, version.documentVersionId),
     );
 
-    expect(read?.supersededAt?.toISOString()).toBe('2026-08-11T11:00:00.000Z');
+    // Which transaction wins the row lock is up to the scheduler, so either stamp is correct;
+    // what matters is that exactly one of them was kept.
+    expect(['2026-08-11T11:00:00.000Z', '2026-08-11T12:00:00.000Z']).toContain(
+      read?.supersededAt?.toISOString(),
+    );
   });
 });
 
